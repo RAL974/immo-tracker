@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a56db">
+  <title>Immo Tracker – Espace Soleil</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ÉCRAN 1 : Accueil -->
+  <div id="screen-accueil" class="screen active">
+    <div class="logo">☀️</div>
+    <h1>Espace Soleil</h1>
+    <p class="subtitle">Suivi des immobilisations</p>
+    <div id="user-info" class="user-badge hidden"></div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="startMouvement('Sortie')">📤 Sortie</button>
+      <button class="btn btn-secondary" onclick="startMouvement('Retour')">📥 Retour</button>
+      <button class="btn btn-tertiary" onclick="startMouvement('Transfert')">🔄 Transfert</button>
+    </div>
+    <button class="btn btn-link" onclick="showScreen('screen-activation')">
+      Première utilisation ?
+    </button>
+  </div>
+
+  <!-- ÉCRAN 2 : Activation (premier lancement) -->
+  <div id="screen-activation" class="screen">
+    <h2>Activation</h2>
+    <p>Scanne le QR code de ta carte BTP</p>
+    <div id="scanner-activation" class="scanner-box"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
+
+  <!-- ÉCRAN 3 : Scan immo -->
+  <div id="screen-scan-immo" class="screen">
+    <h2 id="titre-mouvement">Sortie</h2>
+    <p>Scanne le QR code de l'immo</p>
+    <div id="scanner-immo" class="scanner-box"></div>
+    <div id="immo-result" class="result-box hidden"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
+
+  <!-- ÉCRAN 4 : Chantier -->
+  <div id="screen-chantier" class="screen">
+    <h2>Destination</h2>
+    <p>Où va ce matériel ?</p>
+    <select id="select-chantier" class="select-input">
+      <option value="">-- Sélectionne un chantier --</option>
+    </select>
+    <button class="btn btn-primary" onclick="confirmerMouvement()">Confirmer</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
+
+  <!-- ÉCRAN 5 : Confirmation -->
+  <div id="screen-confirmation" class="screen">
+    <div class="check">✅</div>
+    <h2>Enregistré !</h2>
+    <div id="recap" class="recap-box"></div>
+    <button class="btn btn-primary" onclick="showScreen('screen-accueil')">
+      Nouveau scan
+    </button>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
