@@ -1,0 +1,171 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f0f4f8;
+  color: #1a202c;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 24px;
+  gap: 16px;
+  text-align: center;
+}
+
+.screen.active {
+  display: flex;
+}
+
+.logo {
+  font-size: 64px;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a56db;
+}
+
+h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.btn-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:active {
+  opacity: 0.8;
+}
+
+.btn-primary {
+  background: #1a56db;
+  color: white;
+}
+
+.btn-secondary {
+  background: #0e9f6e;
+  color: white;
+}
+
+.btn-tertiary {
+  background: #ff8c00;
+  color: white;
+}
+
+.btn-outline {
+  background: white;
+  color: #4a5568;
+  border: 2px solid #e2e8f0;
+}
+
+.btn-link {
+  background: none;
+  color: #718096;
+  font-size: 14px;
+  font-weight: 400;
+  text-decoration: underline;
+  width: auto;
+  padding: 8px;
+}
+
+.scanner-box {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 3px solid #1a56db;
+}
+
+.result-box {
+  width: 100%;
+  background: #ebf8ff;
+  border: 2px solid #90cdf4;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 16px;
+  color: #2b6cb0;
+  font-weight: 600;
+}
+
+.select-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  font-size: 16px;
+  background: white;
+  color: #1a202c;
+  appearance: none;
+}
+
+.recap-box {
+  width: 100%;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: left;
+  font-size: 15px;
+  line-height: 2;
+  border: 2px solid #e2e8f0;
+}
+
+.recap-box strong {
+  color: #1a56db;
+}
+
+.user-badge {
+  background: #1a56db;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.check {
+  font-size: 72px;
+}
+
+.hidden {
+  display: none !important;
+}
