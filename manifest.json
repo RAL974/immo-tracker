@@ -1,0 +1,22 @@
+{
+  "name": "Immo Tracker – Espace Soleil",
+  "short_name": "Immo Tracker",
+  "description": "Suivi des immobilisations Espace Soleil",
+  "start_url": "/immo-tracker/",
+  "display": "standalone",
+  "background_color": "#f0f4f8",
+  "theme_color": "#1a56db",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/1a56db/ffffff?text=IS",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/1a56db/ffffff?text=IS",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
