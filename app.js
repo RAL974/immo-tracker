@@ -32,7 +32,7 @@ function showScreen(id) {
 // ── Affichage employé connecté ──────────────────────────────────
 function afficherEmploye() {
   const badge = document.getElementById('user-info');
-  badge.textContent = '👷 ' + state.employe.prenom + ' ' + state.employe.nom;
+  badge.textContent = '👷 ' + state.employe.nom;
   badge.classList.remove('hidden');
 }
 
@@ -74,21 +74,20 @@ function stopScanner() {
 // ── Activation : scan carte BTP ─────────────────────────────────
 function onScanActivation(code) {
   stopScanner();
-  // Le QR BTP contient : CODE_EMPLOYE|NOM|PRENOM
+  // Format QR employé : CODE|NOM_COMPLET
   const parts = code.split('|');
-  if (parts.length < 3) {
+  if (parts.length < 2) {
     alert('QR code invalide. Contacte le responsable logistique.');
     return;
   }
   const employe = {
-    code: parts[0],
-    nom: parts[1],
-    prenom: parts[2],
+    code: parts[0].trim(),
+    nom: parts[1].trim(),
   };
   localStorage.setItem('employe', JSON.stringify(employe));
   state.employe = employe;
   afficherEmploye();
-  alert('✅ Activation réussie ! Bienvenue ' + employe.prenom + '.');
+  alert('✅ Activation réussie ! Bienvenue ' + employe.nom + '.');
   showScreen('screen-accueil');
 }
 
@@ -147,7 +146,7 @@ async function confirmerMouvement() {
   // Affichage récap
   document.getElementById('recap').innerHTML = `
     <strong>Immo :</strong> ${mouvement.code_im}<br>
-    <strong>Employé :</strong> ${state.employe.prenom} ${state.employe.nom}<br>
+    <strong>Employé :</strong> ${state.employe.nom}<br>
     <strong>Type :</strong> ${mouvement.type_mouvement}<br>
     <strong>Chantier :</strong> ${mouvement.code_chantier}<br>
     <strong>Heure :</strong> ${new Date().toLocaleTimeString('fr-FR')}
