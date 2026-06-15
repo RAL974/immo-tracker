@@ -36,6 +36,17 @@ function afficherEmploye() {
   badge.classList.remove('hidden');
 }
 
+// ── Changer d'utilisateur ───────────────────────────────────────
+function changerUtilisateur() {
+  if (confirm('Changer d\'utilisateur ? La session actuelle sera fermée.')) {
+    localStorage.removeItem('employe');
+    state.employe = null;
+    const badge = document.getElementById('user-info');
+    badge.classList.add('hidden');
+    showScreen('screen-activation');
+  }
+}
+
 // ── Démarrer un mouvement ───────────────────────────────────────
 function startMouvement(type) {
   if (!state.employe) {
@@ -76,8 +87,9 @@ function onScanActivation(code) {
   stopScanner();
   // Format QR employé : CODE|NOM_COMPLET
   const parts = code.split('|');
-  if (parts.length < 2) {
-    alert('QR code invalide. Contacte le responsable logistique.');
+  if (parts.length < 2 || parts[0].startsWith('IM')) {
+    alert('Ce QR code n\'est pas une carte employé.\nScanne le QR code de ta carte BTP.');
+    startScanner('scanner-activation', onScanActivation);
     return;
   }
   const employe = {
@@ -93,6 +105,11 @@ function onScanActivation(code) {
 
 // ── Scan immo ───────────────────────────────────────────────────
 function onScanImmo(code) {
+  // Vérifier que c'est bien un QR immo (commence par IM)
+  if (!code.startsWith('IM')) {
+    alert('Ce QR code n\'est pas une immobilisation.\nScanne une étiquette immo.');
+    return; // On ne stoppe pas le scanner, l'utilisateur peut réessayer
+  }
   stopScanner();
   state.codeIM = code;
   const result = document.getElementById('immo-result');
