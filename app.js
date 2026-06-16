@@ -1,113 +1,28 @@
 // ── Configuration ──────────────────────────────────────────────
 const CONFIG = {
-  clientId: '3a901471-86c0-4fc7-8d37-319ead2c4b88',
-  tenantId: 'c7875e38-b2b0-4c10-a8c5-687c5a214e44',
-  sharepointSite: 'https://espacesoleil97.sharepoint.com/sites/Logistique-Immos',
+  webhookChantiers: 'WEBHOOK_CHANTIERS_ICI',
+  webhookMouvements: 'WEBHOOK_MOUVEMENTS_ICI',
   admins: ['HEGE', 'CONI'],
 };
 
-// ── État de l'application ───────────────────────────────────────
+// ── État ────────────────────────────────────────────────────────
 let state = {
   employe: null,
   typeMouvement: null,
   codeIM: null,
   scanner: null,
-  msalInstance: null,
-  msalAccount: null,
   mouvements: JSON.parse(localStorage.getItem('mouvements') || '[]'),
 };
 
-// ── Initialisation MSAL (non bloquante) ────────────────────────
-async function initMsal() {
-  try {
-    const msalConfig = {
-      auth: {
-        clientId: CONFIG.clientId,
-        authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`,
-        redirectUri: window.location.origin + window.location.pathname,
-      },
-      cache: { cacheLocation: 'localStorage' },
-    };
-    state.msalInstance = new msal.PublicClientApplication(msalConfig);
-    await state.msalInstance.initialize();
-    await state.msalInstance.handleRedirectPromise();
-    const accounts = state.msalInstance.getAllAccounts();
-    if (accounts.length > 0) state.msalAccount = accounts[0];
-  } catch (e) {
-    console.warn('MSAL init échouée, mode hors ligne:', e);
-    state.msalInstance = null;
-  }
-}
-
-// ── Initialisation principale ───────────────────────────────────
+// ── Initialisation ──────────────────────────────────────────────
 window.addEventListener('load', async () => {
-  // Charger l'employé mémorisé
   const employe = localStorage.getItem('employe');
   if (employe) {
     state.employe = JSON.parse(employe);
     afficherEmploye();
   }
-
-  // MSAL en arrière-plan — ne bloque pas l'app
-  initMsal().then(() => chargerChantiers());
+  await chargerChantiers();
 });
-
-// ── Obtenir un token SharePoint ─────────────────────────────────
-async function getToken() {
-  if (!state.msalInstance) throw new Error('MSAL non initialisé');
-  const scopes = [`${CONFIG.sharepointSite}/AllSites.Read`,
-                  `${CONFIG.sharepointSite}/AllSites.Write`];
-  const request = { scopes, account: state.msalAccount };
-  try {
-    const result = await state.msalInstance.acquireTokenSilent(request);
-    state.msalAccount = result.account;
-    return result.accessToken;
-  } catch (e) {
-    const result = await state.msalInstance.acquireTokenPopup(request);
-    state.msalAccount = result.account;
-    return result.accessToken;
-  }
-}
-
-// ── Appels API SharePoint ───────────────────────────────────────
-async function spGet(endpoint) {
-  const token = await getToken();
-  const res = await fetch(`${CONFIG.sharepointSite}/_api/${endpoint}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json;odata=nometadata',
-    }
-  });
-  if (!res.ok) throw new Error(`SP GET ${res.status}`);
-  return res.json();
-}
-
-async function spPost(endpoint, body) {
-  const token = await getToken();
-  // Récupérer le digest
-  const digestRes = await fetch(`${CONFIG.sharepointSite}/_api/contextinfo`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json;odata=nometadata',
-    }
-  });
-  const digestData = await digestRes.json();
-  const digest = digestData.FormDigestValue;
-
-  const res = await fetch(`${CONFIG.sharepointSite}/_api/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json;odata=nometadata',
-      'Content-Type': 'application/json;odata=nometadata',
-      'X-RequestDigest': digest,
-    },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) throw new Error(`SP POST ${res.status}`);
-  return res.json();
-}
 
 // ── Navigation ──────────────────────────────────────────────────
 function showScreen(id) {
@@ -129,7 +44,6 @@ function afficherEmploye() {
   });
 }
 
-// ── Changer d'utilisateur ───────────────────────────────────────
 function changerUtilisateur() {
   if (confirm('Changer d\'utilisateur ? La session actuelle sera fermée.')) {
     localStorage.removeItem('employe');
@@ -137,6 +51,29 @@ function changerUtilisateur() {
     document.getElementById('user-info').classList.add('hidden');
     document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
     showScreen('screen-activation');
+  }
+}
+
+// ── Chargement chantiers via Power Automate ─────────────────────
+async function chargerChantiers() {
+  const select = document.getElementById('select-chantier');
+  select.innerHTML = '<option value="">-- Chargement... --</option>';
+  try {
+    if (CONFIG.webhookChantiers === 'WEBHOOK_CHANTIERS_ICI') throw new Error('Webhook non configuré');
+    const res = await fetch(CONFIG.webhookChantiers);
+    const chantiers = await res.json();
+    select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
+    chantiers.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.Code_Chantier;
+      opt.textContent = c.Sous_Chantier
+        ? `${c.Nom_Chantier} — ${c.Sous_Chantier}`
+        : c.Nom_Chantier;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    console.warn('Chantiers non chargés:', e);
+    select.innerHTML = '<option value="">-- Non disponible --</option>';
   }
 }
 
@@ -153,7 +90,7 @@ function startMouvement(type) {
   startScanner('scanner-immo', onScanImmo);
 }
 
-// ── Scanner QR ──────────────────────────────────────────────────
+// ── Scanner ─────────────────────────────────────────────────────
 function startScanner(elementId, callback) {
   stopScanner();
   state.scanner = new Html5Qrcode(elementId);
@@ -175,7 +112,6 @@ function stopScanner() {
   }
 }
 
-// ── Activation ──────────────────────────────────────────────────
 function onScanActivation(code) {
   stopScanner();
   const parts = code.split('|');
@@ -192,7 +128,6 @@ function onScanActivation(code) {
   showScreen('screen-accueil');
 }
 
-// ── Scan immo ───────────────────────────────────────────────────
 function onScanImmo(code) {
   if (!code.startsWith('IM')) {
     alert('Ce QR code n\'est pas une immobilisation.\nScanne une étiquette immo.');
@@ -212,32 +147,11 @@ function onScanImmo(code) {
   }, 800);
 }
 
-// ── Chargement chantiers ────────────────────────────────────────
-async function chargerChantiers() {
-  const select = document.getElementById('select-chantier');
-  try {
-    const data = await spGet("lists/getbytitle('Chantiers')/items?$select=Code_Chantier,Nom_Chantier,Sous_Chantier&$orderby=Nom_Chantier&$top=500");
-    select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
-    data.value.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.Code_Chantier;
-      opt.textContent = c.Sous_Chantier
-        ? `${c.Nom_Chantier} — ${c.Sous_Chantier}`
-        : c.Nom_Chantier;
-      select.appendChild(opt);
-    });
-  } catch (e) {
-    console.warn('Chantiers non chargés (hors ligne):', e);
-    select.innerHTML = '<option value="DEPOT">Mode hors ligne — Dépôt uniquement</option>';
-  }
-}
-
 // ── Confirmation mouvement ──────────────────────────────────────
 async function confirmerMouvement() {
   const chantier = state.typeMouvement === 'Retour'
     ? 'DEPOT'
     : document.getElementById('select-chantier').value;
-
   if (!chantier) { alert('Sélectionne un chantier.'); return; }
 
   const mouvement = {
@@ -261,16 +175,17 @@ async function confirmerMouvement() {
   `;
   showScreen('screen-confirmation');
 
-  // Écriture SharePoint en arrière-plan
+  // Envoi mouvement via Power Automate
   try {
-    await spPost("lists/getbytitle('Mouvements')/items", {
-      Code_IM: mouvement.code_im,
-      Code_Employe: mouvement.code_employe,
-      Type_Mouvement: mouvement.type_mouvement,
-      Code_Chantier: mouvement.code_chantier,
-    });
+    if (CONFIG.webhookMouvements !== 'WEBHOOK_MOUVEMENTS_ICI') {
+      await fetch(CONFIG.webhookMouvements, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mouvement),
+      });
+    }
   } catch (e) {
-    console.warn('Écriture SharePoint échouée, sauvegardé localement:', e);
+    console.warn('Envoi mouvement échoué, sauvegardé localement:', e);
   }
 }
 
@@ -290,17 +205,14 @@ function afficherMonMateriel() {
     });
   const items = Object.values(stock);
   const liste = document.getElementById('liste-materiel');
-  if (items.length === 0) {
-    liste.innerHTML = '<p class="empty-msg">Aucun matériel en ta possession.</p>';
-    return;
-  }
-  liste.innerHTML = items.map(m => `
-    <div class="materiel-card">
-      <strong>${m.code_im}</strong>
-      <span class="chantier-tag">${m.code_chantier}</span>
-      <small>${new Date(m.horodatage).toLocaleDateString('fr-FR')}</small>
-    </div>
-  `).join('');
+  liste.innerHTML = items.length === 0
+    ? '<p class="empty-msg">Aucun matériel en ta possession.</p>'
+    : items.map(m => `
+        <div class="materiel-card">
+          <strong>${m.code_im}</strong>
+          <span class="chantier-tag">${m.code_chantier}</span>
+          <small>${new Date(m.horodatage).toLocaleDateString('fr-FR')}</small>
+        </div>`).join('');
 }
 
 // ── Administration ──────────────────────────────────────────────
@@ -319,28 +231,24 @@ function adminRechercher() {
     m.code_chantier.includes(query)
   ).slice(-50).reverse();
   const div = document.getElementById('admin-resultats');
-  if (resultats.length === 0) {
-    div.innerHTML = '<p class="empty-msg">Aucun résultat.</p>';
-    return;
-  }
-  div.innerHTML = resultats.map(m => `
-    <div class="materiel-card">
-      <strong>${m.code_im}</strong> — ${m.type_mouvement}
-      <span class="chantier-tag">${m.code_chantier}</span><br>
-      <small>👷 ${m.nom_employe} — ${new Date(m.horodatage).toLocaleString('fr-FR')}</small>
-    </div>
-  `).join('');
+  div.innerHTML = resultats.length === 0
+    ? '<p class="empty-msg">Aucun résultat.</p>'
+    : resultats.map(m => `
+        <div class="materiel-card">
+          <strong>${m.code_im}</strong> — ${m.type_mouvement}
+          <span class="chantier-tag">${m.code_chantier}</span><br>
+          <small>👷 ${m.nom_employe} — ${new Date(m.horodatage).toLocaleString('fr-FR')}</small>
+        </div>`).join('');
 }
 
 // ── Démarrage scanner activation ────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const screen = document.getElementById('screen-activation');
   if (screen) {
-    const observer = new MutationObserver(() => {
+    new MutationObserver(() => {
       if (screen.classList.contains('active')) {
         startScanner('scanner-activation', onScanActivation);
       }
-    });
-    observer.observe(screen, { attributes: true });
+    }).observe(screen, { attributes: true });
   }
 });
