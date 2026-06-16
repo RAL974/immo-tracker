@@ -12,8 +12,7 @@
 
   <!-- ÉCRAN 1 : Accueil -->
   <div id="screen-accueil" class="screen active">
-    <div class="logo">☀️</div>
-    <h1>Espace Soleil</h1>
+    <img src="logo.png" alt="Espace Soleil" class="logo-img">
     <p class="subtitle">Suivi des immobilisations</p>
     <div id="user-info" class="user-badge hidden"></div>
     <div class="btn-group">
@@ -21,6 +20,12 @@
       <button class="btn btn-secondary" onclick="startMouvement('Retour')">📥 Retour</button>
       <button class="btn btn-tertiary" onclick="startMouvement('Transfert')">🔄 Transfert</button>
     </div>
+    <button class="btn btn-link" onclick="showScreen('screen-mon-materiel')">
+      📦 Mon matériel
+    </button>
+    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-admin')">
+      ⚙️ Administration
+    </button>
     <button class="btn btn-link" onclick="changerUtilisateur()">
       🔁 Changer d'utilisateur
     </button>
@@ -29,8 +34,9 @@
     </button>
   </div>
 
-  <!-- ÉCRAN 2 : Activation (premier lancement) -->
+  <!-- ÉCRAN 2 : Activation -->
   <div id="screen-activation" class="screen">
+    <img src="logo.png" alt="Espace Soleil" class="logo-img-small">
     <h2>Activation</h2>
     <p>Scanne le QR code de ta carte BTP</p>
     <div id="scanner-activation" class="scanner-box"></div>
@@ -59,12 +65,31 @@
 
   <!-- ÉCRAN 5 : Confirmation -->
   <div id="screen-confirmation" class="screen">
-    <div class="check">✅</div>
+    <div class="check-anim">✅</div>
     <h2>Enregistré !</h2>
     <div id="recap" class="recap-box"></div>
     <button class="btn btn-primary" onclick="showScreen('screen-accueil')">
       Nouveau scan
     </button>
+  </div>
+
+  <!-- ÉCRAN 6 : Mon matériel -->
+  <div id="screen-mon-materiel" class="screen">
+    <h2>📦 Mon matériel</h2>
+    <p id="mon-materiel-user"></p>
+    <div id="liste-materiel" class="liste-materiel"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+  </div>
+
+  <!-- ÉCRAN 7 : Administration -->
+  <div id="screen-admin" class="screen">
+    <h2>⚙️ Administration</h2>
+    <div class="admin-search">
+      <input type="text" id="admin-search" class="select-input" placeholder="Rechercher une immo, un employé...">
+      <button class="btn btn-primary" onclick="adminRechercher()">Rechercher</button>
+    </div>
+    <div id="admin-resultats" class="liste-materiel"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
