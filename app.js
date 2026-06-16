@@ -1,6 +1,6 @@
 // ── Configuration ──────────────────────────────────────────────
 const CONFIG = {
-  webhookChantiers: 'WEBHOOK_CHANTIERS_ICI',
+  webhookChantiers: 'https://defaultc7875e38b2b04c10a8c5687c5a214e.44.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b997eef587b348c68c0728cfce88c8a8/triggers/manual/paths/invoke?api-version=1',
   webhookMouvements: 'WEBHOOK_MOUVEMENTS_ICI',
   admins: ['HEGE', 'CONI'],
 };
@@ -59,9 +59,10 @@ async function chargerChantiers() {
   const select = document.getElementById('select-chantier');
   select.innerHTML = '<option value="">-- Chargement... --</option>';
   try {
-    if (CONFIG.webhookChantiers === 'WEBHOOK_CHANTIERS_ICI') throw new Error('Webhook non configuré');
     const res = await fetch(CONFIG.webhookChantiers);
-    const chantiers = await res.json();
+    const data = await res.json();
+    // Power Automate retourne { value: [...] }
+    const chantiers = data.value || data;
     select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
     chantiers.forEach(c => {
       const opt = document.createElement('option');
@@ -175,7 +176,6 @@ async function confirmerMouvement() {
   `;
   showScreen('screen-confirmation');
 
-  // Envoi mouvement via Power Automate
   try {
     if (CONFIG.webhookMouvements !== 'WEBHOOK_MOUVEMENTS_ICI') {
       await fetch(CONFIG.webhookMouvements, {
