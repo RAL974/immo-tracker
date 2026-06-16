@@ -3,24 +3,8 @@ const CONFIG = {
   clientId: '3a901471-86c0-4fc7-8d37-319ead2c4b88',
   tenantId: 'c7875e38-b2b0-4c10-a8c5-687c5a214e44',
   sharepointSite: 'https://espacesoleil97.sharepoint.com/sites/Logistique-Immos',
-  sharepointHost: 'espacesoleil97.sharepoint.com',
-  siteId: 'Logistique-Immos',
   admins: ['HEGE', 'CONI'],
 };
-
-// ── MSAL (authentification Microsoft) ──────────────────────────
-const msalConfig = {
-  auth: {
-    clientId: CONFIG.clientId,
-    authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`,
-    redirectUri: 'https://ral974.github.io/immo-tracker/',
-  },
-  cache: { cacheLocation: 'localStorage' },
-};
-
-const msalInstance = new msal.PublicClientApplication(msalConfig);
-const scopes = ['https://espacesoleil97.sharepoint.com/AllSites.Read',
-                'https://espacesoleil97.sharepoint.com/AllSites.Write'];
 
 // ── État de l'application ───────────────────────────────────────
 let state = {
@@ -28,39 +12,64 @@ let state = {
   typeMouvement: null,
   codeIM: null,
   scanner: null,
+  msalInstance: null,
   msalAccount: null,
   mouvements: JSON.parse(localStorage.getItem('mouvements') || '[]'),
 };
 
-// ── Initialisation ──────────────────────────────────────────────
-window.addEventListener('load', async () => {
-  // Gérer le retour après login Microsoft
-  await msalInstance.handleRedirectPromise();
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) state.msalAccount = accounts[0];
+// ── Initialisation MSAL (non bloquante) ────────────────────────
+async function initMsal() {
+  try {
+    const msalConfig = {
+      auth: {
+        clientId: CONFIG.clientId,
+        authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`,
+        redirectUri: window.location.origin + window.location.pathname,
+      },
+      cache: { cacheLocation: 'localStorage' },
+    };
+    state.msalInstance = new msal.PublicClientApplication(msalConfig);
+    await state.msalInstance.initialize();
+    await state.msalInstance.handleRedirectPromise();
+    const accounts = state.msalInstance.getAllAccounts();
+    if (accounts.length > 0) state.msalAccount = accounts[0];
+  } catch (e) {
+    console.warn('MSAL init échouée, mode hors ligne:', e);
+    state.msalInstance = null;
+  }
+}
 
+// ── Initialisation principale ───────────────────────────────────
+window.addEventListener('load', async () => {
+  // Charger l'employé mémorisé
   const employe = localStorage.getItem('employe');
   if (employe) {
     state.employe = JSON.parse(employe);
     afficherEmploye();
   }
-  await chargerChantiers();
+
+  // MSAL en arrière-plan — ne bloque pas l'app
+  initMsal().then(() => chargerChantiers());
 });
 
 // ── Obtenir un token SharePoint ─────────────────────────────────
 async function getToken() {
+  if (!state.msalInstance) throw new Error('MSAL non initialisé');
+  const scopes = [`${CONFIG.sharepointSite}/AllSites.Read`,
+                  `${CONFIG.sharepointSite}/AllSites.Write`];
   const request = { scopes, account: state.msalAccount };
   try {
-    const result = await msalInstance.acquireTokenSilent(request);
+    const result = await state.msalInstance.acquireTokenSilent(request);
+    state.msalAccount = result.account;
     return result.accessToken;
   } catch (e) {
-    const result = await msalInstance.acquireTokenPopup(request);
+    const result = await state.msalInstance.acquireTokenPopup(request);
     state.msalAccount = result.account;
     return result.accessToken;
   }
 }
 
-// ── Appel API SharePoint ────────────────────────────────────────
+// ── Appels API SharePoint ───────────────────────────────────────
 async function spGet(endpoint) {
   const token = await getToken();
   const res = await fetch(`${CONFIG.sharepointSite}/_api/${endpoint}`, {
@@ -69,36 +78,35 @@ async function spGet(endpoint) {
       'Accept': 'application/json;odata=nometadata',
     }
   });
-  if (!res.ok) throw new Error(`SP GET error: ${res.status}`);
+  if (!res.ok) throw new Error(`SP GET ${res.status}`);
   return res.json();
 }
 
 async function spPost(endpoint, body) {
   const token = await getToken();
-  const res = await fetch(`${CONFIG.sharepointSite}/_api/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json;odata=nometadata',
-      'Content-Type': 'application/json;odata=nometadata',
-      'X-RequestDigest': await getFormDigest(token),
-    },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) throw new Error(`SP POST error: ${res.status}`);
-  return res.json();
-}
-
-async function getFormDigest(token) {
-  const res = await fetch(`${CONFIG.sharepointSite}/_api/contextinfo`, {
+  // Récupérer le digest
+  const digestRes = await fetch(`${CONFIG.sharepointSite}/_api/contextinfo`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Accept': 'application/json;odata=nometadata',
     }
   });
-  const data = await res.json();
-  return data.FormDigestValue;
+  const digestData = await digestRes.json();
+  const digest = digestData.FormDigestValue;
+
+  const res = await fetch(`${CONFIG.sharepointSite}/_api/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json;odata=nometadata',
+      'Content-Type': 'application/json;odata=nometadata',
+      'X-RequestDigest': digest,
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`SP POST ${res.status}`);
+  return res.json();
 }
 
 // ── Navigation ──────────────────────────────────────────────────
@@ -110,7 +118,7 @@ function showScreen(id) {
   if (id === 'screen-admin') reinitAdmin();
 }
 
-// ── Affichage employé connecté ──────────────────────────────────
+// ── Affichage employé ───────────────────────────────────────────
 function afficherEmploye() {
   const badge = document.getElementById('user-info');
   badge.textContent = '👷 ' + state.employe.nom;
@@ -126,8 +134,7 @@ function changerUtilisateur() {
   if (confirm('Changer d\'utilisateur ? La session actuelle sera fermée.')) {
     localStorage.removeItem('employe');
     state.employe = null;
-    const badge = document.getElementById('user-info');
-    badge.classList.add('hidden');
+    document.getElementById('user-info').classList.add('hidden');
     document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
     showScreen('screen-activation');
   }
@@ -168,7 +175,7 @@ function stopScanner() {
   }
 }
 
-// ── Activation : scan carte BTP ─────────────────────────────────
+// ── Activation ──────────────────────────────────────────────────
 function onScanActivation(code) {
   stopScanner();
   const parts = code.split('|');
@@ -205,25 +212,23 @@ function onScanImmo(code) {
   }, 800);
 }
 
-// ── Chargement chantiers depuis SharePoint ──────────────────────
+// ── Chargement chantiers ────────────────────────────────────────
 async function chargerChantiers() {
   const select = document.getElementById('select-chantier');
-  select.innerHTML = '<option value="">-- Chargement... --</option>';
   try {
-    const data = await spGet("lists/getbytitle('Chantiers')/items?$select=Code_Chantier,Nom_Chantier,Sous_Chantier,Service&$orderby=Nom_Chantier&$top=500");
+    const data = await spGet("lists/getbytitle('Chantiers')/items?$select=Code_Chantier,Nom_Chantier,Sous_Chantier&$orderby=Nom_Chantier&$top=500");
     select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
     data.value.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.Code_Chantier;
-      const label = c.Sous_Chantier
+      opt.textContent = c.Sous_Chantier
         ? `${c.Nom_Chantier} — ${c.Sous_Chantier}`
         : c.Nom_Chantier;
-      opt.textContent = label;
       select.appendChild(opt);
     });
   } catch (e) {
-    console.warn('Chargement chantiers échoué, mode hors ligne:', e);
-    select.innerHTML = '<option value="DEPOT">Dépôt (hors ligne)</option>';
+    console.warn('Chantiers non chargés (hors ligne):', e);
+    select.innerHTML = '<option value="DEPOT">Mode hors ligne — Dépôt uniquement</option>';
   }
 }
 
@@ -242,14 +247,11 @@ async function confirmerMouvement() {
     type_mouvement: state.typeMouvement,
     code_chantier: chantier,
     horodatage: new Date().toISOString(),
-    commentaire: '',
   };
 
-  // Sauvegarde locale
   state.mouvements.push(mouvement);
   localStorage.setItem('mouvements', JSON.stringify(state.mouvements));
 
-  // Affichage récap
   document.getElementById('recap').innerHTML = `
     <strong>Immo :</strong> ${mouvement.code_im}<br>
     <strong>Employé :</strong> ${mouvement.nom_employe}<br>
@@ -259,17 +261,16 @@ async function confirmerMouvement() {
   `;
   showScreen('screen-confirmation');
 
-  // Écriture dans SharePoint
+  // Écriture SharePoint en arrière-plan
   try {
     await spPost("lists/getbytitle('Mouvements')/items", {
       Code_IM: mouvement.code_im,
       Code_Employe: mouvement.code_employe,
       Type_Mouvement: mouvement.type_mouvement,
       Code_Chantier: mouvement.code_chantier,
-      Commentaire: mouvement.commentaire,
     });
   } catch (e) {
-    console.warn('Écriture SharePoint échouée, données sauvegardées localement:', e);
+    console.warn('Écriture SharePoint échouée, sauvegardé localement:', e);
   }
 }
 
@@ -287,8 +288,8 @@ function afficherMonMateriel() {
         delete stock[m.code_im];
       }
     });
-  const liste = document.getElementById('liste-materiel');
   const items = Object.values(stock);
+  const liste = document.getElementById('liste-materiel');
   if (items.length === 0) {
     liste.innerHTML = '<p class="empty-msg">Aucun matériel en ta possession.</p>';
     return;
@@ -333,13 +334,13 @@ function adminRechercher() {
 
 // ── Démarrage scanner activation ────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const btnActivation = document.getElementById('screen-activation');
-  if (btnActivation) {
+  const screen = document.getElementById('screen-activation');
+  if (screen) {
     const observer = new MutationObserver(() => {
-      if (btnActivation.classList.contains('active')) {
+      if (screen.classList.contains('active')) {
         startScanner('scanner-activation', onScanActivation);
       }
     });
-    observer.observe(btnActivation, { attributes: true });
+    observer.observe(screen, { attributes: true });
   }
 });
