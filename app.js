@@ -1,6 +1,5 @@
 // ── Configuration ──────────────────────────────────────────────
 const CONFIG = {
-  webhookChantiers: 'https://defaultc7875e38b2b04c10a8c5687c5a214e.44.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/873fc1ad023e44fda7b7cc970e3371b5/triggers/manual/paths/invoke?api-version=1',
   webhookMouvements: 'WEBHOOK_MOUVEMENTS_ICI',
   admins: ['HEGE', 'CONI'],
 };
@@ -54,19 +53,13 @@ function changerUtilisateur() {
   }
 }
 
-// ── Chargement chantiers via Power Automate ─────────────────────
+// ── Chargement chantiers depuis fichier JSON statique ───────────
 async function chargerChantiers() {
   const select = document.getElementById('select-chantier');
   select.innerHTML = '<option value="">-- Chargement... --</option>';
   try {
-    const res = await fetch(CONFIG.webhookChantiers, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const chantiers = data.value || data;
+    const res = await fetch('chantiers.json');
+    const chantiers = await res.json();
     select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
     chantiers.forEach(c => {
       const opt = document.createElement('option');
