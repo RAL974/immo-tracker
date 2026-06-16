@@ -1,6 +1,6 @@
 // ── Configuration ──────────────────────────────────────────────
 const CONFIG = {
-  webhookChantiers: 'https://defaultc7875e38b2b04c10a8c5687c5a214e.44.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b997eef587b348c68c0728cfce88c8a8/triggers/manual/paths/invoke?api-version=1',
+  webhookChantiers: 'https://defaultc7875e38b2b04c10a8c5687c5a214e.44.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/873fc1ad023e44fda7b7cc970e3371b5/triggers/manual/paths/invoke?api-version=1',
   webhookMouvements: 'WEBHOOK_MOUVEMENTS_ICI',
   admins: ['HEGE', 'CONI'],
 };
@@ -59,9 +59,13 @@ async function chargerChantiers() {
   const select = document.getElementById('select-chantier');
   select.innerHTML = '<option value="">-- Chargement... --</option>';
   try {
-    const res = await fetch(CONFIG.webhookChantiers);
+    const res = await fetch(CONFIG.webhookChantiers, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    // Power Automate retourne { value: [...] }
     const chantiers = data.value || data;
     select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
     chantiers.forEach(c => {
