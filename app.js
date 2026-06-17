@@ -1,6 +1,6 @@
 // ── Configuration ──────────────────────────────────────────────
 const CONFIG = {
-  webhookMouvements: 'WEBHOOK_MOUVEMENTS_ICI',
+  webhookMouvements: 'https://immo-tracker-proxy.ral-85d.workers.dev/',
   admins: ['HEGE', 'CONI'],
 };
 
