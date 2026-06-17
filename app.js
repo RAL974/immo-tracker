@@ -53,7 +53,7 @@ function changerUtilisateur() {
   }
 }
 
-// ── Chargement chantiers depuis fichier JSON statique ───────────
+// ── Chargement chantiers ────────────────────────────────────────
 async function chargerChantiers() {
   const select = document.getElementById('select-chantier');
   select.innerHTML = '<option value="">-- Chargement... --</option>';
@@ -65,7 +65,7 @@ async function chargerChantiers() {
       const opt = document.createElement('option');
       opt.value = c.Code_Chantier;
       opt.textContent = c.Sous_Chantier
-        ? `${c.Nom_Chantier} — ${c.Sous_Chantier}`
+        ? c.Nom_Chantier + ' — ' + c.Sous_Chantier
         : c.Nom_Chantier;
       select.appendChild(opt);
     });
@@ -97,7 +97,7 @@ function startScanner(elementId, callback) {
     { fps: 10, qrbox: { width: 250, height: 250 } },
     callback,
     () => {}
-  ).catch(err => {
+  ).catch(function(err) {
     console.error('Erreur scanner:', err);
     alert('Impossible d\'accéder à la caméra. Vérifie les autorisations.');
   });
@@ -105,7 +105,7 @@ function startScanner(elementId, callback) {
 
 function stopScanner() {
   if (state.scanner) {
-    state.scanner.stop().catch(() => {});
+    state.scanner.stop().catch(function() {});
     state.scanner = null;
   }
 }
@@ -136,7 +136,7 @@ function onScanImmo(code) {
   const result = document.getElementById('immo-result');
   result.textContent = '✅ Immo scannée : ' + code;
   result.classList.remove('hidden');
-  setTimeout(() => {
+  setTimeout(function() {
     if (state.typeMouvement === 'Retour') {
       confirmerMouvement();
     } else {
@@ -146,11 +146,14 @@ function onScanImmo(code) {
 }
 
 // ── Confirmation mouvement ──────────────────────────────────────
-async function confirmerMouvement() {
+function confirmerMouvement() {
   const chantier = state.typeMouvement === 'Retour'
     ? 'DEPOT'
     : document.getElementById('select-chantier').value;
-  if (!chantier) { alert('Sélectionne un chantier.'); return; }
+  if (!chantier) {
+    alert('Sélectionne un chantier.');
+    return;
+  }
 
   const mouvement = {
     code_im: state.codeIM,
@@ -164,38 +167,28 @@ async function confirmerMouvement() {
   state.mouvements.push(mouvement);
   localStorage.setItem('mouvements', JSON.stringify(state.mouvements));
 
-  document.getElementById('recap').innerHTML = `
-    <strong>Immo :</strong> ${mouvement.code_im}<br>
-    <strong>Employé :</strong> ${mouvement.nom_employe}<br>
-    <strong>Type :</strong> ${mouvement.type_mouvement}<br>
-    <strong>Chantier :</strong> ${mouvement.code_chantier}<br>
-    <strong>Heure :</strong> ${new Date().toLocaleTimeString('fr-FR')}
-  `;
+  document.getElementById('recap').innerHTML =
+    '<strong>Immo :</strong> ' + mouvement.code_im + '<br>' +
+    '<strong>Employé :</strong> ' + mouvement.nom_employe + '<br>' +
+    '<strong>Type :</strong> ' + mouvement.type_mouvement + '<br>' +
+    '<strong>Chantier :</strong> ' + mouvement.code_chantier + '<br>' +
+    '<strong>Heure :</strong> ' + new Date().toLocaleTimeString('fr-FR');
+
   showScreen('screen-confirmation');
 
-  try {
-    console.log('Tentative envoi mouvement:', mouvement);
-console.log('Webhook URL:', CONFIG.webhookMouvements);
-try {
-  const res = await fetch(CONFIG.webhookMouvements, {
+  // Envoi au Worker
+  console.log('Envoi mouvement:', mouvement);
+  fetch(CONFIG.webhookMouvements, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mouvement),
+  }).then(function(res) {
+    return res.json();
+  }).then(function(data) {
+    console.log('Réponse Worker:', JSON.stringify(data));
+  }).catch(function(e) {
+    console.error('Erreur envoi:', e.message);
   });
-  const data = await res.json();
-  console.log('Réponse Worker:', data);
-} catch (e) {
-  console.error('Erreur envoi:', e);
-}
-      await fetch(CONFIG.webhookMouvements, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mouvement),
-      });
-    }
-  } catch (e) {
-    console.warn('Envoi mouvement échoué, sauvegardé localement:', e);
-  }
 }
 
 // ── Mon matériel ────────────────────────────────────────────────
@@ -204,8 +197,8 @@ function afficherMonMateriel() {
   document.getElementById('mon-materiel-user').textContent = '👷 ' + state.employe.nom;
   const stock = {};
   state.mouvements
-    .filter(m => m.code_employe === state.employe.code)
-    .forEach(m => {
+    .filter(function(m) { return m.code_employe === state.employe.code; })
+    .forEach(function(m) {
       if (m.type_mouvement === 'Sortie' || m.type_mouvement === 'Transfert') {
         stock[m.code_im] = m;
       } else if (m.type_mouvement === 'Retour') {
@@ -214,14 +207,15 @@ function afficherMonMateriel() {
     });
   const items = Object.values(stock);
   const liste = document.getElementById('liste-materiel');
-  liste.innerHTML = items.length === 0
-    ? '<p class="empty-msg">Aucun matériel en ta possession.</p>'
-    : items.map(m => `
-        <div class="materiel-card">
-          <strong>${m.code_im}</strong>
-          <span class="chantier-tag">${m.code_chantier}</span>
-          <small>${new Date(m.horodatage).toLocaleDateString('fr-FR')}</small>
-        </div>`).join('');
+  if (items.length === 0) {
+    liste.innerHTML = '<p class="empty-msg">Aucun matériel en ta possession.</p>';
+  } else {
+    liste.innerHTML = items.map(function(m) {
+      return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
+        '<span class="chantier-tag">' + m.code_chantier + '</span>' +
+        '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small></div>';
+    }).join('');
+  }
 }
 
 // ── Administration ──────────────────────────────────────────────
@@ -233,28 +227,29 @@ function reinitAdmin() {
 function adminRechercher() {
   const query = document.getElementById('admin-search').value.trim().toUpperCase();
   if (!query) return;
-  const resultats = state.mouvements.filter(m =>
-    m.code_im.includes(query) ||
-    m.code_employe.includes(query) ||
-    m.nom_employe.toUpperCase().includes(query) ||
-    m.code_chantier.includes(query)
-  ).slice(-50).reverse();
+  const resultats = state.mouvements.filter(function(m) {
+    return m.code_im.includes(query) ||
+      m.code_employe.includes(query) ||
+      m.nom_employe.toUpperCase().includes(query) ||
+      m.code_chantier.includes(query);
+  }).slice(-50).reverse();
   const div = document.getElementById('admin-resultats');
-  div.innerHTML = resultats.length === 0
-    ? '<p class="empty-msg">Aucun résultat.</p>'
-    : resultats.map(m => `
-        <div class="materiel-card">
-          <strong>${m.code_im}</strong> — ${m.type_mouvement}
-          <span class="chantier-tag">${m.code_chantier}</span><br>
-          <small>👷 ${m.nom_employe} — ${new Date(m.horodatage).toLocaleString('fr-FR')}</small>
-        </div>`).join('');
+  if (resultats.length === 0) {
+    div.innerHTML = '<p class="empty-msg">Aucun résultat.</p>';
+  } else {
+    div.innerHTML = resultats.map(function(m) {
+      return '<div class="materiel-card"><strong>' + m.code_im + '</strong> — ' + m.type_mouvement +
+        '<span class="chantier-tag">' + m.code_chantier + '</span><br>' +
+        '<small>👷 ' + m.nom_employe + ' — ' + new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
+    }).join('');
+  }
 }
 
 // ── Démarrage scanner activation ────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
   const screen = document.getElementById('screen-activation');
   if (screen) {
-    new MutationObserver(() => {
+    new MutationObserver(function() {
       if (screen.classList.contains('active')) {
         startScanner('scanner-activation', onScanActivation);
       }
