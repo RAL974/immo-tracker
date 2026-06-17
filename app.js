@@ -174,7 +174,19 @@ async function confirmerMouvement() {
   showScreen('screen-confirmation');
 
   try {
-    if (CONFIG.webhookMouvements !== 'WEBHOOK_MOUVEMENTS_ICI') {
+    console.log('Tentative envoi mouvement:', mouvement);
+console.log('Webhook URL:', CONFIG.webhookMouvements);
+try {
+  const res = await fetch(CONFIG.webhookMouvements, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mouvement),
+  });
+  const data = await res.json();
+  console.log('Réponse Worker:', data);
+} catch (e) {
+  console.error('Erreur envoi:', e);
+}
       await fetch(CONFIG.webhookMouvements, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
