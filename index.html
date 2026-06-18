@@ -16,22 +16,14 @@
     <p class="subtitle">Suivi des immobilisations</p>
     <div id="user-info" class="user-badge hidden"></div>
     <div class="btn-group">
-      <button class="btn btn-primary" onclick="startMouvement('Sortie')">📤 Sortie</button>
-      <button class="btn btn-secondary" onclick="startMouvement('Retour')">📥 Retour</button>
-      <button class="btn btn-tertiary" onclick="startMouvement('Transfert')">🔄 Transfert</button>
+      <button class="btn btn-primary" onclick="startMouvement('Transfert')">🔄 Transfert</button>
+      <button class="btn btn-secondary admin-only hidden" onclick="startMouvement('Retour')">📥 Retour dépôt</button>
     </div>
-    <button class="btn btn-link" onclick="showScreen('screen-mon-materiel')">
-      📦 Mon matériel
-    </button>
-    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-admin')">
-      ⚙️ Administration
-    </button>
-    <button class="btn btn-link" onclick="changerUtilisateur()">
-      🔁 Changer d'utilisateur
-    </button>
-    <button class="btn btn-link" onclick="showScreen('screen-activation')">
-      Première utilisation ?
-    </button>
+    <button class="btn btn-link" onclick="showScreen('screen-mon-materiel')">📦 Mon matériel</button>
+    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-immo')">🔍 Suivi immo</button>
+    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-admin')">⚙️ Administration</button>
+    <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
+    <button class="btn btn-link" onclick="showScreen('screen-activation')">Première utilisation ?</button>
   </div>
 
   <!-- ÉCRAN 2 : Activation -->
@@ -45,7 +37,7 @@
 
   <!-- ÉCRAN 3 : Scan immo -->
   <div id="screen-scan-immo" class="screen">
-    <h2 id="titre-mouvement">Sortie</h2>
+    <h2 id="titre-mouvement">Transfert</h2>
     <p>Scanne le QR code de l'immo</p>
     <div id="scanner-immo" class="scanner-box"></div>
     <div id="immo-result" class="result-box hidden"></div>
@@ -68,9 +60,7 @@
     <div class="check-anim">✅</div>
     <h2>Enregistré !</h2>
     <div id="recap" class="recap-box"></div>
-    <button class="btn btn-primary" onclick="showScreen('screen-accueil')">
-      Nouveau scan
-    </button>
+    <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Nouveau scan</button>
   </div>
 
   <!-- ÉCRAN 6 : Mon matériel -->
@@ -81,15 +71,38 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 7 : Administration -->
+  <!-- ÉCRAN 7 : Suivi immo (admin) -->
+  <div id="screen-suivi-immo" class="screen">
+    <h2>🔍 Suivi immo</h2>
+    <div class="admin-search">
+      <input type="text" id="suivi-immo-code" class="select-input" placeholder="Code immo (ex: IM000328)">
+      <button class="btn btn-primary" onclick="rechercherSuiviImmo()">Rechercher</button>
+    </div>
+    <button class="btn btn-outline" onclick="scannerPourSuivi()" style="margin-bottom:12px;">📷 Scanner un QR code</button>
+    <div id="suivi-immo-localisation"></div>
+    <div id="suivi-immo-resultats" class="liste-materiel">
+      <p class="empty-msg">Scanne ou tape un code immo pour voir son historique.</p>
+    </div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+  </div>
+
+  <!-- ÉCRAN 8 : Scanner pour suivi immo -->
+  <div id="screen-scan-suivi" class="screen">
+    <h2>Scanner une immo</h2>
+    <div id="scanner-suivi" class="scanner-box"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-suivi-immo')">Annuler</button>
+  </div>
+
+  <!-- ÉCRAN 9 : Administration -->
   <div id="screen-admin" class="screen">
     <h2>⚙️ Administration</h2>
     <div class="admin-search">
-      <input type="text" id="admin-search" class="select-input"
-        placeholder="Rechercher une immo, un employé...">
+      <input type="text" id="admin-search" class="select-input" placeholder="Immo, employé, chantier...">
       <button class="btn btn-primary" onclick="adminRechercher()">Rechercher</button>
     </div>
-    <div id="admin-resultats" class="liste-materiel"></div>
+    <div id="admin-resultats" class="liste-materiel">
+      <p class="empty-msg">Tapez un code immo, un nom ou un chantier.</p>
+    </div>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
