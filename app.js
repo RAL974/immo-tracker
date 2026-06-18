@@ -1,7 +1,7 @@
 // ── Configuration ──────────────────────────────────────────────
 const CONFIG = {
   webhookMouvements: 'https://immo-proxy.ral-85d.workers.dev/',
-  admins: ['HEGE', 'CONI'],
+  admins: ['HEGE', 'CONI', 'BAKA', 'AUAR', 'BOMA', 'AIWI', 'NAXA'],
 };
 
 // ── État ────────────────────────────────────────────────────────
@@ -14,7 +14,7 @@ let state = {
 };
 
 // ── Initialisation ──────────────────────────────────────────────
-window.addEventListener('load', async () => {
+window.addEventListener('load', async function() {
   const employe = localStorage.getItem('employe');
   if (employe) {
     state.employe = JSON.parse(employe);
@@ -26,10 +26,11 @@ window.addEventListener('load', async () => {
 // ── Navigation ──────────────────────────────────────────────────
 function showScreen(id) {
   stopScanner();
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
   if (id === 'screen-mon-materiel') afficherMonMateriel();
   if (id === 'screen-admin') reinitAdmin();
+  if (id === 'screen-suivi-immo') reinitSuiviImmo();
 }
 
 // ── Affichage employé ───────────────────────────────────────────
@@ -38,7 +39,8 @@ function afficherEmploye() {
   badge.textContent = '👷 ' + state.employe.nom;
   badge.classList.remove('hidden');
   const isAdmin = CONFIG.admins.includes(state.employe.code);
-  document.querySelectorAll('.admin-only').forEach(el => {
+  // Boutons admin uniquement
+  document.querySelectorAll('.admin-only').forEach(function(el) {
     el.classList.toggle('hidden', !isAdmin);
   });
 }
@@ -48,7 +50,7 @@ function changerUtilisateur() {
     localStorage.removeItem('employe');
     state.employe = null;
     document.getElementById('user-info').classList.add('hidden');
-    document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.add('hidden'); });
     showScreen('screen-activation');
   }
 }
@@ -61,16 +63,13 @@ async function chargerChantiers() {
     const res = await fetch('chantiers.json');
     const chantiers = await res.json();
     select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
-    chantiers.forEach(c => {
+    chantiers.forEach(function(c) {
       const opt = document.createElement('option');
       opt.value = c.Code_Chantier;
-      opt.textContent = c.Sous_Chantier
-        ? c.Nom_Chantier + ' — ' + c.Sous_Chantier
-        : c.Nom_Chantier;
+      opt.textContent = c.Sous_Chantier ? c.Nom_Chantier + ' — ' + c.Sous_Chantier : c.Nom_Chantier;
       select.appendChild(opt);
     });
   } catch (e) {
-    console.warn('Chantiers non chargés:', e);
     select.innerHTML = '<option value="">-- Non disponible --</option>';
   }
 }
@@ -96,7 +95,7 @@ function startScanner(elementId, callback) {
     { facingMode: 'environment' },
     { fps: 10, qrbox: { width: 250, height: 250 } },
     callback,
-    () => {}
+    function() {}
   ).catch(function(err) {
     console.error('Erreur scanner:', err);
     alert('Impossible d\'accéder à la caméra. Vérifie les autorisations.');
@@ -150,10 +149,7 @@ function confirmerMouvement() {
   const chantier = state.typeMouvement === 'Retour'
     ? 'DEPOT'
     : document.getElementById('select-chantier').value;
-  if (!chantier) {
-    alert('Sélectionne un chantier.');
-    return;
-  }
+  if (!chantier) { alert('Sélectionne un chantier.'); return; }
 
   const mouvement = {
     code_im: state.codeIM,
@@ -176,19 +172,13 @@ function confirmerMouvement() {
 
   showScreen('screen-confirmation');
 
-  // Envoi au Worker
-  console.log('Envoi mouvement:', mouvement);
   fetch(CONFIG.webhookMouvements, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mouvement),
-  }).then(function(res) {
-    return res.json();
-  }).then(function(data) {
-    console.log('Réponse Worker:', JSON.stringify(data));
-  }).catch(function(e) {
-    console.error('Erreur envoi:', e.message);
-  });
+  }).then(function(res) { return res.json(); })
+    .then(function(data) { console.log('Mouvement:', data.success ? '✅' : '❌', data.status); })
+    .catch(function(e) { console.error('Erreur envoi:', e.message); });
 }
 
 // ── Mon matériel ────────────────────────────────────────────────
@@ -207,41 +197,96 @@ function afficherMonMateriel() {
     });
   const items = Object.values(stock);
   const liste = document.getElementById('liste-materiel');
-  if (items.length === 0) {
-    liste.innerHTML = '<p class="empty-msg">Aucun matériel en ta possession.</p>';
-  } else {
-    liste.innerHTML = items.map(function(m) {
-      return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
-        '<span class="chantier-tag">' + m.code_chantier + '</span>' +
-        '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small></div>';
-    }).join('');
-  }
+  liste.innerHTML = items.length === 0
+    ? '<p class="empty-msg">Aucun matériel en ta possession.</p>'
+    : items.map(function(m) {
+        return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
+          '<span class="chantier-tag">' + m.code_chantier + '</span>' +
+          '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small></div>';
+      }).join('');
 }
 
 // ── Administration ──────────────────────────────────────────────
 function reinitAdmin() {
   document.getElementById('admin-search').value = '';
-  document.getElementById('admin-resultats').innerHTML = '';
+  document.getElementById('admin-resultats').innerHTML = '<p class="empty-msg">Tapez un code immo, un nom ou un chantier.</p>';
 }
 
-function adminRechercher() {
-  const query = document.getElementById('admin-search').value.trim().toUpperCase();
+async function adminRechercher() {
+  const query = document.getElementById('admin-search').value.trim();
   if (!query) return;
-  const resultats = state.mouvements.filter(function(m) {
-    return m.code_im.includes(query) ||
-      m.code_employe.includes(query) ||
-      m.nom_employe.toUpperCase().includes(query) ||
-      m.code_chantier.includes(query);
-  }).slice(-50).reverse();
   const div = document.getElementById('admin-resultats');
-  if (resultats.length === 0) {
-    div.innerHTML = '<p class="empty-msg">Aucun résultat.</p>';
-  } else {
-    div.innerHTML = resultats.map(function(m) {
-      return '<div class="materiel-card"><strong>' + m.code_im + '</strong> — ' + m.type_mouvement +
-        '<span class="chantier-tag">' + m.code_chantier + '</span><br>' +
-        '<small>👷 ' + m.nom_employe + ' — ' + new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
-    }).join('');
+  div.innerHTML = '<p class="empty-msg">Recherche en cours...</p>';
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?q=' + encodeURIComponent(query.toUpperCase()));
+    const resultats = await res.json();
+    const q = query.toUpperCase();
+    const filtres = resultats.filter(function(m) {
+      return m.code_im.toUpperCase().includes(q) ||
+        m.code_employe.toUpperCase().includes(q) ||
+        m.nom_employe.toUpperCase().includes(q) ||
+        m.code_chantier.toUpperCase().includes(q);
+    });
+    div.innerHTML = filtres.length === 0
+      ? '<p class="empty-msg">Aucun résultat pour "' + query + '".</p>'
+      : filtres.map(function(m) {
+          return '<div class="materiel-card"><strong>' + m.code_im + '</strong> — ' + m.type_mouvement +
+            ' <span class="chantier-tag">' + m.code_chantier + '</span><br>' +
+            '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
+            new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
+        }).join('');
+  } catch (e) {
+    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+  }
+}
+
+// ── Suivi par immo ──────────────────────────────────────────────
+function reinitSuiviImmo() {
+  document.getElementById('suivi-immo-code').value = '';
+  document.getElementById('suivi-immo-resultats').innerHTML = '<p class="empty-msg">Scanne ou tape un code immo pour voir son historique.</p>';
+  document.getElementById('suivi-immo-localisation').innerHTML = '';
+}
+
+function scannerPourSuivi() {
+  showScreen('screen-scan-suivi');
+  startScanner('scanner-suivi', function(code) {
+    stopScanner();
+    showScreen('screen-suivi-immo');
+    document.getElementById('suivi-immo-code').value = code;
+    rechercherSuiviImmo();
+  });
+}
+
+async function rechercherSuiviImmo() {
+  const code = document.getElementById('suivi-immo-code').value.trim().toUpperCase();
+  if (!code) return;
+  const div = document.getElementById('suivi-immo-resultats');
+  const loc = document.getElementById('suivi-immo-localisation');
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  loc.innerHTML = '';
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?immo=' + encodeURIComponent(code));
+    const mouvements = await res.json();
+    if (!Array.isArray(mouvements) || mouvements.length === 0) {
+      div.innerHTML = '<p class="empty-msg">Aucun mouvement trouvé pour ' + code + '.</p>';
+      return;
+    }
+    // Localisation actuelle = dernier mouvement
+    const dernier = mouvements[0];
+    const locActuelle = dernier.type_mouvement === 'Retour' ? '🏭 Au dépôt' : '📍 ' + dernier.code_chantier + ' — ' + dernier.nom_employe;
+    loc.innerHTML = '<div class="localisation-badge">' + locActuelle + '</div>';
+
+    // Historique complet
+    div.innerHTML = '<h3 style="margin:8px 0;font-size:14px;color:#1a3a6b;">Historique complet (' + mouvements.length + ' mouvements)</h3>' +
+      mouvements.map(function(m) {
+        const icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
+        return '<div class="materiel-card">' + icon + ' <strong>' + m.type_mouvement + '</strong>' +
+          ' <span class="chantier-tag">' + m.code_chantier + '</span><br>' +
+          '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
+          new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
+      }).join('');
+  } catch (e) {
+    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
   }
 }
 
