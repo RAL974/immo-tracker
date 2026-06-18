@@ -10,6 +10,7 @@ let state = {
   typeMouvement: null,
   codeIM: null,
   scanner: null,
+  employes: [],
   mouvements: JSON.parse(localStorage.getItem('mouvements') || '[]'),
 };
 
@@ -21,6 +22,8 @@ window.addEventListener('load', async function() {
     afficherEmploye();
   }
   await chargerChantiers();
+  await chargerEmployes();
+  if (state.employe) await verifierTransfertsEnAttente();
 });
 
 // ── Navigation ──────────────────────────────────────────────────
@@ -31,6 +34,7 @@ function showScreen(id) {
   if (id === 'screen-mon-materiel') afficherMonMateriel();
   if (id === 'screen-admin') reinitAdmin();
   if (id === 'screen-suivi-immo') reinitSuiviImmo();
+  if (id === 'screen-transferts-attente') afficherTransfertsEnAttente();
 }
 
 // ── Affichage employé ───────────────────────────────────────────
@@ -39,7 +43,6 @@ function afficherEmploye() {
   badge.textContent = '👷 ' + state.employe.nom;
   badge.classList.remove('hidden');
   const isAdmin = CONFIG.admins.includes(state.employe.code);
-  // Boutons admin uniquement
   document.querySelectorAll('.admin-only').forEach(function(el) {
     el.classList.toggle('hidden', !isAdmin);
   });
@@ -50,6 +53,7 @@ function changerUtilisateur() {
     localStorage.removeItem('employe');
     state.employe = null;
     document.getElementById('user-info').classList.add('hidden');
+    document.getElementById('badge-attente').classList.add('hidden');
     document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.add('hidden'); });
     showScreen('screen-activation');
   }
@@ -71,6 +75,46 @@ async function chargerChantiers() {
     });
   } catch (e) {
     select.innerHTML = '<option value="">-- Non disponible --</option>';
+  }
+}
+
+// ── Chargement employés ─────────────────────────────────────────
+async function chargerEmployes() {
+  try {
+    const res = await fetch('employes.json');
+    state.employes = await res.json();
+    const select = document.getElementById('select-receveur');
+    if (select) {
+      select.innerHTML = '<option value="">-- Sélectionne un employé --</option>';
+      state.employes.forEach(function(e) {
+        if (!state.employe || e.Code !== state.employe.code) {
+          const opt = document.createElement('option');
+          opt.value = e.Code;
+          opt.textContent = e.Nom + ' (' + e.Poste + ')';
+          select.appendChild(opt);
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('Employés non chargés:', e);
+  }
+}
+
+// ── Vérifier transferts en attente ─────────────────────────────
+async function verifierTransfertsEnAttente() {
+  if (!state.employe) return;
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?transferts=' + state.employe.code);
+    const data = await res.json();
+    const badge = document.getElementById('badge-attente');
+    if (data.length > 0) {
+      badge.textContent = '⚠️ ' + data.length + ' transfert(s) en attente';
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  } catch (e) {
+    console.warn('Vérification transferts échouée:', e);
   }
 }
 
@@ -121,6 +165,9 @@ function onScanActivation(code) {
   localStorage.setItem('employe', JSON.stringify(employe));
   state.employe = employe;
   afficherEmploye();
+  // Recharger la liste employés sans l'utilisateur courant
+  chargerEmployes();
+  verifierTransfertsEnAttente();
   alert('✅ Activation réussie ! Bienvenue ' + employe.nom + '.');
   showScreen('screen-accueil');
 }
@@ -139,46 +186,133 @@ function onScanImmo(code) {
     if (state.typeMouvement === 'Retour') {
       confirmerMouvement();
     } else {
-      showScreen('screen-chantier');
+      // Transfert → sélectionner le receveur
+      showScreen('screen-receveur');
     }
   }, 800);
 }
 
-// ── Confirmation mouvement ──────────────────────────────────────
+// ── Confirmation mouvement classique (Retour) ───────────────────
 function confirmerMouvement() {
-  const chantier = state.typeMouvement === 'Retour'
-    ? 'DEPOT'
-    : document.getElementById('select-chantier').value;
-  if (!chantier) { alert('Sélectionne un chantier.'); return; }
-
   const mouvement = {
     code_im: state.codeIM,
     code_employe: state.employe.code,
     nom_employe: state.employe.nom,
     type_mouvement: state.typeMouvement,
-    code_chantier: chantier,
+    code_chantier: 'DEPOT',
+    horodatage: new Date().toISOString(),
+  };
+  enregistrerMouvement(mouvement);
+}
+
+// ── Confirmer transfert (étape 1 — donneur) ─────────────────────
+function confirmerTransfert() {
+  const select = document.getElementById('select-receveur');
+  const codeReceveur = select.value;
+  const nomReceveur = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+  if (!codeReceveur) { alert('Sélectionne un employé.'); return; }
+
+  const transfert = {
+    code_im: state.codeIM,
+    code_employe_donneur: state.employe.code,
+    nom_donneur: state.employe.nom,
+    code_employe_receveur: codeReceveur,
+    nom_receveur: nomReceveur.split(' (')[0],
+    statut: 'En attente',
     horodatage: new Date().toISOString(),
   };
 
+  document.getElementById('recap').innerHTML =
+    '<strong>Immo :</strong> ' + transfert.code_im + '<br>' +
+    '<strong>De :</strong> ' + transfert.nom_donneur + '<br>' +
+    '<strong>À :</strong> ' + transfert.nom_receveur + '<br>' +
+    '<strong>Statut :</strong> En attente de validation<br>' +
+    '<strong>Heure :</strong> ' + new Date().toLocaleTimeString('fr-FR');
+
+  showScreen('screen-confirmation');
+
+  // Créer le transfert en attente dans SharePoint
+  fetch(CONFIG.webhookMouvements + '?action=transfert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(transfert),
+  }).then(function(res) { return res.json(); })
+    .then(function(data) { console.log('Transfert créé:', data.success ? '✅' : '❌'); })
+    .catch(function(e) { console.error('Erreur:', e.message); });
+}
+
+// ── Afficher transferts en attente (receveur) ───────────────────
+async function afficherTransfertsEnAttente() {
+  const div = document.getElementById('liste-attente');
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?transferts=' + state.employe.code);
+    const transferts = await res.json();
+    if (transferts.length === 0) {
+      div.innerHTML = '<p class="empty-msg">Aucun transfert en attente.</p>';
+      return;
+    }
+    div.innerHTML = transferts.map(function(t) {
+      return '<div class="materiel-card">' +
+        '<strong>' + t.code_im + '</strong><br>' +
+        '<small>De : ' + t.nom_donneur + '</small><br>' +
+        '<small>' + new Date(t.horodatage).toLocaleString('fr-FR') + '</small><br>' +
+        '<button class="btn btn-primary" style="margin-top:8px" onclick="validerTransfert(\'' + t.id + '\',\'' + t.code_im + '\')">📷 Scanner pour valider</button>' +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+  }
+}
+
+// ── Valider un transfert (receveur) ─────────────────────────────
+function validerTransfert(transfertId, codeIM) {
+  state.codeIM = codeIM;
+  state.transfertId = transfertId;
+  showScreen('screen-scan-validation');
+  startScanner('scanner-validation', function(code) {
+    stopScanner();
+    if (code !== codeIM) {
+      alert('Ce n\'est pas le bon matériel. Attendu : ' + codeIM);
+      showScreen('screen-transferts-attente');
+      return;
+    }
+    // Valider le transfert
+    fetch(CONFIG.webhookMouvements + '?action=valider', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: transfertId, code_employe: state.employe.code, nom_employe: state.employe.nom }),
+    }).then(function(res) { return res.json(); })
+      .then(function(data) {
+        document.getElementById('recap').innerHTML =
+          '<strong>✅ Transfert validé !</strong><br>' +
+          '<strong>Immo :</strong> ' + codeIM + '<br>' +
+          '<strong>Reçu par :</strong> ' + state.employe.nom;
+        showScreen('screen-confirmation');
+        verifierTransfertsEnAttente();
+      })
+      .catch(function(e) { console.error('Erreur validation:', e.message); });
+  });
+}
+
+// ── Enregistrer mouvement simple ────────────────────────────────
+function enregistrerMouvement(mouvement) {
   state.mouvements.push(mouvement);
   localStorage.setItem('mouvements', JSON.stringify(state.mouvements));
-
   document.getElementById('recap').innerHTML =
     '<strong>Immo :</strong> ' + mouvement.code_im + '<br>' +
     '<strong>Employé :</strong> ' + mouvement.nom_employe + '<br>' +
     '<strong>Type :</strong> ' + mouvement.type_mouvement + '<br>' +
     '<strong>Chantier :</strong> ' + mouvement.code_chantier + '<br>' +
     '<strong>Heure :</strong> ' + new Date().toLocaleTimeString('fr-FR');
-
   showScreen('screen-confirmation');
-
   fetch(CONFIG.webhookMouvements, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mouvement),
   }).then(function(res) { return res.json(); })
-    .then(function(data) { console.log('Mouvement:', data.success ? '✅' : '❌', data.status); })
-    .catch(function(e) { console.error('Erreur envoi:', e.message); });
+    .then(function(data) { console.log('Mouvement:', data.success ? '✅' : '❌'); })
+    .catch(function(e) { console.error('Erreur:', e.message); });
 }
 
 // ── Mon matériel ────────────────────────────────────────────────
@@ -204,6 +338,55 @@ function afficherMonMateriel() {
           '<span class="chantier-tag">' + m.code_chantier + '</span>' +
           '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small></div>';
       }).join('');
+}
+
+// ── Suivi immo ──────────────────────────────────────────────────
+function reinitSuiviImmo() {
+  document.getElementById('suivi-immo-code').value = '';
+  document.getElementById('suivi-immo-resultats').innerHTML = '<p class="empty-msg">Scanne ou tape un code immo.</p>';
+  document.getElementById('suivi-immo-localisation').innerHTML = '';
+}
+
+function scannerPourSuivi() {
+  showScreen('screen-scan-suivi');
+  startScanner('scanner-suivi', function(code) {
+    stopScanner();
+    showScreen('screen-suivi-immo');
+    document.getElementById('suivi-immo-code').value = code;
+    rechercherSuiviImmo();
+  });
+}
+
+async function rechercherSuiviImmo() {
+  const code = document.getElementById('suivi-immo-code').value.trim().toUpperCase();
+  if (!code) return;
+  const div = document.getElementById('suivi-immo-resultats');
+  const loc = document.getElementById('suivi-immo-localisation');
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  loc.innerHTML = '';
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?immo=' + encodeURIComponent(code));
+    const mouvements = await res.json();
+    if (!Array.isArray(mouvements) || mouvements.length === 0) {
+      div.innerHTML = '<p class="empty-msg">Aucun mouvement trouvé pour ' + code + '.</p>';
+      return;
+    }
+    const dernier = mouvements[0];
+    const locActuelle = dernier.type_mouvement === 'Retour'
+      ? '🏭 Au dépôt'
+      : '📍 ' + dernier.code_chantier + ' — ' + dernier.nom_employe;
+    loc.innerHTML = '<div class="localisation-badge">' + locActuelle + '</div>';
+    div.innerHTML = '<h3 style="margin:8px 0;font-size:14px;color:#1a3a6b;">Historique (' + mouvements.length + ' mouvements)</h3>' +
+      mouvements.map(function(m) {
+        const icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
+        return '<div class="materiel-card">' + icon + ' <strong>' + m.type_mouvement + '</strong>' +
+          ' <span class="chantier-tag">' + m.code_chantier + '</span><br>' +
+          '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
+          new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
+      }).join('');
+  } catch (e) {
+    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+  }
 }
 
 // ── Administration ──────────────────────────────────────────────
@@ -235,56 +418,6 @@ async function adminRechercher() {
             '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
             new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
         }).join('');
-  } catch (e) {
-    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
-  }
-}
-
-// ── Suivi par immo ──────────────────────────────────────────────
-function reinitSuiviImmo() {
-  document.getElementById('suivi-immo-code').value = '';
-  document.getElementById('suivi-immo-resultats').innerHTML = '<p class="empty-msg">Scanne ou tape un code immo pour voir son historique.</p>';
-  document.getElementById('suivi-immo-localisation').innerHTML = '';
-}
-
-function scannerPourSuivi() {
-  showScreen('screen-scan-suivi');
-  startScanner('scanner-suivi', function(code) {
-    stopScanner();
-    showScreen('screen-suivi-immo');
-    document.getElementById('suivi-immo-code').value = code;
-    rechercherSuiviImmo();
-  });
-}
-
-async function rechercherSuiviImmo() {
-  const code = document.getElementById('suivi-immo-code').value.trim().toUpperCase();
-  if (!code) return;
-  const div = document.getElementById('suivi-immo-resultats');
-  const loc = document.getElementById('suivi-immo-localisation');
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  loc.innerHTML = '';
-  try {
-    const res = await fetch(CONFIG.webhookMouvements + '?immo=' + encodeURIComponent(code));
-    const mouvements = await res.json();
-    if (!Array.isArray(mouvements) || mouvements.length === 0) {
-      div.innerHTML = '<p class="empty-msg">Aucun mouvement trouvé pour ' + code + '.</p>';
-      return;
-    }
-    // Localisation actuelle = dernier mouvement
-    const dernier = mouvements[0];
-    const locActuelle = dernier.type_mouvement === 'Retour' ? '🏭 Au dépôt' : '📍 ' + dernier.code_chantier + ' — ' + dernier.nom_employe;
-    loc.innerHTML = '<div class="localisation-badge">' + locActuelle + '</div>';
-
-    // Historique complet
-    div.innerHTML = '<h3 style="margin:8px 0;font-size:14px;color:#1a3a6b;">Historique complet (' + mouvements.length + ' mouvements)</h3>' +
-      mouvements.map(function(m) {
-        const icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
-        return '<div class="materiel-card">' + icon + ' <strong>' + m.type_mouvement + '</strong>' +
-          ' <span class="chantier-tag">' + m.code_chantier + '</span><br>' +
-          '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
-          new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
-      }).join('');
   } catch (e) {
     div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
   }
