@@ -15,6 +15,7 @@
     <img src="logo.png" alt="Espace Soleil" class="logo-img">
     <p class="subtitle">Suivi des immobilisations</p>
     <div id="user-info" class="user-badge hidden"></div>
+    <div id="badge-attente" class="badge-attente hidden" onclick="showScreen('screen-transferts-attente')"></div>
     <div class="btn-group">
       <button class="btn btn-primary" onclick="startMouvement('Transfert')">🔄 Transfert</button>
       <button class="btn btn-secondary admin-only hidden" onclick="startMouvement('Retour')">📥 Retour dépôt</button>
@@ -44,14 +45,14 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 4 : Chantier -->
-  <div id="screen-chantier" class="screen">
-    <h2>Destination</h2>
-    <p>Où va ce matériel ?</p>
-    <select id="select-chantier" class="select-input">
-      <option value="">-- Sélectionne un chantier --</option>
+  <!-- ÉCRAN 4 : Sélection receveur (transfert) -->
+  <div id="screen-receveur" class="screen">
+    <h2>À qui ?</h2>
+    <p>Sélectionne l'employé qui reçoit le matériel</p>
+    <select id="select-receveur" class="select-input">
+      <option value="">-- Sélectionne un employé --</option>
     </select>
-    <button class="btn btn-primary" onclick="confirmerMouvement()">Confirmer</button>
+    <button class="btn btn-primary" onclick="confirmerTransfert()">Confirmer le transfert</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
@@ -60,7 +61,7 @@
     <div class="check-anim">✅</div>
     <h2>Enregistré !</h2>
     <div id="recap" class="recap-box"></div>
-    <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Nouveau scan</button>
+    <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Retour accueil</button>
   </div>
 
   <!-- ÉCRAN 6 : Mon matériel -->
@@ -71,11 +72,27 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 7 : Suivi immo (admin) -->
+  <!-- ÉCRAN 7 : Transferts en attente -->
+  <div id="screen-transferts-attente" class="screen">
+    <h2>⚠️ Transferts en attente</h2>
+    <p>Ces matériels t'ont été transmis — scanne chacun pour valider.</p>
+    <div id="liste-attente" class="liste-materiel"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+  </div>
+
+  <!-- ÉCRAN 8 : Scanner pour validation -->
+  <div id="screen-scan-validation" class="screen">
+    <h2>Scanner pour valider</h2>
+    <p>Scanne le QR code du matériel reçu</p>
+    <div id="scanner-validation" class="scanner-box"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">Annuler</button>
+  </div>
+
+  <!-- ÉCRAN 9 : Suivi immo (admin) -->
   <div id="screen-suivi-immo" class="screen">
     <h2>🔍 Suivi immo</h2>
     <div class="admin-search">
-      <input type="text" id="suivi-immo-code" class="select-input" placeholder="Code immo (ex: IM000328)">
+      <input type="text" id="suivi-immo-code" class="select-input" placeholder="Code immo (ex: IM000328 ou 328)">
       <button class="btn btn-primary" onclick="rechercherSuiviImmo()">Rechercher</button>
     </div>
     <button class="btn btn-outline" onclick="scannerPourSuivi()" style="margin-bottom:12px;">📷 Scanner un QR code</button>
@@ -86,14 +103,14 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 8 : Scanner pour suivi immo -->
+  <!-- ÉCRAN 10 : Scanner pour suivi -->
   <div id="screen-scan-suivi" class="screen">
     <h2>Scanner une immo</h2>
     <div id="scanner-suivi" class="scanner-box"></div>
     <button class="btn btn-outline" onclick="showScreen('screen-suivi-immo')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 9 : Administration -->
+  <!-- ÉCRAN 11 : Administration -->
   <div id="screen-admin" class="screen">
     <h2>⚙️ Administration</h2>
     <div class="admin-search">
