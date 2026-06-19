@@ -21,7 +21,6 @@ window.addEventListener('load', async function() {
     state.employe = JSON.parse(employe);
     afficherEmploye();
   }
-  await chargerChantiers();
   await chargerEmployes();
   if (state.employe) await verifierTransfertsEnAttente();
 });
@@ -56,25 +55,6 @@ function changerUtilisateur() {
     document.getElementById('badge-attente').classList.add('hidden');
     document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.add('hidden'); });
     showScreen('screen-activation');
-  }
-}
-
-// ── Chargement chantiers ────────────────────────────────────────
-async function chargerChantiers() {
-  const select = document.getElementById('select-chantier');
-  select.innerHTML = '<option value="">-- Chargement... --</option>';
-  try {
-    const res = await fetch('chantiers.json');
-    const chantiers = await res.json();
-    select.innerHTML = '<option value="">-- Sélectionne un chantier --</option>';
-    chantiers.forEach(function(c) {
-      const opt = document.createElement('option');
-      opt.value = c.Code_Chantier;
-      opt.textContent = c.Sous_Chantier ? c.Nom_Chantier + ' — ' + c.Sous_Chantier : c.Nom_Chantier;
-      select.appendChild(opt);
-    });
-  } catch (e) {
-    select.innerHTML = '<option value="">-- Non disponible --</option>';
   }
 }
 
