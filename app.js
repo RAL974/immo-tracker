@@ -33,6 +33,7 @@ function showScreen(id) {
   if (id === 'screen-mon-materiel') afficherMonMateriel();
   if (id === 'screen-admin') reinitAdmin();
   if (id === 'screen-suivi-immo') reinitSuiviImmo();
+  if (id === 'screen-suivi-employe') reinitSuiviEmploye();
   if (id === 'screen-transferts-attente') afficherTransfertsEnAttente();
 }
 
@@ -397,7 +398,7 @@ async function rechercherSuiviImmo() {
     const dernier = mouvements[0];
     const locActuelle = dernier.type_mouvement === 'Retour'
       ? '🏭 Au dépôt'
-      : '📍 ' + dernier.code_chantier + ' — ' + dernier.nom_employe;
+      : '👤 Avec ' + dernier.nom_employe + ' (' + dernier.code_employe + ')';
     loc.innerHTML = '<div class="localisation-badge">' + locActuelle + '</div>';
     div.innerHTML = '<h3 style="margin:8px 0;font-size:14px;color:#1a3a6b;">Historique (' + mouvements.length + ' mouvements)</h3>' +
       mouvements.map(function(m) {
@@ -407,6 +408,71 @@ async function rechercherSuiviImmo() {
           '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
           new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
       }).join('');
+  } catch (e) {
+    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+  }
+}
+
+// ── Suivi par employé ────────────────────────────────────────────
+function reinitSuiviEmploye() {
+  document.getElementById('suivi-employe-search').value = '';
+  document.getElementById('suivi-employe-suggestions').innerHTML = '';
+  document.getElementById('suivi-employe-resultats').innerHTML = '<p class="empty-msg">Tape un nom ou un code employé.</p>';
+}
+
+function rechercherSuggestionsEmploye() {
+  const query = document.getElementById('suivi-employe-search').value.trim().toUpperCase();
+  const div = document.getElementById('suivi-employe-suggestions');
+  if (!query) { div.innerHTML = ''; return; }
+
+  const matches = state.employes.filter(function(e) {
+    return e.Code.toUpperCase().includes(query) || e.Nom.toUpperCase().includes(query);
+  }).slice(0, 8);
+
+  if (matches.length === 0) {
+    div.innerHTML = '<p class="empty-msg">Aucun employé trouvé.</p>';
+    return;
+  }
+
+  div.innerHTML = matches.map(function(e) {
+    return '<div class="suggestion-item" onclick="afficherSuiviEmploye(\'' + e.Code + '\',\'' + e.Nom.replace(/'/g, "\\'") + '\')">' +
+      '<strong>' + e.Nom + '</strong> <span class="chantier-tag">' + e.Code + '</span>' +
+      '<small> — ' + e.Poste + '</small></div>';
+  }).join('');
+}
+
+async function afficherSuiviEmploye(code, nom) {
+  document.getElementById('suivi-employe-search').value = nom + ' (' + code + ')';
+  document.getElementById('suivi-employe-suggestions').innerHTML = '';
+  const div = document.getElementById('suivi-employe-resultats');
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?employe=' + encodeURIComponent(code));
+    const data = await res.json();
+
+    let html = '<h3 style="margin:8px 0;font-size:14px;color:#1a3a6b;">📦 Actuellement en sa possession (' + data.actuel.length + ')</h3>';
+    if (data.actuel.length === 0) {
+      html += '<p class="empty-msg">Aucun matériel en ce moment.</p>';
+    } else {
+      html += data.actuel.map(function(m) {
+        return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
+          '<small> — ' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small></div>';
+      }).join('');
+    }
+
+    html += '<h3 style="margin:16px 0 8px;font-size:14px;color:#1a3a6b;">🕓 Historique complet (' + data.historique.length + ' mouvements)</h3>';
+    if (data.historique.length === 0) {
+      html += '<p class="empty-msg">Aucun mouvement enregistré.</p>';
+    } else {
+      html += data.historique.map(function(m) {
+        const icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
+        return '<div class="materiel-card">' + icon + ' <strong>' + m.code_im + '</strong> — ' + m.type_mouvement + '<br>' +
+          '<small>' + new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
+      }).join('');
+    }
+
+    div.innerHTML = html;
   } catch (e) {
     div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
   }
