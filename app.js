@@ -162,14 +162,57 @@ function onScanImmo(code) {
   const result = document.getElementById('immo-result');
   result.textContent = '✅ Immo scannée : ' + code;
   result.classList.remove('hidden');
-  setTimeout(function() {
+  setTimeout(async function() {
     if (state.typeMouvement === 'Retour') {
       confirmerMouvement();
+      return;
+    }
+    // Vérifier si cette immo correspond à un transfert en attente pour moi
+    const pending = await chercherTransfertEnAttentePourImmo(code);
+    if (pending) {
+      state.transfertEnCours = pending;
+      document.getElementById('accepter-texte').textContent =
+        'Accepter ' + code + ' de la part de ' + pending.nom_donneur + ' ?';
+      showScreen('screen-accepter');
     } else {
-      // Transfert → sélectionner le receveur
       showScreen('screen-receveur');
     }
   }, 800);
+}
+
+// ── Chercher un transfert en attente pour une immo précise ──────
+async function chercherTransfertEnAttentePourImmo(code) {
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?transferts=' + state.employe.code);
+    const transferts = await res.json();
+    return transferts.find(function(t) { return t.code_im === code; }) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ── Accepter / refuser un transfert détecté au scan ──────────────
+function accepterTransfert() {
+  const t = state.transfertEnCours;
+  fetch(CONFIG.webhookMouvements + '?action=valider', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: t.id, code_employe: state.employe.code, nom_employe: state.employe.nom }),
+  }).then(function(res) { return res.json(); })
+    .then(function(data) {
+      document.getElementById('recap').innerHTML =
+        '<strong>✅ Transfert accepté !</strong><br>' +
+        '<strong>Immo :</strong> ' + t.code_im + '<br>' +
+        '<strong>De :</strong> ' + t.nom_donneur + '<br>' +
+        '<strong>Reçu par :</strong> ' + state.employe.nom;
+      showScreen('screen-confirmation');
+      verifierTransfertsEnAttente();
+    })
+    .catch(function(e) { console.error('Erreur validation:', e.message); });
+}
+
+function refuserTransfert() {
+  showScreen('screen-accueil');
 }
 
 // ── Confirmation mouvement classique (Retour) ───────────────────
