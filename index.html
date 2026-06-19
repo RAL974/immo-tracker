@@ -56,6 +56,14 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
+  <!-- ÉCRAN : Accepter un transfert -->
+  <div id="screen-accepter" class="screen">
+    <h2>📥 Réception de matériel</h2>
+    <p id="accepter-texte" style="font-size:16px;font-weight:600;margin:24px 0;text-align:center;"></p>
+    <button class="btn btn-primary" onclick="accepterTransfert()">✅ Oui, j'accepte</button>
+    <button class="btn btn-outline" onclick="refuserTransfert()">❌ Annuler</button>
+  </div>
+
   <!-- ÉCRAN 5 : Confirmation -->
   <div id="screen-confirmation" class="screen">
     <div class="check-anim">✅</div>
