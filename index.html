@@ -22,6 +22,7 @@
     </div>
     <button class="btn btn-link" onclick="showScreen('screen-mon-materiel')">📦 Mon matériel</button>
     <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-immo')">🔍 Suivi immo</button>
+    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-employe')">👤 Suivi employé</button>
     <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-admin')">⚙️ Administration</button>
     <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
     <button class="btn btn-link" onclick="showScreen('screen-activation')">Première utilisation ?</button>
@@ -116,6 +117,17 @@
     <h2>Scanner une immo</h2>
     <div id="scanner-suivi" class="scanner-box"></div>
     <button class="btn btn-outline" onclick="showScreen('screen-suivi-immo')">Annuler</button>
+  </div>
+
+  <!-- ÉCRAN : Suivi employé -->
+  <div id="screen-suivi-employe" class="screen">
+    <h2>👤 Suivi employé</h2>
+    <input type="text" id="suivi-employe-search" class="select-input" placeholder="Nom ou code employé..." oninput="rechercherSuggestionsEmploye()">
+    <div id="suivi-employe-suggestions" class="liste-materiel"></div>
+    <div id="suivi-employe-resultats" class="liste-materiel">
+      <p class="empty-msg">Tape un nom ou un code employé.</p>
+    </div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
   <!-- ÉCRAN 11 : Administration -->
