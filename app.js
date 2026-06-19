@@ -198,7 +198,7 @@ function accepterTransfert() {
   fetch(CONFIG.webhookMouvements + '?action=valider', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: t.id, code_employe: state.employe.code, nom_employe: state.employe.nom }),
+    body: JSON.stringify({ id: t.id, code_im: t.code_im, code_employe: state.employe.code, nom_employe: state.employe.nom }),
   }).then(function(res) { return res.json(); })
     .then(function(data) {
       document.getElementById('recap').innerHTML =
@@ -305,7 +305,7 @@ function validerTransfert(transfertId, codeIM) {
     fetch(CONFIG.webhookMouvements + '?action=valider', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: transfertId, code_employe: state.employe.code, nom_employe: state.employe.nom }),
+      body: JSON.stringify({ id: transfertId, code_im: codeIM, code_employe: state.employe.code, nom_employe: state.employe.nom }),
     }).then(function(res) { return res.json(); })
       .then(function(data) {
         document.getElementById('recap').innerHTML =
