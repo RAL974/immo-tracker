@@ -169,3 +169,20 @@ h2 {
 .hidden {
   display: none !important;
 }
+.suggestion-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+.suggestion-item:active {
+  background: #f0f4fa;
+}
+.localisation-badge {
+  background: #1a3a6b;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+  margin: 10px 0;
+}
