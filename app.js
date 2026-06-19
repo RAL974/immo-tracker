@@ -340,28 +340,24 @@ function enregistrerMouvement(mouvement) {
 }
 
 // ── Mon matériel ────────────────────────────────────────────────
-function afficherMonMateriel() {
+async function afficherMonMateriel() {
   if (!state.employe) { showScreen('screen-activation'); return; }
   document.getElementById('mon-materiel-user').textContent = '👷 ' + state.employe.nom;
-  const stock = {};
-  state.mouvements
-    .filter(function(m) { return m.code_employe === state.employe.code; })
-    .forEach(function(m) {
-      if (m.type_mouvement === 'Sortie' || m.type_mouvement === 'Transfert') {
-        stock[m.code_im] = m;
-      } else if (m.type_mouvement === 'Retour') {
-        delete stock[m.code_im];
-      }
-    });
-  const items = Object.values(stock);
   const liste = document.getElementById('liste-materiel');
-  liste.innerHTML = items.length === 0
-    ? '<p class="empty-msg">Aucun matériel en ta possession.</p>'
-    : items.map(function(m) {
-        return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
-          '<span class="chantier-tag">' + m.code_chantier + '</span>' +
-          '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small></div>';
-      }).join('');
+  liste.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  try {
+    const res = await fetch(CONFIG.webhookMouvements + '?employe=' + encodeURIComponent(state.employe.code));
+    const data = await res.json();
+    const items = data.actuel || [];
+    liste.innerHTML = items.length === 0
+      ? '<p class="empty-msg">Aucun matériel en ta possession.</p>'
+      : items.map(function(m) {
+          return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
+            '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small></div>';
+        }).join('');
+  } catch (e) {
+    liste.innerHTML = '<p class="empty-msg">Erreur de connexion. Vérifie ta connexion internet.</p>';
+  }
 }
 
 // ── Suivi immo ──────────────────────────────────────────────────
