@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de bord — Espace Soleil Logistique</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root {
+  --blue: #1A3A6B; --orange: #E87722; --bg: #F0F4F8;
+  --card: #fff; --text: #2C3E50; --grey: #7F8C8D;
+  --green: #27AE60; --red: #E74C3C; --yellow: #F39C12;
+  --shadow: 0 2px 16px rgba(0,0,0,0.09);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+/* ── PIN Modal ── */
+#pin-overlay { position: fixed; inset: 0; background: var(--blue); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+#pin-box { background: white; border-radius: 20px; padding: 40px; text-align: center; width: 320px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+#pin-box img { width: 80px; margin-bottom: 16px; }
+#pin-box h2 { color: var(--blue); margin-bottom: 8px; }
+#pin-box p { color: var(--grey); font-size: 13px; margin-bottom: 20px; }
+#pin-input { width: 100%; padding: 14px; border: 2px solid #ddd; border-radius: 10px; font-size: 20px; letter-spacing: 6px; text-align: center; }
+#pin-input:focus { outline: none; border-color: var(--orange); }
+#pin-btn { width: 100%; margin-top: 12px; padding: 14px; background: var(--blue); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
+#pin-btn:hover { background: #0d2a54; }
+#pin-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; }
+
+/* ── Header ── */
+header { background: var(--blue); color: white; padding: 0 28px; display: flex; align-items: center; height: 64px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
+header img { height: 40px; margin-right: 16px; }
+header h1 { font-size: 18px; font-weight: 700; flex: 1; }
+header .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+#last-refresh { opacity: 0.7; }
+#refresh-btn { background: var(--orange); border: none; color: white; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
+#refresh-btn:hover { background: #c96a1e; }
+#logout-btn { background: rgba(255,255,255,0.15); border: none; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+
+/* ── Main ── */
+main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+/* ── Loading ── */
+#loading { text-align: center; padding: 80px; font-size: 18px; color: var(--grey); }
+
+/* ── KPI Cards ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.kpi-card { background: var(--card); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--orange); }
+.kpi-card.green::before { background: var(--green); }
+.kpi-card.red::before { background: var(--red); }
+.kpi-card.yellow::before { background: var(--yellow); }
+.kpi-card.blue::before { background: var(--blue); }
+.kpi-icon { font-size: 28px; margin-bottom: 8px; }
+.kpi-value { font-size: 36px; font-weight: 800; color: var(--blue); line-height: 1; }
+.kpi-label { font-size: 13px; color: var(--grey); margin-top: 4px; font-weight: 500; }
+
+/* ── État mini-KPIs ── */
+.etat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 24px; }
+.etat-card { background: var(--card); border-radius: 10px; padding: 14px; box-shadow: var(--shadow); text-align: center; }
+.etat-count { font-size: 28px; font-weight: 800; }
+.etat-name { font-size: 12px; color: var(--grey); margin-top: 2px; font-weight: 500; }
+.e-neuf .etat-count { color: var(--green); }
+.e-bon .etat-count { color: #2980B9; }
+.e-use .etat-count { color: var(--yellow); }
+.e-abime .etat-count { color: var(--red); }
+.e-hs .etat-count { color: #7F8C8D; }
+.e-inconnu .etat-count { color: #BDC3C7; }
+
+/* ── Charts ── */
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.chart-card { background: var(--card); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); }
+.chart-card h3 { font-size: 14px; color: var(--grey); font-weight: 600; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+.chart-wrap { position: relative; height: 220px; }
+
+/* ── Search ── */
+.search-bar { background: var(--card); border-radius: 14px; padding: 16px 20px; box-shadow: var(--shadow); margin-bottom: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.search-bar input { flex: 1; min-width: 200px; padding: 10px 16px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; }
+.search-bar input:focus { outline: none; border-color: var(--orange); }
+.search-bar select { padding: 10px 14px; border: 2px solid #ddd; border-radius: 10px; font-size: 14px; background: white; }
+.search-bar select:focus { outline: none; border-color: var(--orange); }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--card); padding: 6px; border-radius: 12px; box-shadow: var(--shadow); width: fit-content; }
+.tab { padding: 10px 20px; border-radius: 8px; border: none; background: transparent; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--grey); transition: all 0.15s; }
+.tab.active { background: var(--blue); color: white; }
+.tab-badge { display: inline-block; background: var(--red); color: white; font-size: 11px; border-radius: 10px; padding: 1px 6px; margin-left: 4px; }
+
+/* ── Table ── */
+.table-card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.table-header { padding: 16px 20px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
+.table-header h3 { font-size: 15px; font-weight: 700; color: var(--blue); }
+.table-count { background: var(--bg); padding: 4px 10px; border-radius: 10px; font-size: 13px; color: var(--grey); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #F8FAFC; padding: 12px 16px; text-align: left; font-size: 12px; color: var(--grey); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-bottom: 2px solid #eee; cursor: pointer; user-select: none; }
+th:hover { background: #f0f4f8; }
+td { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #FAFBFC; }
+.immo-code { font-weight: 700; color: var(--blue); font-family: monospace; font-size: 13px; }
+.employe-nom { font-weight: 600; }
+.employe-code { font-size: 11px; color: var(--grey); font-family: monospace; }
+
+/* ── Badges état ── */
+.badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.b-neuf     { background: #E8F5E9; color: #1B5E20; }
+.b-bon      { background: #E3F2FD; color: #0D47A1; }
+.b-use      { background: #FFF8E1; color: #E65100; }
+.b-abime    { background: #FBE9E7; color: #B71C1C; }
+.b-hs       { background: #ECEFF1; color: #37474F; }
+.b-inconnu  { background: #F5F5F5; color: #9E9E9E; }
+.b-attente  { background: #FFF3E0; color: #E65100; }
+.b-retard   { background: #FFEBEE; color: var(--red); }
+.b-depot    { background: #E8F5E9; color: #1B5E20; }
+.b-circ     { background: #E3F2FD; color: #0D47A1; }
+
+/* ── Alerte ── */
+.alerte-row td { background: #FFF8F0 !important; }
+.alerte-row td:first-child { border-left: 3px solid var(--orange); }
+
+/* ── Empty state ── */
+.empty-state { text-align: center; padding: 40px; color: var(--grey); font-size: 14px; }
+
+/* ── Détenteur cards (vue en circulation) ── */
+.detenteur-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; padding: 16px; }
+.detenteur-card { background: #F8FAFC; border-radius: 10px; padding: 14px; border: 1px solid #eee; }
+.detenteur-name { font-weight: 700; color: var(--blue); font-size: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.detenteur-count { background: var(--blue); color: white; font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+.immo-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+.immo-item:last-child { border-bottom: none; }
+.immo-date { font-size: 11px; color: var(--grey); }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  main { padding: 12px; }
+  header h1 { font-size: 14px; }
+  .kpi-value { font-size: 28px; }
+  table { font-size: 12px; }
+  th, td { padding: 8px 10px; }
+  .tabs { overflow-x: auto; }
+  .tab { padding: 8px 14px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+
+<!-- PIN Modal -->
+<div id="pin-overlay">
+  <div id="pin-box">
+    <img src="logo.png" alt="Espace Soleil" onerror="this.style.display='none'">
+    <h2>Tableau de bord logistique</h2>
+    <p>Accès réservé à l'encadrement</p>
+    <input type="password" id="pin-input" maxlength="10" placeholder="••••" onkeydown="if(event.key==='Enter')verifierPin()">
+    <button id="pin-btn" onclick="verifierPin()">Accéder</button>
+    <p id="pin-error"></p>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <img src="logo.png" alt="ES" onerror="this.style.display='none'">
+  <h1>Tableau de bord — Suivi des immobilisations</h1>
+  <div class="header-right">
+    <span id="last-refresh">Chargement...</span>
+    <button id="refresh-btn" onclick="chargerDonnees()">🔄 Actualiser</button>
+    <button id="logout-btn" onclick="deconnecter()">Déconnexion</button>
+  </div>
+</header>
+
+<main>
+  <div id="loading">⏳ Chargement des données...</div>
+  <div id="dashboard" style="display:none">
+
+    <!-- KPI principaux -->
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <!-- KPI par état -->
+    <div class="etat-grid" id="etat-grid"></div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>📦 Circulation vs Dépôt</h3>
+        <div class="chart-wrap"><canvas id="chart-repartition"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>📊 Distribution par état</h3>
+        <div class="chart-wrap"><canvas id="chart-etats"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>👤 Top détenteurs</h3>
+        <div class="chart-wrap"><canvas id="chart-detenteurs"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Recherche et filtre -->
+    <div class="search-bar">
+      <span style="font-weight:700;color:var(--blue)">🔍</span>
+      <input type="text" id="search-input" placeholder="Rechercher une immo, un employé..." oninput="filtrerTableau()">
+      <select id="filter-etat" onchange="filtrerTableau()">
+        <option value="">Tous les états</option>
+        <option>Neuf</option>
+        <option>Bon état</option>
+        <option>Usé</option>
+        <option>Abîmé</option>
+        <option>Hors service</option>
+        <option>Inconnu</option>
+      </select>
+      <select id="filter-statut" onchange="filtrerTableau()">
+        <option value="">Tous les statuts</option>
+        <option value="En circulation">En circulation</option>
+        <option value="Au dépôt">Au dépôt</option>
+      </select>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('circulation')">🔄 En circulation <span id="tab-count-circ" class="tab-badge">0</span></button>
+      <button class="tab" onclick="switchTab('depot')">🏭 Au dépôt <span id="tab-count-depot" class="tab-badge" style="background:var(--green)">0</span></button>
+      <button class="tab" onclick="switchTab('table')">📋 Tableau complet <span id="tab-count-total" class="tab-badge" style="background:var(--blue)">0</span></button>
+      <button class="tab" onclick="switchTab('pending')">⏳ Transferts <span id="tab-count-pending" class="tab-badge">0</span></button>
+      <button class="tab" onclick="switchTab('alertes')">⚠️ Alertes <span id="tab-count-alertes" class="tab-badge">0</span></button>
+    </div>
+
+    <!-- Contenu tabs -->
+    <div class="table-card">
+
+      <!-- En circulation (vue par détenteur) -->
+      <div id="tab-circulation">
+        <div class="table-header">
+          <h3>Matériel en circulation</h3>
+          <span class="table-count" id="circ-count"></span>
+        </div>
+        <div class="detenteur-grid" id="detenteur-grid"></div>
+      </div>
+
+      <!-- Au dépôt -->
+      <div id="tab-depot" style="display:none">
+        <div class="table-header">
+          <h3>Matériel au dépôt</h3>
+          <span class="table-count" id="depot-count"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="table-depot">
+            <thead><tr>
+              <th onclick="sortTable('depot','code_im')">Code IM</th>
+              <th onclick="sortTable('depot','etat')">État</th>
+              <th onclick="sortTable('depot','since')">Dernier mouvement</th>
+              <th>Note</th>
+            </tr></thead>
+            <tbody id="tbody-depot"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tableau complet -->
+      <div id="tab-table" style="display:none">
+        <div class="table-header">
+          <h3>Inventaire complet (immos ayant eu des mouvements)</h3>
+          <span class="table-count" id="table-count"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="table-main">
+            <thead><tr>
+              <th onclick="sortTable('main','code_im')">Code IM</th>
+              <th onclick="sortTable('main','statut')">Statut</th>
+              <th onclick="sortTable('main','detenteur_nom')">Détenteur</th>
+              <th onclick="sortTable('main','etat')">État</th>
+              <th onclick="sortTable('main','since')">Depuis</th>
+              <th>Note</th>
+            </tr></thead>
+            <tbody id="tbody-main"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Transferts en attente -->
+      <div id="tab-pending" style="display:none">
+        <div class="table-header">
+          <h3>Transferts en attente de validation</h3>
+          <span class="table-count" id="pending-count"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th>Code IM</th>
+              <th>Donneur</th>
+              <th>Receveur</th>
+              <th>État déclaré</th>
+              <th>En attente depuis</th>
+              <th>Note</th>
+            </tr></thead>
+            <tbody id="tbody-pending"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Alertes -->
+      <div id="tab-alertes" style="display:none">
+        <div class="table-header">
+          <h3>⚠️ Points d'attention</h3>
+        </div>
+        <div id="alertes-content"></div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+const WORKER = 'https://immo-proxy.ral-85d.workers.dev/';
+const PIN_CORRECT = 'ES974';
+let dashData = null;
+let sortConfig = { field: 'code_im', asc: true };
+let currentTab = 'circulation';
+let charts = {};
+
+// ── Auth ─────────────────────────────────────────────────────────
+function verifierPin() {
+  const pin = document.getElementById('pin-input').value;
+  if (pin === PIN_CORRECT) {
+    document.getElementById('pin-overlay').style.display = 'none';
+    sessionStorage.setItem('dash_auth', '1');
+    chargerDonnees();
+  } else {
+    document.getElementById('pin-error').textContent = 'Code incorrect.';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+function deconnecter() {
+  sessionStorage.removeItem('dash_auth');
+  location.reload();
+}
+
+// ── Chargement données ────────────────────────────────────────────
+async function chargerDonnees() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  try {
+    const res = await fetch(WORKER + '?dashboard=1');
+    dashData = await res.json();
+    afficherDashboard();
+    document.getElementById('last-refresh').textContent = 'Actualisé à ' + new Date().toLocaleTimeString('fr-FR');
+  } catch (e) {
+    document.getElementById('loading').textContent = '❌ Erreur de connexion. ' + e.message;
+  }
+}
+
+// ── Affichage principal ───────────────────────────────────────────
+function afficherDashboard() {
+  const s = dashData.stats;
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+
+  // KPI cards
+  document.getElementById('kpi-grid').innerHTML = [
+    { icon:'📦', val: s.total_mouvementes, label:'Immos tracées', cls:'' },
+    { icon:'🔄', val: s.en_circulation, label:'En circulation', cls:'blue' },
+    { icon:'🏭', val: s.au_depot, label:'Au dépôt', cls:'green' },
+    { icon:'⏳', val: s.transferts_en_attente, label:'Transferts en attente', cls: s.transferts_en_attente > 0 ? 'yellow' : '' },
+    { icon:'🔴', val: s.hors_service, label:'Hors service', cls: s.hors_service > 0 ? 'red' : '' },
+    { icon:'⚠️', val: s.alertes_delai, label:'Transferts > 24h', cls: s.alertes_delai > 0 ? 'red' : 'green' },
+  ].map(k => '<div class="kpi-card ' + k.cls + '"><div class="kpi-icon">' + k.icon + '</div><div class="kpi-value">' + k.val + '</div><div class="kpi-label">' + k.label + '</div></div>').join('');
+
+  // État cards
+  const etats = [
+    { key:'Neuf', cls:'e-neuf', icon:'⭐' },
+    { key:'Bon état', cls:'e-bon', icon:'✅' },
+    { key:'Usé', cls:'e-use', icon:'🔶' },
+    { key:'Abîmé', cls:'e-abime', icon:'⚠️' },
+    { key:'Hors service', cls:'e-hs', icon:'🔴' },
+    { key:'Inconnu', cls:'e-inconnu', icon:'❓' },
+  ];
+  document.getElementById('etat-grid').innerHTML = etats.map(e =>
+    '<div class="etat-card ' + e.cls + '"><div class="etat-count">' + (s.par_etat[e.key] || 0) + '</div><div class="etat-name">' + e.icon + ' ' + e.key + '</div></div>'
+  ).join('');
+
+  // Tab badges
+  document.getElementById('tab-count-circ').textContent = s.en_circulation;
+  document.getElementById('tab-count-depot').textContent = s.au_depot;
+  document.getElementById('tab-count-total').textContent = s.total_mouvementes;
+  document.getElementById('tab-count-pending').textContent = s.transferts_en_attente;
+  document.getElementById('tab-count-alertes').textContent = s.alertes_delai + s.hors_service;
+
+  dessinerCharts();
+  switchTab(currentTab);
+}
+
+// ── Charts ────────────────────────────────────────────────────────
+function dessinerCharts() {
+  const s = dashData.stats;
+  if (charts.repartition) charts.repartition.destroy();
+  if (charts.etats) charts.etats.destroy();
+  if (charts.detenteurs) charts.detenteurs.destroy();
+
+  charts.repartition = new Chart(document.getElementById('chart-repartition'), {
+    type: 'doughnut',
+    data: {
+      labels: ['En circulation', 'Au dépôt'],
+      datasets: [{ data: [s.en_circulation, s.au_depot], backgroundColor: ['#1A3A6B','#27AE60'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  const etatsKeys = ['Neuf','Bon état','Usé','Abîmé','Hors service','Inconnu'];
+  const etatsColors = ['#27AE60','#2980B9','#F39C12','#E74C3C','#7F8C8D','#BDC3C7'];
+  charts.etats = new Chart(document.getElementById('chart-etats'), {
+    type: 'bar',
+    data: {
+      labels: etatsKeys,
+      datasets: [{ data: etatsKeys.map(k => s.par_etat[k] || 0), backgroundColor: etatsColors, borderRadius: 6, borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+
+  const top = dashData.top_detenteurs.slice(0, 8);
+  charts.detenteurs = new Chart(document.getElementById('chart-detenteurs'), {
+    type: 'bar',
+    data: {
+      labels: top.map(d => d.nom.split(' ')[0]),
+      datasets: [{ data: top.map(d => d.count), backgroundColor: '#E87722', borderRadius: 6, borderWidth: 0 }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const idx = ['circulation','depot','table','pending','alertes'];
+  document.querySelectorAll('.tab')[idx.indexOf(tab)].classList.add('active');
+  ['circulation','depot','table','pending','alertes'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'circulation') afficherCirculation();
+  if (tab === 'depot') afficherDepot();
+  if (tab === 'table') afficherTableauComplet();
+  if (tab === 'pending') afficherPending();
+  if (tab === 'alertes') afficherAlertes();
+}
+
+// ── En circulation (vue par détenteur) ───────────────────────────
+function afficherCirculation() {
+  const q = document.getElementById('search-input').value.toUpperCase();
+  const fe = document.getElementById('filter-etat').value;
+  let data = dashData.en_circulation;
+  if (q) data = data.filter(i => i.code_im.includes(q) || i.detenteur_nom.toUpperCase().includes(q) || i.detenteur_code.includes(q));
+  if (fe) data = data.filter(i => i.etat === fe);
+
+  const grouped = {};
+  data.forEach(function(i) {
+    if (!grouped[i.detenteur_code]) grouped[i.detenteur_code] = { nom: i.detenteur_nom, code: i.detenteur_code, immos: [] };
+    grouped[i.detenteur_code].immos.push(i);
+  });
+
+  document.getElementById('circ-count').textContent = data.length + ' immos';
+  const sorted = Object.values(grouped).sort(function(a,b) { return b.immos.length - a.immos.length; });
+
+  document.getElementById('detenteur-grid').innerHTML = sorted.length === 0
+    ? '<p class="empty-state">Aucun résultat.</p>'
+    : sorted.map(function(d) {
+        return '<div class="detenteur-card"><div class="detenteur-name">' + d.nom + ' <span>' +
+          '<span class="detenteur-count">' + d.immos.length + '</span>' +
+          '<span class="employe-code" style="margin-left:8px">' + d.code + '</span></span></div>' +
+          d.immos.map(function(i) {
+            return '<div class="immo-item"><span class="immo-code">' + i.code_im + '</span>' +
+              '<span>' + etatBadge(i.etat) + ' <span class="immo-date">' + formatDate(i.since) + '</span></span></div>';
+          }).join('') + '</div>';
+      }).join('');
+}
+
+// ── Au dépôt ──────────────────────────────────────────────────────
+function afficherDepot() {
+  const q = document.getElementById('search-input').value.toUpperCase();
+  const fe = document.getElementById('filter-etat').value;
+  let data = dashData.au_depot;
+  if (q) data = data.filter(i => i.code_im.includes(q));
+  if (fe) data = data.filter(i => i.etat === fe);
+  data = sortData(data, sortConfig.field, sortConfig.asc);
+
+  document.getElementById('depot-count').textContent = data.length + ' immos';
+  document.getElementById('tbody-depot').innerHTML = data.length === 0
+    ? '<tr><td colspan="4" class="empty-state">Aucun résultat.</td></tr>'
+    : data.map(function(i) {
+        return '<tr><td class="immo-code">' + i.code_im + '</td>' +
+          '<td>' + etatBadge(i.etat) + '</td>' +
+          '<td>' + formatDate(i.since) + '</td>' +
+          '<td style="color:#666;font-size:12px">' + (i.note || '—') + '</td></tr>';
+      }).join('');
+}
+
+// ── Tableau complet ───────────────────────────────────────────────
+function afficherTableauComplet() {
+  const q = document.getElementById('search-input').value.toUpperCase();
+  const fe = document.getElementById('filter-etat').value;
+  const fs = document.getElementById('filter-statut').value;
+  let data = dashData.inventory;
+  if (q) data = data.filter(i => i.code_im.includes(q) || i.detenteur_nom.toUpperCase().includes(q));
+  if (fe) data = data.filter(i => i.etat === fe);
+  if (fs) data = data.filter(i => i.statut === fs);
+  data = sortData(data, sortConfig.field, sortConfig.asc);
+
+  document.getElementById('table-count').textContent = data.length + ' immos';
+  document.getElementById('tbody-main').innerHTML = data.length === 0
+    ? '<tr><td colspan="6" class="empty-state">Aucun résultat.</td></tr>'
+    : data.map(function(i) {
+        var hs = i.etat === 'Hors service';
+        return '<tr' + (hs ? ' class="alerte-row"' : '') + '>' +
+          '<td class="immo-code">' + i.code_im + '</td>' +
+          '<td>' + statutBadge(i.statut) + '</td>' +
+          '<td><span class="employe-nom">' + i.detenteur_nom + '</span><br><span class="employe-code">' + i.detenteur_code + '</span></td>' +
+          '<td>' + etatBadge(i.etat) + '</td>' +
+          '<td style="font-size:12px;color:#666">' + formatDate(i.since) + '</td>' +
+          '<td style="font-size:12px;color:#666;max-width:200px">' + (i.note || '—') + '</td></tr>';
+      }).join('');
+}
+
+// ── Transferts en attente ─────────────────────────────────────────
+function afficherPending() {
+  const data = dashData.pending;
+  document.getElementById('pending-count').textContent = data.length + ' en attente';
+  const now = new Date();
+  document.getElementById('tbody-pending').innerHTML = data.length === 0
+    ? '<tr><td colspan="6" class="empty-state">Aucun transfert en attente. ✅</td></tr>'
+    : data.map(function(t) {
+        const heures = Math.round((now - new Date(t.horodatage)) / 3600000);
+        const retard = heures > 24;
+        return '<tr' + (retard ? ' class="alerte-row"' : '') + '>' +
+          '<td class="immo-code">' + t.code_im + '</td>' +
+          '<td><span class="employe-nom">' + t.donneur_nom + '</span><br><span class="employe-code">' + t.donneur_code + '</span></td>' +
+          '<td><span class="employe-nom">' + t.receveur_nom + '</span><br><span class="employe-code">' + t.receveur_code + '</span></td>' +
+          '<td>' + etatBadge(t.etat || 'Inconnu') + '</td>' +
+          '<td>' + (retard ? '<span class="badge b-retard">⚠️ ' + heures + 'h</span>' : '<span class="badge b-attente">' + heures + 'h</span>') + '</td>' +
+          '<td style="font-size:12px;color:#666">' + (t.note || '—') + '</td></tr>';
+      }).join('');
+}
+
+// ── Alertes ───────────────────────────────────────────────────────
+function afficherAlertes() {
+  let html = '';
+  const now = new Date();
+
+  if (dashData.hors_service.length > 0) {
+    html += '<div class="table-header" style="border-top:3px solid var(--red)"><h3>🔴 Immos hors service (' + dashData.hors_service.length + ')</h3></div>';
+    html += '<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Dernier détenteur</th><th>Depuis</th><th>Note</th></tr></thead><tbody>';
+    html += dashData.hors_service.map(function(i) {
+      return '<tr class="alerte-row"><td class="immo-code">' + i.code_im + '</td>' +
+        '<td>' + i.detenteur_nom + '</td>' +
+        '<td>' + formatDate(i.since) + '</td>' +
+        '<td style="font-size:12px;color:#666">' + (i.note || '—') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  }
+
+  if (dashData.alertes_delai.length > 0) {
+    html += '<div class="table-header" style="border-top:3px solid var(--orange);margin-top:8px"><h3>⏰ Transferts en attente depuis + de 24h (' + dashData.alertes_delai.length + ')</h3></div>';
+    html += '<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur attendu</th><th>En attente depuis</th></tr></thead><tbody>';
+    html += dashData.alertes_delai.map(function(t) {
+      const heures = Math.round((now - new Date(t.horodatage)) / 3600000);
+      return '<tr class="alerte-row"><td class="immo-code">' + t.code_im + '</td>' +
+        '<td>' + t.donneur_nom + '</td>' +
+        '<td>' + t.receveur_nom + '</td>' +
+        '<td><span class="badge b-retard">' + heures + 'h</span></td></tr>';
+    }).join('') + '</tbody></table></div>';
+  }
+
+  if (!html) html = '<div class="empty-state" style="padding:40px">✅ Aucune alerte en cours. Tout est en ordre !</div>';
+  document.getElementById('alertes-content').innerHTML = html;
+}
+
+// ── Filtrage ──────────────────────────────────────────────────────
+function filtrerTableau() {
+  if (currentTab === 'circulation') afficherCirculation();
+  else if (currentTab === 'depot') afficherDepot();
+  else if (currentTab === 'table') afficherTableauComplet();
+}
+
+// ── Tri ───────────────────────────────────────────────────────────
+function sortTable(table, field) {
+  if (sortConfig.field === field) sortConfig.asc = !sortConfig.asc;
+  else { sortConfig.field = field; sortConfig.asc = true; }
+  if (table === 'depot') afficherDepot();
+  else if (table === 'main') afficherTableauComplet();
+}
+
+function sortData(data, field, asc) {
+  return [...data].sort(function(a, b) {
+    const av = (a[field] || '').toString().toLowerCase();
+    const bv = (b[field] || '').toString().toLowerCase();
+    return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function etatBadge(etat) {
+  const map = { 'Neuf':'b-neuf', 'Bon état':'b-bon', 'Usé':'b-use', 'Abîmé':'b-abime', 'Hors service':'b-hs', 'Inconnu':'b-inconnu' };
+  return '<span class="badge ' + (map[etat] || 'b-inconnu') + '">' + (etat || '—') + '</span>';
+}
+function statutBadge(statut) {
+  return statut === 'En circulation'
+    ? '<span class="badge b-circ">🔄 ' + statut + '</span>'
+    : '<span class="badge b-depot">🏭 ' + statut + '</span>';
+}
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+if (sessionStorage.getItem('dash_auth') === '1') {
+  document.getElementById('pin-overlay').style.display = 'none';
+  chargerDonnees();
+}
+// Rafraîchissement automatique toutes les 5 minutes
+setInterval(function() {
+  if (sessionStorage.getItem('dash_auth') === '1') chargerDonnees();
+}, 5 * 60 * 1000);
+</script>
+</body>
+</html>
