@@ -377,6 +377,19 @@ function scannerPourSuivi() {
   });
 }
 
+// ── Mise en forme d'une ligne de mouvement (gère le détail des transferts) ──
+function formatMouvementBadge(m) {
+  if (m.type_mouvement === 'Transfert' && m.code_chantier && m.code_chantier.indexOf('|') !== -1) {
+    const parts = m.code_chantier.split('|');
+    const donneurNom = parts[1] || parts[0];
+    return '<span class="chantier-tag">' + donneurNom + ' → ' + m.nom_employe + '</span>';
+  }
+  if (m.type_mouvement === 'Retour') {
+    return '<span class="chantier-tag">🏭 Dépôt</span>';
+  }
+  return '<span class="chantier-tag">' + (m.code_chantier || '') + '</span>';
+}
+
 async function rechercherSuiviImmo() {
   const code = document.getElementById('suivi-immo-code').value.trim().toUpperCase();
   if (!code) return;
@@ -400,7 +413,7 @@ async function rechercherSuiviImmo() {
       mouvements.map(function(m) {
         const icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
         return '<div class="materiel-card">' + icon + ' <strong>' + m.type_mouvement + '</strong>' +
-          ' <span class="chantier-tag">' + m.code_chantier + '</span><br>' +
+          ' ' + formatMouvementBadge(m) + '<br>' +
           '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
           new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
       }).join('');
@@ -499,7 +512,7 @@ async function adminRechercher() {
       ? '<p class="empty-msg">Aucun résultat pour "' + query + '".</p>'
       : filtres.map(function(m) {
           return '<div class="materiel-card"><strong>' + m.code_im + '</strong> — ' + m.type_mouvement +
-            ' <span class="chantier-tag">' + m.code_chantier + '</span><br>' +
+            ' ' + formatMouvementBadge(m) + '<br>' +
             '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
             new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
         }).join('');
