@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1a56db">
+  <meta name="theme-color" content="#E87722">
   <title>Immo Tracker – Espace Soleil</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
@@ -17,8 +17,16 @@
     <div id="user-info" class="user-badge hidden"></div>
     <div id="badge-attente" class="badge-attente hidden" onclick="showScreen('screen-transferts-attente')"></div>
     <div class="btn-group">
-      <button class="btn btn-primary" onclick="startMouvement('Transfert')">🔄 Transfert</button>
+      <button class="btn btn-primary btn-with-badge" onclick="startMouvement('Transfert')">
+        🔄 Transfert
+        <span id="badge-materiel" class="btn-badge-count hidden"></span>
+      </button>
       <button class="btn btn-secondary admin-only hidden" onclick="startMouvement('Retour')">📥 Retour dépôt</button>
+    </div>
+    <div class="separator">Retour rapide</div>
+    <div class="retour-rapide-group">
+      <button class="btn btn-outline" onclick="retourRapide('CONI')">↩️ Rendre à CONI</button>
+      <button class="btn btn-outline" onclick="retourRapide('HEGE')">↩️ Rendre à HEGE</button>
     </div>
     <button class="btn btn-link" onclick="showScreen('screen-mon-materiel')">📦 Mon matériel</button>
     <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-immo')">🔍 Suivi immo</button>
@@ -46,34 +54,45 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 4 : Sélection receveur (transfert) -->
+  <!-- ÉCRAN 4 : Sélection receveur -->
   <div id="screen-receveur" class="screen">
     <h2>À qui ?</h2>
-    <p>Sélectionne l'employé qui reçoit le matériel</p>
+    <p id="receveur-immo-info" style="font-weight:600;color:#1A3A6B;font-size:15px;"></p>
     <select id="select-receveur" class="select-input">
       <option value="">-- Sélectionne un employé --</option>
     </select>
-    <button class="btn btn-primary" onclick="confirmerTransfert()">Confirmer le transfert</button>
+    <button class="btn btn-primary" onclick="validerReceveur()">Suivant →</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN : Accepter un transfert -->
-  <div id="screen-accepter" class="screen">
-    <h2>📥 Réception de matériel</h2>
-    <p id="accepter-texte" style="font-size:16px;font-weight:600;margin:24px 0;text-align:center;"></p>
-    <button class="btn btn-primary" onclick="accepterTransfert()">✅ Oui, j'accepte</button>
-    <button class="btn btn-outline" onclick="refuserTransfert()">❌ Annuler</button>
+  <!-- ÉCRAN 5 : État et note -->
+  <div id="screen-etat" class="screen">
+    <h2>État du matériel</h2>
+    <p id="etat-immo-info" style="font-weight:600;color:#1A3A6B;font-size:15px;"></p>
+    <label class="field-label">État général</label>
+    <select id="select-etat" class="select-input">
+      <option value="Neuf">⭐ Neuf</option>
+      <option value="Bon état" selected>✅ Bon état</option>
+      <option value="Usé">🔶 Usé</option>
+      <option value="Abîmé">⚠️ Abîmé</option>
+      <option value="Hors service">🔴 Hors service</option>
+    </select>
+    <label class="field-label">Note (optionnel)</label>
+    <textarea id="note-texte" class="note-textarea" placeholder="Ex : manque 3 pièces, câble abîmé, nécessite nettoyage..."></textarea>
+    <button class="btn btn-primary" onclick="confirmerAvecEtat()">✅ Confirmer</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 5 : Confirmation -->
+  <!-- ÉCRAN 6 : Confirmation -->
   <div id="screen-confirmation" class="screen">
     <div class="check-anim">✅</div>
     <h2>Enregistré !</h2>
     <div id="recap" class="recap-box"></div>
+    <div id="alerte-degradation" class="alert-degradation hidden"></div>
     <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Retour accueil</button>
   </div>
 
-  <!-- ÉCRAN 6 : Mon matériel -->
+  <!-- ÉCRAN 7 : Mon matériel -->
   <div id="screen-mon-materiel" class="screen">
     <h2>📦 Mon matériel</h2>
     <p id="mon-materiel-user"></p>
@@ -81,15 +100,35 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 7 : Transferts en attente -->
+  <!-- ÉCRAN 8 : Transferts en attente -->
   <div id="screen-transferts-attente" class="screen">
     <h2>⚠️ Transferts en attente</h2>
-    <p>Ces matériels t'ont été transmis — scanne chacun pour valider.</p>
+    <p>Ces matériels t'ont été transmis — clique pour valider.</p>
     <div id="liste-attente" class="liste-materiel"></div>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 8 : Scanner pour validation -->
+  <!-- ÉCRAN 9 : Accepter un transfert -->
+  <div id="screen-accepter" class="screen">
+    <h2>📥 Réception de matériel</h2>
+    <p id="accepter-texte" style="font-size:16px;font-weight:600;margin:8px 0;text-align:center;color:#1A3A6B;"></p>
+    <div id="accepter-etat-donneur" class="localisation-badge" style="font-size:13px;"></div>
+    <div id="accepter-note-donneur" style="width:100%;"></div>
+    <label class="field-label">Ton constat à réception</label>
+    <select id="accepter-select-etat" class="select-input">
+      <option value="Neuf">⭐ Neuf</option>
+      <option value="Bon état" selected>✅ Bon état</option>
+      <option value="Usé">🔶 Usé</option>
+      <option value="Abîmé">⚠️ Abîmé</option>
+      <option value="Hors service">🔴 Hors service</option>
+    </select>
+    <label class="field-label">Note (optionnel)</label>
+    <textarea id="accepter-note" class="note-textarea" placeholder="Observations à la réception..."></textarea>
+    <button class="btn btn-primary" onclick="accepterTransfert()">✅ Oui, j'accepte</button>
+    <button class="btn btn-danger" onclick="refuserTransfert()">❌ Annuler</button>
+  </div>
+
+  <!-- ÉCRAN 10 : Scanner pour validation -->
   <div id="screen-scan-validation" class="screen">
     <h2>Scanner pour valider</h2>
     <p>Scanne le QR code du matériel reçu</p>
@@ -97,29 +136,29 @@
     <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 9 : Suivi immo (admin) -->
+  <!-- ÉCRAN 11 : Suivi immo -->
   <div id="screen-suivi-immo" class="screen">
     <h2>🔍 Suivi immo</h2>
     <div class="admin-search">
-      <input type="text" id="suivi-immo-code" class="select-input" placeholder="Code immo (ex: IM000328 ou 328)">
-      <button class="btn btn-primary" onclick="rechercherSuiviImmo()">Rechercher</button>
+      <input type="text" id="suivi-immo-code" class="select-input" placeholder="Code (ex: 328 ou IM000328)">
+      <button class="btn btn-primary" onclick="rechercherSuiviImmo()">Go</button>
     </div>
-    <button class="btn btn-outline" onclick="scannerPourSuivi()" style="margin-bottom:12px;">📷 Scanner un QR code</button>
+    <button class="btn btn-outline" onclick="scannerPourSuivi()">📷 Scanner un QR code</button>
     <div id="suivi-immo-localisation"></div>
     <div id="suivi-immo-resultats" class="liste-materiel">
-      <p class="empty-msg">Scanne ou tape un code immo pour voir son historique.</p>
+      <p class="empty-msg">Scanne ou tape un code immo.</p>
     </div>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 10 : Scanner pour suivi -->
+  <!-- ÉCRAN 12 : Scanner pour suivi -->
   <div id="screen-scan-suivi" class="screen">
     <h2>Scanner une immo</h2>
     <div id="scanner-suivi" class="scanner-box"></div>
     <button class="btn btn-outline" onclick="showScreen('screen-suivi-immo')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN : Suivi employé -->
+  <!-- ÉCRAN 13 : Suivi employé -->
   <div id="screen-suivi-employe" class="screen">
     <h2>👤 Suivi employé</h2>
     <input type="text" id="suivi-employe-search" class="select-input" placeholder="Nom ou code employé..." oninput="rechercherSuggestionsEmploye()">
@@ -130,12 +169,12 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 11 : Administration -->
+  <!-- ÉCRAN 14 : Administration -->
   <div id="screen-admin" class="screen">
     <h2>⚙️ Administration</h2>
     <div class="admin-search">
       <input type="text" id="admin-search" class="select-input" placeholder="Immo, employé, chantier...">
-      <button class="btn btn-primary" onclick="adminRechercher()">Rechercher</button>
+      <button class="btn btn-primary" onclick="adminRechercher()">Go</button>
     </div>
     <div id="admin-resultats" class="liste-materiel">
       <p class="empty-msg">Tapez un code immo, un nom ou un chantier.</p>
