@@ -880,17 +880,55 @@ async function adminRechercher() {
         m.nom_employe.toUpperCase().includes(q) ||
         m.code_chantier.toUpperCase().includes(q);
     });
-    div.innerHTML = filtres.length === 0
-      ? '<p class="empty-msg">Aucun résultat pour "' + query + '".</p>'
-      : filtres.map(function(m) {
-          return '<div class="materiel-card"><strong>' + m.code_im + '</strong> — ' + m.type_mouvement +
-            ' ' + formatMouvementBadge(m) + '<br>' +
-            '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
-            new Date(m.horodatage).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small>' +
-            (m.etat ? '<br><small>État : ' + m.etat + '</small>' : '') +
-            (m.note ? '<br><small>📝 ' + m.note + '</small>' : '') +
-            '</div>';
-        }).join('');
+
+    var html = '';
+
+    // Chercher aussi dans immos.json pour les immos sans mouvement
+    var immosMatchs = [];
+    if (filtres.length === 0 || q.match(/^[0-9]+$/) || q.startsWith('IM')) {
+      for (var k in state.immos) {
+        var im = state.immos[k];
+        if (k.toUpperCase().includes(q) ||
+            (im.Libelle || '').toUpperCase().includes(q) ||
+            (im.N_Serie || '').toUpperCase().includes(q)) {
+          // Vérifier si cette immo a des mouvements dans filtres
+          var aMouvements = filtres.some(function(m) { return m.code_im === k; });
+          if (!aMouvements) immosMatchs.push(im);
+        }
+      }
+    }
+
+    // Afficher d'abord les immos sans mouvement
+    if (immosMatchs.length > 0) {
+      html += immosMatchs.map(function(im) {
+        var fdsBtn = im.FDS_URL ? '<a href="' + im.FDS_URL + '" target="_blank" style="font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;margin-left:6px">📄 FDS</a>' : '';
+        return '<div class="materiel-card" style="border-left-color:#27AE60">' +
+          '<strong style="font-size:15px">' + im.Libelle + '</strong>' + fdsBtn + '<br>' +
+          '<span style="font-size:11px;color:#999;font-family:monospace">' + im.Code_IM + '</span>' +
+          (im.Categorie ? ' · <span style="font-size:11px;color:#666">' + im.Categorie + '</span>' : '') +
+          (im.N_Serie ? '<br><small style="color:#888">N° série : ' + im.N_Serie + '</small>' : '') +
+          '<br><small style="color:var(--green, #27AE60);font-weight:600">🏭 Au dépôt — aucun mouvement enregistré</small>' +
+          '</div>';
+      }).join('');
+    }
+
+    // Puis les mouvements
+    if (filtres.length > 0) {
+      html += filtres.map(function(m) {
+        return '<div class="materiel-card">' +
+          '<strong style="font-size:15px">' + getLibelle(m.code_im) + '</strong><br>' +
+          '<span style="font-size:11px;color:#999;font-family:monospace">' + m.code_im + '</span>' +
+          ' — ' + m.type_mouvement + ' ' + formatMouvementBadge(m) + '<br>' +
+          '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
+          new Date(m.horodatage).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small>' +
+          (m.etat ? '<br><small>État : ' + m.etat + '</small>' : '') +
+          (m.note ? '<br><small>📝 ' + m.note + '</small>' : '') +
+          '</div>';
+      }).join('');
+    }
+
+    div.innerHTML = html || '<p class="empty-msg">Aucun résultat pour "' + query + '".</p>';
+
   } catch (e) {
     div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
   }
