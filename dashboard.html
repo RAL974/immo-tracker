@@ -238,14 +238,27 @@ async function loadData() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('dash').style.display = 'none';
   try {
-    var r = await fetch(W + '?dashboard=1');
-    d = await r.json();
+    var fdsMap = {};
+    var dashRes = await fetch(W + '?dashboard=1');
+    d = await dashRes.json();
+    try {
+      var fdsRes = await fetch(W + '?fds_map=1');
+      fdsMap = await fdsRes.json();
+    } catch(e2) {}
     try {
       var ir = await fetch('immos.json');
       var il = await ir.json();
       il.forEach(function(i) { im[i.Code_IM] = i; });
+      // Injecter les FDS depuis SharePoint dans im
+      Object.keys(fdsMap).forEach(function(code) {
+        if (im[code]) im[code].FDS_URL = fdsMap[code];
+        else im[code] = { Code_IM: code, Libelle: code, FDS_URL: fdsMap[code], Categorie: '', N_Serie: '' };
+      });
       function enrich(x) {
-        if (x && x.code_im && im[x.code_im]) { x.lib = im[x.code_im].Libelle||''; x.fds = im[x.code_im].FDS_URL||''; }
+        if (x && x.code_im) {
+          x.lib = im[x.code_im] ? im[x.code_im].Libelle||'' : '';
+          x.fds = fdsMap[x.code_im] || (im[x.code_im] ? im[x.code_im].FDS_URL||'' : '');
+        }
         return x;
       }
       ['inventory','en_circulation','au_depot','pending','hors_service','all_movements'].forEach(function(k) {
@@ -537,7 +550,7 @@ function renderDocs() {
       var fdsCell = r.fds
         ? '<a href="' + r.fds + '" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">📄 Voir FDS</a>'
         : '<span style="color:var(--red);font-size:12px;font-weight:600">⚠️ Manquante</span>';
-      var photosCell = '<button onclick="window.open(\'' + encodeURI('https://immo-proxy.ral-85d.workers.dev/?photos='+r.code_im) + '\')" style="font-size:11px;padding:3px 8px;background:#FFF8F0;color:#E87722;border:1px solid #E87722;border-radius:6px;cursor:pointer">🖼️</button>';
+      var photosCell = '<button onclick="showPhotosModal(\''+r.code_im+'\')" style="font-size:11px;padding:3px 8px;background:#FFF8F0;color:#E87722;border:1px solid #E87722;border-radius:6px;cursor:pointer">Photos</button>';
       var statBadge = r.statut === 'En circulation'
         ? '<span class="badge bc" style="font-size:11px">Circ. — ' + r.detenteur + '</span>'
         : '<span class="badge bd" style="font-size:11px">Depot</span>';
@@ -548,6 +561,43 @@ function renderDocs() {
         '<td>' + fdsCell + '</td>' +
         '<td>' + photosCell + '</td></tr>';
     }).join('');
+}
+
+async function showPhotosModal(codeIM) {
+  var old = document.getElementById('photos-modal');
+  if (old) old.remove();
+  var modal = document.createElement('div');
+  modal.id = 'photos-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+  var box = document.createElement('div');
+  box.style.cssText = 'background:white;border-radius:16px;padding:20px;max-width:860px;width:100%;max-height:85vh;overflow-y:auto';
+  var libelle = im[codeIM] ? im[codeIM].Libelle||codeIM : codeIM;
+  box.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+    '<div><strong style="color:var(--blue)">' + libelle + '</strong><br><span style="font-size:12px;color:var(--grey);font-family:monospace">' + codeIM + '</span></div>' +
+    '<button id="close-modal-btn" style="background:#eee;border:none;border-radius:50%;width:34px;height:34px;font-size:20px;cursor:pointer">x</button>' +
+    '</div><p id="photos-modal-body" style="color:var(--grey);text-align:center;padding:20px">Chargement...</p>';
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+  document.getElementById('close-modal-btn').onclick = function() { modal.remove(); };
+  try {
+    var res = await fetch(W + '?photos=' + encodeURIComponent(codeIM));
+    var photos = await res.json();
+    var body = document.getElementById('photos-modal-body');
+    if (!photos || !photos.length) { body.textContent = 'Aucune photo pour ' + codeIM + '.'; return; }
+    var grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
+    photos.forEach(function(p) {
+      grid += '<div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)">' +
+        '<img src="' + p.url + '" loading="lazy" style="width:100%;height:160px;object-fit:cover;cursor:pointer;display:block" onclick="window.open(this.src)">' +
+        '<p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">' + fmtD(p.created) + ' — ' + Math.round(p.size/1024) + ' Ko</p>' +
+        '</div>';
+    });
+    grid += '</div>';
+    body.outerHTML = grid;
+  } catch(e) {
+    var b = document.getElementById('photos-modal-body');
+    if (b) b.textContent = 'Erreur : ' + e.message;
+  }
 }
 
 function exportExcel() {
