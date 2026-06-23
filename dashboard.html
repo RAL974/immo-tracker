@@ -141,6 +141,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
         <button class="tab" onclick="tab('hist')">Historique</button>
         <button class="tab" onclick="tab('analyse')">Analyses</button>
         <button class="tab" onclick="tab('alertes')">Alertes <span class="tbadge" id="tc-alert">0</span></button>
+        <button class="tab" onclick="tab('docs')">Documents <span class="tbadge" style="background:var(--orange)" id="tc-docs">0</span></button>
       </div>
     </div>
 
@@ -192,6 +193,20 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
       <div id="pane-alertes" style="display:none">
         <div class="thead"><h3>Points d attention</h3></div>
         <div id="alertes-content"></div>
+      </div>
+      <div id="pane-docs" style="display:none">
+        <div class="thead"><h3>Suivi des documents par immo</h3><span class="tcnt" id="cnt-docs"></span></div>
+        <div class="srch-hist">
+          <input type="text" id="docs-q" placeholder="Filtrer par libelle, categorie, code..." oninput="renderDocs()">
+          <select id="docs-filter" onchange="renderDocs()" style="padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px">
+            <option value="">Tous</option>
+            <option value="manque_fds">Sans FDS</option>
+            <option value="a_fds">Avec FDS</option>
+          </select>
+        </div>
+        <div style="overflow-x:auto"><table><thead><tr>
+          <th>Code IM</th><th>Libelle</th><th>Categorie</th><th>Statut</th><th>FDS</th><th>Photos</th>
+        </tr></thead><tbody id="tb-docs"></tbody></table></div>
       </div>
     </div>
   </div>
@@ -330,7 +345,7 @@ function drawCharts() {
   });
 }
 
-var tabs=['circ','depot','all','pending','hist','analyse','alertes'];
+var tabs=['circ','depot','all','pending','hist','analyse','alertes','docs'];
 function tab(t) {
   curTab = t;
   document.querySelectorAll('.tab').forEach(function(el,i){ el.classList.toggle('active',tabs[i]===t); });
@@ -341,6 +356,7 @@ function tab(t) {
   else if (t==='pending') renderPending();
   else if (t==='alertes') renderAlertes();
   else if (t==='analyse') renderAnalyse();
+  else if (t==='docs') renderDocs();
 }
 
 function filterTable() {
@@ -481,6 +497,57 @@ function srt(arr, field, asc) {
 function ebadge(e) {
   var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh'};
   return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';
+}
+
+function renderDocs() {
+  var q = (document.getElementById('docs-q').value||'').toUpperCase();
+  var f = document.getElementById('docs-filter').value;
+  // Fusionner inventory avec TOUTES les immos du fichier immos.json
+  var invMap = {};
+  (d.inventory||[]).forEach(function(i) { invMap[i.code_im] = i; });
+  var rows = Object.keys(im).map(function(code) {
+    var immo = im[code];
+    var inv = invMap[code];
+    return {
+      code_im: code,
+      libelle: immo.Libelle || '',
+      categorie: immo.Categorie || '',
+      fds: immo.FDS_URL || '',
+      statut: inv ? inv.statut : 'Au depot',
+      detenteur: inv ? inv.detenteur_nom : 'Depot',
+    };
+  });
+  // Filtres
+  if (q) rows = rows.filter(function(r) {
+    return r.code_im.includes(q) || r.libelle.toUpperCase().includes(q) || r.categorie.toUpperCase().includes(q);
+  });
+  if (f === 'manque_fds') rows = rows.filter(function(r) { return !r.fds; });
+  if (f === 'a_fds') rows = rows.filter(function(r) { return !!r.fds; });
+  // Trier : sans FDS d'abord
+  rows.sort(function(a,b) {
+    if (!a.fds && b.fds) return -1;
+    if (a.fds && !b.fds) return 1;
+    return a.code_im.localeCompare(b.code_im);
+  });
+  var sansFds = rows.filter(function(r) { return !r.fds; }).length;
+  document.getElementById('tc-docs').textContent = sansFds + ' sans FDS';
+  document.getElementById('cnt-docs').textContent = rows.length + ' immos';
+  document.getElementById('tb-docs').innerHTML = rows.length === 0 ? '<tr><td colspan="6" class="es">Aucune immo.</td></tr>' :
+    rows.map(function(r) {
+      var fdsCell = r.fds
+        ? '<a href="' + r.fds + '" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">📄 Voir FDS</a>'
+        : '<span style="color:var(--red);font-size:12px;font-weight:600">⚠️ Manquante</span>';
+      var photosCell = '<button onclick="window.open(\'' + encodeURI('https://immo-proxy.ral-85d.workers.dev/?photos='+r.code_im) + '\')" style="font-size:11px;padding:3px 8px;background:#FFF8F0;color:#E87722;border:1px solid #E87722;border-radius:6px;cursor:pointer">🖼️</button>';
+      var statBadge = r.statut === 'En circulation'
+        ? '<span class="badge bc" style="font-size:11px">Circ. — ' + r.detenteur + '</span>'
+        : '<span class="badge bd" style="font-size:11px">Depot</span>';
+      return '<tr><td class="icode">' + r.code_im + '</td>' +
+        '<td style="font-size:12px">' + r.libelle + '</td>' +
+        '<td style="font-size:11px;color:var(--grey)">' + r.categorie + '</td>' +
+        '<td>' + statBadge + '</td>' +
+        '<td>' + fdsCell + '</td>' +
+        '<td>' + photosCell + '</td></tr>';
+    }).join('');
 }
 
 function exportExcel() {
