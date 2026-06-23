@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tableau de bord — Espace Soleil Logistique</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --blue: #1A3A6B; --orange: #E87722; --bg: #F0F4F8;
@@ -33,6 +34,8 @@ header img { height: 40px; margin-right: 16px; }
 header h1 { font-size: 18px; font-weight: 700; flex: 1; }
 header .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
 #last-refresh { opacity: 0.7; }
+#export-btn { background: var(--green); border: none; color: white; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
+#export-btn:hover { background: #1e8449; }
 #refresh-btn { background: var(--orange); border: none; color: white; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
 #refresh-btn:hover { background: #c96a1e; }
 #logout-btn { background: rgba(255,255,255,0.15); border: none; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
@@ -162,6 +165,7 @@ tr:hover td { background: #FAFBFC; }
   <h1>Tableau de bord — Suivi des immobilisations</h1>
   <div class="header-right">
     <span id="last-refresh">Chargement...</span>
+    <button id="export-btn" onclick="exporterExcel()">📥 Exporter Excel</button>
     <button id="refresh-btn" onclick="chargerDonnees()">🔄 Actualiser</button>
     <button id="logout-btn" onclick="deconnecter()">Déconnexion</button>
   </div>
@@ -315,6 +319,143 @@ let sortConfig = { field: 'code_im', asc: true };
 let currentTab = 'circulation';
 let charts = {};
 
+// ── Export Excel ─────────────────────────────────────────────────
+function exporterExcel() {
+  if (!dashData) { alert('Aucune donnée à exporter. Chargez d'abord le tableau de bord.'); return; }
+  const wb = XLSX.utils.book_new();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR');
+  const heureStr = now.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+
+  // ── Onglet 1 : Inventaire complet ──
+  const invRows = [
+    ['Code IM', 'Libellé', 'Statut', 'Détenteur', 'Code détenteur', 'État', 'Note', 'Dernier mouvement', 'Depuis'],
+  ];
+  dashData.inventory.forEach(function(i) {
+    invRows.push([
+      i.code_im,
+      i.libelle || '',
+      i.statut,
+      i.statut === 'Au dépôt' ? 'Dépôt' : i.detenteur_nom,
+      i.statut === 'Au dépôt' ? 'DEPOT' : i.detenteur_code,
+      i.etat || 'Inconnu',
+      i.note || '',
+      i.dernier_mouvement || '',
+      i.since ? new Date(i.since).toLocaleString('fr-FR') : '',
+    ]);
+  });
+  const wsInv = XLSX.utils.aoa_to_sheet(invRows);
+  wsInv['!cols'] = [12,40,16,28,14,14,30,16,20].map(function(w) { return { wch: w }; });
+  styliserEntete(wsInv, invRows[0].length);
+  XLSX.utils.book_append_sheet(wb, wsInv, 'Inventaire complet');
+
+  // ── Onglet 2 : En circulation ──
+  const circRows = [
+    ['Détenteur', 'Code', 'Code IM', 'Libellé', 'État', 'Note', 'Depuis'],
+  ];
+  const grouped = {};
+  dashData.en_circulation.forEach(function(i) {
+    if (!grouped[i.detenteur_code]) grouped[i.detenteur_code] = { nom: i.detenteur_nom, items: [] };
+    grouped[i.detenteur_code].items.push(i);
+  });
+  Object.entries(grouped).sort(function(a,b) { return b[1].items.length - a[1].items.length; }).forEach(function(entry) {
+    const code = entry[0]; const g = entry[1];
+    g.items.forEach(function(i) {
+      circRows.push([g.nom, code, i.code_im, i.libelle || '', i.etat || '', i.note || '', i.since ? new Date(i.since).toLocaleString('fr-FR') : '']);
+    });
+  });
+  const wsCirc = XLSX.utils.aoa_to_sheet(circRows);
+  wsCirc['!cols'] = [28,10,14,40,14,30,20].map(function(w) { return { wch: w }; });
+  styliserEntete(wsCirc, circRows[0].length);
+  XLSX.utils.book_append_sheet(wb, wsCirc, 'En circulation');
+
+  // ── Onglet 3 : Au dépôt ──
+  const depotRows = [
+    ['Code IM', 'Libellé', 'État', 'Note', 'Dernier mouvement', 'Depuis'],
+  ];
+  dashData.au_depot.forEach(function(i) {
+    depotRows.push([i.code_im, i.libelle || '', i.etat || '', i.note || '', i.dernier_mouvement || '', i.since ? new Date(i.since).toLocaleString('fr-FR') : '']);
+  });
+  const wsDepot = XLSX.utils.aoa_to_sheet(depotRows);
+  wsDepot['!cols'] = [14,40,14,30,16,20].map(function(w) { return { wch: w }; });
+  styliserEntete(wsDepot, depotRows[0].length);
+  XLSX.utils.book_append_sheet(wb, wsDepot, 'Au dépôt');
+
+  // ── Onglet 4 : Transferts en attente ──
+  const pendRows = [
+    ['Code IM', 'Libellé', 'Donneur', 'Code donneur', 'Receveur attendu', 'Code receveur', 'État déclaré', 'Note', 'En attente depuis', 'Retard'],
+  ];
+  const nowMs = now.getTime();
+  dashData.pending.forEach(function(t) {
+    const heures = Math.round((nowMs - new Date(t.horodatage).getTime()) / 3600000);
+    pendRows.push([
+      t.code_im, t.libelle || '', t.donneur_nom, t.donneur_code,
+      t.receveur_nom, t.receveur_code, t.etat || '', t.note || '',
+      new Date(t.horodatage).toLocaleString('fr-FR'),
+      heures > 24 ? heures + 'h ⚠️' : heures + 'h'
+    ]);
+  });
+  const wsPend = XLSX.utils.aoa_to_sheet(pendRows);
+  wsPend['!cols'] = [14,40,28,12,28,12,14,30,20,10].map(function(w) { return { wch: w }; });
+  styliserEntete(wsPend, pendRows[0].length);
+  XLSX.utils.book_append_sheet(wb, wsPend, 'Transferts en attente');
+
+  // ── Onglet 5 : Alertes ──
+  const alertRows = [
+    ['Type alerte', 'Code IM', 'Libellé', 'Détail', 'Depuis'],
+  ];
+  dashData.hors_service.forEach(function(i) {
+    alertRows.push(['🔴 Hors service', i.code_im, i.libelle || '', i.note || '', i.since ? new Date(i.since).toLocaleString('fr-FR') : '']);
+  });
+  dashData.alertes_delai.forEach(function(t) {
+    const heures = Math.round((nowMs - new Date(t.horodatage).getTime()) / 3600000);
+    alertRows.push(['⏰ Transfert > 24h', t.code_im, t.libelle || '', 'Attendu par ' + t.receveur_nom + ' depuis ' + heures + 'h', new Date(t.horodatage).toLocaleString('fr-FR')]);
+  });
+  if (alertRows.length === 1) alertRows.push(['✅ Aucune alerte', '', '', '', '']);
+  const wsAlert = XLSX.utils.aoa_to_sheet(alertRows);
+  wsAlert['!cols'] = [20,14,40,40,20].map(function(w) { return { wch: w }; });
+  styliserEntete(wsAlert, alertRows[0].length);
+  XLSX.utils.book_append_sheet(wb, wsAlert, 'Alertes');
+
+  // ── Onglet 6 : Résumé stats ──
+  const s = dashData.stats;
+  const statRows = [
+    ['Tableau de bord Espace Soleil — Suivi des immobilisations'],
+    ['Généré le', dateStr + ' à ' + heureStr],
+    [],
+    ['Indicateur', 'Valeur'],
+    ['Immos tracées', s.total_mouvementes],
+    ['En circulation', s.en_circulation],
+    ['Au dépôt', s.au_depot],
+    ['Transferts en attente', s.transferts_en_attente],
+    ['Hors service', s.hors_service],
+    ['Alertes retard (> 24h)', s.alertes_delai],
+    [],
+    ['Distribution par état', ''],
+    ['Neuf', s.par_etat['Neuf'] || 0],
+    ['Bon état', s.par_etat['Bon état'] || 0],
+    ['Usé', s.par_etat['Usé'] || 0],
+    ['Abîmé', s.par_etat['Abîmé'] || 0],
+    ['Hors service', s.par_etat['Hors service'] || 0],
+    ['État inconnu', s.par_etat['Inconnu'] || 0],
+  ];
+  const wsStat = XLSX.utils.aoa_to_sheet(statRows);
+  wsStat['!cols'] = [{ wch: 30 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, wsStat, 'Résumé');
+
+  // Télécharger
+  const filename = 'Espace_Soleil_Immos_' + now.toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, filename);
+}
+
+function styliserEntete(ws, ncols) {
+  for (var c = 0; c < ncols; c++) {
+    var cell_ref = XLSX.utils.encode_cell({ r: 0, c: c });
+    if (!ws[cell_ref]) continue;
+    ws[cell_ref].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1A3A6B' } } };
+  }
+}
+
 // ── Auth ─────────────────────────────────────────────────────────
 function verifierPin() {
   const pin = document.getElementById('pin-input').value;
@@ -338,8 +479,30 @@ async function chargerDonnees() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('dashboard').style.display = 'none';
   try {
-    const res = await fetch(WORKER + '?dashboard=1');
-    dashData = await res.json();
+    const [dashRes, immosRes] = await Promise.all([
+      fetch(WORKER + '?dashboard=1'),
+      fetch('immos.json').catch(function() { return { json: function() { return Promise.resolve([]); } }; })
+    ]);
+    dashData = await dashRes.json();
+
+    // Enrichir avec les libellés depuis immos.json
+    const immosList = await immosRes.json();
+    const immosMap = {};
+    immosList.forEach(function(i) { immosMap[i.Code_IM] = i; });
+    function enrichir(item) {
+      if (immosMap[item.code_im]) {
+        item.libelle = immosMap[item.code_im].Libelle;
+        item.categorie = immosMap[item.code_im].Categorie;
+        item.fds_url = immosMap[item.code_im].FDS_URL;
+      }
+      return item;
+    }
+    if (dashData.inventory) dashData.inventory.forEach(enrichir);
+    if (dashData.en_circulation) dashData.en_circulation.forEach(enrichir);
+    if (dashData.au_depot) dashData.au_depot.forEach(enrichir);
+    if (dashData.pending) dashData.pending.forEach(enrichir);
+    if (dashData.hors_service) dashData.hors_service.forEach(enrichir);
+
     afficherDashboard();
     document.getElementById('last-refresh').textContent = 'Actualisé à ' + new Date().toLocaleTimeString('fr-FR');
   } catch (e) {
@@ -465,7 +628,8 @@ function afficherCirculation() {
           '<span class="detenteur-count">' + d.immos.length + '</span>' +
           '<span class="employe-code" style="margin-left:8px">' + d.code + '</span></span></div>' +
           d.immos.map(function(i) {
-            return '<div class="immo-item"><span class="immo-code">' + i.code_im + '</span>' +
+            var fdsBtn = i.fds_url ? '<a href="' + i.fds_url + '" target="_blank" title="FDS" style="font-size:11px;color:#0D47A1;margin-left:4px;">📄</a>' : '';
+            return '<div class="immo-item"><span><span class="immo-code">' + i.code_im + '</span>' + fdsBtn + '<br><span style="font-size:12px;color:#555">' + (i.libelle || '') + '</span></span>' +
               '<span>' + etatBadge(i.etat) + ' <span class="immo-date">' + formatDate(i.since) + '</span></span></div>';
           }).join('') + '</div>';
       }).join('');
