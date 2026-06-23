@@ -237,6 +237,32 @@ async function loadData() {
         if (d[k]) d[k].forEach(enrich);
       });
     } catch(e) {}
+
+    // Compléter l'inventaire avec TOUTES les immos (819), pas seulement celles avec mouvements
+    var inventorySet = {};
+    (d.inventory||[]).forEach(function(i) { inventorySet[i.code_im] = true; });
+    Object.keys(im).forEach(function(code) {
+      if (!inventorySet[code]) {
+        var immo = im[code];
+        var jamais = {
+          code_im: code, lib: immo.Libelle||'', libelle: immo.Libelle||'',
+          fds: immo.FDS_URL||'', statut: 'Au depot',
+          detenteur_code: 'DEPOT', detenteur_nom: 'Depot',
+          etat: 'Inconnu', note: '', since: null,
+          dernier_mouvement: 'Jamais sorti', jamais_sorti: true,
+        };
+        d.inventory.push(jamais);
+        d.au_depot.push(jamais);
+      }
+    });
+    // Recalculer les stats
+    d.stats.total_mouvementes = d.inventory.length;
+    d.stats.au_depot = d.au_depot.length;
+    d.stats.par_etat['Inconnu'] = d.inventory.filter(function(i) {
+      var etats = ['Neuf','Bon état','Usé','Abîmé','Hors service'];
+      return !etats.includes(i.etat);
+    }).length;
+
     render();
     document.getElementById('last-refresh').textContent = 'Actualise ' + fmtDT(new Date().toISOString());
   } catch(e) { document.getElementById('loading').textContent = 'Erreur : ' + e.message; }
