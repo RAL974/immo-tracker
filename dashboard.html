@@ -536,31 +536,35 @@ function renderDocs() {
   });
   if (f === 'manque_fds') rows = rows.filter(function(r) { return !r.fds; });
   if (f === 'a_fds') rows = rows.filter(function(r) { return !!r.fds; });
-  // Trier : sans FDS d'abord
-  rows.sort(function(a,b) {
-    if (!a.fds && b.fds) return -1;
-    if (a.fds && !b.fds) return 1;
-    return a.code_im.localeCompare(b.code_im);
-  });
+  // Tri alphabétique
+  rows.sort(function(a,b) { return a.code_im.localeCompare(b.code_im); });
   var sansFds = rows.filter(function(r) { return !r.fds; }).length;
+  var avecPhotos = rows.filter(function(r) { return photosMapData[r.code_im]; }).length;
   document.getElementById('tc-docs').textContent = sansFds + ' sans FDS';
-  document.getElementById('cnt-docs').textContent = rows.length + ' immos';
+  document.getElementById('cnt-docs').textContent = rows.length + ' immos — ' + avecPhotos + ' avec photos';
   document.getElementById('tb-docs').innerHTML = rows.length === 0 ? '<tr><td colspan="6" class="es">Aucune immo.</td></tr>' :
     rows.map(function(r) {
-      var fdsCell = r.fds
-        ? '<a href="' + r.fds + '" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">📄 Voir FDS</a>'
-        : '<span style="color:var(--red);font-size:12px;font-weight:600">⚠️ Manquante</span>';
-      var photosCell = '<button onclick="showPhotosModal(\''+r.code_im+'\')" style="font-size:11px;padding:3px 8px;background:#FFF8F0;color:#E87722;border:1px solid #E87722;border-radius:6px;cursor:pointer">Photos</button>';
+      var hasFds = !!r.fds;
+      var hasPhotos = !!photosMapData[r.code_im];
+      var fdsCell = hasFds
+        ? '<a href="' + r.fds + '" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">Voir FDS</a>'
+        : '<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>';
+      var photosCell = hasPhotos
+        ? '<button onclick="showPhotosModal(this.getAttribute('data-code'))" data-code="' + r.code_im + '" style="font-size:11px;padding:4px 9px;background:var(--green);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>'
+        : '<span style="font-size:11px;color:#ccc">—</span>';
       var statBadge = r.statut === 'En circulation'
-        ? '<span class="badge bc" style="font-size:11px">Circ. — ' + r.detenteur + '</span>'
+        ? '<span class="badge bc" style="font-size:11px">Circ.</span>'
         : '<span class="badge bd" style="font-size:11px">Depot</span>';
-      return '<tr><td class="icode">' + r.code_im + '</td>' +
+      var bg = hasFds ? ' style="background:#F0FFF4"' : '';
+      return '<tr' + bg + '><td class="icode">' + r.code_im + '</td>' +
         '<td style="font-size:12px">' + r.libelle + '</td>' +
         '<td style="font-size:11px;color:var(--grey)">' + r.categorie + '</td>' +
         '<td>' + statBadge + '</td>' +
         '<td>' + fdsCell + '</td>' +
         '<td>' + photosCell + '</td></tr>';
     }).join('');
+}
+
 }
 
 async function showPhotosModal(codeIM) {
