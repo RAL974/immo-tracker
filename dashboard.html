@@ -19,27 +19,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #pin-input:focus{outline:none;border-color:var(--orange);}
 #pin-btn{width:100%;margin-top:12px;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
 #pin-error{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
-header{background:var(--blue);color:#fff;padding:0 24px;display:flex;align-items:center;height:60px;position:sticky;top:0;z-index:100;gap:12px;}
+header{background:var(--blue);color:#fff;padding:0 24px;display:flex;align-items:center;height:60px;position:sticky;top:0;z-index:100;gap:10px;}
 header img{height:38px;}
-header h1{font-size:17px;font-weight:700;flex:1;}
+header h1{font-size:16px;font-weight:700;flex:1;}
 .hbtn{border:none;color:#fff;padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;}
 #btn-export{background:var(--green);}
 #btn-refresh{background:var(--orange);}
 #btn-logout{background:rgba(255,255,255,.15);}
-#last-refresh{font-size:12px;opacity:.7;}
+#last-refresh{font-size:11px;opacity:.7;}
 main{max-width:1400px;margin:0 auto;padding:20px;}
 #loading{text-align:center;padding:60px;color:var(--grey);font-size:16px;}
-.section{margin-bottom:20px;}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
-.kpi{background:var(--card);border-radius:12px;padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.section{margin-bottom:18px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;}
+.kpi{background:var(--card);border-radius:12px;padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
 .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--orange);}
 .kpi.g::before{background:var(--green);}.kpi.r::before{background:var(--red);}.kpi.b::before{background:var(--blue);}.kpi.y::before{background:var(--yellow);}
-.kpi-v{font-size:34px;font-weight:800;color:var(--blue);line-height:1;}
-.kpi-l{font-size:12px;color:var(--grey);margin-top:4px;font-weight:500;}
-.kpi-sub{font-size:11px;color:var(--orange);font-weight:600;margin-top:2px;}
-.etat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;}
+.kpi-v{font-size:32px;font-weight:800;color:var(--blue);line-height:1;}
+.kpi-l{font-size:12px;color:var(--grey);margin-top:4px;}
+.etat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;}
 .ec{background:var(--card);border-radius:10px;padding:12px;box-shadow:var(--shadow);text-align:center;}
-.ec-v{font-size:26px;font-weight:800;}.ec-l{font-size:11px;color:var(--grey);margin-top:2px;}
+.ec-v{font-size:24px;font-weight:800;}.ec-l{font-size:11px;color:var(--grey);margin-top:2px;}
 .neuf .ec-v{color:var(--green);}.bon .ec-v{color:#2980B9;}.use .ec-v{color:var(--yellow);}.abime .ec-v{color:var(--red);}.hs .ec-v{color:var(--grey);}.inc .ec-v{color:#BDC3C7;}
 .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
 .chart-card{background:var(--card);border-radius:12px;padding:18px;box-shadow:var(--shadow);}
@@ -49,7 +48,7 @@ main{max-width:1400px;margin:0 auto;padding:20px;}
 .search-bar input,.search-bar select{padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;background:#fff;}
 .search-bar input{flex:1;min-width:200px;}
 .search-bar input:focus,.search-bar select:focus{outline:none;border-color:var(--orange);}
-.tabs{display:flex;gap:3px;background:var(--card);padding:5px;border-radius:10px;box-shadow:var(--shadow);width:fit-content;overflow-x:auto;max-width:100%;}
+.tabs{display:flex;gap:3px;background:var(--card);padding:5px;border-radius:10px;box-shadow:var(--shadow);overflow-x:auto;max-width:100%;}
 .tab{padding:9px 16px;border-radius:7px;border:none;background:transparent;cursor:pointer;font-weight:600;font-size:13px;color:var(--grey);white-space:nowrap;}
 .tab.active{background:var(--blue);color:#fff;}
 .tbadge{display:inline-block;background:var(--red);color:#fff;font-size:10px;border-radius:8px;padding:1px 5px;margin-left:3px;}
@@ -76,11 +75,12 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
 .dcnt{background:var(--blue);color:#fff;font-size:11px;padding:1px 7px;border-radius:8px;}
 .ii{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;font-size:12px;}
 .ii:last-child{border-bottom:none;}
-.srch-hist{display:flex;gap:8px;padding:14px 18px;border-bottom:1px solid #eee;}
-.srch-hist input{flex:1;padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;}
+.srch-hist{display:flex;gap:8px;padding:14px 18px;border-bottom:1px solid #eee;flex-wrap:wrap;}
+.srch-hist input{flex:1;min-width:180px;padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;}
 .srch-hist input:focus{outline:none;border-color:var(--orange);}
 .srch-hist button{padding:9px 18px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;}
-@media(max-width:600px){main{padding:10px;}header h1{font-size:13px;}.kpi-v{font-size:26px;}th,td{padding:7px 9px;font-size:12px;}}
+.srch-hist select{padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;background:#fff;}
+@media(max-width:600px){main{padding:10px;}header h1{font-size:13px;}.kpi-v{font-size:24px;}th,td{padding:7px 9px;font-size:12px;}}
 </style>
 </head>
 <body>
@@ -108,15 +108,13 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
 <main>
   <div id="loading">Chargement en cours...</div>
   <div id="dash" style="display:none">
-
     <div class="section"><div class="kpi-grid" id="kpi-grid"></div></div>
     <div class="section"><div class="etat-grid" id="etat-grid"></div></div>
     <div class="section charts-grid">
       <div class="chart-card"><h3>Circulation vs Depot</h3><div class="chart-wrap"><canvas id="ch-rep"></canvas></div></div>
       <div class="chart-card"><h3>Distribution par etat</h3><div class="chart-wrap"><canvas id="ch-etat"></canvas></div></div>
-      <div class="chart-card"><h3>Top detenteurs (nb immos)</h3><div class="chart-wrap"><canvas id="ch-det"></canvas></div></div>
+      <div class="chart-card"><h3>Top detenteurs</h3><div class="chart-wrap"><canvas id="ch-det"></canvas></div></div>
     </div>
-
     <div class="section search-bar">
       <span style="font-weight:700;color:var(--blue)">Filtres</span>
       <input type="text" id="s-q" placeholder="Immo, employe..." oninput="filterTable()">
@@ -131,7 +129,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
         <option value="Au depot">Au depot</option>
       </select>
     </div>
-
     <div class="section">
       <div class="tabs">
         <button class="tab active" onclick="tab('circ')">En circulation <span class="tbadge" id="tc-circ">0</span></button>
@@ -140,84 +137,50 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
         <button class="tab" onclick="tab('pending')">Transferts <span class="tbadge" id="tc-pend">0</span></button>
         <button class="tab" onclick="tab('hist')">Historique</button>
         <button class="tab" onclick="tab('analyse')">Analyses</button>
-        <button class="tab" onclick="tab('alertes')">Alertes <span class="tbadge" id="tc-alert">0</span></button>
         <button class="tab" onclick="tab('docs')">Documents <span class="tbadge" style="background:var(--orange)" id="tc-docs">0</span></button>
+        <button class="tab" onclick="tab('alertes')">Alertes <span class="tbadge" id="tc-alert">0</span></button>
       </div>
     </div>
-
     <div class="tcard">
-      <div id="pane-circ">
-        <div class="thead"><h3>Materiel en circulation</h3><span class="tcnt" id="cnt-circ"></span></div>
-        <div class="dg" id="dg-circ"></div>
-      </div>
-      <div id="pane-depot" style="display:none">
-        <div class="thead"><h3>Materiel au depot</h3><span class="tcnt" id="cnt-depot"></span></div>
-        <div style="overflow-x:auto"><table><thead><tr>
-          <th onclick="sort('depot','code_im')">Code IM</th><th>Libelle</th>
-          <th onclick="sort('depot','etat')">Etat</th>
-          <th onclick="sort('depot','since')">Depuis</th><th>Note</th>
-        </tr></thead><tbody id="tb-depot"></tbody></table></div>
-      </div>
-      <div id="pane-all" style="display:none">
-        <div class="thead"><h3>Inventaire complet</h3><span class="tcnt" id="cnt-all"></span></div>
-        <div style="overflow-x:auto"><table><thead><tr>
-          <th onclick="sort('all','code_im')">Code IM</th><th>Libelle</th>
-          <th onclick="sort('all','statut')">Statut</th>
-          <th onclick="sort('all','detenteur_nom')">Detenteur</th>
-          <th onclick="sort('all','etat')">Etat</th>
-          <th onclick="sort('all','since')">Depuis</th><th>Note</th>
-        </tr></thead><tbody id="tb-all"></tbody></table></div>
-      </div>
-      <div id="pane-pending" style="display:none">
-        <div class="thead"><h3>Transferts en attente</h3><span class="tcnt" id="cnt-pend"></span></div>
-        <div style="overflow-x:auto"><table><thead><tr>
-          <th>Code IM</th><th>Libelle</th><th>Donneur</th>
-          <th>Receveur</th><th>Etat declare</th><th>Attente</th><th>Note</th>
-        </tr></thead><tbody id="tb-pend"></tbody></table></div>
-      </div>
+      <div id="pane-circ"><div class="thead"><h3>Materiel en circulation</h3><span class="tcnt" id="cnt-circ"></span></div><div class="dg" id="dg-circ"></div></div>
+      <div id="pane-depot" style="display:none"><div class="thead"><h3>Au depot</h3><span class="tcnt" id="cnt-depot"></span></div><div style="overflow-x:auto"><table><thead><tr><th onclick="sort('depot','code_im')">Code IM</th><th>Libelle</th><th onclick="sort('depot','etat')">Etat</th><th onclick="sort('depot','since')">Depuis</th><th>Note</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
+      <div id="pane-all" style="display:none"><div class="thead"><h3>Inventaire complet</h3><span class="tcnt" id="cnt-all"></span></div><div style="overflow-x:auto"><table><thead><tr><th onclick="sort('all','code_im')">Code IM</th><th>Libelle</th><th onclick="sort('all','statut')">Statut</th><th onclick="sort('all','detenteur_nom')">Detenteur</th><th onclick="sort('all','etat')">Etat</th><th onclick="sort('all','since')">Depuis</th><th>Note</th></tr></thead><tbody id="tb-all"></tbody></table></div></div>
+      <div id="pane-pending" style="display:none"><div class="thead"><h3>Transferts en attente</h3><span class="tcnt" id="cnt-pend"></span></div><div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Donneur</th><th>Receveur</th><th>Etat</th><th>Attente</th><th>Note</th></tr></thead><tbody id="tb-pend"></tbody></table></div></div>
       <div id="pane-hist" style="display:none">
-        <div class="thead"><h3>Historique — recherche par immo ou employe</h3></div>
+        <div class="thead"><h3>Historique des mouvements</h3></div>
         <div class="srch-hist">
           <input type="text" id="hist-q" placeholder="Code immo (ex: 328) ou nom employe...">
           <button onclick="searchHist()">Rechercher</button>
         </div>
-        <div style="overflow-x:auto"><table><thead><tr>
-          <th>Date (Reunion UTC+4)</th><th>Code IM</th><th>Libelle</th>
-          <th>Type</th><th>Employe</th><th>Etat</th><th>Note</th>
-        </tr></thead><tbody id="tb-hist"></tbody></table></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libelle</th><th>Type</th><th>Employe</th><th>Etat</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
       </div>
-      <div id="pane-analyse" style="display:none">
-        <div class="thead"><h3>Analyses</h3></div>
-        <div id="analyse-content" style="padding:14px"></div>
-      </div>
-      <div id="pane-alertes" style="display:none">
-        <div class="thead"><h3>Points d attention</h3></div>
-        <div id="alertes-content"></div>
-      </div>
+      <div id="pane-analyse" style="display:none"><div class="thead"><h3>Analyses</h3></div><div id="analyse-content" style="padding:16px"></div></div>
       <div id="pane-docs" style="display:none">
         <div class="thead"><h3>Suivi des documents par immo</h3><span class="tcnt" id="cnt-docs"></span></div>
         <div class="srch-hist">
           <input type="text" id="docs-q" placeholder="Filtrer par libelle, categorie, code..." oninput="renderDocs()">
-          <select id="docs-filter" onchange="renderDocs()" style="padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px">
+          <select id="docs-filter" onchange="renderDocs()">
             <option value="">Tous</option>
             <option value="manque_fds">Sans FDS</option>
             <option value="a_fds">Avec FDS</option>
+            <option value="avec_photos">Avec photos</option>
           </select>
         </div>
-        <div style="overflow-x:auto"><table><thead><tr>
-          <th>Code IM</th><th>Libelle</th><th>Categorie</th><th>Statut</th><th>FDS</th><th>Photos</th>
-        </tr></thead><tbody id="tb-docs"></tbody></table></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Categorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
       </div>
+      <div id="pane-alertes" style="display:none"><div class="thead"><h3>Points d attention</h3></div><div id="alertes-content"></div></div>
     </div>
   </div>
 </main>
 
 <script>
 var W = 'https://immo-proxy.ral-85d.workers.dev/';
-var PIN = 'ES974';
 var TZ = 'Indian/Reunion';
+var PIN = 'ES974';
 var d = null;
 var im = {};
+var fdsMap = {};
+var photosMap = {};
 var sc = {field:'code_im',asc:true};
 var curTab = 'circ';
 var charts = {};
@@ -234,102 +197,94 @@ function checkPin() {
 }
 function logout() { sessionStorage.removeItem('da'); location.reload(); }
 
+function fmtD(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric'}); }
+function fmtDT(s) { if (!s) return '—'; return new Date(s).toLocaleString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+
+function getFdsUrl(fdsValue, codeIM) {
+  if (!fdsValue) return '';
+  if (!fdsValue.startsWith('http')) return W + '?fds=' + encodeURIComponent(codeIM);
+  if (fdsValue.includes('sharepoint.com')) return W + '?fds=' + encodeURIComponent(codeIM);
+  return fdsValue;
+}
+
 async function loadData() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('dash').style.display = 'none';
   try {
-    var fdsMap = {};
     var dashRes = await fetch(W + '?dashboard=1');
     d = await dashRes.json();
+    fdsMap = {};
+    photosMap = {};
     try {
-      var fdsRes = await fetch(W + '?fds_map=1');
-      fdsMap = await fdsRes.json();
-    } catch(e2) {}
-    try {
-      var ir = await fetch('immos.json');
-      var il = await ir.json();
-      il.forEach(function(i) { im[i.Code_IM] = i; });
-      // Injecter les FDS depuis SharePoint dans im
+      var results = await Promise.all([
+        fetch(W + '?fds_map=1').then(function(r){return r.json();}),
+        fetch(W + '?photos_map=1').then(function(r){return r.json();}),
+        fetch('immos.json').then(function(r){return r.json();})
+      ]);
+      fdsMap = results[0] || {};
+      photosMap = results[1] || {};
+      var imList = results[2] || [];
+      imList.forEach(function(i) { im[i.Code_IM] = i; });
       Object.keys(fdsMap).forEach(function(code) {
-        if (im[code]) im[code].FDS_URL = fdsMap[code];
-        else im[code] = { Code_IM: code, Libelle: code, FDS_URL: fdsMap[code], Categorie: '', N_Serie: '' };
+        if (!im[code]) im[code] = {Code_IM:code,Libelle:code,Categorie:'',N_Serie:'',FDS_URL:''};
+        im[code].FDS_URL = fdsMap[code];
       });
-      function enrich(x) {
-        if (x && x.code_im) {
-          x.lib = im[x.code_im] ? im[x.code_im].Libelle||'' : '';
-          x.fds = fdsMap[x.code_im] || (im[x.code_im] ? im[x.code_im].FDS_URL||'' : '');
-        }
-        return x;
-      }
-      ['inventory','en_circulation','au_depot','pending','hors_service','all_movements'].forEach(function(k) {
-        if (d[k]) d[k].forEach(enrich);
-      });
-    } catch(e) {}
+    } catch(e2) {}
 
-    // Compléter l'inventaire avec TOUTES les immos (819), pas seulement celles avec mouvements
-    var inventorySet = {};
-    (d.inventory||[]).forEach(function(i) { inventorySet[i.code_im] = true; });
+    function enrich(x) {
+      if (!x || !x.code_im) return x;
+      x.lib = im[x.code_im] ? im[x.code_im].Libelle||'' : '';
+      x.fds = fdsMap[x.code_im] || (im[x.code_im] ? im[x.code_im].FDS_URL||'' : '');
+      return x;
+    }
+    ['inventory','en_circulation','au_depot','pending','hors_service','all_movements'].forEach(function(k) {
+      if (d[k]) d[k].forEach(enrich);
+    });
+
+    // Ajouter les immos sans mouvement
+    var invSet = {};
+    (d.inventory||[]).forEach(function(i) { invSet[i.code_im] = true; });
     Object.keys(im).forEach(function(code) {
-      if (!inventorySet[code]) {
-        var immo = im[code];
-        var jamais = {
-          code_im: code, lib: immo.Libelle||'', libelle: immo.Libelle||'',
-          fds: immo.FDS_URL||'', statut: 'Au depot',
-          detenteur_code: 'DEPOT', detenteur_nom: 'Depot',
-          etat: 'Inconnu', note: '', since: null,
-          dernier_mouvement: 'Jamais sorti', jamais_sorti: true,
-        };
-        d.inventory.push(jamais);
-        d.au_depot.push(jamais);
+      if (!invSet[code]) {
+        var item = {code_im:code,lib:im[code].Libelle||'',libelle:im[code].Libelle||'',fds:fdsMap[code]||(im[code].FDS_URL||''),statut:'Au depot',detenteur_code:'DEPOT',detenteur_nom:'Depot',etat:'Inconnu',note:'',since:null,dernier_mouvement:'Jamais sorti'};
+        d.inventory.push(item);
+        d.au_depot.push(item);
       }
     });
-    // Recalculer les stats
     d.stats.total_mouvementes = d.inventory.length;
     d.stats.au_depot = d.au_depot.length;
-    d.stats.par_etat['Inconnu'] = d.inventory.filter(function(i) {
-      var etats = ['Neuf','Bon état','Usé','Abîmé','Hors service'];
-      return !etats.includes(i.etat);
-    }).length;
+    d.stats.par_etat['Inconnu'] = d.inventory.filter(function(i){var e=['Neuf','Bon état','Usé','Abîmé','Hors service'];return !e.includes(i.etat);}).length;
 
     render();
     document.getElementById('last-refresh').textContent = 'Actualise ' + fmtDT(new Date().toISOString());
   } catch(e) { document.getElementById('loading').textContent = 'Erreur : ' + e.message; }
 }
 
-function fmtD(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric'}); }
-function fmtDT(s) { if (!s) return '—'; return new Date(s).toLocaleString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
-
 function render() {
   var s = d.stats;
   document.getElementById('loading').style.display = 'none';
   document.getElementById('dash').style.display = 'block';
-
   document.getElementById('kpi-grid').innerHTML = [
-    {ic:'📦',v:s.total_mouvementes,l:'Immos tracees',sub:'',cl:''},
-    {ic:'🔄',v:s.en_circulation,l:'En circulation',sub:'',cl:'b'},
-    {ic:'🏭',v:s.au_depot,l:'Au depot',sub:'',cl:'g'},
-    {ic:'📋',v:s.total_mouvements,l:'Total mouvements',sub:'',cl:''},
-    {ic:'⏱️',v:s.moyenne_jours_hors_depot+'j',l:'Duree moy. hors depot',sub:'',cl:''},
-    {ic:'⏳',v:s.transferts_en_attente,l:'Transferts en attente',sub:'',cl:s.transferts_en_attente>0?'y':''},
-    {ic:'🔴',v:s.hors_service,l:'Hors service',sub:'',cl:s.hors_service>0?'r':'g'},
-    {ic:'⚠️',v:s.alertes_delai,l:'Transferts >24h',sub:'',cl:s.alertes_delai>0?'r':'g'},
-  ].map(function(k) {
-    return '<div class="kpi '+k.cl+'"><div style="font-size:24px;margin-bottom:6px">'+k.ic+'</div><div class="kpi-v">'+k.v+'</div><div class="kpi-l">'+k.l+'</div></div>';
-  }).join('');
+    {ic:'📦',v:s.total_mouvementes,l:'Immos tracees',cl:''},
+    {ic:'🔄',v:s.en_circulation,l:'En circulation',cl:'b'},
+    {ic:'🏭',v:s.au_depot,l:'Au depot',cl:'g'},
+    {ic:'📋',v:s.total_mouvements,l:'Total mouvements',cl:''},
+    {ic:'⏱',v:s.moyenne_jours_hors_depot+'j',l:'Duree moy. hors depot',cl:''},
+    {ic:'⏳',v:s.transferts_en_attente,l:'Transferts en attente',cl:s.transferts_en_attente>0?'y':''},
+    {ic:'🔴',v:s.hors_service,l:'Hors service',cl:s.hors_service>0?'r':'g'},
+    {ic:'⚠',v:s.alertes_delai,l:'Transferts >24h',cl:s.alertes_delai>0?'r':'g'},
+  ].map(function(k){return '<div class="kpi '+k.cl+'"><div style="font-size:22px;margin-bottom:6px">'+k.ic+'</div><div class="kpi-v">'+k.v+'</div><div class="kpi-l">'+k.l+'</div></div>';}).join('');
 
-  var eList = [
-    {k:'Neuf',c:'neuf',i:'⭐'},{k:'Bon état',c:'bon',i:'✅'},{k:'Usé',c:'use',i:'🔶'},
-    {k:'Abîmé',c:'abime',i:'⚠️'},{k:'Hors service',c:'hs',i:'🔴'},{k:'Inconnu',c:'inc',i:'❓'}
-  ];
-  document.getElementById('etat-grid').innerHTML = eList.map(function(e) {
-    return '<div class="ec '+e.c+'"><div class="ec-v">'+(s.par_etat[e.k]||0)+'</div><div class="ec-l">'+e.i+' '+e.k+'</div></div>';
-  }).join('');
+  var eList=[{k:'Neuf',c:'neuf',i:'⭐'},{k:'Bon état',c:'bon',i:'✅'},{k:'Usé',c:'use',i:'🔶'},{k:'Abîmé',c:'abime',i:'⚠'},{k:'Hors service',c:'hs',i:'🔴'},{k:'Inconnu',c:'inc',i:'❓'}];
+  document.getElementById('etat-grid').innerHTML = eList.map(function(e){return '<div class="ec '+e.c+'"><div class="ec-v">'+(s.par_etat[e.k]||0)+'</div><div class="ec-l">'+e.i+' '+e.k+'</div></div>';}).join('');
 
   document.getElementById('tc-circ').textContent = s.en_circulation;
   document.getElementById('tc-depot').textContent = s.au_depot;
   document.getElementById('tc-all').textContent = s.total_mouvementes;
   document.getElementById('tc-pend').textContent = s.transferts_en_attente;
   document.getElementById('tc-alert').textContent = s.alertes_delai + s.hors_service;
+  var sansFds = (d.inventory||[]).filter(function(i){return !i.fds;}).length;
+  document.getElementById('tc-docs').textContent = sansFds + ' sans FDS';
 
   drawCharts();
   tab(curTab);
@@ -337,82 +292,61 @@ function render() {
 
 function drawCharts() {
   var s = d.stats;
-  ['rep','etat','det'].forEach(function(k) { if (charts[k]) charts[k].destroy(); });
-  charts.rep = new Chart(document.getElementById('ch-rep'), {
-    type:'doughnut',
-    data:{labels:['En circulation','Au depot'],datasets:[{data:[s.en_circulation,s.au_depot],backgroundColor:['#1A3A6B','#27AE60'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}
-  });
-  var ek=['Neuf','Bon état','Usé','Abîmé','Hors service','Inconnu'];
-  var ec=['#27AE60','#2980B9','#F39C12','#E74C3C','#7F8C8D','#BDC3C7'];
-  charts.etat = new Chart(document.getElementById('ch-etat'), {
-    type:'bar',
-    data:{labels:ek,datasets:[{data:ek.map(function(k){return s.par_etat[k]||0;}),backgroundColor:ec,borderRadius:5,borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
-  });
+  ['rep','etat','det'].forEach(function(k){if(charts[k])charts[k].destroy();});
+  charts.rep = new Chart(document.getElementById('ch-rep'),{type:'doughnut',data:{labels:['En circulation','Au depot'],datasets:[{data:[s.en_circulation,s.au_depot],backgroundColor:['#1A3A6B','#27AE60'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  var ek=['Neuf','Bon état','Usé','Abîmé','Hors service','Inconnu'];var ec=['#27AE60','#2980B9','#F39C12','#E74C3C','#7F8C8D','#BDC3C7'];
+  charts.etat = new Chart(document.getElementById('ch-etat'),{type:'bar',data:{labels:ek,datasets:[{data:ek.map(function(k){return s.par_etat[k]||0;}),backgroundColor:ec,borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}});
   var top=(d.top_detenteurs||[]).slice(0,8);
-  charts.det = new Chart(document.getElementById('ch-det'), {
-    type:'bar',
-    data:{labels:top.map(function(x){return x.nom.split(' ')[0];}),datasets:[{data:top.map(function(x){return x.count;}),backgroundColor:'#E87722',borderRadius:5,borderWidth:0}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}
-  });
+  charts.det = new Chart(document.getElementById('ch-det'),{type:'bar',data:{labels:top.map(function(x){return x.nom.split(' ')[0];}),datasets:[{data:top.map(function(x){return x.count;}),backgroundColor:'#E87722',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});
 }
 
-var tabs=['circ','depot','all','pending','hist','analyse','alertes','docs'];
+var tabs=['circ','depot','all','pending','hist','analyse','docs','alertes'];
 function tab(t) {
-  curTab = t;
-  document.querySelectorAll('.tab').forEach(function(el,i){ el.classList.toggle('active',tabs[i]===t); });
-  tabs.forEach(function(x){ document.getElementById('pane-'+x).style.display = x===t?'block':'none'; });
-  if (t==='circ') renderCirc();
-  else if (t==='depot') renderDepot();
-  else if (t==='all') renderAll();
-  else if (t==='pending') renderPending();
-  else if (t==='alertes') renderAlertes();
-  else if (t==='analyse') renderAnalyse();
-  else if (t==='docs') renderDocs();
+  curTab=t;
+  document.querySelectorAll('.tab').forEach(function(el,i){el.classList.toggle('active',tabs[i]===t);});
+  tabs.forEach(function(x){document.getElementById('pane-'+x).style.display=x===t?'block':'none';});
+  if(t==='circ')renderCirc();
+  else if(t==='depot')renderDepot();
+  else if(t==='all')renderAll();
+  else if(t==='pending')renderPending();
+  else if(t==='alertes')renderAlertes();
+  else if(t==='analyse')renderAnalyse();
+  else if(t==='docs')renderDocs();
 }
 
-function filterTable() {
-  if (curTab==='circ') renderCirc();
-  else if (curTab==='depot') renderDepot();
-  else if (curTab==='all') renderAll();
-}
+function filterTable(){if(curTab==='circ')renderCirc();else if(curTab==='depot')renderDepot();else if(curTab==='all')renderAll();}
 
-function getQ() { return document.getElementById('s-q').value.toUpperCase(); }
-function getEtat() { return document.getElementById('s-etat').value; }
-function getStatut() { return document.getElementById('s-statut').value; }
+function ebadge(e){var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh'};return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';}
 
 function renderCirc() {
-  var q=getQ(), fe=getEtat();
-  var data=(d.en_circulation||[]).filter(function(i){ return (!q||(i.code_im.includes(q)||i.detenteur_nom.toUpperCase().includes(q)||i.detenteur_code.includes(q)||((i.lib||'').toUpperCase().includes(q))))&&(!fe||i.etat===fe); });
-  var grp={};
-  data.forEach(function(i){ if(!grp[i.detenteur_code]) grp[i.detenteur_code]={nom:i.detenteur_nom,code:i.detenteur_code,list:[]}; grp[i.detenteur_code].list.push(i); });
-  document.getElementById('cnt-circ').textContent = data.length+' immos';
+  var q=document.getElementById('s-q').value.toUpperCase(),fe=document.getElementById('s-etat').value;
+  var data=(d.en_circulation||[]).filter(function(i){return(!q||(i.code_im.includes(q)||i.detenteur_nom.toUpperCase().includes(q)||(i.lib||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe);});
+  var grp={};data.forEach(function(i){if(!grp[i.detenteur_code])grp[i.detenteur_code]={nom:i.detenteur_nom,code:i.detenteur_code,list:[]};grp[i.detenteur_code].list.push(i);});
+  document.getElementById('cnt-circ').textContent=data.length+' immos';
   var sorted=Object.values(grp).sort(function(a,b){return b.list.length-a.list.length;});
-  document.getElementById('dg-circ').innerHTML = sorted.length===0?'<p class="es">Aucun resultat.</p>':sorted.map(function(g){
+  document.getElementById('dg-circ').innerHTML=sorted.length===0?'<p class="es">Aucun resultat.</p>':sorted.map(function(g){
     return '<div class="dc"><div class="dn">'+g.nom+' <span><span class="dcnt">'+g.list.length+'</span> <span style="font-size:10px;color:var(--grey);margin-left:4px">'+g.code+'</span></span></div>'+
-      g.list.map(function(i){
-        var fds=i.fds?'<a href="'+i.fds+'" target="_blank" style="font-size:10px;color:var(--blue);margin-left:4px">FDS</a>':'';
+      g.list.map(function(i){var fdsU=getFdsUrl(i.fds,i.code_im);var fds=fdsU?'<a href="'+fdsU+'" target="_blank" style="font-size:10px;color:var(--blue);margin-left:4px">FDS</a>':'';
         return '<div class="ii"><span><b style="font-family:monospace;font-size:11px">'+i.code_im+'</b>'+fds+'<br><span style="font-size:11px;color:#555">'+(i.lib||'')+'</span></span><span>'+ebadge(i.etat)+' <span style="font-size:10px;color:var(--grey)">'+fmtD(i.since)+'</span></span></div>';
       }).join('')+'</div>';
   }).join('');
 }
 
 function renderDepot() {
-  var q=getQ(), fe=getEtat();
-  var data=srt((d.au_depot||[]).filter(function(i){return (!q||(i.code_im.includes(q)||(i.lib||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe);}),sc.field,sc.asc);
+  var q=document.getElementById('s-q').value.toUpperCase(),fe=document.getElementById('s-etat').value;
+  var data=srt((d.au_depot||[]).filter(function(i){return(!q||(i.code_im.includes(q)||(i.lib||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe);}),sc.field,sc.asc);
   document.getElementById('cnt-depot').textContent=data.length+' immos';
   document.getElementById('tb-depot').innerHTML=data.length===0?'<tr><td colspan="5" class="es">Aucun.</td></tr>':
-    data.map(function(i){return '<tr><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||'')+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey);max-width:200px">'+(i.note||'—')+'</td></tr>';}).join('');
+    data.map(function(i){return '<tr><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey);max-width:200px">'+(i.note||'—')+'</td></tr>';}).join('');
 }
 
 function renderAll() {
-  var q=getQ(), fe=getEtat(), fs=getStatut();
-  var data=srt((d.inventory||[]).filter(function(i){return (!q||(i.code_im.includes(q)||i.detenteur_nom.toUpperCase().includes(q)||(i.lib||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe)&&(!fs||i.statut===fs);}),sc.field,sc.asc);
+  var q=document.getElementById('s-q').value.toUpperCase(),fe=document.getElementById('s-etat').value,fs=document.getElementById('s-statut').value;
+  var data=srt((d.inventory||[]).filter(function(i){return(!q||(i.code_im.includes(q)||i.detenteur_nom.toUpperCase().includes(q)||(i.lib||i.libelle||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe)&&(!fs||i.statut===fs);}),sc.field,sc.asc);
   document.getElementById('cnt-all').textContent=data.length+' immos';
   document.getElementById('tb-all').innerHTML=data.length===0?'<tr><td colspan="7" class="es">Aucun.</td></tr>':
     data.map(function(i){var hs=i.etat==='Hors service';return '<tr'+(hs?' class="arow"':'')+'>'+
-      '<td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||'')+'</td>'+
+      '<td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td>'+
       '<td>'+(i.statut==='En circulation'?'<span class="badge bc">Circ.</span>':'<span class="badge bd">Depot</span>')+'</td>'+
       '<td><b style="font-size:12px">'+i.detenteur_nom+'</b><br><span style="font-size:10px;color:var(--grey)">'+i.detenteur_code+'</span></td>'+
       '<td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td>'+
@@ -420,8 +354,7 @@ function renderAll() {
 }
 
 function renderPending() {
-  var data=d.pending||[];
-  var now=Date.now();
+  var data=d.pending||[],now=Date.now();
   document.getElementById('cnt-pend').textContent=data.length+' en attente';
   document.getElementById('tb-pend').innerHTML=data.length===0?'<tr><td colspan="7" class="es">Aucun transfert en attente.</td></tr>':
     data.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);var ret=h>24;
@@ -435,229 +368,125 @@ function renderPending() {
 }
 
 function searchHist() {
-  var q = document.getElementById('hist-q').value.trim().toUpperCase();
-  if (!q) return;
-  var all = d.all_movements || [];
-  var res = all.filter(function(m) {
-    return m.code_im.toUpperCase().includes(q) || m.code_employe.toUpperCase().includes(q) || m.nom_employe.toUpperCase().includes(q);
+  var q=document.getElementById('hist-q').value.trim().toUpperCase();
+  if(!q)return;
+  var all=d.all_movements||[];
+  var res=all.filter(function(m){return m.code_im.toUpperCase().includes(q)||m.code_employe.toUpperCase().includes(q)||m.nom_employe.toUpperCase().includes(q);});
+  document.getElementById('tb-hist').innerHTML=res.length===0?'<tr><td colspan="7" class="es">Aucun resultat.</td></tr>':
+    res.map(function(m){var lib=im[m.code_im]?im[m.code_im].Libelle||'':'';var icon=m.type_mouvement==='Retour'?'📥':m.type_mouvement==='Transfert'?'🔄':'📤';
+      return '<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td><td class="icode">'+m.code_im+'</td><td style="font-size:12px">'+lib+'</td><td>'+icon+' '+m.type_mouvement+'</td><td><b style="font-size:12px">'+m.nom_employe+'</b><br><span style="font-size:10px;color:var(--grey)">'+m.code_employe+'</span></td><td>'+ebadge(m.etat||'')+'</td><td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
+    }).join('');
+}
+
+function renderDocs() {
+  var q=(document.getElementById('docs-q').value||'').toUpperCase();
+  var f=document.getElementById('docs-filter').value;
+  var invMap={};(d.inventory||[]).forEach(function(i){invMap[i.code_im]=i;});
+  var rows=Object.keys(im).map(function(code){
+    var immo=im[code];var inv=invMap[code];
+    return {code_im:code,libelle:immo.Libelle||'',categorie:immo.Categorie||'',fds:fdsMap[code]||(immo.FDS_URL||''),statut:inv?inv.statut:'Au depot',detenteur:inv?inv.detenteur_nom:'Depot'};
   });
-  document.getElementById('tb-hist').innerHTML = res.length === 0 ? '<tr><td colspan="7" class="es">Aucun resultat pour "'+q+'".</td></tr>' :
-    res.map(function(m) {
-      var libelle = im[m.code_im] ? (im[m.code_im].Libelle||'') : '';
-      var icon = m.type_mouvement==='Retour'?'📥':m.type_mouvement==='Transfert'?'🔄':'📤';
-      return '<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>' +
-        '<td class="icode">'+m.code_im+'</td><td style="font-size:12px">'+libelle+'</td>' +
-        '<td>'+icon+' '+m.type_mouvement+'</td>' +
-        '<td><b style="font-size:12px">'+m.nom_employe+'</b><br><span style="font-size:10px;color:var(--grey)">'+m.code_employe+'</span></td>' +
-        '<td>'+ebadge(m.etat||'')+'</td>' +
-        '<td style="font-size:11px;color:var(--grey);max-width:180px">'+(m.note||'—')+'</td></tr>';
+  if(q)rows=rows.filter(function(r){return r.code_im.includes(q)||r.libelle.toUpperCase().includes(q)||r.categorie.toUpperCase().includes(q);});
+  if(f==='manque_fds')rows=rows.filter(function(r){return!r.fds;});
+  if(f==='a_fds')rows=rows.filter(function(r){return!!r.fds;});
+  if(f==='avec_photos')rows=rows.filter(function(r){return!!photosMap[r.code_im];});
+  rows.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
+  var sansFds=rows.filter(function(r){return!r.fds;}).length;
+  var avecPhotos=rows.filter(function(r){return!!photosMap[r.code_im];}).length;
+  document.getElementById('tc-docs').textContent=sansFds+' sans FDS';
+  document.getElementById('cnt-docs').textContent=rows.length+' immos — '+avecPhotos+' avec photos';
+  document.getElementById('tb-docs').innerHTML=rows.length===0?'<tr><td colspan="6" class="es">Aucune immo.</td></tr>':
+    rows.map(function(r){
+      var hasFds=!!r.fds;var hasPhotos=!!photosMap[r.code_im];
+      var fdsUrl=getFdsUrl(r.fds,r.code_im);
+      var fdsCell=hasFds?'<a href="'+fdsUrl+'" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">Voir FDS</a>':'<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>';
+      var photosCell=hasPhotos?'<button onclick="showPhotosModal(\''+r.code_im+'\')" style="font-size:11px;padding:4px 9px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>':'<span style="font-size:11px;color:#ccc">—</span>';
+      var statBadge=r.statut==='En circulation'?'<span class="badge bc" style="font-size:11px">Circ.</span>':'<span class="badge bd" style="font-size:11px">Depot</span>';
+      var bg=hasFds?' style="background:#F0FFF4"':'';
+      return '<tr'+bg+'><td class="icode">'+r.code_im+'</td><td style="font-size:12px">'+r.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+r.categorie+'</td><td>'+statBadge+'</td><td>'+fdsCell+'</td><td>'+photosCell+'</td></tr>';
     }).join('');
 }
 
 function renderAnalyse() {
-  var cl = d.classement_duree || [];
-  var html = '<h3 style="color:var(--blue);margin-bottom:12px">Classement employes — duree moyenne de detention</h3>';
-  if (cl.length === 0) {
-    html += '<p class="es">Aucune donnee disponible.</p>';
-  } else {
-    html += '<table><thead><tr><th>Rang</th><th>Employe</th><th>Immos en cours</th><th>Duree moy./immo</th><th>Total cumule</th></tr></thead><tbody>';
-    html += cl.map(function(r, i) {
-      var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-      return '<tr><td>'+medal+' '+(i+1)+'</td><td><b>'+r.nom+'</b></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';
-    }).join('') + '</tbody></table>';
-  }
-  html += '<div style="margin-top:20px;background:#F8FAFC;border-radius:10px;padding:14px">';
-  html += '<div style="font-size:13px;color:var(--grey);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Resume global</div>';
-  var s = d.stats;
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">';
-  html += '<div><div style="font-size:24px;font-weight:800;color:var(--blue)">'+s.total_mouvements+'</div><div style="font-size:12px;color:var(--grey)">Total mouvements enregistres</div></div>';
-  html += '<div><div style="font-size:24px;font-weight:800;color:var(--orange)">'+s.moyenne_jours_hors_depot+'j</div><div style="font-size:12px;color:var(--grey)">Duree moy. hors depot</div></div>';
-  html += '<div><div style="font-size:24px;font-weight:800;color:var(--green)">'+s.au_depot+'</div><div style="font-size:12px;color:var(--grey)">Immos au depot</div></div>';
-  html += '</div></div>';
-  document.getElementById('analyse-content').innerHTML = html;
+  var cl=d.classement_duree||[];var s=d.stats||{};
+  var html='<h3 style="color:var(--blue);margin-bottom:12px">Classement employes — duree moyenne de detention</h3>';
+  if(cl.length===0){html+='<p class="es">Aucune donnee.</p>';}
+  else{html+='<table><thead><tr><th>Rang</th><th>Employe</th><th>Immos en cours</th><th>Duree moy.</th><th>Total cumule</th></tr></thead><tbody>';
+    html+=cl.map(function(r,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';return '<tr><td>'+m+' '+(i+1)+'</td><td><b>'+r.nom+'</b></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';}).join('')+'</tbody></table>';}
+  html+='<div style="margin-top:20px;background:#F8FAFC;border-radius:10px;padding:14px"><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--blue)">'+s.total_mouvements+'</div><div style="font-size:12px;color:var(--grey)">Total mouvements</div></div>';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--orange)">'+s.moyenne_jours_hors_depot+'j</div><div style="font-size:12px;color:var(--grey)">Duree moy. hors depot</div></div>';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--green)">'+s.au_depot+'</div><div style="font-size:12px;color:var(--grey)">Immos au depot</div></div>';
+  html+='</div></div>';
+  document.getElementById('analyse-content').innerHTML=html;
 }
 
 function renderAlertes() {
-  var html = '';
-  var now = Date.now();
-  var hs = d.hors_service || [];
-  var ret = d.alertes_delai || [];
-  if (hs.length > 0) {
-    html += '<div class="thead" style="border-top:3px solid var(--red)"><h3>Immos hors service ('+hs.length+')</h3></div>';
-    html += '<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Depuis</th><th>Note</th></tr></thead><tbody>';
-    html += hs.map(function(i){ return '<tr class="arow"><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td><td>'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(i.note||'—')+'</td></tr>'; }).join('');
-    html += '</tbody></table></div>';
-  }
-  if (ret.length > 0) {
-    html += '<div class="thead" style="border-top:3px solid var(--orange);margin-top:8px"><h3>Transferts en attente +24h ('+ret.length+')</h3></div>';
-    html += '<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>';
-    html += ret.map(function(t){ var h=Math.round((now-new Date(t.horodatage).getTime())/3600000); return '<tr class="arow"><td class="icode">'+t.code_im+'</td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>'; }).join('');
-    html += '</tbody></table></div>';
-  }
-  if (!html) html = '<div class="es" style="padding:40px">Aucune alerte en cours.</div>';
-  document.getElementById('alertes-content').innerHTML = html;
+  var html='',now=Date.now();
+  var hs=d.hors_service||[];var ret=d.alertes_delai||[];
+  if(hs.length>0){html+='<div class="thead" style="border-top:3px solid var(--red)"><h3>Hors service ('+hs.length+')</h3></div>';html+='<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Depuis</th><th>Note</th></tr></thead><tbody>';html+=hs.map(function(i){return '<tr class="arow"><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td><td>'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(i.note||'—')+'</td></tr>';}).join('');html+='</tbody></table></div>';}
+  if(ret.length>0){html+='<div class="thead" style="border-top:3px solid var(--orange);margin-top:8px"><h3>Transferts +24h ('+ret.length+')</h3></div>';html+='<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>';html+=ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return '<tr class="arow"><td class="icode">'+t.code_im+'</td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('');html+='</tbody></table></div>';}
+  if(!html)html='<div class="es" style="padding:40px">Aucune alerte en cours.</div>';
+  document.getElementById('alertes-content').innerHTML=html;
 }
 
-function sort(tbl, field) {
-  if (sc.field===field) sc.asc=!sc.asc; else { sc.field=field; sc.asc=true; }
-  if (tbl==='depot') renderDepot(); else if (tbl==='all') renderAll();
-}
-
-function srt(arr, field, asc) {
-  return arr.slice().sort(function(a,b){ var av=(a[field]||'').toString().toLowerCase(),bv=(b[field]||'').toString().toLowerCase(); return asc?av.localeCompare(bv):bv.localeCompare(av); });
-}
-
-function ebadge(e) {
-  var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh'};
-  return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';
-}
-
-function renderDocs() {
-  var q = (document.getElementById('docs-q').value||'').toUpperCase();
-  var f = document.getElementById('docs-filter').value;
-  // Fusionner inventory avec TOUTES les immos du fichier immos.json
-  var invMap = {};
-  (d.inventory||[]).forEach(function(i) { invMap[i.code_im] = i; });
-  var rows = Object.keys(im).map(function(code) {
-    var immo = im[code];
-    var inv = invMap[code];
-    return {
-      code_im: code,
-      libelle: immo.Libelle || '',
-      categorie: immo.Categorie || '',
-      fds: immo.FDS_URL || '',
-      statut: inv ? inv.statut : 'Au depot',
-      detenteur: inv ? inv.detenteur_nom : 'Depot',
-    };
-  });
-  // Filtres
-  if (q) rows = rows.filter(function(r) {
-    return r.code_im.includes(q) || r.libelle.toUpperCase().includes(q) || r.categorie.toUpperCase().includes(q);
-  });
-  if (f === 'manque_fds') rows = rows.filter(function(r) { return !r.fds; });
-  if (f === 'a_fds') rows = rows.filter(function(r) { return !!r.fds; });
-  // Tri alphabétique
-  rows.sort(function(a,b) { return a.code_im.localeCompare(b.code_im); });
-  var sansFds = rows.filter(function(r) { return !r.fds; }).length;
-  var avecPhotos = rows.filter(function(r) { return photosMapData[r.code_im]; }).length;
-  document.getElementById('tc-docs').textContent = sansFds + ' sans FDS';
-  document.getElementById('cnt-docs').textContent = rows.length + ' immos — ' + avecPhotos + ' avec photos';
-  document.getElementById('tb-docs').innerHTML = rows.length === 0 ? '<tr><td colspan="6" class="es">Aucune immo.</td></tr>' :
-    rows.map(function(r) {
-      var hasFds = !!r.fds;
-      var hasPhotos = !!photosMapData[r.code_im];
-      var fdsUrl = getFdsUrl(r.fds, r.code_im);
-      var fdsCell = hasFds
-        ? '<a href="' + fdsUrl + '" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">Voir FDS</a>'
-        : '<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>';
-      var photosCell = hasPhotos
-        ? '<button onclick="showPhotosModal(this.getAttribute('data-code'))" data-code="' + r.code_im + '" style="font-size:11px;padding:4px 9px;background:var(--green);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>'
-        : '<span style="font-size:11px;color:#ccc">—</span>';
-      var statBadge = r.statut === 'En circulation'
-        ? '<span class="badge bc" style="font-size:11px">Circ.</span>'
-        : '<span class="badge bd" style="font-size:11px">Depot</span>';
-      var bg = hasFds ? ' style="background:#F0FFF4"' : '';
-      return '<tr' + bg + '><td class="icode">' + r.code_im + '</td>' +
-        '<td style="font-size:12px">' + r.libelle + '</td>' +
-        '<td style="font-size:11px;color:var(--grey)">' + r.categorie + '</td>' +
-        '<td>' + statBadge + '</td>' +
-        '<td>' + fdsCell + '</td>' +
-        '<td>' + photosCell + '</td></tr>';
-    }).join('');
-}
-
-}
-
-function getFdsUrl(fdsValue, codeIM) {
-  // Si vide : pas de FDS
-  if (!fdsValue) return '';
-  // Si c'est déjà un code IM (ex: "IM000009") ou juste "1" ou n'importe quelle valeur non-URL
-  // → construire l'URL via le Worker proxy
-  if (!fdsValue.startsWith('http')) return W + '?fds=' + encodeURIComponent(codeIM);
-  // Si c'est une URL SharePoint → utiliser le proxy Worker
-  if (fdsValue.includes('sharepoint.com')) return W + '?fds=' + encodeURIComponent(codeIM);
-  // Sinon URL directe (GitHub Pages etc.)
-  return fdsValue;
-}
+function sort(tbl,field){if(sc.field===field)sc.asc=!sc.asc;else{sc.field=field;sc.asc=true;}if(tbl==='depot')renderDepot();else if(tbl==='all')renderAll();}
+function srt(arr,field,asc){return arr.slice().sort(function(a,b){var av=(a[field]||'').toString().toLowerCase(),bv=(b[field]||'').toString().toLowerCase();return asc?av.localeCompare(bv):bv.localeCompare(av);});}
 
 async function showPhotosModal(codeIM) {
-  var old = document.getElementById('photos-modal');
-  if (old) old.remove();
-  var modal = document.createElement('div');
-  modal.id = 'photos-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
-  var box = document.createElement('div');
-  box.style.cssText = 'background:white;border-radius:16px;padding:20px;max-width:860px;width:100%;max-height:85vh;overflow-y:auto';
-  var libelle = im[codeIM] ? im[codeIM].Libelle||codeIM : codeIM;
-  box.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
-    '<div><strong style="color:var(--blue)">' + libelle + '</strong><br><span style="font-size:12px;color:var(--grey);font-family:monospace">' + codeIM + '</span></div>' +
-    '<button id="close-modal-btn" style="background:#eee;border:none;border-radius:50%;width:34px;height:34px;font-size:20px;cursor:pointer">x</button>' +
-    '</div><p id="photos-modal-body" style="color:var(--grey);text-align:center;padding:20px">Chargement...</p>';
-  modal.appendChild(box);
-  document.body.appendChild(modal);
-  document.getElementById('close-modal-btn').onclick = function() { modal.remove(); };
+  var oldM=document.getElementById('photos-modal');if(oldM)oldM.remove();
+  var modal=document.createElement('div');modal.id='photos-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  var box=document.createElement('div');box.style.cssText='background:white;border-radius:16px;padding:20px;max-width:860px;width:100%;max-height:85vh;overflow-y:auto';
+  var lib=im[codeIM]?im[codeIM].Libelle||codeIM:codeIM;
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div><strong style="color:var(--blue)">'+lib+'</strong><br><span style="font-size:12px;color:var(--grey);font-family:monospace">'+codeIM+'</span></div><button id="close-pm" style="background:#eee;border:none;border-radius:50%;width:34px;height:34px;font-size:20px;cursor:pointer">x</button></div><p id="pm-body" style="color:var(--grey);text-align:center;padding:20px">Chargement...</p>';
+  modal.appendChild(box);document.body.appendChild(modal);
+  document.getElementById('close-pm').onclick=function(){modal.remove();};
   try {
-    var res = await fetch(W + '?photos=' + encodeURIComponent(codeIM));
-    var photos = await res.json();
-    var body = document.getElementById('photos-modal-body');
-    if (!photos || !photos.length) { body.textContent = 'Aucune photo pour ' + codeIM + '.'; return; }
-    var grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
-    photos.forEach(function(p) {
-      grid += '<div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)">' +
-        '<img src="' + p.url + '" loading="lazy" style="width:100%;height:160px;object-fit:cover;cursor:pointer;display:block" onclick="window.open(this.src)">' +
-        '<p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">' + fmtD(p.created) + ' — ' + Math.round(p.size/1024) + ' Ko</p>' +
-        '</div>';
-    });
-    grid += '</div>';
-    body.outerHTML = grid;
-  } catch(e) {
-    var b = document.getElementById('photos-modal-body');
-    if (b) b.textContent = 'Erreur : ' + e.message;
-  }
+    var res=await fetch(W+'?photos='+encodeURIComponent(codeIM));
+    var photos=await res.json();
+    var body=document.getElementById('pm-body');
+    if(!photos||!photos.length){body.textContent='Aucune photo pour '+codeIM+'.';return;}
+    var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
+    photos.forEach(function(p){grid+='<div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)"><img src="'+p.url+'" loading="lazy" style="width:100%;height:160px;object-fit:cover;cursor:pointer;display:block" onclick="window.open(this.src)"><p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">'+fmtD(p.created)+' — '+Math.round(p.size/1024)+' Ko</p></div>';});
+    grid+='</div>';body.outerHTML=grid;
+  } catch(e){var b=document.getElementById('pm-body');if(b)b.textContent='Erreur : '+e.message;}
 }
 
 function exportExcel() {
-  if (!d) { alert('Chargez le tableau de bord.'); return; }
-  var wb = XLSX.utils.book_new();
-  var now = new Date();
+  if(!d){alert('Chargez le tableau de bord.');return;}
+  var wb=XLSX.utils.book_new();var now=new Date();
   function hdr(ws,n){for(var c=0;c<n;c++){var ref=XLSX.utils.encode_cell({r:0,c:c});if(ws[ref])ws[ref].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1A3A6B'}}};}}
-
-  var r1=[['Code IM','Libelle','Statut','Detenteur','Code','Etat','Note','Mouvement','Depuis (Reunion)']];
+  var r1=[['Code IM','Libelle','Statut','Detenteur','Code','Etat','Note','Mouvement','Depuis']];
   (d.inventory||[]).forEach(function(i){r1.push([i.code_im,i.lib||i.libelle||'',i.statut,i.statut==='Au depot'?'Depot':i.detenteur_nom,i.statut==='Au depot'?'DEPOT':i.detenteur_code,i.etat||'Inconnu',i.note||'',i.dernier_mouvement||'',i.since?fmtDT(i.since):'']);});
   var ws1=XLSX.utils.aoa_to_sheet(r1);ws1['!cols']=[12,40,16,28,10,14,30,16,20].map(function(w){return{wch:w};});hdr(ws1,r1[0].length);XLSX.utils.book_append_sheet(wb,ws1,'Inventaire complet');
-
-  var r2=[['Detenteur','Code','Code IM','Libelle','Etat','Note','Depuis (Reunion)']];
+  var r2=[['Detenteur','Code','Code IM','Libelle','Etat','Note','Depuis']];
   var grp={};(d.en_circulation||[]).forEach(function(i){if(!grp[i.detenteur_code])grp[i.detenteur_code]={nom:i.detenteur_nom,l:[]};grp[i.detenteur_code].l.push(i);});
   Object.entries(grp).sort(function(a,b){return b[1].l.length-a[1].l.length;}).forEach(function(e){e[1].l.forEach(function(i){r2.push([e[1].nom,e[0],i.code_im,i.lib||i.libelle||'',i.etat||'',i.note||'',i.since?fmtDT(i.since):'']);});});
   var ws2=XLSX.utils.aoa_to_sheet(r2);ws2['!cols']=[28,10,14,40,14,30,20].map(function(w){return{wch:w};});hdr(ws2,r2[0].length);XLSX.utils.book_append_sheet(wb,ws2,'En circulation');
-
-  var r3=[['Code IM','Libelle','Etat','Note','Depuis (Reunion)']];
+  var r3=[['Code IM','Libelle','Etat','Note','Depuis']];
   (d.au_depot||[]).forEach(function(i){r3.push([i.code_im,i.lib||i.libelle||'',i.etat||'',i.note||'',i.since?fmtDT(i.since):'']);});
   var ws3=XLSX.utils.aoa_to_sheet(r3);ws3['!cols']=[14,40,14,30,20].map(function(w){return{wch:w};});hdr(ws3,r3[0].length);XLSX.utils.book_append_sheet(wb,ws3,'Au depot');
-
-  var r4=[['Code IM','Libelle','Donneur','Donneur code','Receveur','Receveur code','Etat declare','Note','Depuis','Attente']];
-  var now4=Date.now();(d.pending||[]).forEach(function(t){var h=Math.round((now4-new Date(t.horodatage).getTime())/3600000);r4.push([t.code_im,t.lib||t.libelle||'',t.donneur_nom,t.donneur_code,t.receveur_nom,t.receveur_code,t.etat||'',t.note||'',fmtDT(t.horodatage),h+'h']);});
+  var r4=[['Code IM','Libelle','Donneur','Donneur code','Receveur','Receveur code','Etat','Note','Depuis','Attente']];
+  var n4=Date.now();(d.pending||[]).forEach(function(t){var h=Math.round((n4-new Date(t.horodatage).getTime())/3600000);r4.push([t.code_im,t.lib||t.libelle||'',t.donneur_nom,t.donneur_code,t.receveur_nom,t.receveur_code,t.etat||'',t.note||'',fmtDT(t.horodatage),h+'h']);});
   var ws4=XLSX.utils.aoa_to_sheet(r4);ws4['!cols']=[14,40,28,10,28,10,14,30,20,10].map(function(w){return{wch:w};});hdr(ws4,r4[0].length);XLSX.utils.book_append_sheet(wb,ws4,'Transferts en attente');
-
-  var r5=[['Date (Reunion)','Code IM','Libelle','Type','Employe','Code employe','Etat','Note']];
+  var r5=[['Date','Code IM','Libelle','Type','Employe','Code','Etat','Note']];
   (d.all_movements||[]).forEach(function(m){r5.push([fmtDT(m.horodatage),m.code_im,m.lib||(im[m.code_im]?im[m.code_im].Libelle:''),m.type_mouvement,m.nom_employe,m.code_employe,m.etat||'',m.note||'']);});
-  var ws5=XLSX.utils.aoa_to_sheet(r5);ws5['!cols']=[20,14,40,14,28,12,14,30].map(function(w){return{wch:w};});hdr(ws5,r5[0].length);XLSX.utils.book_append_sheet(wb,ws5,'Historique mouvements');
-
+  var ws5=XLSX.utils.aoa_to_sheet(r5);ws5['!cols']=[20,14,40,14,28,12,14,30].map(function(w){return{wch:w};});hdr(ws5,r5[0].length);XLSX.utils.book_append_sheet(wb,ws5,'Historique');
   var s=d.stats||{};
-  var r6=[['Espace Soleil — Tableau de bord logistique'],['Genere le '+fmtDT(now.toISOString())],[],
-    ['Indicateur','Valeur'],['Immos tracees',s.total_mouvementes||0],['En circulation',s.en_circulation||0],
-    ['Au depot',s.au_depot||0],['Total mouvements',s.total_mouvements||0],['Duree moy. hors depot (jours)',s.moyenne_jours_hors_depot||0],
+  var r6=[['Espace Soleil — Tableau de bord'],['Genere le '+fmtDT(now.toISOString())],[],['Indicateur','Valeur'],
+    ['Immos tracees',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au depot',s.au_depot||0],
+    ['Total mouvements',s.total_mouvements||0],['Duree moy. hors depot',s.moyenne_jours_hors_depot+'j'],
     ['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0],['Alertes retard',s.alertes_delai||0],
     [],['Distribution par etat',''],['Neuf',(s.par_etat||{})['Neuf']||0],['Bon etat',(s.par_etat||{})['Bon état']||0],
     ['Use',(s.par_etat||{})['Usé']||0],['Abime',(s.par_etat||{})['Abîmé']||0],['Hors service',(s.par_etat||{})['Hors service']||0],['Inconnu',(s.par_etat||{})['Inconnu']||0]];
   var ws6=XLSX.utils.aoa_to_sheet(r6);ws6['!cols']=[{wch:35},{wch:20}];XLSX.utils.book_append_sheet(wb,ws6,'Resume');
-
   XLSX.writeFile(wb,'EspaceSoleil_Immos_'+now.toISOString().slice(0,10)+'.xlsx');
 }
 
-if (sessionStorage.getItem('da')==='1') { document.getElementById('pin-overlay').style.display='none'; loadData(); }
-setInterval(function(){ if(sessionStorage.getItem('da')==='1') loadData(); }, 5*60*1000);
+if(sessionStorage.getItem('da')==='1'){document.getElementById('pin-overlay').style.display='none';loadData();}
+setInterval(function(){if(sessionStorage.getItem('da')==='1')loadData();},5*60*1000);
 </script>
 </body>
 </html>
