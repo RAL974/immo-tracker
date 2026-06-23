@@ -624,25 +624,59 @@ async function rechercherSuiviImmo() {
       }
       return;
     }
-    var dernier = mouvements[0];
-    var locActuelle = dernier.type_mouvement === 'Retour'
-      ? '🏭 Au dépôt'
-      : '👤 Avec ' + dernier.nom_employe + ' (' + dernier.code_employe + ')';
-    loc.innerHTML = '<div class="localisation-badge">' + locActuelle + '</div>';
-    // Afficher le bouton photos
+    var GESTIONNAIRES = ['HEGE', 'CONI'];
+    // Cacher le bouton photos générique (on met les boutons par immo ci-dessous)
     var btnPhotos = document.getElementById('btn-photos-suivi');
-    if (btnPhotos) { btnPhotos.style.display = 'block'; }
-    div.innerHTML = '<h3>Historique (' + mouvements.length + ' mouvements)</h3>' +
-      mouvements.map(function(m) {
+    if (btnPhotos) btnPhotos.style.display = 'none';
+    loc.innerHTML = '';
+
+    // Grouper par immo (si recherche partielle retourne plusieurs immos)
+    var groupes = {};
+    mouvements.forEach(function(m) {
+      if (!groupes[m.code_im]) groupes[m.code_im] = [];
+      groupes[m.code_im].push(m);
+    });
+
+    var html = '';
+    Object.keys(groupes).forEach(function(codeIM) {
+      var mvts = groupes[codeIM];
+      var immoInfo = state.immos[codeIM] || null;
+      var libelle = immoInfo ? immoInfo.Libelle : codeIM;
+      var fdsUrl = immoInfo ? (immoInfo.FDS_URL || '') : '';
+      var dernier = mvts[0];
+      var estGest = GESTIONNAIRES.includes(dernier.code_employe);
+      var estRetour = dernier.type_mouvement === 'Retour' || dernier.code_chantier === 'DEPOT';
+      var locActuelle = (estRetour || estGest) ? '🏭 Au dépôt' : '👤 Avec ' + dernier.nom_employe + ' (' + dernier.code_employe + ')';
+
+      html += '<div style="background:white;border-radius:14px;padding:14px;box-shadow:0 2px 12px rgba(0,0,0,0.09);margin-bottom:12px;border-left:4px solid #E87722">';
+      html += '<div style="font-weight:700;font-size:16px;color:#1A3A6B;margin-bottom:2px">' + libelle + '</div>';
+      html += '<div style="font-size:11px;color:#999;font-family:monospace;margin-bottom:8px">' + codeIM;
+      if (immoInfo && immoInfo.Categorie) html += ' · ' + immoInfo.Categorie;
+      if (immoInfo && immoInfo.N_Serie) html += ' · N° ' + immoInfo.N_Serie;
+      html += '</div>';
+      html += '<div style="background:#1A3A6B;color:white;padding:8px 12px;border-radius:8px;font-weight:600;font-size:13px;margin-bottom:8px">' + locActuelle + '</div>';
+      html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">';
+      if (fdsUrl) {
+        html += '<a href="' + fdsUrl + '" target="_blank" style="padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">📄 Voir la FDS</a>';
+      } else {
+        html += '<span style="padding:7px 14px;background:#F5F5F5;color:#999;border-radius:8px;font-size:12px">📄 FDS non renseignée</span>';
+      }
+      var photoCode = codeIM;
+      html += '<button data-code="' + photoCode + '" onclick="ouvrirPhotos(this.getAttribute(\"data-code\"))" style="padding:7px 14px;background:#FFF8F0;color:#E87722;border:2px solid #E87722;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Photos</button>';
+      html += '</div>';
+      html += '<div style="font-size:12px;font-weight:600;color:#7F8C8D;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Historique (' + mvts.length + ' mouvements)</div>';
+      html += mvts.map(function(m) {
         var icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
-        return '<div class="materiel-card">' + icon + ' <strong>' + m.type_mouvement + '</strong>' +
-          ' ' + formatMouvementBadge(m) +
-          (m.etat ? ' <span class="etat-badge">' + m.etat + '</span>' : '') + '<br>' +
-          '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
-          new Date(m.horodatage).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small>' +
-          (m.note ? '<br><small>📝 ' + m.note + '</small>' : '') +
+        return '<div style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">' +
+          icon + ' <strong>' + m.type_mouvement + '</strong> ' + formatMouvementBadge(m) +
+          (m.etat ? ' <span style="font-size:11px;font-weight:600;padding:1px 7px;background:#E3F2FD;color:#0D47A1;border-radius:8px">' + m.etat + '</span>' : '') + '<br>' +
+          '<small style="color:#888">👷 ' + m.nom_employe + ' — ' + new Date(m.horodatage).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small>' +
+          (m.note ? '<br><small style="color:#E87722">📝 ' + m.note + '</small>' : '') +
           '</div>';
       }).join('');
+      html += '</div>';
+    });
+    div.innerHTML = html;
   } catch (e) {
     div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
   }
