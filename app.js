@@ -144,6 +144,13 @@ async function chargerImmos() {
   } catch (e) { console.warn('immos.json non chargé:', e); }
 }
 
+function getFdsUrl(fdsValue, codeIM) {
+  if (!fdsValue) return '';
+  if (!fdsValue.startsWith('http')) return CONFIG.webhookMouvements + '?fds=' + encodeURIComponent(codeIM || '');
+  if (fdsValue.includes('sharepoint.com')) return CONFIG.webhookMouvements + '?fds=' + encodeURIComponent(codeIM || '');
+  return fdsValue;
+}
+
 function getLibelle(codeIM) {
   return state.immos[codeIM] ? state.immos[codeIM].Libelle : codeIM;
 }
@@ -155,7 +162,8 @@ function getFDS(codeIM) {
 function immoCard(codeIM, extraInfo, date) {
   var libelle = getLibelle(codeIM);
   var fds = getFDS(codeIM);
-  var fdsBtn = fds ? '<a href="' + fds + '" target="_blank" style="display:inline-block;margin-left:6px;font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;font-weight:600;">📄 FDS</a>' : '';
+  var fdsProxyUrl = getFdsUrl(fds, codeIM);
+  var fdsBtn = fdsProxyUrl ? '<a href="' + fdsProxyUrl + '" target="_blank" style="display:inline-block;margin-left:6px;font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;font-weight:600;">📄 FDS</a>' : '';
   return '<div class="materiel-card">' +
     '<strong style="font-size:15px">' + libelle + '</strong>' + fdsBtn + '<br>' +
     '<span style="font-size:11px;color:#999;font-family:monospace">' + codeIM + '</span>' +
@@ -657,7 +665,8 @@ async function rechercherSuiviImmo() {
       html += '<div style="background:#1A3A6B;color:white;padding:8px 12px;border-radius:8px;font-weight:600;font-size:13px;margin-bottom:8px">' + locActuelle + '</div>';
       html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">';
       if (fdsUrl) {
-        html += '<a href="' + fdsUrl + '" target="_blank" style="padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">📄 Voir la FDS</a>';
+        var fdsProxyUrl2 = getFdsUrl(fdsUrl, codeIM);
+        html += '<a href="' + fdsProxyUrl2 + '" target="_blank" style="padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">📄 Voir la FDS</a>';
       } else {
         html += '<span style="padding:7px 14px;background:#F5F5F5;color:#999;border-radius:8px;font-size:12px">📄 FDS non renseignée</span>';
       }
