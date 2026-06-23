@@ -546,8 +546,9 @@ function renderDocs() {
     rows.map(function(r) {
       var hasFds = !!r.fds;
       var hasPhotos = !!photosMapData[r.code_im];
+      var fdsUrl = getFdsUrl(r.fds, r.code_im);
       var fdsCell = hasFds
-        ? '<a href="' + r.fds + '" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">Voir FDS</a>'
+        ? '<a href="' + fdsUrl + '" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">Voir FDS</a>'
         : '<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>';
       var photosCell = hasPhotos
         ? '<button onclick="showPhotosModal(this.getAttribute('data-code'))" data-code="' + r.code_im + '" style="font-size:11px;padding:4px 9px;background:var(--green);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>'
@@ -565,6 +566,18 @@ function renderDocs() {
     }).join('');
 }
 
+}
+
+function getFdsUrl(fdsValue, codeIM) {
+  // Si vide : pas de FDS
+  if (!fdsValue) return '';
+  // Si c'est déjà un code IM (ex: "IM000009") ou juste "1" ou n'importe quelle valeur non-URL
+  // → construire l'URL via le Worker proxy
+  if (!fdsValue.startsWith('http')) return W + '?fds=' + encodeURIComponent(codeIM);
+  // Si c'est une URL SharePoint → utiliser le proxy Worker
+  if (fdsValue.includes('sharepoint.com')) return W + '?fds=' + encodeURIComponent(codeIM);
+  // Sinon URL directe (GitHub Pages etc.)
+  return fdsValue;
 }
 
 async function showPhotosModal(codeIM) {
