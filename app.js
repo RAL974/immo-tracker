@@ -19,6 +19,7 @@ let state = {
   employes: [],
   immos: {},
   transfertEnCours: null,
+  photoImmo: null,
   transfertId: null,
   mouvements: JSON.parse(localStorage.getItem('mouvements') || '[]'),
 };
@@ -604,6 +605,9 @@ async function rechercherSuiviImmo() {
       ? '🏭 Au dépôt'
       : '👤 Avec ' + dernier.nom_employe + ' (' + dernier.code_employe + ')';
     loc.innerHTML = '<div class="localisation-badge">' + locActuelle + '</div>';
+    // Afficher le bouton photos
+    var btnPhotos = document.getElementById('btn-photos-suivi');
+    if (btnPhotos) { btnPhotos.style.display = 'block'; }
     div.innerHTML = '<h3>Historique (' + mouvements.length + ' mouvements)</h3>' +
       mouvements.map(function(m) {
         var icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
@@ -680,6 +684,154 @@ async function afficherSuiviEmploye(code, nom) {
     div.innerHTML = html;
   } catch (e) {
     div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+  }
+}
+
+// ── Photos ───────────────────────────────────────────────────────
+function ouvrirPhotos(codeIM) {
+  if (!codeIM) return;
+  // Trouver le code complet si partiel
+  var codeComplet = codeIM;
+  if (!codeIM.startsWith('IM')) {
+    // chercher dans les immos
+    var found = Object.keys(state.immos).find(function(k) { return k.includes(codeIM.toUpperCase()); });
+    if (found) codeComplet = found;
+  }
+  state.photoImmo = codeComplet;
+  var libelle = getLibelle(codeComplet);
+  document.getElementById('photos-immo-titre').textContent = libelle + ' (' + codeComplet + ')';
+
+  // Afficher zone upload aux admins
+  var uploadZone = document.getElementById('upload-zone');
+  if (uploadZone) {
+    var isAdmin = state.employe && CONFIG.admins.includes(state.employe.code);
+    uploadZone.classList.toggle('hidden', !isAdmin);
+  }
+  document.getElementById('upload-progress').textContent = '';
+  showScreen('screen-photos');
+  chargerPhotos(codeComplet);
+}
+
+async function chargerPhotos(codeIM) {
+  var galerie = document.getElementById('galerie-photos');
+  galerie.innerHTML = '<p class="empty-msg">Chargement des photos...</p>';
+  try {
+    var res = await fetch(CONFIG.webhookMouvements + '?photos=' + encodeURIComponent(codeIM));
+    var photos = await res.json();
+    if (!Array.isArray(photos) || photos.length === 0) {
+      galerie.innerHTML = '<p class="empty-msg">Aucune photo pour cette immo.<br>Sois le premier à en ajouter une !</p>';
+      return;
+    }
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%">';
+    photos.forEach(function(p) {
+      var dateStr = new Date(p.created).toLocaleDateString('fr-FR');
+      var supprBtn = '';
+      if (state.employe && CONFIG.admins.includes(state.employe.code)) {
+        var fn = p.name;
+        supprBtn = '<button onclick="supprimerPhoto(\'' + fn + '\')" style="width:100%;padding:6px;background:#FDECEA;border:none;color:#C0392B;font-size:12px;cursor:pointer">Supprimer</button>';
+      }
+      html += '<div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)">';
+      html += '<img src="' + p.url + '" style="width:100%;height:160px;object-fit:cover;display:block;cursor:pointer" loading="lazy" onclick="agrandirPhoto(this.src)">';
+      html += '<p style="font-size:11px;color:#999;padding:4px 8px;margin:0">' + dateStr + '</p>';
+      html += supprBtn;
+      html += '</div>';
+    });
+    html += '</div>';
+    galerie.innerHTML = html;
+  } catch (e) {
+    galerie.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+  }
+}
+
+async function uploadPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  var progress = document.getElementById('upload-progress');
+  progress.textContent = '⏳ Compression en cours...';
+
+  try {
+    // Compression via Canvas (max 1200px, qualité 0.75)
+    var base64 = await new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement('canvas');
+          var maxDim = 1200;
+          var ratio = Math.min(maxDim / img.width, maxDim / img.height, 1);
+          canvas.width = Math.round(img.width * ratio);
+          canvas.height = Math.round(img.height * ratio);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    var now = new Date();
+    var filename = now.getFullYear() + '' +
+      String(now.getMonth()+1).padStart(2,'0') +
+      String(now.getDate()).padStart(2,'0') + '_' +
+      String(now.getHours()).padStart(2,'0') +
+      String(now.getMinutes()).padStart(2,'0') +
+      String(now.getSeconds()).padStart(2,'0') + '.jpg';
+
+    progress.textContent = '⬆️ Upload en cours...';
+
+    var res = await fetch(CONFIG.webhookMouvements + '?action=upload_photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_im: state.photoImmo, data: base64, filename: filename }),
+    });
+    var result = await res.json();
+
+    if (result.success) {
+      progress.textContent = '✅ Photo ajoutée !';
+      vibrer(200);
+      input.value = '';
+      setTimeout(function() {
+        progress.textContent = '';
+        chargerPhotos(state.photoImmo);
+      }, 1000);
+    } else {
+      progress.textContent = '❌ Échec : ' + (result.status || '');
+    }
+  } catch (e) {
+    progress.textContent = '❌ Erreur : ' + e.message;
+  }
+}
+
+function agrandirPhoto(url) {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  overlay.onclick = function() { document.body.removeChild(overlay); };
+  var img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:95vw;max-height:90vh;border-radius:8px;object-fit:contain';
+  overlay.appendChild(img);
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;background:white;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;font-weight:700';
+  overlay.appendChild(closeBtn);
+  document.body.appendChild(overlay);
+}
+
+async function supprimerPhoto(filename) {
+  if (!confirm('Supprimer cette photo ?')) return;
+  try {
+    var deleteUrl = 'https://graph.microsoft.com/v1.0/sites/espacesoleil97.sharepoint.com:/sites/Logistique-Immos:/drive/root:/Photos_Immos/' + state.photoImmo + '/' + filename;
+    // La suppression doit passer par le Worker
+    var res = await fetch(CONFIG.webhookMouvements + '?action=delete_photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_im: state.photoImmo, filename: filename }),
+    });
+    chargerPhotos(state.photoImmo);
+  } catch (e) {
+    alert('Erreur lors de la suppression.');
   }
 }
 
