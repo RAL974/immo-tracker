@@ -17,6 +17,7 @@ let state = {
   noteTexte: '',
   scanner: null,
   employes: [],
+  immos: {},
   transfertEnCours: null,
   transfertId: null,
   mouvements: JSON.parse(localStorage.getItem('mouvements') || '[]'),
@@ -37,6 +38,7 @@ window.addEventListener('load', async function() {
     chargerBadgeMateriel();
   }
   await chargerEmployes();
+  await chargerImmos();
 });
 
 // ── Navigation ──────────────────────────────────────────────────
@@ -130,6 +132,35 @@ async function chargerEmployes() {
   } catch (e) {
     console.warn('Employés non chargés:', e);
   }
+}
+
+// ── Chargement immos (libellés et FDS) ─────────────────────────────
+async function chargerImmos() {
+  try {
+    var res = await fetch('immos.json');
+    var arr = await res.json();
+    arr.forEach(function(i) { state.immos[i.Code_IM] = i; });
+  } catch (e) { console.warn('immos.json non chargé:', e); }
+}
+
+function getLibelle(codeIM) {
+  return state.immos[codeIM] ? state.immos[codeIM].Libelle : codeIM;
+}
+
+function getFDS(codeIM) {
+  return state.immos[codeIM] ? state.immos[codeIM].FDS_URL : '';
+}
+
+function immoCard(codeIM, extraInfo, date) {
+  var libelle = getLibelle(codeIM);
+  var fds = getFDS(codeIM);
+  var fdsBtn = fds ? '<a href="' + fds + '" target="_blank" style="display:inline-block;margin-left:6px;font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;font-weight:600;">📄 FDS</a>' : '';
+  return '<div class="materiel-card">' +
+    '<strong style="font-size:15px">' + libelle + '</strong>' + fdsBtn + '<br>' +
+    '<span style="font-size:11px;color:#999;font-family:monospace">' + codeIM + '</span>' +
+    (extraInfo ? ' ' + extraInfo : '') +
+    (date ? '<br><small>' + date + '</small>' : '') +
+    '</div>';
 }
 
 // ── Vérifier transferts en attente ─────────────────────────────
@@ -255,7 +286,7 @@ function onScanImmo(code) {
     if (pending) {
       state.transfertEnCours = pending;
       document.getElementById('accepter-texte').textContent =
-        'Accepter ' + code + ' de ' + pending.nom_donneur + ' ?';
+        'Accepter ' + getLibelle(code) + ' (' + code + ') de ' + pending.nom_donneur + ' ?';
       // Afficher état déclaré par le donneur
       var etatDiv = document.getElementById('accepter-etat-donneur');
       var noteDiv = document.getElementById('accepter-note-donneur');
@@ -437,7 +468,7 @@ async function afficherTransfertsEnAttente() {
       var etatInfo = t.etat ? ' — État déclaré : <strong>' + t.etat + '</strong>' : '';
       var noteInfo = t.note ? '<br><small>📝 ' + t.note + '</small>' : '';
       return '<div class="materiel-card">' +
-        '<strong>' + t.code_im + '</strong><br>' +
+        '<strong>' + getLibelle(t.code_im) + '</strong> <span style="font-size:11px;color:#999;font-family:monospace">(' + t.code_im + ')</span><br>' +
         '<small>De : ' + t.nom_donneur + etatInfo + '</small>' + noteInfo + '<br>' +
         '<small>' + new Date(t.horodatage).toLocaleString('fr-FR') + '</small><br>' +
         '<button class="btn btn-primary" style="margin-top:8px;padding:10px" onclick="demarrerValidationTransfert(\'' + t.id + '\',\'' + t.code_im + '\')">📷 Scanner pour valider</button>' +
@@ -527,11 +558,9 @@ async function afficherMonMateriel() {
     liste.innerHTML = items.length === 0
       ? '<p class="empty-msg">Aucun matériel en ta possession.</p>'
       : items.map(function(m) {
-          return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
-            (m.etat ? ' <span class="etat-badge etat-' + m.etat.toLowerCase().replace(' ', '').replace('é','e').replace('î','i') + '">' + m.etat + '</span>' : '') + '<br>' +
-            '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small>' +
-            (m.note ? '<br><small>📝 ' + m.note + '</small>' : '') +
-            '</div>';
+          var etatBadgeHtml = m.etat ? ' <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:8px;background:#E3F2FD;color:#0D47A1">' + m.etat + '</span>' : '';
+          var noteHtml = m.note ? '<br><small style="color:#888">📝 ' + m.note + '</small>' : '';
+          return immoCard(m.code_im, etatBadgeHtml, new Date(m.horodatage).toLocaleDateString('fr-FR') + noteHtml);
         }).join('');
   } catch (e) {
     liste.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
