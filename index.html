@@ -144,6 +144,7 @@
       <button class="btn btn-primary" onclick="rechercherSuiviImmo()">Go</button>
     </div>
     <button class="btn btn-outline" onclick="scannerPourSuivi()">📷 Scanner un QR code</button>
+    <button class="btn btn-tertiary" id="btn-photos-suivi" onclick="ouvrirPhotos(document.getElementById('suivi-immo-code').value)" style="display:none">🖼️ Voir les photos</button>
     <div id="suivi-immo-localisation"></div>
     <div id="suivi-immo-resultats" class="liste-materiel">
       <p class="empty-msg">Scanne ou tape un code immo.</p>
@@ -167,6 +168,27 @@
       <p class="empty-msg">Tape un nom ou un code employé.</p>
     </div>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+  </div>
+
+  <!-- ÉCRAN : Photos d'une immo -->
+  <div id="screen-photos" class="screen">
+    <h2>🖼️ Photos</h2>
+    <p id="photos-immo-titre" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
+
+    <!-- Upload -->
+    <div class="admin-only hidden" id="upload-zone" style="width:100%;background:#FFF8F0;border:2px dashed #E87722;border-radius:14px;padding:16px;text-align:center;">
+      <p style="font-size:13px;color:#666;margin-bottom:10px;">Ajouter une photo (appareil photo ou galerie)</p>
+      <label style="cursor:pointer;display:inline-block;background:#E87722;color:white;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px;">
+        📷 Prendre / Choisir
+        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="uploadPhoto(this)">
+      </label>
+      <div id="upload-progress" style="margin-top:10px;font-size:13px;color:#666;"></div>
+    </div>
+
+    <!-- Galerie -->
+    <div id="galerie-photos" style="width:100%;"></div>
+
+    <button class="btn btn-outline" onclick="showScreen('screen-suivi-immo')">Retour</button>
   </div>
 
   <!-- ÉCRAN 14 : Administration -->
