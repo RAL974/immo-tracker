@@ -561,7 +561,7 @@ async function afficherMonMateriel() {
       : items.map(function(m) {
           var etatBadgeHtml = m.etat ? ' <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:8px;background:#E3F2FD;color:#0D47A1">' + m.etat + '</span>' : '';
           var noteHtml = m.note ? '<br><small style="color:#888">📝 ' + m.note + '</small>' : '';
-          return immoCard(m.code_im, etatBadgeHtml, new Date(m.horodatage).toLocaleDateString('fr-FR') + noteHtml);
+          return immoCard(m.code_im, etatBadgeHtml, new Date(m.horodatage).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' }) + noteHtml);
         }).join('');
   } catch (e) {
     liste.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
@@ -597,7 +597,31 @@ async function rechercherSuiviImmo() {
     var res = await fetch(CONFIG.webhookMouvements + '?immo=' + encodeURIComponent(code));
     var mouvements = await res.json();
     if (!Array.isArray(mouvements) || mouvements.length === 0) {
-      div.innerHTML = '<p class="empty-msg">Aucun mouvement trouvé pour "' + code + '".</p>';
+      // Chercher dans immos.json même si aucun mouvement
+      var immoTrouve = null;
+      for (var k in state.immos) {
+        if (k.toUpperCase().includes(code) || code.includes(k.replace('IM','').replace(/^0+/,''))) {
+          immoTrouve = state.immos[k];
+          break;
+        }
+      }
+      if (immoTrouve) {
+        loc.innerHTML = '<div class="localisation-badge">🏭 Au dépôt — jamais sorti</div>';
+        div.innerHTML = '<div class="materiel-card">' +
+          '<strong style="font-size:15px">' + immoTrouve.Libelle + '</strong><br>' +
+          '<span style="font-size:11px;color:#999;font-family:monospace">' + immoTrouve.Code_IM + '</span>' +
+          (immoTrouve.Categorie ? ' · <span style="font-size:11px;color:#666">' + immoTrouve.Categorie + '</span>' : '') +
+          (immoTrouve.N_Serie ? '<br><small style="color:#888">N° série : ' + immoTrouve.N_Serie + '</small>' : '') +
+          '</div>' +
+          '<p class="empty-msg">Aucun mouvement enregistré pour cette immo.</p>';
+        var btnPhotos = document.getElementById('btn-photos-suivi');
+        if (btnPhotos) btnPhotos.style.display = 'block';
+        state.photoImmo = immoTrouve.Code_IM;
+        document.getElementById('suivi-immo-code').value = immoTrouve.Code_IM;
+      } else {
+        loc.innerHTML = '';
+        div.innerHTML = '<p class="empty-msg">Aucun mouvement trouvé pour "' + code + '".</p>';
+      }
       return;
     }
     var dernier = mouvements[0];
@@ -615,7 +639,7 @@ async function rechercherSuiviImmo() {
           ' ' + formatMouvementBadge(m) +
           (m.etat ? ' <span class="etat-badge">' + m.etat + '</span>' : '') + '<br>' +
           '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
-          new Date(m.horodatage).toLocaleString('fr-FR') + '</small>' +
+          new Date(m.horodatage).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small>' +
           (m.note ? '<br><small>📝 ' + m.note + '</small>' : '') +
           '</div>';
       }).join('');
@@ -670,7 +694,7 @@ async function afficherSuiviEmploye(code, nom) {
       : data.actuel.map(function(m) {
           return '<div class="materiel-card"><strong>' + m.code_im + '</strong>' +
             (m.etat ? ' <span class="etat-badge">' + m.etat + '</span>' : '') + '<br>' +
-            '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR') + '</small>' +
+            '<small>' + new Date(m.horodatage).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small>' +
             (m.note ? '<br><small>📝 ' + m.note + '</small>' : '') + '</div>';
         }).join('');
     html += '<h3>🕓 Historique complet (' + data.historique.length + ' mouvements)</h3>';
@@ -679,7 +703,7 @@ async function afficherSuiviEmploye(code, nom) {
       : data.historique.map(function(m) {
           var icon = m.type_mouvement === 'Retour' ? '📥' : m.type_mouvement === 'Transfert' ? '🔄' : '📤';
           return '<div class="materiel-card">' + icon + ' <strong>' + m.code_im + '</strong> — ' + m.type_mouvement + '<br>' +
-            '<small>' + new Date(m.horodatage).toLocaleString('fr-FR') + '</small></div>';
+            '<small>' + new Date(m.horodatage).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small></div>';
         }).join('');
     div.innerHTML = html;
   } catch (e) {
@@ -862,7 +886,7 @@ async function adminRechercher() {
           return '<div class="materiel-card"><strong>' + m.code_im + '</strong> — ' + m.type_mouvement +
             ' ' + formatMouvementBadge(m) + '<br>' +
             '<small>👷 ' + m.nom_employe + ' (' + m.code_employe + ') — ' +
-            new Date(m.horodatage).toLocaleString('fr-FR') + '</small>' +
+            new Date(m.horodatage).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion' }) + '</small>' +
             (m.etat ? '<br><small>État : ' + m.etat + '</small>' : '') +
             (m.note ? '<br><small>📝 ' + m.note + '</small>' : '') +
             '</div>';
