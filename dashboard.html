@@ -508,35 +508,83 @@ function renderResa() {
   });
   document.getElementById('cnt-resa').textContent = data.length + ' réservations';
 
-  // Gantt simplifié
-  var now = new Date();
-  var mois = [now.getFullYear(), now.getMonth()];
-  var jours = new Date(mois[0], mois[1]+1, 0).getDate();
-  var ganttData = data.filter(function(r){ return r.date_debut || r.date_fin; }).slice(0,20);
-  var ganttHtml = '';
-  if (ganttData.length > 0) {
-    ganttHtml = '<div style="margin-bottom:12px"><strong style="color:var(--blue)">Vue calendrier — ' + new Date(mois[0],mois[1],1).toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'Indian/Reunion'}) + '</strong></div>';
-    ganttHtml += '<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:600px"><thead><tr><th style="padding:4px 8px;font-size:11px;color:var(--grey);text-align:left;width:160px">Immo</th>';
-    for (var j=1;j<=jours;j++) ganttHtml += '<th style="padding:2px 3px;font-size:10px;color:var(--grey);text-align:center;width:18px">' + j + '</th>';
-    ganttHtml += '</tr></thead><tbody>';
+  // Gantt 6 semaines à partir de la semaine en cours
+  var today = new Date();
+  // Lundi de la semaine courante
+  var lundi = new Date(today);
+  lundi.setDate(today.getDate() - ((today.getDay()+6)%7));
+  lundi.setHours(0,0,0,0);
+  var NB_JOURS = 42; // 6 semaines
+  var joursFR = ['L','M','M','J','V','S','D'];
+  var moisFR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+  // Filtrer les réservations qui intersectent la période
+  var periodeDebut = lundi;
+  var periodeFin = new Date(lundi.getTime() + NB_JOURS * 86400000);
+  var ganttData = data.filter(function(r){
+    if (!r.date_debut && !r.date_fin) return false;
+    var rd = r.date_debut ? new Date(r.date_debut) : periodeDebut;
+    var rf = r.date_fin ? new Date(r.date_fin) : periodeFin;
+    return !(rf < periodeDebut || rd > periodeFin);
+  });
+
+  // Construire les jours
+  var cols = [];
+  for (var ci=0; ci<NB_JOURS; ci++) {
+    var d = new Date(lundi.getTime() + ci * 86400000);
+    cols.push(d);
+  }
+
+  var ganttHtml = '<div style="margin-bottom:10px;display:flex;align-items:center;gap:12px">';
+  ganttHtml += '<strong style="color:var(--blue)">Calendrier des réservations — 6 semaines</strong>';
+  Object.keys(SCOL).forEach(function(s){ ganttHtml += '<span style="font-size:11px"><span style="display:inline-block;width:12px;height:12px;background:'+SCOL[s]+';border-radius:2px;margin-right:3px;vertical-align:middle"></span>'+(SLAB[s]||s)+'</span>'; });
+  ganttHtml += '</div>';
+  ganttHtml += '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px"><thead>';
+  // Ligne mois
+  ganttHtml += '<tr><th style="padding:3px 8px;text-align:left;min-width:160px;position:sticky;left:0;background:white;z-index:1">Immo</th>';
+  var lastMois = -1;
+  cols.forEach(function(d,i){
+    if (d.getMonth() !== lastMois) {
+      var span = cols.filter(function(c){ return c.getMonth()===d.getMonth(); }).length;
+      ganttHtml += '<th colspan="'+span+'" style="padding:2px 4px;background:#F0F4F8;color:var(--blue);font-weight:700;text-align:center;border:1px solid #ddd">'+moisFR[d.getMonth()]+' '+d.getFullYear()+'</th>';
+      lastMois = d.getMonth();
+    }
+  });
+  ganttHtml += '</tr>';
+  // Ligne jours
+  ganttHtml += '<tr><th style="position:sticky;left:0;background:white;z-index:1"></th>';
+  cols.forEach(function(d){
+    var isToday = d.toDateString() === today.toDateString();
+    var isWE = d.getDay()===0 || d.getDay()===6;
+    ganttHtml += '<th style="padding:2px 1px;text-align:center;width:22px;min-width:22px;' +
+      (isToday ? 'background:var(--orange);color:white;border-radius:3px;' : isWE ? 'background:#F8F8F8;color:#bbb;' : 'color:var(--grey);') + '">' +
+      joursFR[d.getDay()-1 < 0 ? 6 : d.getDay()-1] + '<br>' + d.getDate() + '</th>';
+  });
+  ganttHtml += '</tr></thead><tbody>';
+
+  if (ganttData.length === 0) {
+    ganttHtml += '<tr><td colspan="'+(NB_JOURS+1)+'" style="padding:20px;text-align:center;color:var(--grey)">Aucune réservation sur cette période.</td></tr>';
+  } else {
     ganttData.forEach(function(r){
-      var lib = im[r.code_im] ? (im[r.code_im].Libelle||r.code_im).substring(0,20) : r.code_im;
+      var lib = im[r.code_im] ? (im[r.code_im].Libelle||r.code_im).substring(0,22) : (r.code_im||'—');
       var col = SCOL[r.statut] || '#999';
-      ganttHtml += '<tr><td style="padding:3px 8px;font-size:11px;white-space:nowrap" title="'+r.nom_employe+'">'+lib+'</td>';
-      for (var j=1;j<=jours;j++) {
-        var d = new Date(mois[0],mois[1],j);
+      ganttHtml += '<tr><td style="padding:3px 8px;white-space:nowrap;position:sticky;left:0;background:white;border-right:1px solid #eee;z-index:1" title="'+r.nom_employe+'">'+lib+'<br><span style="font-size:10px;color:var(--grey)">'+r.nom_employe+'</span></td>';
+      cols.forEach(function(d){
+        var isWE = d.getDay()===0||d.getDay()===6;
+        var isToday = d.toDateString()===today.toDateString();
         var deb = r.date_debut ? new Date(r.date_debut) : null;
-        var fin = r.date_fin ? new Date(r.date_fin) : null;
-        var inRange = deb && fin && d >= new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()) && d <= new Date(fin.getFullYear(),fin.getMonth(),fin.getDate());
-        ganttHtml += '<td style="padding:2px;background:' + (inRange ? col : 'transparent') + ';border:1px solid #f0f0f0"></td>';
-      }
+        var fin = r.date_fin   ? new Date(r.date_fin)   : null;
+        var debJ = deb ? new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()) : null;
+        var finJ = fin ? new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()) : null;
+        var inRange = debJ && finJ && d >= debJ && d <= finJ;
+        var bg = inRange ? col : (isWE ? '#F8F8F8' : 'transparent');
+        var border = isToday ? '2px solid var(--orange)' : '1px solid #f0f0f0';
+        ganttHtml += '<td style="width:22px;min-width:22px;padding:2px;background:'+bg+';border:'+border+'" title="'+(inRange?r.statut:'')+'"></td>';
+      });
       ganttHtml += '</tr>';
     });
-    ganttHtml += '</tbody></table></div>';
-    if (data.length > 20) ganttHtml += '<p style="font-size:12px;color:var(--grey);margin-top:6px">Affichage limité aux 20 premières réservations dans le Gantt.</p>';
-  } else {
-    ganttHtml = '<p style="color:var(--grey);font-size:13px;text-align:center;padding:20px">Aucune réservation avec dates à afficher.</p>';
   }
+  ganttHtml += '</tbody></table></div>';
   document.getElementById('resa-gantt').innerHTML = ganttHtml;
 
   // Tableau
