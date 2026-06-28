@@ -73,6 +73,15 @@ function afficherEmploye() {
   document.querySelectorAll('.admin-only').forEach(function (el) {
     el.classList.toggle('hidden', !isAdmin);
   });
+  document.querySelectorAll('.non-admin-only').forEach(function (el) {
+    el.classList.toggle('hidden', isAdmin);
+  });
+  // Peupler les selects catégorie si immos déjà chargés
+  if (Object.keys(state.immos).length > 0) {
+    ['resa-categorie', 'rech-cat', 'force-cat', 'stock-cat'].forEach(function(id) {
+      buildCatSelect(id);
+    });
+  }
 }
 
 function changerUtilisateur() {
@@ -91,6 +100,10 @@ async function chargerImmos() {
     var res = await fetch('immos.json');
     var arr = await res.json();
     arr.forEach(function (i) { state.immos[i.Code_IM] = i; });
+    // Peupler les selects catégorie
+    ['resa-categorie', 'rech-cat', 'force-cat', 'stock-cat'].forEach(function(id) {
+      buildCatSelect(id);
+    });
   } catch (e) {}
 }
 
@@ -535,15 +548,8 @@ async function rechercheAuto() {
   var html = '';
 
   // Immos correspondantes
-  var immosMatch = [];
-  for (var k in state.immos) {
-    var im = state.immos[k];
-    var num = k.replace('IM', '').replace(/^0+/, '');
-    if (k.includes(q) || (im.Libelle || '').toUpperCase().includes(q) || num === q) {
-      immosMatch.push(im);
-    }
-    if (immosMatch.length >= 6) break;
-  }
+  var cat = (document.getElementById('rech-cat') || {}).value || '';
+  var immosMatch = immosFiltrees(cat, q).slice(0, 8);
 
   // Employés correspondants
   var empMatch = state.employes.filter(function (e) {
@@ -670,19 +676,33 @@ async function voirDetailEmploye(code, nom) {
 var forceImmoCode = null;
 
 function rechercherImmoPourForce() {
-  var q = document.getElementById('force-immo-search').value.trim().toUpperCase();
-  if (!q) return;
-  for (var k in state.immos) {
-    var im = state.immos[k];
-    var num = k.replace('IM', '').replace(/^0+/, '');
-    if (k.includes(q) || (im.Libelle || '').toUpperCase().includes(q) || num === q) {
-      forceImmoCode = k;
-      document.getElementById('force-immo-info').textContent = '✅ ' + im.Libelle + ' (' + k + ')';
-      return;
-    }
+  var cat = (document.getElementById('force-cat') || {}).value || '';
+  var q = document.getElementById('force-immo-search').value.trim();
+  var div = document.getElementById('force-suggestions');
+  var results = immosFiltrees(cat, q);
+  if (results.length === 1) {
+    forceImmoCode = results[0].Code_IM;
+    document.getElementById('force-immo-info').textContent = '✅ ' + results[0].Libelle + ' (' + results[0].Code_IM + ')';
+    if (div) div.innerHTML = '';
+    return;
   }
-  document.getElementById('force-immo-info').textContent = '';
   forceImmoCode = null;
+  document.getElementById('force-immo-info').textContent = results.length > 1 ? results.length + ' immos correspondantes' : '';
+  if (!div) return;
+  div.innerHTML = (!q && !cat) ? '' : results.length === 0 ? '<p class="empty-msg">Aucune immo.</p>' :
+    results.slice(0, 8).map(function(im) {
+      var esc = im.Code_IM.replace(/'/g, "\'");
+      var lib = (im.Libelle||'').replace(/'/g, "\'");
+      return '<div class="suggestion-item" onclick="selForceImmo(\''+esc+'\',\''+lib+'\')"><strong>'+im.Libelle+'</strong> <span class="chantier-tag">'+im.Code_IM+'</span></div>';
+    }).join('');
+}
+
+function selForceImmo(code, lib) {
+  forceImmoCode = code;
+  document.getElementById('force-immo-search').value = lib;
+  document.getElementById('force-immo-info').textContent = '✅ ' + lib + ' (' + code + ')';
+  var div = document.getElementById('force-suggestions');
+  if (div) div.innerHTML = '';
 }
 
 function scannerPourForce() {
@@ -839,16 +859,11 @@ async function verifierReservationsEnRetard() {
 }
 
 function rechercherImmoResa() {
-  var q = document.getElementById('resa-immo-search').value.trim().toUpperCase();
+  var cat = (document.getElementById('resa-categorie') || {}).value || '';
+  var q = document.getElementById('resa-immo-search').value.trim();
   var div = document.getElementById('resa-immo-suggestions');
-  if (!q || q.length < 2) { div.innerHTML = ''; return; }
-  var results = [];
-  for (var k in state.immos) {
-    var im = state.immos[k];
-    var num = k.replace('IM', '').replace(/^0+/, '');
-    if (k.includes(q) || (im.Libelle || '').toUpperCase().includes(q) || num === q) results.push(im);
-    if (results.length >= 6) break;
-  }
+  if (!q && !cat) { div.innerHTML = ''; return; }
+  var results = immosFiltrees(cat, q);
   div.innerHTML = results.length === 0 ? '<p class="empty-msg">Aucune immo.</p>' :
     results.map(function (im) {
       var esc = im.Code_IM.replace(/'/g, "\\'");
@@ -887,6 +902,7 @@ function initReservationScreen() {
   document.getElementById('resa-date-fin').value = '';
   document.getElementById('resa-chantier').value = '';
   document.getElementById('resa-note').value = '';
+  buildCatSelect('resa-categorie', rechercherImmoResa);
 }
 
 async function verifierConflits(codeIM, dateDebut, dateFin) {
@@ -1029,4 +1045,41 @@ async function validerModifResa() {
     resaEnCoursId = null;
     showScreen('screen-mes-reservations');
   } catch (e) { alert('Erreur.'); }
+}
+
+// ── Stock au dépôt (admin/CONI) ─────────────────────────────────────────
+async function ouvrirStockDepot() {
+  showScreen('screen-stock-depot');
+  buildCatSelect('stock-cat', filtrerStockDepot);
+  filtrerStockDepot();
+}
+
+async function filtrerStockDepot() {
+  var cat = (document.getElementById('stock-cat') || {}).value || '';
+  var q = (document.getElementById('stock-search') || {}).value || '';
+  var div = document.getElementById('stock-depot-liste');
+  if (!div) return;
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  try {
+    var enCircSet = {};
+    try {
+      var r = await fetch(CONFIG.webhookMouvements + '?dashboard=1');
+      var dd = await r.json();
+      (dd.en_circulation || []).forEach(function(i) { enCircSet[i.code_im] = true; });
+    } catch(e2) {}
+    var filtered = immosFiltrees(cat, q).filter(function(im) { return !enCircSet[im.Code_IM]; });
+    filtered.sort(function(a, b) { return a.Code_IM.localeCompare(b.Code_IM); });
+    var countEl = document.getElementById('stock-count');
+    if (countEl) countEl.textContent = filtered.length + ' immos';
+    if (!filtered.length) { div.innerHTML = '<p class="empty-msg">Aucune immo au dépôt.</p>'; return; }
+    div.innerHTML = filtered.map(function(im) {
+      var fdsUrl = getFdsUrl(im.FDS_URL || '', im.Code_IM);
+      var fdsBtn = fdsUrl ? '<a href="' + fdsUrl + '" target="_blank" style="font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;margin-left:6px">📄 FDS</a>' : '';
+      return '<div class="materiel-card">' +
+        '<strong style="font-size:14px;color:#1A3A6B">' + im.Libelle + '</strong>' + fdsBtn + '<br>' +
+        '<span style="font-size:11px;color:#999;font-family:monospace">' + im.Code_IM + '</span>' +
+        (im.Categorie ? ' · <span style="font-size:11px;color:#888">' + im.Categorie + '</span>' : '') +
+        '</div>';
+    }).join('');
+  } catch(e) { div.innerHTML = '<p class="empty-msg">Erreur : ' + e.message + '</p>'; }
 }
