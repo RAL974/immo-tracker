@@ -301,6 +301,9 @@ tr:hover td{background:#FAFBFC;}
         <input type="text" id="depot-q" placeholder="Code, libellé..." oninput="renderDepot()">
         <select id="depot-cat" onchange="renderDepot()"><option value="">Toutes catégories</option></select>
         <select id="depot-etat" onchange="renderDepot()"><option value="">Tous états</option><option>Neuf</option><option>Bon état</option><option>Usé</option><option>Abîmé</option><option>Hors service</option><option>Inconnu</option></select>
+        <select id="depot-nb" onchange="renderDepot()" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+          <option value="50">50 max</option><option value="100">100 max</option><option value="200">200 max</option><option value="0">Tous</option>
+        </select>
       </div>
       <div class="card"><div class="card-head"><h3>Au dépôt</h3><span class="card-cnt" id="cnt-depot"></span></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>État</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
@@ -308,10 +311,21 @@ tr:hover td{background:#FAFBFC;}
 
     <!-- Historique -->
     <div id="pane-historique" class="tab-pane">
-      <div class="card"><div class="card-head"><h3>Historique des mouvements</h3></div>
-        <div style="padding:12px;display:flex;gap:8px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap">
+      <div class="card"><div class="card-head"><h3>Historique des mouvements</h3><span class="card-cnt" id="cnt-hist"></span></div>
+        <div style="padding:12px;display:flex;gap:8px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap;align-items:center">
           <input type="text" id="hist-q" style="flex:1;min-width:180px;padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px" placeholder="Code IM, numéro, nom...">
-          <button class="filter-btn" onclick="searchHist()">Rechercher</button>
+          <select id="hist-type" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+            <option value="">Tous types</option>
+            <option value="Transfert">🔄 Transferts</option>
+            <option value="Retour">📥 Retours dépôt</option>
+          </select>
+          <select id="hist-nb" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+            <option value="50">50 derniers</option>
+            <option value="100">100 derniers</option>
+            <option value="200">200 derniers</option>
+            <option value="0">Tous</option>
+          </select>
+          <button class="filter-btn" onclick="filterHist()">Filtrer</button>
         </div>
         <div class="tbl-wrap"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libellé</th><th>Type</th><th>Employé</th><th>Donneur</th><th>État</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
       </div>
@@ -353,7 +367,13 @@ tr:hover td{background:#FAFBFC;}
       <div id="docs-content" style="display:none">
         <div class="filters">
           <input type="text" id="docs-q" placeholder="Filtrer..." oninput="renderDocs()">
-          <select id="docs-filter" onchange="renderDocs()"><option value="">Tous</option><option value="manque_fds">Sans FDS</option><option value="a_fds">Avec FDS</option><option value="avec_photos">Avec photos</option></select>
+          <select id="docs-filter" onchange="renderDocs()">
+            <option value="renseignees">Avec FDS ou photos (défaut)</option>
+            <option value="">Toutes immos</option>
+            <option value="manque_fds">Sans FDS</option>
+            <option value="a_fds">Avec FDS</option>
+            <option value="avec_photos">Avec photos</option>
+          </select>
         </div>
         <div class="card"><div class="card-head"><h3>Suivi des documents</h3><span class="card-cnt" id="cnt-docs"></span></div>
           <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
@@ -607,21 +627,29 @@ function renderDepot(){
   var qu=q.trim().toUpperCase();
   var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe);});
   data.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
-  document.getElementById('cnt-depot').textContent=data.length+' immos';
-  document.getElementById('tb-depot').innerHTML=data.length===0?'<tr><td colspan="5" class="es">Aucun résultat.</td></tr>':
-    data.map(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return'<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+l+'</td><td style="font-size:11px;color:var(--grey)">'+c+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td></tr>';}).join('');
+  var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
+  var affiche=nb===0?data:data.slice(0,nb);
+  document.getElementById('cnt-depot').textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
+  document.getElementById('tb-depot').innerHTML=affiche.length===0?'<tr><td colspan="5" class="es">Aucun résultat.</td></tr>':
+    affiche.map(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return'<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+l+'</td><td style="font-size:11px;color:var(--grey)">'+c+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td></tr>';}).join('');
 }
 
 // ── Rendu — Historique ───────────────────────────────────
-function searchHist(){
-  if(!d)return;
-  var q=(document.getElementById('hist-q')||{}).value||'';
+function filterHist(){
+  autoLoadHist();
+}
+function searchHist(){filterHist();}
+function autoLoadHist_internal(all,q,type,nb){
   var qu=q.trim().toUpperCase();
-  if(!qu){document.getElementById('tb-hist').innerHTML='<tr><td colspan="8" class="es">Tapez un code ou un nom.</td></tr>';return;}
-  var all=d.all_movements||[];
-  var res=all.filter(function(m){return m.code_im.toUpperCase().includes(qu)||m.code_employe.toUpperCase().includes(qu)||m.nom_employe.toUpperCase().includes(qu);});
-  document.getElementById('tb-hist').innerHTML=res.length===0?'<tr><td colspan="8" class="es">Aucun résultat pour "'+q+'".</td></tr>':
-    res.map(function(m){
+  var res=all.filter(function(m){
+    var matchQ=!qu||(m.code_im.toUpperCase().includes(qu)||m.code_employe.toUpperCase().includes(qu)||m.nom_employe.toUpperCase().includes(qu));
+    var matchT=!type||m.type_mouvement===type;
+    return matchQ&&matchT;
+  });
+  var affiche=nb===0?res:res.slice(0,nb);
+  document.getElementById('cnt-hist').textContent=affiche.length+(res.length>affiche.length?' / '+res.length:'')+' mouvements';
+  document.getElementById('tb-hist').innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
+    affiche.map(function(m){
       var l=getLib(m.code_im);
       var icon=m.type_mouvement==='Retour'?'📥':'🔄';
       var donneur='—';
@@ -657,22 +685,34 @@ function renderTransferts(){
     html+='<td>'+ebadge(t.etat||'Inconnu')+'</td>';
     html+='<td><span class="badge '+(ret?'bret':'batt')+'">'+h+'h</span></td>';
     html+='<td style="font-size:11px;color:var(--grey)">'+(t.note||'—')+'</td>';
-    html+='<td style="white-space:nowrap">';
-    html+='<select class="sel-etat-t" style="font-size:11px;padding:2px 6px;border:1px solid #ddd;border-radius:6px;margin-right:4px">';
+    html+='<td style="white-space:nowrap;min-width:200px">';
+    html+='<select class="sel-etat-t" style="font-size:11px;padding:2px 6px;border:1px solid #ddd;border-radius:6px;margin-right:4px;margin-bottom:4px">';
     html+='<option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option>';
-    html+='</select>';
-    html+='<button class="btn-val-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">✅ Valider</button>';
+    html+='</select><br>';
+    html+='<button class="btn-val-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">✅ Valider</button>';
+    html+='<button class="btn-ann-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" style="padding:4px 8px;background:#FFEBEE;color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">❌ Annuler</button>';
+    html+='<button class="btn-mod-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:#E3F2FD;color:var(--blue);border:1px solid var(--blue);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">✏️ Modifier</button>';
     html+='</td></tr>';
   });
   document.getElementById('tb-transf').innerHTML=html;
-  // Attacher les handlers via event delegation sur le tbody
-  document.getElementById('tb-transf').querySelectorAll('.btn-val-t').forEach(function(btn){
+  // Attacher les handlers
+  var tbody=document.getElementById('tb-transf');
+  tbody.querySelectorAll('.btn-val-t').forEach(function(btn){
     btn.onclick=function(){
-      var row=this.closest('tr');
-      var sel=row?row.querySelector('.sel-etat-t'):null;
-      var etat=sel?sel.value:'Bon état';
-      var tid=this.dataset.tid, cim=this.dataset.cim, rec=this.dataset.rec, recNom=this.dataset.recnom;
-      validerTransfertDash(btn,tid,cim,rec,recNom,etat);
+      var row=this.closest('tr');var sel=row?row.querySelector('.sel-etat-t'):null;
+      validerTransfertDash(this,this.dataset.tid,this.dataset.cim,this.dataset.rec,this.dataset.recnom,sel?sel.value:'Bon état');
+    };
+  });
+  tbody.querySelectorAll('.btn-ann-t').forEach(function(btn){
+    btn.onclick=function(){
+      var cim=this.dataset.cim,tid=this.dataset.tid;
+      if(!confirm('Annuler le transfert de '+getLib(cim)+' ?'))return;
+      annulerTransfert(tid);
+    };
+  });
+  tbody.querySelectorAll('.btn-mod-t').forEach(function(btn){
+    btn.onclick=function(){
+      ouvrirModifTransfert(this.dataset.tid,this.dataset.cim,this.dataset.rec,this.dataset.recnom);
     };
   });
 }
@@ -732,6 +772,21 @@ function renderResa(){
   document.getElementById('resa-gantt').innerHTML=gh;
   // Tableau
   document.getElementById('cnt-resa').textContent=data.length+' réservations';
+  // Attacher les handlers sans inline onclick
+  setTimeout(function(){
+    document.querySelectorAll('.resa-action-sel').forEach(function(sel){
+      sel.onchange=function(){
+        var val=this.value; if(!val)return; this.value='';
+        var id=this.dataset.rid,cim=this.dataset.cim,nom=this.dataset.nom,deb=this.dataset.deb,fin=this.dataset.fin;
+        if(val==='Confirmee'||val==='Annulee'){
+          if(!confirm((val==='Confirmee'?'Confirmer':'Annuler')+' la réservation de '+nom+' pour '+getLib(cim)+' ?'))return;
+          majStatutResa(id,val,this);
+        } else if(val==='contre_prop'){
+          ouvrirContreProposition(id,cim,nom,deb,fin);
+        }
+      };
+    });
+  }, 50);
   document.getElementById('tb-resa').innerHTML=data.length===0?'<tr><td colspan="8" class="es">Aucune réservation.</td></tr>':
     data.map(function(r){
       var l=getLib(r.code_im);
@@ -744,7 +799,7 @@ function renderResa(){
       tr+='<td style="font-size:12px">'+(r.nom_chantier||'—')+'</td>';
       tr+='<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td>';
       tr+='<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_fin)+'</td>';
-      tr+='<td><select onchange="majStatutResa(\''+r.id+'\',this.value,this)" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Changer...</option><option value="Confirmee">Confirmer</option><option value="Annulee">Annuler</option><option value="Rendue">Rendue</option></select></td>';
+      tr+='<td><select class="resa-action-sel" data-rid="'+r.id+'" data-cim="'+r.code_im+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'" data-deb="'+r.date_debut+'" data-fin="'+r.date_fin+'" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Action...</option><option value="Confirmee">✅ Confirmer</option><option value="Annulee">❌ Annuler</option><option value="contre_prop">✏️ Proposer modification</option></select></td>';
       tr+='</tr>';return tr;
     }).join('');
 }
@@ -768,6 +823,7 @@ function renderDocs(){
   if(f==='manque_fds')rows=rows.filter(function(r){return!r.hasFds;});
   if(f==='a_fds')rows=rows.filter(function(r){return r.hasFds;});
   if(f==='avec_photos')rows=rows.filter(function(r){return r.hasPhotos;});
+  if(f==='renseignees'||f==='')rows=rows.filter(function(r){return r.hasFds||r.hasPhotos;});
   rows.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
   var sansFds=rows.filter(function(r){return!r.hasFds;}).length;
   document.getElementById('nb-docs').textContent=sansFds+' sans FDS';
@@ -809,11 +865,77 @@ function renderAlertes(){
 
 // ── Rendu — Analyses ─────────────────────────────────────
 function renderAnalyse(){
-  var cl=d.classement_duree||[];
-  var html='<div class="card"><div class="card-head"><h3>Classement — Durée de détention</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Immos</th><th>Durée moy.</th><th>Total cumulé</th></tr></thead><tbody>';
-  if(!cl.length)html+='<tr><td colspan="5" class="es">Aucune donnée.</td></tr>';
-  else html+=cl.map(function(r,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':''+(i+1);return'<tr><td>'+m+'</td><td><b>'+r.nom+'</b></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';}).join('');
+  if(!d){document.getElementById('analyse-content').innerHTML='<p class="es">Chargement...</p>';return;}
+  var all=d.all_movements||[];
+  var inv=d.inventory||[];
+  var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">';
+
+  // ── KPI stats rapides ─────────────────────────────────────────────────────
+  var nbRetours=all.filter(function(m){return m.type_mouvement==='Retour';}).length;
+  var nbTransferts=all.filter(function(m){return m.type_mouvement==='Transfert';}).length;
+  var nbHS=all.filter(function(m){return m.etat==='Hors service';}).length;
+  var nbAbime=all.filter(function(m){return m.etat==='Abîmé';}).length;
+  html+='<div class="card"><div class="card-head"><h3>📊 Synthèse globale</h3></div><div style="padding:12px">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  [{v:all.length,l:'Mouvements totaux',c:'var(--blue)'},{v:nbTransferts,l:'Transferts',c:'var(--orange)'},{v:nbRetours,l:'Retours dépôt',c:'var(--green)'},{v:nbHS,l:'Pannes déclarées',c:'var(--red)'},{v:nbAbime,l:'Dégradations',c:'var(--yellow)'},{v:d.stats.moyenne_jours_hors_depot+'j',l:'Durée moy. hors dépôt',c:'var(--blue)'}].forEach(function(k){
+    html+='<div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:'+k.c+'">'+k.v+'</div><div style="font-size:11px;color:var(--grey)">'+k.l+'</div></div>';
+  });
+  html+='</div></div></div>';
+
+  // ── Top immos les plus demandées ──────────────────────────────────────────
+  var immoFreq={};all.forEach(function(m){immoFreq[m.code_im]=(immoFreq[m.code_im]||0)+1;});
+  var topImmo=Object.keys(immoFreq).sort(function(a,b){return immoFreq[b]-immoFreq[a];}).slice(0,10);
+  html+='<div class="card"><div class="card-head"><h3>🔥 Top immos les plus mouvementées</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Mouvements</th></tr></thead><tbody>';
+  topImmo.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);
+    html+='<tr><td>'+m+'</td><td><span class="link-im" data-cim="'+code+'" data-lib="'+getLib(code).replace(/"/g,'')+'">'+code+'</span></td><td style="font-size:12px">'+getLib(code)+'</td><td><b>'+immoFreq[code]+'</b></td></tr>';
+  });
   html+='</tbody></table></div></div>';
+
+  // ── Top rétenteurs (durée) ────────────────────────────────────────────────
+  var cl=d.classement_duree||[];
+  html+='<div class="card"><div class="card-head"><h3>⏱ Top rétenteurs (durée moy.)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Immos</th><th>Durée moy.</th><th>Total</th></tr></thead><tbody>';
+  if(!cl.length)html+='<tr><td colspan="5" class="es">Aucune donnée.</td></tr>';
+  else cl.forEach(function(r,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);
+    html+='<tr><td>'+m+'</td><td><span class="link-emp" data-emp="" data-nom="'+r.nom.replace(/"/g,'')+'">'+r.nom+'</span></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  // ── Top demandeurs (volume de mouvements) ─────────────────────────────────
+  var empFreq={};var empNom={};all.forEach(function(m){empFreq[m.code_employe]=(empFreq[m.code_employe]||0)+1;empNom[m.code_employe]=m.nom_employe;});
+  var topEmp=Object.keys(empFreq).sort(function(a,b){return empFreq[b]-empFreq[a];}).slice(0,10);
+  html+='<div class="card"><div class="card-head"><h3>👷 Top demandeurs (volume)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Code</th><th>Mouvements</th></tr></thead><tbody>';
+  topEmp.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);
+    html+='<tr><td>'+m+'</td><td><span class="link-emp" data-emp="'+code+'" data-nom="'+empNom[code].replace(/"/g,'')+'">'+empNom[code]+'</span></td><td style="font-size:11px;color:var(--grey)">'+code+'</td><td><b>'+empFreq[code]+'</b></td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  // ── Pannes et dégradations par catégorie ──────────────────────────────────
+  var pannes={};all.filter(function(m){return m.etat==='Hors service'||m.etat==='Abîmé';}).forEach(function(m){var c=getCat(m.code_im)||'Sans catégorie';if(!pannes[c])pannes[c]={hs:0,abime:0};if(m.etat==='Hors service')pannes[c].hs++;else pannes[c].abime++;});
+  html+='<div class="card"><div class="card-head"><h3>⚠️ Pannes & dégradations par catégorie</h3></div><div class="tbl-wrap"><table><thead><tr><th>Catégorie</th><th>🔴 Hors service</th><th>⚠️ Abîmé</th><th>Total</th></tr></thead><tbody>';
+  var panCats=Object.keys(pannes).sort(function(a,b){return(pannes[b].hs+pannes[b].abime)-(pannes[a].hs+pannes[a].abime);});
+  if(!panCats.length)html+='<tr><td colspan="4" class="es">Aucune panne ou dégradation enregistrée.</td></tr>';
+  else panCats.forEach(function(c){var p=pannes[c];html+='<tr><td style="font-size:12px">'+c+'</td><td style="color:var(--red);font-weight:700">'+p.hs+'</td><td style="color:var(--yellow);font-weight:700">'+p.abime+'</td><td><b>'+(p.hs+p.abime)+'</b></td></tr>';});
+  html+='</tbody></table></div></div>';
+
+  // ── Taux d'utilisation par catégorie ──────────────────────────────────────
+  var catTotal={};var catCirc={};
+  inv.forEach(function(i){var c=getCat(i.code_im)||'Sans catégorie';catTotal[c]=(catTotal[c]||0)+1;if(i.statut==='En circulation')catCirc[c]=(catCirc[c]||0)+1;});
+  html+='<div class="card"><div class="card-head"><h3>📈 Taux d utilisation par catégorie</h3></div><div style="padding:12px">';
+  Object.keys(catTotal).sort().forEach(function(c){var tot=catTotal[c];var circ=catCirc[c]||0;var pct=Math.round(circ/tot*100);
+    html+='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+c+'</span><span><b>'+circ+'</b>/'+tot+' ('+pct+'%)</span></div><div style="background:#eee;border-radius:4px;height:6px"><div style="background:var(--orange);width:'+pct+'%;height:6px;border-radius:4px"></div></div></div>';
+  });
+  html+='</div></div>';
+
+  // ── Statistiques réservations ──────────────────────────────────────────────
+  if(reservations&&reservations.length){
+    var resaDem={};reservations.forEach(function(r){resaDem[r.nom_employe]=(resaDem[r.nom_employe]||0)+1;});
+    var topResaDem=Object.keys(resaDem).sort(function(a,b){return resaDem[b]-resaDem[a];}).slice(0,5);
+    html+='<div class="card"><div class="card-head"><h3>📅 Top demandeurs de réservations</h3></div><div class="tbl-wrap"><table><thead><tr><th>Employé</th><th>Réservations</th></tr></thead><tbody>';
+    topResaDem.forEach(function(n){html+='<tr><td style="font-size:12px">'+n+'</td><td><b>'+resaDem[n]+'</b></td></tr>';});
+    html+='</tbody></table></div></div>';
+  }
+
+  html+='</div>';
   document.getElementById('analyse-content').innerHTML=html;
 }
 
@@ -1013,6 +1135,39 @@ function exportExcel(){
   var s=d.stats||{};var r4=[['Espace Soleil — Tableau de bord'],['Génére le '+fmtDT(new Date().toISOString())],[],['Indicateur','Valeur'],['Immos tracées',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au dépôt',s.au_depot||0],['Total mouvements',s.total_mouvements||0],['Durée moy. hors dépôt',s.moyenne_jours_hors_depot+'j'],['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0]];
   var ws4=XLSX.utils.aoa_to_sheet(r4);XLSX.utils.book_append_sheet(wb,ws4,'Resume');
   XLSX.writeFile(wb,'EspaceSoleil_Immos_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+
+// ── Annuler transfert ────────────────────────────────────
+async function annulerTransfert(tid){
+  try{
+    var r=await fetch(W+'?action=modifier_resa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,statut:'Annule'})});
+    // En fait les transferts sont dans Transferts_En_Attente, utiliser un PATCH direct
+    var r2=await fetch(W,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({_action:'annuler_transfert',id:tid})});
+    renderTransferts();
+    setTimeout(refreshAll,1000);
+  }catch(e){alert('Erreur : '+e.message);}
+}
+
+function ouvrirModifTransfert(tid,cim,recCode,recNom){
+  document.getElementById('act-titre').textContent='✏️ Modifier le transfert — '+getLib(cim);
+  var allEmps={};(d.all_movements||[]).forEach(function(m){if(m.code_employe&&m.nom_employe)allEmps[m.code_employe]=m.nom_employe;});
+  var empOpts='<option value="">-- Garder '+recNom+' --</option>'+Object.keys(allEmps).sort().map(function(c){return'<option value="'+c+'" data-nom="'+allEmps[c].replace(/"/g,'')+'">'+allEmps[c]+' ('+c+')</option>';}).join('');
+  document.getElementById('act-form').innerHTML=
+    '<div class="frow"><label>Code IM</label><input type="text" value="'+cim+' — '+getLib(cim)+'" readonly style="background:#F8FAFC"></div>'+
+    '<div class="frow"><label>Changer le receveur (optionnel)</label><select id="mt-receveur">'+empOpts+'</select></div>'+
+    '<div class="frow"><label>Note</label><textarea id="mt-note" rows="2" placeholder="Motif de la modification..."></textarea></div>';
+  document.getElementById('act-overlay').classList.add('open');
+  document.querySelector('#act-overlay .fact-btns button').onclick=function(){
+    var newRec=document.getElementById('mt-receveur').value;
+    var note=document.getElementById('mt-note').value;
+    // Mettre à jour le transfert dans Transferts_En_Attente
+    if(newRec){
+      var opt=document.getElementById('mt-receveur').options[document.getElementById('mt-receveur').selectedIndex];
+      var newNom=opt.dataset.nom||newRec;
+      fetch(W+'?action=maj_transfert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_employe_receveur:newRec,nom_receveur:newNom,note:note})}).then(function(){fermerAction();renderTransferts();});
+    }else{fermerAction();}
+  };
 }
 
 // Actualisation auto toutes les 5 min
