@@ -25,8 +25,11 @@
         📥 Retour au dépôt
       </button>
     </div>
-    <button class="btn btn-link btn-with-badge" onclick="showScreen('screen-mon-materiel')">
+    <button class="btn btn-link btn-with-badge non-admin-only" onclick="showScreen('screen-mon-materiel')">
       📦 Mon matériel
+    </button>
+    <button class="btn btn-link admin-only hidden" onclick="ouvrirStockDepot()">
+      🏭 Stock au dépôt
     </button>
     <button class="btn btn-link" onclick="showScreen('screen-mes-reservations')">
       📅 Mes réservations <span id="badge-resa-retard" class="btn-badge-count hidden" style="background:#E74C3C"></span>
@@ -163,9 +166,11 @@
   <!-- RECHERCHER (écran unifié admin) -->
   <div id="screen-rechercher" class="screen">
     <h2>🔍 Rechercher</h2>
-    <p style="font-size:13px;color:#888;text-align:center">Immo (code ou libellé) ou employé (nom ou code)</p>
+    <select id="rech-cat" class="select-input" style="margin-bottom:6px" onchange="rechercheAuto()">
+      <option value="">Toutes catégories</option>
+    </select>
     <div class="admin-search">
-      <input type="text" id="rech-input" class="select-input" placeholder="328, perceuse, GOLU..." oninput="rechercheAuto()">
+      <input type="text" id="rech-input" class="select-input" placeholder="N° immo, libellé, nom employé..." oninput="rechercheAuto()">
       <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourRecherche()">📷</button>
     </div>
     <div id="rech-resultats" class="liste-materiel">
@@ -197,16 +202,33 @@
     <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">Retour</button>
   </div>
 
+  <!-- STOCK DÉPÔT (admin/CONI) -->
+  <div id="screen-stock-depot" class="screen">
+    <h2>🏭 Stock au dépôt</h2>
+    <p id="stock-count" style="font-size:13px;color:#888;text-align:center"></p>
+    <select id="stock-cat" class="select-input" onchange="filtrerStockDepot()">
+      <option value="">Toutes catégories</option>
+    </select>
+    <input type="text" id="stock-search" class="select-input" placeholder="Rechercher par code ou libellé..." oninput="filtrerStockDepot()">
+    <div id="stock-depot-liste" class="liste-materiel"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+  </div>
+
   <!-- FORCE ATTRIBUTION (admin) -->
   <div id="screen-force-attribution" class="screen">
     <h2>⚡ Forcer attribution</h2>
     <p style="font-size:13px;color:#888;text-align:center">Attribue une immo sans validation par le receveur</p>
+    <label class="field-label">Catégorie (optionnel)</label>
+    <select id="force-cat" class="select-input" onchange="rechercherImmoPourForce()">
+      <option value="">Toutes catégories</option>
+    </select>
     <label class="field-label">Immo à attribuer</label>
     <div style="display:flex;gap:8px;width:100%">
       <input type="text" id="force-immo-search" class="select-input" style="flex:1" placeholder="Code IM ou libellé..." oninput="rechercherImmoPourForce()">
       <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourForce()">📷</button>
     </div>
     <p id="force-immo-info" style="font-weight:700;color:#1A3A6B;font-size:14px;"></p>
+    <div id="force-suggestions" class="liste-materiel"></div>
     <label class="field-label">Attribuer à</label>
     <select id="force-receveur" class="select-input">
       <option value="">-- Sélectionne un employé --</option>
@@ -244,9 +266,13 @@
     <img src="logo.png" alt="ES" class="logo-img-small">
     <h2>📅 Réserver une immo</h2>
     <p id="resa-immo-info" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
+    <label class="field-label">Catégorie (optionnel)</label>
+    <select id="resa-categorie" class="select-input" onchange="rechercherImmoResa()">
+      <option value="">Toutes catégories</option>
+    </select>
     <label class="field-label">Immo à réserver</label>
     <div style="display:flex;gap:8px;width:100%">
-      <input type="text" id="resa-immo-search" class="select-input" style="flex:1" placeholder="Code IM ou libellé..." oninput="rechercherImmoResa()">
+      <input type="text" id="resa-immo-search" class="select-input" style="flex:1" placeholder="Code IM, libellé ou n° série..." oninput="rechercherImmoResa()">
       <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourResa()">📷</button>
     </div>
     <div id="resa-immo-suggestions" class="liste-materiel"></div>
