@@ -3,364 +3,438 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#E87722">
+  <meta name="theme-color" content="#1A3A6B">
   <title>Immo Tracker – Espace Soleil</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <style>
-    /* Scanner visible */
-    .scanner-box {
-      width: 100%;
-      min-height: 300px;
-      background: #111;
-      border-radius: 14px;
-      overflow: hidden;
-      margin: 8px 0;
-      position: relative;
-    }
-    .scanner-box video {
-      width: 100% !important;
-      min-height: 280px !important;
-      object-fit: cover;
-      display: block;
-    }
-    .scanner-box canvas {
-      display: none;
-    }
-    /* Toast notification */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #27AE60;
-      color: white;
-      padding: 14px 24px;
-      border-radius: 12px;
-      font-weight: 700;
-      font-size: 15px;
-      z-index: 9999;
-      box-shadow: 0 4px 20px rgba(0,0,0,.3);
-      opacity: 0;
-      transition: opacity .3s;
-      white-space: nowrap;
-    }
-    .toast.show { opacity: 1; }
-    .toast.error { background: #E74C3C; }
+    /* ── Base manquante ────────────────────────────────── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F0F4F8; color: #2C3E50; }
+    :root { --blue:#1A3A6B; --orange:#E87722; --green:#27AE60; --red:#E74C3C; --grey:#7F8C8D; }
+
+    /* ── Écrans ────────────────────────────────────────── */
+    .screen { display: none; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px 16px 40px; max-width: 480px; margin: 0 auto; gap: 10px; }
+    .screen.active { display: flex; }
+
+    /* ── Logo ──────────────────────────────────────────── */
+    .logo-img { width: 140px; margin-bottom: 8px; }
+    .logo-img-small { width: 80px; margin-bottom: 4px; }
+    .subtitle { color: var(--grey); font-size: 13px; margin-bottom: 4px; }
+
+    /* ── Boutons ───────────────────────────────────────── */
+    .btn { width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn:active { opacity: .8; }
+    .btn-primary   { background: var(--blue);   color: #fff; }
+    .btn-secondary { background: var(--orange); color: #fff; }
+    .btn-tertiary  { background: #E3F2FD; color: var(--blue); }
+    .btn-outline   { background: transparent; color: var(--blue); border: 2px solid var(--blue); }
+    .btn-danger    { background: var(--red);    color: #fff; }
+    .btn-link      { background: transparent; color: var(--grey); font-size: 14px; padding: 10px; border: none; width: 100%; cursor: pointer; font-weight: 600; }
+    .btn-link:hover { color: var(--blue); }
+    .btn-group     { display: flex; gap: 10px; width: 100%; }
+    .btn-group .btn { flex: 1; font-size: 14px; padding: 14px 10px; }
+
+    /* ── Badges ────────────────────────────────────────── */
+    .badge-count { display: inline-flex; align-items: center; justify-content: center; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; margin-left: 6px; min-width: 20px; }
+    .badge-attente { width: 100%; background: #FFF3E0; border: 2px solid var(--orange); border-radius: 12px; padding: 10px 14px; color: #E65100; font-weight: 700; font-size: 14px; cursor: pointer; text-align: center; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.02);} }
+    .hidden { display: none !important; }
+
+    /* ── Séparateur ────────────────────────────────────── */
+    .separator { width: 100%; text-align: center; font-size: 11px; color: var(--grey); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 4px 0; position: relative; }
+    .separator::before, .separator::after { content: ''; position: absolute; top: 50%; width: 35%; height: 1px; background: #ddd; }
+    .separator::before { left: 0; } .separator::after { right: 0; }
+
+    /* ── User badge ────────────────────────────────────── */
+    .user-badge { background: var(--blue); color: #fff; padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 14px; }
+
+    /* ── Scanner ───────────────────────────────────────── */
+    .scanner-box { width: 100%; min-height: 280px; background: #111; border-radius: 14px; overflow: hidden; position: relative; }
+    .scanner-box video { width: 100% !important; min-height: 280px !important; object-fit: cover; display: block; }
+    .scanner-box canvas { display: none; }
+    .scanner-hint { font-size: 13px; color: var(--grey); text-align: center; }
+
+    /* ── Champs ────────────────────────────────────────── */
+    .field-label { width: 100%; font-size: 12px; font-weight: 700; color: var(--grey); text-transform: uppercase; letter-spacing: .5px; }
+    .select-input { width: 100%; padding: 14px; border: 2px solid #ddd; border-radius: 12px; font-size: 15px; background: #fff; }
+    .select-input:focus { outline: none; border-color: var(--orange); }
+    .note-textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 12px; font-size: 14px; min-height: 80px; resize: vertical; }
+    .note-textarea:focus { outline: none; border-color: var(--orange); }
+    .search-row { display: flex; gap: 8px; width: 100%; }
+    .search-row input, .search-row select { flex: 1; }
+    .search-row .btn { width: auto; padding: 14px 16px; flex: 0 0 auto; }
+
+    /* ── Résultats ─────────────────────────────────────── */
+    .liste-materiel { width: 100%; }
+    .materiel-card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); border-left: 4px solid var(--orange); }
+    .suggestion-item { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 6px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.07); border: 1px solid #eee; }
+    .suggestion-item:active { background: #F0F4F8; }
+    .chantier-tag { background: #E3F2FD; color: var(--blue); font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 8px; font-family: monospace; }
+    .empty-msg { color: var(--grey); text-align: center; font-size: 13px; padding: 20px; }
+    .localisation-badge { background: var(--blue); color: #fff; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; width: 100%; text-align: center; }
+
+    /* ── Recap ─────────────────────────────────────────── */
+    .check-anim { font-size: 64px; animation: popIn .4s; }
+    @keyframes popIn { 0%{transform:scale(.5);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+    .recap-box { background: #fff; border-radius: 12px; padding: 16px; width: 100%; line-height: 1.8; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .alert-degradation { background: #FFEBEE; border: 2px solid var(--red); border-radius: 10px; padding: 10px 14px; color: var(--red); font-weight: 700; font-size: 13px; width: 100%; text-align: center; }
+
+    /* ── Photo ─────────────────────────────────────────── */
+    .photo-zone { width: 100%; background: #FFF8F0; border: 2px dashed var(--orange); border-radius: 12px; padding: 12px; text-align: center; }
+    .photo-zone p { font-size: 12px; color: #888; margin-bottom: 8px; }
+    .photo-btn-label { cursor: pointer; display: inline-block; padding: 8px 16px; background: var(--orange); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 700; }
+
+    /* ── Toast ─────────────────────────────────────────── */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--green); color: #fff; padding: 14px 24px; border-radius: 12px; font-weight: 700; font-size: 15px; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,.3); opacity: 0; transition: opacity .3s; white-space: nowrap; pointer-events: none; }
+    #toast.show { opacity: 1; }
+    #toast.error { background: var(--red); }
+
+    /* ── Admin section ─────────────────────────────────── */
+    .admin-section { width: 100%; display: flex; flex-direction: column; gap: 8px; }
   </style>
 </head>
 <body>
-  <div id="toast" class="toast"></div>
 
-  <!-- ACCUEIL -->
-  <div id="screen-accueil" class="screen active">
-    <img src="logo.png" alt="Espace Soleil" class="logo-img">
-    <p class="subtitle">Suivi des immobilisations</p>
-    <div id="user-info" class="user-badge hidden"></div>
-    <div id="badge-attente" class="badge-attente hidden" onclick="showScreen('screen-transferts-attente')"></div>
+<div id="toast"></div>
+
+<!-- ══════════════ ACCUEIL ══════════════ -->
+<div id="screen-accueil" class="screen active">
+  <img src="logo.png" alt="Espace Soleil" class="logo-img" onerror="this.style.display='none'">
+  <p class="subtitle">Suivi des immobilisations</p>
+  <div id="user-info" class="user-badge hidden"></div>
+
+  <!-- Badge transferts en attente (cliquable) -->
+  <div id="badge-attente" class="badge-attente hidden" onclick="showScreen('screen-transferts-attente')">
+    ⚠️ Transfert(s) en attente de validation
+  </div>
+
+  <!-- Actions principales -->
+  <div class="btn-group">
+    <button class="btn btn-secondary" onclick="startMouvement('Transfert')">
+      🔄 Transférer <span id="badge-materiel" class="badge-count hidden"></span>
+    </button>
+    <button class="btn btn-primary" onclick="startMouvement('Retour')">
+      📥 Retour dépôt
+    </button>
+  </div>
+
+  <!-- Mon matériel (tous) / Stock dépôt (admin) -->
+  <button id="btn-mon-materiel" class="btn btn-tertiary" onclick="showScreen('screen-mon-materiel')">
+    📦 Mon matériel <span id="badge-mon-mat" class="badge-count hidden"></span>
+  </button>
+  <button id="btn-stock-depot" class="btn btn-tertiary hidden" onclick="ouvrirStockDepot()">
+    🏭 Stock au dépôt
+  </button>
+
+  <!-- Réservations -->
+  <button class="btn btn-link" onclick="showScreen('screen-mes-reservations')" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+    📅 Mes réservations <span id="badge-resa" class="badge-count hidden"></span>
+  </button>
+
+  <!-- Section admin -->
+  <div class="admin-section admin-only hidden">
+    <div class="separator">Actions logistique</div>
+    <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">🔍 Rechercher une immo ou un employé</button>
     <div class="btn-group">
-      <button class="btn btn-secondary" onclick="startMouvement('Transfert')">
-        🔄 Transfert
-        <span id="badge-materiel" class="btn-badge-count hidden"></span>
-      </button>
-      <button class="btn btn-primary" onclick="startMouvement('Retour')">
-        📥 Retour au dépôt
-      </button>
+      <button class="btn btn-outline" onclick="showScreen('screen-force-attribution')" style="font-size:13px">⚡ Attribution forcée</button>
+      <button class="btn btn-outline" onclick="initReservationScreen(true)" style="font-size:13px">📅 Réserver pour...</button>
     </div>
-    <button class="btn btn-link btn-with-badge non-admin-only" onclick="showScreen('screen-mon-materiel')">
-      📦 Mon matériel
-    </button>
-    <button class="btn btn-link admin-only hidden" onclick="ouvrirStockDepot()">
-      🏭 Stock au dépôt
-    </button>
-    <button class="btn btn-link" onclick="showScreen('screen-mes-reservations')">
-      📅 Mes réservations <span id="badge-resa-retard" class="btn-badge-count hidden" style="background:#E74C3C"></span>
-    </button>
-    <!-- Admin seulement -->
-    <div class="admin-only hidden" style="width:100%;display:flex;flex-direction:column;gap:8px">
-      <div class="separator">Actions admin</div>
-      <button class="btn btn-tertiary" onclick="showScreen('screen-rechercher')">🔍 Rechercher</button>
-      <button class="btn btn-outline" onclick="showScreen('screen-force-attribution')">⚡ Forcer attribution</button>
-      <button class="btn btn-outline" onclick="showScreen('screen-reserver')">📅 Réserver pour quelqu'un</button>
-    </div>
-    <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
-    <button class="btn btn-link" onclick="showScreen('screen-activation')">Première utilisation ?</button>
   </div>
 
-  <!-- ACTIVATION -->
-  <div id="screen-activation" class="screen">
-    <img src="logo.png" alt="Espace Soleil" class="logo-img-small">
-    <h2>Activation</h2>
-    <p>Scanne le QR code de ta carte BTP</p>
-    <div id="scanner-activation" class="scanner-box"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
+  <button class="btn btn-link" onclick="showScreen('screen-activation')" style="font-size:12px;color:var(--grey)">Première utilisation / Réactiver</button>
+</div>
+
+<!-- ══════════════ ACTIVATION ══════════════ -->
+<div id="screen-activation" class="screen">
+  <img src="logo.png" class="logo-img" onerror="this.style.display='none'">
+  <h2>Activation</h2>
+  <p class="scanner-hint">Scanne le QR code de ta <strong>carte BTP</strong></p>
+  <div id="scanner-activation" class="scanner-box"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
+
+<!-- ══════════════ SCAN IMMO ══════════════ -->
+<div id="screen-scan-immo" class="screen">
+  <h2 id="titre-mouvement">Mouvement</h2>
+  <p class="scanner-hint">Scanne le QR code de l'immo</p>
+  <div id="scanner-immo" class="scanner-box"></div>
+  <div id="immo-result" class="localisation-badge hidden"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
+
+<!-- ══════════════ SÉLECTION RECEVEUR ══════════════ -->
+<div id="screen-receveur" class="screen">
+  <h2>À qui transférer ?</h2>
+  <p id="receveur-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+
+  <!-- Option 1 : Scanner la carte BTP -->
+  <div style="width:100%;background:#E8F5E9;border-radius:12px;padding:12px;text-align:center">
+    <p style="font-size:13px;color:#1B5E20;font-weight:700;margin-bottom:8px">Option rapide — Carte BTP du receveur</p>
+    <button class="btn btn-primary" style="width:auto;padding:12px 24px" onclick="scannerCarteReceveur()">📷 Scanner la carte</button>
   </div>
 
-  <!-- SCAN IMMO -->
-  <div id="screen-scan-immo" class="screen">
-    <h2 id="titre-mouvement">Transfert</h2>
-    <p>Scanne le QR code de l'immo</p>
-    <div id="scanner-immo" class="scanner-box"></div>
-    <div id="immo-result" class="result-box hidden"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
-  </div>
+  <div class="separator">ou sélectionner dans la liste</div>
 
-  <!-- SÉLECTION RECEVEUR -->
-  <div id="screen-receveur" class="screen">
-    <h2>À qui ?</h2>
-    <p id="receveur-immo-info" style="font-weight:600;color:#1A3A6B;font-size:15px;"></p>
-    <select id="select-receveur" class="select-input">
-      <option value="">-- Sélectionne un employé --</option>
+  <!-- Option 2 : Liste déroulante -->
+  <select id="select-receveur" class="select-input">
+    <option value="">-- Sélectionne un employé --</option>
+  </select>
+  <button class="btn btn-secondary" onclick="validerReceveur()">Suivant →</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
+
+<!-- ══════════════ SCAN CARTE RECEVEUR ══════════════ -->
+<div id="screen-scan-receveur" class="screen">
+  <h2>Scanner la carte du receveur</h2>
+  <p class="scanner-hint">Demande au receveur de présenter sa carte BTP</p>
+  <div id="scanner-receveur" class="scanner-box"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-receveur')">Annuler</button>
+</div>
+
+<!-- ══════════════ ÉTAT + PHOTO ══════════════ -->
+<div id="screen-etat" class="screen">
+  <h2>État du matériel</h2>
+  <p id="etat-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <label class="field-label">État général</label>
+  <select id="select-etat" class="select-input">
+    <option value="Neuf">⭐ Neuf</option>
+    <option value="Bon état" selected>✅ Bon état</option>
+    <option value="Usé">🔶 Usé</option>
+    <option value="Abîmé">⚠️ Abîmé</option>
+    <option value="Hors service">🔴 Hors service</option>
+  </select>
+  <label class="field-label">Note (optionnel)</label>
+  <textarea id="note-texte" class="note-textarea" placeholder="Ex : câble abîmé, manque une pièce..."></textarea>
+  <div class="photo-zone">
+    <p>📷 Photo optionnelle</p>
+    <label class="photo-btn-label">
+      Prendre / Choisir
+      <input type="file" id="photo-etat-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(this,'photo-etat-preview','photoEtatBase64')">
+    </label>
+    <div id="photo-etat-preview" style="margin-top:8px"></div>
+  </div>
+  <button class="btn btn-secondary" onclick="confirmerAvecEtat()">✅ Confirmer</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
+
+<!-- ══════════════ CONFIRMATION ══════════════ -->
+<div id="screen-confirmation" class="screen">
+  <div class="check-anim">✅</div>
+  <h2>Enregistré !</h2>
+  <div id="recap" class="recap-box"></div>
+  <div id="alerte-degradation" class="alert-degradation hidden"></div>
+  <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Retour accueil</button>
+</div>
+
+<!-- ══════════════ MON MATÉRIEL ══════════════ -->
+<div id="screen-mon-materiel" class="screen">
+  <h2>📦 Mon matériel</h2>
+  <p id="mon-materiel-user" style="color:var(--grey);font-size:13px"></p>
+  <div id="liste-materiel" class="liste-materiel"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ STOCK DÉPÔT (admin) ══════════════ -->
+<div id="screen-stock-depot" class="screen">
+  <h2>🏭 Stock au dépôt</h2>
+  <p id="stock-count" style="color:var(--grey);font-size:13px"></p>
+  <select id="stock-cat" class="select-input" onchange="filtrerStockDepot()">
+    <option value="">Toutes catégories</option>
+  </select>
+  <input type="text" id="stock-search" class="select-input" placeholder="Code ou libellé..." oninput="filtrerStockDepot()">
+  <div id="stock-depot-liste" class="liste-materiel"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ TRANSFERTS EN ATTENTE ══════════════ -->
+<div id="screen-transferts-attente" class="screen">
+  <h2>⚠️ Transferts en attente</h2>
+  <p style="font-size:13px;color:var(--grey);text-align:center">Scanne l'immo pour valider la réception</p>
+  <div id="liste-attente" class="liste-materiel"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ SCAN VALIDATION ══════════════ -->
+<div id="screen-scan-validation" class="screen">
+  <h2>Scanner pour valider</h2>
+  <p class="scanner-hint">Scanne le QR code du matériel reçu</p>
+  <div id="scanner-validation" class="scanner-box"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">Annuler</button>
+</div>
+
+<!-- ══════════════ ACCEPTER TRANSFERT ══════════════ -->
+<div id="screen-accepter" class="screen">
+  <h2>📥 Réception de matériel</h2>
+  <p id="accepter-texte" style="font-size:16px;font-weight:700;color:var(--blue);text-align:center"></p>
+  <div id="accepter-etat-donneur" class="localisation-badge hidden"></div>
+  <div id="accepter-note-donneur"></div>
+  <label class="field-label">Ton constat à la réception</label>
+  <select id="accepter-etat" class="select-input">
+    <option value="Neuf">⭐ Neuf</option>
+    <option value="Bon état" selected>✅ Bon état</option>
+    <option value="Usé">🔶 Usé</option>
+    <option value="Abîmé">⚠️ Abîmé</option>
+    <option value="Hors service">🔴 Hors service</option>
+  </select>
+  <label class="field-label">Note (optionnel)</label>
+  <textarea id="accepter-note" class="note-textarea" placeholder="Observations à la réception..."></textarea>
+  <div class="photo-zone">
+    <p>📷 Photo optionnelle — état à la réception</p>
+    <label class="photo-btn-label">
+      Prendre / Choisir
+      <input type="file" id="photo-reception-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(this,'photo-reception-preview','photoReceptionBase64')">
+    </label>
+    <div id="photo-reception-preview" style="margin-top:8px"></div>
+  </div>
+  <button class="btn btn-secondary" onclick="accepterTransfert()">✅ Accepter et valider</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">← Retour</button>
+</div>
+
+<!-- ══════════════ RECHERCHE UNIFIÉE (admin) ══════════════ -->
+<div id="screen-rechercher" class="screen">
+  <h2>🔍 Rechercher</h2>
+  <select id="rech-cat" class="select-input" onchange="rechercheAuto()">
+    <option value="">Toutes catégories</option>
+  </select>
+  <div class="search-row">
+    <input type="text" id="rech-input" class="select-input" placeholder="Code, libellé, nom employé..." oninput="rechercheAuto()">
+    <button class="btn btn-primary" onclick="scannerPourRecherche()">📷</button>
+  </div>
+  <div id="rech-resultats" class="liste-materiel">
+    <p class="empty-msg">Sélectionne une catégorie ou tape ta recherche.</p>
+  </div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ SCAN RECHERCHE ══════════════ -->
+<div id="screen-scan-recherche" class="screen">
+  <h2>Scanner une immo</h2>
+  <div id="scanner-recherche" class="scanner-box"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">Annuler</button>
+</div>
+
+<!-- ══════════════ PHOTOS ══════════════ -->
+<div id="screen-photos" class="screen">
+  <h2>🖼️ Photos</h2>
+  <p id="photos-immo-titre" style="font-weight:700;color:var(--blue)"></p>
+  <div id="upload-zone" class="photo-zone admin-only hidden">
+    <p>Ajouter une photo</p>
+    <label class="photo-btn-label">
+      📷 Prendre / Choisir
+      <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="uploadPhoto(this)">
+    </label>
+    <div id="upload-progress" style="font-size:13px;color:var(--grey);margin-top:6px"></div>
+  </div>
+  <div id="galerie-photos" class="liste-materiel"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">Retour</button>
+</div>
+
+<!-- ══════════════ FORCE ATTRIBUTION (admin) ══════════════ -->
+<div id="screen-force-attribution" class="screen">
+  <h2>⚡ Attribution forcée</h2>
+  <p style="font-size:13px;color:var(--grey);text-align:center">Sans validation par le receveur</p>
+  <label class="field-label">Catégorie</label>
+  <select id="force-cat" class="select-input" onchange="rechercherImmoPourForce()">
+    <option value="">Toutes catégories</option>
+  </select>
+  <label class="field-label">Immo</label>
+  <div class="search-row">
+    <input type="text" id="force-immo-search" class="select-input" placeholder="Code ou libellé..." oninput="rechercherImmoPourForce()">
+    <button class="btn btn-primary" onclick="scannerPourForce()">📷</button>
+  </div>
+  <p id="force-immo-info" style="font-weight:700;color:var(--blue);font-size:14px;min-height:20px"></p>
+  <div id="force-suggestions" class="liste-materiel"></div>
+  <label class="field-label">Attribuer à</label>
+  <select id="force-receveur" class="select-input">
+    <option value="">-- Sélectionne un employé --</option>
+  </select>
+  <label class="field-label">État</label>
+  <select id="force-etat" class="select-input">
+    <option value="Bon état">✅ Bon état</option>
+    <option value="Neuf">⭐ Neuf</option>
+    <option value="Usé">🔶 Usé</option>
+    <option value="Abîmé">⚠️ Abîmé</option>
+    <option value="Hors service">🔴 Hors service</option>
+  </select>
+  <label class="field-label">Motif (optionnel)</label>
+  <textarea id="force-note" class="note-textarea" placeholder="Raison de l'attribution..."></textarea>
+  <button class="btn btn-secondary" onclick="validerForceAttribution()">⚡ Attribuer maintenant</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
+
+<!-- ══════════════ SCAN FORCE ══════════════ -->
+<div id="screen-scan-force" class="screen">
+  <h2>Scanner une immo</h2>
+  <div id="scanner-force" class="scanner-box"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-force-attribution')">Annuler</button>
+</div>
+
+<!-- ══════════════ MES RÉSERVATIONS ══════════════ -->
+<div id="screen-mes-reservations" class="screen">
+  <h2>📅 Mes réservations</h2>
+  <div id="mes-resa-liste" class="liste-materiel"></div>
+  <button class="btn btn-primary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ RÉSERVATION ══════════════ -->
+<div id="screen-reserver" class="screen">
+  <h2>📅 Réserver une immo</h2>
+  <p id="resa-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;min-height:20px"></p>
+  <label class="field-label">Catégorie</label>
+  <select id="resa-categorie" class="select-input" onchange="rechercherImmoResa()">
+    <option value="">Toutes catégories</option>
+  </select>
+  <label class="field-label">Immo</label>
+  <div class="search-row">
+    <input type="text" id="resa-immo-search" class="select-input" placeholder="Code IM ou libellé..." oninput="rechercherImmoResa()">
+    <button class="btn btn-primary" onclick="scannerPourResa()">📷</button>
+  </div>
+  <div id="resa-immo-suggestions" class="liste-materiel"></div>
+  <div id="resa-pour-qui-section" class="admin-only hidden">
+    <label class="field-label">Pour qui (admin)</label>
+    <select id="resa-pour-qui" class="select-input">
+      <option value="">-- Moi-même --</option>
     </select>
-    <button class="btn btn-primary" onclick="validerReceveur()">Suivant →</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
+  <label class="field-label">Date de départ</label>
+  <input type="date" id="resa-date-debut" class="select-input">
+  <label class="field-label">Date de retour prévue</label>
+  <input type="date" id="resa-date-fin" class="select-input">
+  <label class="field-label">Chantier (optionnel)</label>
+  <input type="text" id="resa-chantier" class="select-input" placeholder="Nom ou code du chantier...">
+  <label class="field-label">Note (optionnel)</label>
+  <textarea id="resa-note" class="note-textarea" placeholder="Précisions..."></textarea>
+  <button class="btn btn-primary" onclick="soumettreReservation()">✅ Envoyer la demande</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
 
-  <!-- ÉTAT ET NOTE + PHOTO OPTIONNELLE -->
-  <div id="screen-etat" class="screen">
-    <h2>État du matériel</h2>
-    <p id="etat-immo-info" style="font-weight:600;color:#1A3A6B;font-size:15px;"></p>
-    <label class="field-label">État général</label>
-    <select id="select-etat" class="select-input">
-      <option value="Neuf">⭐ Neuf</option>
-      <option value="Bon état" selected>✅ Bon état</option>
-      <option value="Usé">🔶 Usé</option>
-      <option value="Abîmé">⚠️ Abîmé</option>
-      <option value="Hors service">🔴 Hors service</option>
-    </select>
-    <label class="field-label">Note (optionnel)</label>
-    <textarea id="note-texte" class="note-textarea" placeholder="Ex : câble abîmé, manque une pièce..."></textarea>
-    <!-- Photo optionnelle -->
-    <div style="width:100%;background:#FFF8F0;border:2px dashed #E87722;border-radius:12px;padding:12px;text-align:center">
-      <p style="font-size:12px;color:#888;margin-bottom:8px">📷 Photo optionnelle — état du matériel</p>
-      <label style="cursor:pointer;display:inline-block;padding:8px 16px;background:#E87722;color:white;border-radius:8px;font-size:13px;font-weight:600">
-        Prendre / Choisir
-        <input type="file" id="photo-etat-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhotoEtat(this)">
-      </label>
-      <div id="photo-etat-preview" style="margin-top:8px"></div>
-    </div>
-    <button class="btn btn-primary" onclick="confirmerAvecEtat()">✅ Confirmer</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
-  </div>
+<!-- ══════════════ MODIFIER RÉSERVATION ══════════════ -->
+<div id="screen-modifier-resa" class="screen">
+  <h2>✏️ Modifier la réservation</h2>
+  <p id="modif-resa-info" style="font-weight:700;color:var(--blue);font-size:15px"></p>
+  <label class="field-label">Nouvelle date de départ</label>
+  <input type="date" id="modif-date-debut" class="select-input">
+  <label class="field-label">Nouvelle date de retour</label>
+  <input type="date" id="modif-date-fin" class="select-input">
+  <label class="field-label">Chantier</label>
+  <input type="text" id="modif-chantier" class="select-input">
+  <label class="field-label">Note</label>
+  <textarea id="modif-note" class="note-textarea"></textarea>
+  <button class="btn btn-primary" onclick="validerModifResa()">✅ Enregistrer</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-mes-reservations')">Annuler</button>
+</div>
 
-  <!-- CONFIRMATION -->
-  <div id="screen-confirmation" class="screen">
-    <div class="check-anim">✅</div>
-    <h2>Enregistré !</h2>
-    <div id="recap" class="recap-box"></div>
-    <div id="alerte-degradation" class="alert-degradation hidden"></div>
-    <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Retour accueil</button>
-  </div>
+<!-- ══════════════ SCAN RÉSERVATION ══════════════ -->
+<div id="screen-scan-resa" class="screen">
+  <h2>Scanner une immo</h2>
+  <div id="scanner-resa" class="scanner-box"></div>
+  <button class="btn btn-outline" onclick="showScreen('screen-reserver')">Annuler</button>
+</div>
 
-  <!-- MON MATÉRIEL -->
-  <div id="screen-mon-materiel" class="screen">
-    <h2>📦 Mon matériel</h2>
-    <p id="mon-materiel-user"></p>
-    <div id="liste-materiel" class="liste-materiel"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
-  </div>
-
-  <!-- TRANSFERTS EN ATTENTE -->
-  <div id="screen-transferts-attente" class="screen">
-    <h2>⚠️ Transferts en attente</h2>
-    <p>Ces matériels t'ont été transmis — clique pour valider.</p>
-    <div id="liste-attente" class="liste-materiel"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
-  </div>
-
-  <!-- ACCEPTER UN TRANSFERT -->
-  <div id="screen-accepter" class="screen">
-    <h2>📥 Réception de matériel</h2>
-    <p id="accepter-texte" style="font-size:16px;font-weight:600;margin:8px 0;text-align:center;color:#1A3A6B;"></p>
-    <div id="accepter-etat-donneur" class="localisation-badge" style="font-size:13px;"></div>
-    <div id="accepter-note-donneur" style="width:100%;"></div>
-    <label class="field-label">Ton constat à réception</label>
-    <select id="accepter-select-etat" class="select-input">
-      <option value="Neuf">⭐ Neuf</option>
-      <option value="Bon état" selected>✅ Bon état</option>
-      <option value="Usé">🔶 Usé</option>
-      <option value="Abîmé">⚠️ Abîmé</option>
-      <option value="Hors service">🔴 Hors service</option>
-    </select>
-    <label class="field-label">Note (optionnel)</label>
-    <textarea id="accepter-note" class="note-textarea" placeholder="Observations à la réception..."></textarea>
-    <!-- Photo optionnelle réception -->
-    <div style="width:100%;background:#FFF8F0;border:2px dashed #E87722;border-radius:12px;padding:12px;text-align:center">
-      <p style="font-size:12px;color:#888;margin-bottom:8px">📷 Photo optionnelle — état à la réception</p>
-      <label style="cursor:pointer;display:inline-block;padding:8px 16px;background:#E87722;color:white;border-radius:8px;font-size:13px;font-weight:600">
-        Prendre / Choisir
-        <input type="file" id="photo-reception-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhotoReception(this)">
-      </label>
-      <div id="photo-reception-preview" style="margin-top:8px"></div>
-    </div>
-    <button class="btn btn-primary" onclick="accepterTransfert()">✅ Oui, j'accepte</button>
-    <button class="btn btn-danger" onclick="refuserTransfert()">❌ Annuler</button>
-  </div>
-
-  <!-- SCAN VALIDATION -->
-  <div id="screen-scan-validation" class="screen">
-    <h2>Scanner pour valider</h2>
-    <p>Scanne le QR code du matériel reçu</p>
-    <div id="scanner-validation" class="scanner-box"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">Annuler</button>
-  </div>
-
-  <!-- RECHERCHER (écran unifié admin) -->
-  <div id="screen-rechercher" class="screen">
-    <h2>🔍 Rechercher</h2>
-    <select id="rech-cat" class="select-input" style="margin-bottom:6px" onchange="rechercheAuto()">
-      <option value="">Toutes catégories</option>
-    </select>
-    <div class="admin-search">
-      <input type="text" id="rech-input" class="select-input" placeholder="N° immo, libellé, nom employé..." oninput="rechercheAuto()">
-      <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourRecherche()">📷</button>
-    </div>
-    <div id="rech-resultats" class="liste-materiel">
-      <p class="empty-msg">Tape un code immo, un libellé ou un nom d'employé.</p>
-    </div>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
-  </div>
-
-  <!-- SCAN POUR RECHERCHE -->
-  <div id="screen-scan-recherche" class="screen">
-    <h2>Scanner une immo</h2>
-    <div id="scanner-recherche" class="scanner-box"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">Annuler</button>
-  </div>
-
-  <!-- PHOTOS D'UNE IMMO -->
-  <div id="screen-photos" class="screen">
-    <h2>🖼️ Photos</h2>
-    <p id="photos-immo-titre" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
-    <div class="admin-only hidden" id="upload-zone" style="width:100%;background:#FFF8F0;border:2px dashed #E87722;border-radius:14px;padding:16px;text-align:center;">
-      <p style="font-size:13px;color:#666;margin-bottom:10px">Ajouter une photo</p>
-      <label style="cursor:pointer;display:inline-block;background:#E87722;color:white;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px">
-        📷 Prendre / Choisir
-        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="uploadPhoto(this)">
-      </label>
-      <div id="upload-progress" style="margin-top:10px;font-size:13px;color:#666;"></div>
-    </div>
-    <div id="galerie-photos" style="width:100%;"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">Retour</button>
-  </div>
-
-  <!-- STOCK DÉPÔT (admin/CONI) -->
-  <div id="screen-stock-depot" class="screen">
-    <h2>🏭 Stock au dépôt</h2>
-    <p id="stock-count" style="font-size:13px;color:#888;text-align:center"></p>
-    <select id="stock-cat" class="select-input" onchange="filtrerStockDepot()">
-      <option value="">Toutes catégories</option>
-    </select>
-    <input type="text" id="stock-search" class="select-input" placeholder="Rechercher par code ou libellé..." oninput="filtrerStockDepot()">
-    <div id="stock-depot-liste" class="liste-materiel"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
-  </div>
-
-  <!-- FORCE ATTRIBUTION (admin) -->
-  <div id="screen-force-attribution" class="screen">
-    <h2>⚡ Forcer attribution</h2>
-    <p style="font-size:13px;color:#888;text-align:center">Attribue une immo sans validation par le receveur</p>
-    <label class="field-label">Catégorie (optionnel)</label>
-    <select id="force-cat" class="select-input" onchange="rechercherImmoPourForce()">
-      <option value="">Toutes catégories</option>
-    </select>
-    <label class="field-label">Immo à attribuer</label>
-    <div style="display:flex;gap:8px;width:100%">
-      <input type="text" id="force-immo-search" class="select-input" style="flex:1" placeholder="Code IM ou libellé..." oninput="rechercherImmoPourForce()">
-      <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourForce()">📷</button>
-    </div>
-    <p id="force-immo-info" style="font-weight:700;color:#1A3A6B;font-size:14px;"></p>
-    <div id="force-suggestions" class="liste-materiel"></div>
-    <label class="field-label">Attribuer à</label>
-    <select id="force-receveur" class="select-input">
-      <option value="">-- Sélectionne un employé --</option>
-    </select>
-    <label class="field-label">État</label>
-    <select id="force-etat" class="select-input">
-      <option value="Bon état">✅ Bon état</option>
-      <option value="Neuf">⭐ Neuf</option>
-      <option value="Usé">🔶 Usé</option>
-      <option value="Abîmé">⚠️ Abîmé</option>
-    </select>
-    <label class="field-label">Note (optionnel)</label>
-    <textarea id="force-note" class="note-textarea" placeholder="Raison de l'attribution forcée..."></textarea>
-    <button class="btn btn-secondary" onclick="validerForceAttribution()">⚡ Attribuer maintenant</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
-  </div>
-
-  <!-- SCAN POUR FORCE ATTRIBUTION -->
-  <div id="screen-scan-force" class="screen">
-    <h2>Scanner une immo</h2>
-    <div id="scanner-force" class="scanner-box"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-force-attribution')">Annuler</button>
-  </div>
-
-  <!-- MES RÉSERVATIONS -->
-  <div id="screen-mes-reservations" class="screen">
-    <h2>📅 Mes réservations</h2>
-    <div id="mes-resa-liste" class="liste-materiel"></div>
-    <button class="btn btn-primary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
-  </div>
-
-  <!-- RÉSERVATION -->
-  <div id="screen-reserver" class="screen">
-    <img src="logo.png" alt="ES" class="logo-img-small">
-    <h2>📅 Réserver une immo</h2>
-    <p id="resa-immo-info" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
-    <label class="field-label">Catégorie (optionnel)</label>
-    <select id="resa-categorie" class="select-input" onchange="rechercherImmoResa()">
-      <option value="">Toutes catégories</option>
-    </select>
-    <label class="field-label">Immo à réserver</label>
-    <div style="display:flex;gap:8px;width:100%">
-      <input type="text" id="resa-immo-search" class="select-input" style="flex:1" placeholder="Code IM, libellé ou n° série..." oninput="rechercherImmoResa()">
-      <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourResa()">📷</button>
-    </div>
-    <div id="resa-immo-suggestions" class="liste-materiel"></div>
-    <!-- Pour qui (admin seulement) -->
-    <div class="admin-only hidden" style="width:100%">
-      <label class="field-label">Pour qui (admin — laisser vide = moi)</label>
-      <select id="resa-pour-qui" class="select-input">
-        <option value="">-- Moi-même --</option>
-      </select>
-    </div>
-    <label class="field-label">Date de départ</label>
-    <input type="date" id="resa-date-debut" class="select-input">
-    <label class="field-label">Date de retour prévue</label>
-    <input type="date" id="resa-date-fin" class="select-input">
-    <label class="field-label">Chantier (optionnel)</label>
-    <input type="text" id="resa-chantier" class="select-input" placeholder="Nom ou code du chantier...">
-    <label class="field-label">Note (optionnel)</label>
-    <textarea id="resa-note" class="note-textarea" placeholder="Précisions..."></textarea>
-    <button class="btn btn-primary" onclick="soumettreReservation()">✅ Envoyer la demande</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
-  </div>
-
-  <!-- MODIFIER RÉSERVATION -->
-  <div id="screen-modifier-resa" class="screen">
-    <h2>✏️ Modifier la réservation</h2>
-    <p id="modif-resa-info" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
-    <label class="field-label">Nouvelle date de départ</label>
-    <input type="date" id="modif-date-debut" class="select-input">
-    <label class="field-label">Nouvelle date de retour</label>
-    <input type="date" id="modif-date-fin" class="select-input">
-    <label class="field-label">Chantier</label>
-    <input type="text" id="modif-chantier" class="select-input">
-    <label class="field-label">Note</label>
-    <textarea id="modif-note" class="note-textarea"></textarea>
-    <button class="btn btn-primary" onclick="validerModifResa()">✅ Enregistrer</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-mes-reservations')">Annuler</button>
-  </div>
-
-  <!-- SCANNERS DIVERS -->
-  <div id="screen-scan-resa" class="screen">
-    <h2>Scanner une immo</h2>
-    <div id="scanner-resa" class="scanner-box"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-reserver')">Annuler</button>
-  </div>
-
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="app.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
