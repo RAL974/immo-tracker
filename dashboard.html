@@ -177,7 +177,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
   <button class="nav-tab" onclick="showTab('depot')">Au dépôt <span class="ntbadge green" id="nb-depot">0</span></button>
   <button class="nav-tab" onclick="showTab('historique')">Historique</button>
   <button class="nav-tab" onclick="showTab('transferts')">Transferts <span class="ntbadge red" id="nb-transf">0</span></button>
-  <button class="nav-tab" onclick="showTab('transferts')">Transferts <span class="ntbadge red" id="nb-transf">0</span></button>
   <button class="nav-tab" onclick="showTab('reservations')">Réservations <span class="ntbadge orange" id="nb-resa">0</span></button>
   <button class="nav-tab" onclick="showTab('documents')">Documents <span class="ntbadge orange" id="nb-docs">0</span></button>
   <button class="nav-tab" onclick="showTab('maintenance')">Maintenance <span class="ntbadge red" id="nb-maint">0</span></button>
@@ -300,17 +299,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
     </div>
 
     <!-- ANALYSES -->
-    <div id="tab-transferts" class="tab-content">
-      <div class="lazy-loading" id="transf-loading" style="display:none">Chargement...</div>
-      <div id="transf-content">
-        <div class="tcard">
-          <div class="thead"><h3>Transferts en attente de validation</h3><span class="tcnt" id="cnt-transf"></span></div>
-          <div style="overflow-x:auto"><table><thead><tr>
-            <th>Code IM</th><th>Libelle</th><th>Donneur</th><th>Receveur</th><th>Etat déclaré</th><th>Attente</th><th>Note</th><th>Action</th>
-          </tr></thead><tbody id="tb-transf"></tbody></table></div>
-        </div>
-      </div>
-    </div>
     <div id="tab-transferts" class="tab-content">
       <div class="tcard">
         <div class="thead"><h3>Transferts en attente de validation</h3><span class="tcnt" id="cnt-transf"></span></div>
