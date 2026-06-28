@@ -4,16 +4,18 @@
 
 const CONFIG = {
   proxy:   'https://immo-proxy.ral-85d.workers.dev/',
-  admins:  ['CONI', 'BAKA', 'AUAR', 'BOMA', 'AIWI', 'NAXA'],
-  // Codes des Chefs de Travaux autorisés à réserver (compléter selon organigramme)
-  CTs:     ['BAKA', 'AUAR', 'BOMA'],
+  // Admins / logistique
+  admins:  ['CONI', 'AIWI', 'NAXA', 'BAKA'],
+  // Responsables d'affaires + CTs + admins : tous autorisés à réserver
+  autorises: ['CONI', 'AIWI', 'NAXA', 'BAKA', 'ROJO', 'AUAR', 'BOMA', 'ADWI',
+              'RIJB', 'MEJO', 'GOLU', 'SCST', 'CANI', 'DACH', 'TOHO'],
   etats:   { 'Neuf': 5, 'Bon état': 4, 'Usé': 3, 'Abîmé': 2, 'Hors service': 1 },
 };
 
 // Peut-on faire une réservation ?
 function peutReserver(code) {
   if (!code) return false;
-  return CONFIG.admins.includes(code) || CONFIG.CTs.includes(code);
+  return CONFIG.autorises.includes(code);
 }
 
 // ── État global ───────────────────────────────────────────
@@ -205,9 +207,13 @@ function afficherEmploye() {
   // Adapter le bouton réservations selon le rôle
   const btnResa = document.getElementById('btn-resa');
   if (btnResa) {
-    if (isAdmin) btnResa.textContent = '📋 Réservations';
-    else if (!peutReserver(S.employe.code)) btnResa.style.display = 'none';
-    else btnResa.textContent = '📅 Mes réservations';
+    if (!peutReserver(S.employe.code)) {
+      btnResa.style.display = 'none';
+    } else {
+      btnResa.style.display = '';
+      const label = isAdmin ? '📋 Réservations' : '📅 Mes réservations';
+      btnResa.innerHTML = label + ' <span id="badge-resa" class="badge-count hidden"></span>';
+    }
   }
 }
 
