@@ -12,6 +12,7 @@ const CONFIG = {
 
 // Peut-on faire une réservation ?
 function peutReserver(code) {
+  if (!code) return false;
   return CONFIG.admins.includes(code) || CONFIG.CTs.includes(code);
 }
 
@@ -201,12 +202,12 @@ function afficherEmploye() {
   const btnStock = document.getElementById('btn-stock-depot');
   if (btnMat)   btnMat.classList.toggle('hidden', isAdmin);
   if (btnStock) btnStock.classList.toggle('hidden', !isAdmin);
-  // Label du bouton réservations selon le rôle
-  const btnResa = document.querySelector('[onclick*="mes-reservations"]');
+  // Adapter le bouton réservations selon le rôle
+  const btnResa = document.getElementById('btn-resa');
   if (btnResa) {
-    if (isAdmin) {
-      btnResa.innerHTML = '📋 Réservations <span id="badge-resa" class="badge-count ' + (document.getElementById('badge-resa')?.classList.contains('hidden') ? 'hidden' : '') + '">' + (document.getElementById('badge-resa')?.textContent || '') + '</span>';
-    }
+    if (isAdmin) btnResa.textContent = '📋 Réservations';
+    else if (!peutReserver(S.employe.code)) btnResa.style.display = 'none';
+    else btnResa.textContent = '📅 Mes réservations';
   }
 }
 
@@ -957,7 +958,8 @@ async function afficherMesReservations() {
         <div style="font-size:13px;margin-top:4px">📅 ${fmt(r.date_debut)} → ${fmt(r.date_fin)}</div>
         ${r.nom_chantier ? `<div style="font-size:12px;color:var(--grey)">🏗️ ${r.nom_chantier}</div>` : ''}
         ${r.note ? `<div style="font-size:12px;color:var(--grey)">📝 ${r.note}</div>` : ''}
-        ${canEdit ? `<div style="display:flex;gap:8px;margin-top:8px">
+        ${r.statut === 'Contre-proposition' ? `<div style="background:#EDE7F6;border-radius:8px;padding:8px;margin-top:6px;font-size:12px;color:#4527A0"><strong>✏️ Proposition de la logistique :</strong> voir les nouvelles dates ci-dessus<br><div style="display:flex;gap:8px;margin-top:6px"><button onclick="accepterContreProp('${r.id}')" style="flex:1;padding:7px;background:#27AE60;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">✅ Accepter</button><button onclick="annulerResa('${r.id}')" style="flex:1;padding:7px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">❌ Refuser</button></div></div>` : ''}
+        ${canEdit && r.statut !== 'Contre-proposition' ? `<div style="display:flex;gap:8px;margin-top:8px">
           <button onclick="ouvrirModifResa('${r.id}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>
           <button onclick="annulerResa('${r.id}')" style="flex:1;padding:8px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">❌ Annuler</button>
         </div>` : ''}
@@ -967,6 +969,19 @@ async function afficherMesReservations() {
     if (terminees.length) html += `<h3 style="color:var(--grey);font-size:13px;margin:12px 0 6px">Terminées (${terminees.length})</h3>` + terminees.map(carte).join('');
     div.innerHTML = html;
   } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur : ' + e.message + '</p>'; }
+}
+
+async function accepterContreProp(id) {
+  if (!confirm('Accepter la proposition de la logistique ?')) return;
+  try {
+    await fetch(CONFIG.proxy + '?action=statut_resa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, statut: 'Confirmee' }),
+    });
+    toast('✅ Proposition acceptée — réservation confirmée', 'success', 3000);
+    afficherMesReservations();
+    majBadgeResas();
+  } catch (e) { toast('Erreur', 'error'); }
 }
 
 async function annulerResa(id) {
