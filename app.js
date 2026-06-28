@@ -22,6 +22,8 @@ let state = {
   photoImmo: null,
   transfertId: null,
   mouvements: JSON.parse(localStorage.getItem('mouvements') || '[]'),
+  resaImmoCode: null,
+  resaImmoLibelle: null,
 };
 
 // ── Vibration ───────────────────────────────────────────────────
@@ -48,6 +50,8 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
   if (id === 'screen-mon-materiel') afficherMonMateriel();
+  if (id === 'screen-mes-reservations') afficherMesReservations();
+  if (id === 'screen-reserver') { state.resaImmoCode = null; state.resaImmoLibelle = null; document.getElementById('resa-immo-info').textContent = ''; document.getElementById('resa-immo-search').value = ''; document.getElementById('resa-immo-suggestions').innerHTML = ''; document.getElementById('resa-date-debut').value = ''; document.getElementById('resa-date-fin').value = ''; document.getElementById('resa-chantier').value = ''; document.getElementById('resa-note').value = ''; }
   if (id === 'screen-admin') reinitAdmin();
   if (id === 'screen-suivi-immo') reinitSuiviImmo();
   if (id === 'screen-suivi-employe') reinitSuiviEmploye();
@@ -262,6 +266,7 @@ function onScanActivation(code) {
   chargerEmployes();
   verifierTransfertsEnAttente();
   chargerBadgeMateriel();
+  verifierReservationsEnRetard();
   alert('✅ Activation réussie ! Bienvenue ' + employe.nom + '.');
   showScreen('screen-accueil');
 }
@@ -988,3 +993,159 @@ document.addEventListener('DOMContentLoaded', function() {
     }).observe(screen, { attributes: true });
   }
 });
+
+// ══════════════════════════════════════════════════════
+// ── MODULE RÉSERVATIONS ───────────────────────────────
+// ══════════════════════════════════════════════════════
+
+var STATUT_COLORS = {
+  'Demandee':   { bg: '#FFF8E1', color: '#E65100', label: '⏳ Demandée' },
+  'Confirmee':  { bg: '#E8F5E9', color: '#1B5E20', label: '✅ Confirmée' },
+  'En cours':   { bg: '#E3F2FD', color: '#0D47A1', label: '🔄 En cours' },
+  'Rendue':     { bg: '#F5F5F5', color: '#757575', label: '📦 Rendue' },
+  'En retard':  { bg: '#FFEBEE', color: '#B71C1C', label: '⚠️ En retard' },
+  'Annulee':    { bg: '#F5F5F5', color: '#9E9E9E', label: '❌ Annulée' },
+};
+
+function statutBadgeResa(statut) {
+  var s = STATUT_COLORS[statut] || STATUT_COLORS['Demandee'];
+  return '<span style="display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:' + s.bg + ';color:' + s.color + '">' + s.label + '</span>';
+}
+
+// Vérifier les réservations en retard au chargement
+async function verifierReservationsEnRetard() {
+  if (!state.employe) return;
+  try {
+    var res = await fetch(CONFIG.webhookMouvements + '?mes_reservations=' + state.employe.code);
+    var resas = await res.json();
+    var retards = resas.filter(function(r) { return r.statut === 'En retard'; });
+    var badge = document.getElementById('badge-resa-retard');
+    if (badge) {
+      if (retards.length > 0) { badge.textContent = retards.length; badge.classList.remove('hidden'); }
+      else badge.classList.add('hidden');
+    }
+  } catch (e) {}
+}
+
+// Recherche immo pour réservation
+function rechercherImmoResa() {
+  var q = document.getElementById('resa-immo-search').value.trim().toUpperCase();
+  var div = document.getElementById('resa-immo-suggestions');
+  if (!q || q.length < 2) { div.innerHTML = ''; return; }
+  var results = [];
+  for (var k in state.immos) {
+    var im = state.immos[k];
+    if (k.includes(q) || (im.Libelle || '').toUpperCase().includes(q) || k.replace('IM0*','').includes(q)) {
+      results.push(im);
+    }
+    if (results.length >= 8) break;
+  }
+  div.innerHTML = results.length === 0
+    ? '<p class="empty-msg">Aucune immo trouvée.</p>'
+    : results.map(function(im) {
+        return '<div class="suggestion-item" onclick="selectionnerImmoResa(\'' + im.Code_IM + '\',\'' + (im.Libelle||'').replace(/'/g,"\\'") + '\')">' +
+          '<strong>' + im.Libelle + '</strong> <span class="chantier-tag">' + im.Code_IM + '</span>' +
+          (im.Categorie ? '<small> — ' + im.Categorie + '</small>' : '') + '</div>';
+      }).join('');
+}
+
+function selectionnerImmoResa(code, libelle) {
+  state.resaImmoCode = code;
+  state.resaImmoLibelle = libelle;
+  document.getElementById('resa-immo-info').textContent = libelle + ' (' + code + ')';
+  document.getElementById('resa-immo-search').value = libelle + ' — ' + code;
+  document.getElementById('resa-immo-suggestions').innerHTML = '';
+}
+
+function scannerPourResa() {
+  showScreen('screen-scan-resa');
+  startScanner('scanner-resa', function(code) {
+    stopScanner();
+    if (!code.startsWith('IM')) { alert('Ce QR code n\'est pas une immobilisation.'); showScreen('screen-reserver'); return; }
+    vibrer(200);
+    var libelle = getLibelle(code);
+    selectionnerImmoResa(code, libelle);
+    showScreen('screen-reserver');
+  });
+}
+
+// Soumettre la demande de réservation
+async function soumettreReservation() {
+  if (!state.resaImmoCode) { alert('Sélectionne ou scanne une immo.'); return; }
+  var debut = document.getElementById('resa-date-debut').value;
+  var fin = document.getElementById('resa-date-fin').value;
+  if (!debut || !fin) { alert('Indique les dates de départ et de retour.'); return; }
+  if (new Date(fin) <= new Date(debut)) { alert('La date de retour doit être après la date de départ.'); return; }
+  var chantier = document.getElementById('resa-chantier').value.trim();
+  var note = document.getElementById('resa-note').value.trim();
+
+  var payload = {
+    code_im: state.resaImmoCode,
+    code_employe: state.employe.code,
+    nom_employe: state.employe.nom,
+    code_chantier: chantier,
+    nom_chantier: chantier,
+    date_debut: new Date(debut).toISOString(),
+    date_fin: new Date(fin).toISOString(),
+    note: note,
+  };
+
+  try {
+    var res = await fetch(CONFIG.webhookMouvements + '?action=reserver', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    var data = await res.json();
+    if (data.success) {
+      vibrer(300);
+      document.getElementById('recap').innerHTML =
+        '<strong>✅ Demande envoyée !</strong><br>' +
+        '<strong>Immo :</strong> ' + state.resaImmoLibelle + ' (' + state.resaImmoCode + ')<br>' +
+        '<strong>Du :</strong> ' + new Date(debut).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' }) + '<br>' +
+        '<strong>Au :</strong> ' + new Date(fin).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' }) + '<br>' +
+        '<strong>Statut :</strong> En attente de confirmation logistique';
+      document.getElementById('alerte-degradation').classList.add('hidden');
+      showScreen('screen-confirmation');
+    } else {
+      alert('Erreur lors de la création de la réservation.');
+    }
+  } catch (e) {
+    alert('Erreur de connexion : ' + e.message);
+  }
+}
+
+// Afficher mes réservations
+async function afficherMesReservations() {
+  if (!state.employe) { showScreen('screen-activation'); return; }
+  var div = document.getElementById('mes-resa-liste');
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  try {
+    var res = await fetch(CONFIG.webhookMouvements + '?mes_reservations=' + state.employe.code);
+    var resas = await res.json();
+    if (!resas.length) {
+      div.innerHTML = '<p class="empty-msg">Aucune réservation. Clique sur "Nouvelle réservation" pour commencer.</p>';
+      return;
+    }
+    var retards = resas.filter(function(r) { return r.statut === 'En retard'; });
+    var html = '';
+    if (retards.length > 0) {
+      html += '<div style="background:#FFEBEE;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:4px solid #E74C3C">' +
+        '<strong style="color:#B71C1C">⚠️ ' + retards.length + ' retard(s) de restitution</strong><br>' +
+        '<small style="color:#666">La logistique a été notifiée. Retourne le matériel au dépôt.</small></div>';
+    }
+    html += resas.map(function(r) {
+      var lib = getLibelle(r.code_im);
+      var dDebut = new Date(r.date_debut).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' });
+      var dFin = new Date(r.date_fin).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' });
+      return '<div class="materiel-card" style="border-left-color:' + (STATUT_COLORS[r.statut] || STATUT_COLORS['Demandee']).color + '">' +
+        '<strong style="font-size:15px">' + lib + '</strong><br>' +
+        '<span style="font-size:11px;color:#999;font-family:monospace">' + r.code_im + '</span><br>' +
+        statutBadgeResa(r.statut) + '<br>' +
+        '<small>📅 ' + dDebut + ' → ' + dFin + '</small>' +
+        (r.note ? '<br><small style="color:#888">📝 ' + r.note + '</small>' : '') +
+        '</div>';
+    }).join('');
+    div.innerHTML = html;
+  } catch (e) {
+    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+  }
+}
