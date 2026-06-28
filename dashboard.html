@@ -109,6 +109,38 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
 /* Lazy load spinner */
 .lazy-loading{text-align:center;padding:40px;color:var(--grey);}
 @media(max-width:600px){main{padding:8px;}header h1{font-size:13px;}.kpi-v{font-size:22px;}th,td{padding:6px 8px;font-size:12px;}.nav-tab{padding:10px 12px;font-size:12px;}}
+/* Drawer fiche */
+#fiche-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:flex-start;justify-content:flex-end;}
+#fiche-overlay.open{display:flex;}
+#fiche-panel{background:#fff;width:min(680px,100vw);height:100vh;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,.2);display:flex;flex-direction:column;}
+#fiche-header{background:var(--blue);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+#fiche-header h2{flex:1;font-size:16px;margin:0;}
+#fiche-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;}
+#fiche-body{padding:20px;flex:1;}
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;}
+.stat-box{background:var(--bg);border-radius:10px;padding:12px;text-align:center;}
+.stat-box .sv{font-size:24px;font-weight:800;color:var(--blue);}
+.stat-box .sl{font-size:11px;color:var(--grey);margin-top:2px;}
+.loc-card{padding:12px 16px;border-radius:10px;font-weight:700;font-size:14px;margin-bottom:12px;}
+.action-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.action-bar button{padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;}
+.ab-green{background:var(--green);color:#fff;}
+.ab-blue{background:var(--blue);color:#fff;}
+.ab-orange{background:var(--orange);color:#fff;}
+.ab-grey{background:#eee;color:var(--text);}
+.link-im{color:var(--blue);cursor:pointer;text-decoration:underline;font-family:monospace;font-weight:700;font-size:12px;}
+.link-emp{color:var(--blue);cursor:pointer;text-decoration:underline;font-weight:600;}
+/* Modal action */
+#action-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:none;align-items:center;justify-content:center;padding:16px;}
+#action-overlay.open{display:flex;}
+#action-modal{background:#fff;border-radius:16px;padding:24px;width:min(480px,100%);max-height:90vh;overflow-y:auto;}
+#action-modal h3{color:var(--blue);margin-bottom:16px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:12px;font-weight:600;color:var(--grey);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:14px;}
+.form-row input:focus,.form-row select:focus{outline:none;border-color:var(--orange);}
+.form-actions{display:flex;gap:8px;margin-top:16px;}
+.form-actions button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -144,6 +176,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
   <button class="nav-tab" onclick="showTab('circulation')">En circulation <span class="ntbadge blue" id="nb-circ">0</span></button>
   <button class="nav-tab" onclick="showTab('depot')">Au dépôt <span class="ntbadge green" id="nb-depot">0</span></button>
   <button class="nav-tab" onclick="showTab('historique')">Historique</button>
+  <button class="nav-tab" onclick="showTab('transferts')">Transferts <span class="ntbadge red" id="nb-transf">0</span></button>
+  <button class="nav-tab" onclick="showTab('transferts')">Transferts <span class="ntbadge red" id="nb-transf">0</span></button>
   <button class="nav-tab" onclick="showTab('reservations')">Réservations <span class="ntbadge orange" id="nb-resa">0</span></button>
   <button class="nav-tab" onclick="showTab('documents')">Documents <span class="ntbadge orange" id="nb-docs">0</span></button>
   <button class="nav-tab" onclick="showTab('maintenance')">Maintenance <span class="ntbadge red" id="nb-maint">0</span></button>
@@ -266,12 +300,55 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
     </div>
 
     <!-- ANALYSES -->
+    <div id="tab-transferts" class="tab-content">
+      <div class="lazy-loading" id="transf-loading" style="display:none">Chargement...</div>
+      <div id="transf-content">
+        <div class="tcard">
+          <div class="thead"><h3>Transferts en attente de validation</h3><span class="tcnt" id="cnt-transf"></span></div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th>Code IM</th><th>Libelle</th><th>Donneur</th><th>Receveur</th><th>Etat déclaré</th><th>Attente</th><th>Note</th><th>Action</th>
+          </tr></thead><tbody id="tb-transf"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+    <div id="tab-transferts" class="tab-content">
+      <div class="tcard">
+        <div class="thead"><h3>Transferts en attente de validation</h3><span class="tcnt" id="cnt-transf"></span></div>
+        <p style="padding:10px 16px;font-size:13px;color:var(--grey)">Vous pouvez valider ici la réception d'un matériel sans passer par la PWA.</p>
+        <div style="overflow-x:auto"><table><thead><tr>
+          <th>Code IM</th><th>Libellé</th><th>Donneur</th><th>Receveur</th><th>Etat déclaré</th><th>Attente</th><th>Note</th><th>Action</th>
+        </tr></thead><tbody id="tb-transf"></tbody></table></div>
+      </div>
+    </div>
     <div id="tab-analyses" class="tab-content">
       <div id="analyse-content" style="padding:16px"></div>
     </div>
 
   </div>
 </main>
+
+<!-- DRAWER FICHE IMMO / EMPLOYÉ -->
+<div id="fiche-overlay" onclick="if(event.target===this)fermerFiche()">
+  <div id="fiche-panel">
+    <div id="fiche-header">
+      <h2 id="fiche-titre">Fiche</h2>
+      <button id="fiche-close" onclick="fermerFiche()">✕</button>
+    </div>
+    <div id="fiche-body"><p style="color:var(--grey);text-align:center;padding:40px">Chargement...</p></div>
+  </div>
+</div>
+
+<!-- MODAL ACTION ADMIN -->
+<div id="action-overlay" onclick="if(event.target===this)fermerAction()">
+  <div id="action-modal">
+    <h3 id="action-titre">Action</h3>
+    <div id="action-form"></div>
+    <div class="form-actions">
+      <button style="background:var(--orange);color:#fff" onclick="soumettreAction()">✅ Confirmer</button>
+      <button style="background:#eee;color:var(--text)" onclick="fermerAction()">Annuler</button>
+    </div>
+  </div>
+</div>
 
 <script>
 var W='https://immo-proxy.ral-85d.workers.dev/';
@@ -331,7 +408,6 @@ async function loadReservations(){
     var r=await fetch(W+'?reservations=1');
     reservations=await r.json();
     updateBadgesResa();
-    if(tabLoaded['reservations']) renderResa();
   }catch(e){reservations=[];}
 }
 
@@ -384,10 +460,14 @@ function updateBadges(){
   document.getElementById('nb-circ').textContent=s.en_circulation;
   document.getElementById('nb-depot').textContent=s.au_depot;
   document.getElementById('nb-alert').textContent=s.alertes_delai+s.hors_service;
+  document.getElementById('nb-transf').textContent=s.transferts_en_attente||0;
+  document.getElementById('nb-transf').textContent=s.transferts_en_attente;
   // Bandeau alertes
   var items=[];
   if(s.hors_service>0) items.push({cls:'ab-red ab-pulse',txt:'🔴 '+s.hors_service+' hors service',tab:'alertes'});
+  if(s.transferts_en_attente>0) items.push({cls:'ab-orange ab-pulse',txt:'🔄 '+s.transferts_en_attente+' transfert(s) en attente',tab:'transferts'});
   if(s.alertes_delai>0) items.push({cls:'ab-orange ab-pulse',txt:'⏰ '+s.alertes_delai+' transfert(s) >24h',tab:'alertes'});
+  if(s.transferts_en_attente>0) items.push({cls:'ab-blue',txt:'🔄 '+s.transferts_en_attente+' transfert(s) à valider',tab:'transferts'});
   if(s.transferts_en_attente>0) items.push({cls:'ab-blue',txt:'⏳ '+s.transferts_en_attente+' transfert(s) en attente',tab:'circulation'});
   var banner=document.getElementById('action-banner');
   if(items.length>0){
@@ -492,6 +572,7 @@ function searchHist(){
 
 // ── Réservations ──────────────────────────────────────────────────
 function renderResa(){
+  document.getElementById('resa-stats').innerHTML='';
   document.getElementById('resa-loading').style.display='none';
   document.getElementById('resa-content').style.display='block';
   var q=(document.getElementById('resa-q').value||'').toUpperCase();
@@ -504,7 +585,7 @@ function renderResa(){
   data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9);});
   var counts={};
   reservations.forEach(function(r){counts[r.statut]=(counts[r.statut]||0)+1;});
-  var statsHtml='';
+  document.getElementById('resa-stats').innerHTML='';
   Object.keys(counts).forEach(function(s){
     var col=SCOL[s]||'#999';
     var lbl=SLAB[s]||s;
@@ -599,7 +680,7 @@ function renderResa(){
 async function majStatutResa(id,statut){
   if(!statut)return;
   await fetch(W+'?action=statut_resa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,statut:statut})});
-  await loadReservations();renderResa();
+  await loadReservations();
 }
 
 // ── Documents ─────────────────────────────────────────────────────
@@ -706,6 +787,408 @@ async function showPhotosModal(codeIM){
 }
 
 // ── Export Excel ──────────────────────────────────────────────────
+function renderTransferts(){
+  var data=d.pending||[];
+  var now=Date.now();
+  document.getElementById('cnt-transf').textContent=data.length+' en attente';
+  var tbHtml='';
+  if(data.length===0){
+    tbHtml='<tr><td colspan="8" class="es">Aucun transfert en attente.</td></tr>';
+  }else{
+    data.forEach(function(t){
+      var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);
+      var ret=h>24;
+      var lib=im[t.code_im]?im[t.code_im].Libelle||t.code_im:t.code_im;
+      var row='<tr'+(ret?' class="urgent-row"':'')+'>';
+      row+='<td class="icode">'+t.code_im+'</td>';
+      row+='<td style="font-size:12px">'+lib+'</td>';
+      row+='<td><b style="font-size:12px">'+t.donneur_nom+'</b><br><span style="font-size:10px;color:var(--grey)">'+t.donneur_code+'</span></td>';
+      row+='<td><b style="font-size:12px">'+t.receveur_nom+'</b><br><span style="font-size:10px;color:var(--grey)">'+t.receveur_code+'</span></td>';
+      row+='<td>'+ebadge(t.etat||'Inconnu')+'</td>';
+      row+='<td>'+(ret?'<span class="badge bret">'+h+'h</span>':'<span class="badge batt">'+h+'h</span>')+'</td>';
+      row+='<td style="font-size:11px;color:var(--grey)">'+(t.note||'—')+'</td>';
+      row+='<td style="white-space:nowrap">';
+      row+='<select class="sel-etat-transf" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px">';
+      row+='<option value="Bon état">✅ Bon état</option>';
+      row+='<option value="Neuf">⭐ Neuf</option>';
+      row+='<option value="Usé">🔶 Usé</option>';
+      row+='<option value="Abîmé">⚠️ Abîmé</option>';
+      row+='</select> ';
+      row+='<button class="btn-valider-transf"';
+      row+=' data-tid="'+t.id+'"';
+      row+=' data-cim="'+t.code_im+'"';
+      row+=' data-rec="'+t.receveur_code+'"';
+      row+=' data-recnom="'+t.receveur_nom.replace(/"/g,'').replace(/'/g,'')+'"';
+      row+=' style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600"';
+      row+=' onclick="validerTransfertDashboard(this)">✅ Valider</button>';
+      row+='</td></tr>';
+      tbHtml+=row;
+    });
+  }
+  document.getElementById('tb-transf').innerHTML=tbHtml;
+}
+
+async function validerTransfertDashboard(btn){
+  var tid=btn.dataset.tid;
+  var cim=btn.dataset.cim;
+  var recCode=btn.dataset.rec;
+  var recNom=btn.dataset.recnom;
+  var row=btn.closest('tr');
+  var sel=row?row.querySelector('.sel-etat-transf'):null;
+  var etat=sel?sel.value:'Bon état';
+  var lib=im[cim]?im[cim].Libelle||cim:cim;
+  if(!confirm('Valider : '+lib+' -> '+recNom+' ('+etat+') ?'))return;
+  btn.textContent='...';btn.disabled=true;
+  try{
+    var res=await fetch(W+'?action=valider',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:tid,code_im:cim,code_employe:recCode,nom_employe:recNom,etat_reception:etat,note_reception:'Validé depuis le tableau de bord',etat_donneur:''})
+    });
+    var data=await res.json();
+    if(data.success!==false){
+      row.style.background='#E8F5E9';
+      btn.textContent='✅ Validé';
+      setTimeout(function(){loadDashboard();},1800);
+    }else{
+      btn.textContent='✅ Valider';btn.disabled=false;
+      alert('Erreur lors de la validation.');
+    }
+  }catch(e){
+    btn.textContent='✅ Valider';btn.disabled=false;
+    alert('Erreur : '+e.message);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// ── FICHES INDIVIDUELLES ────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+function ouvrirFiche(type, code, nom) {
+  document.getElementById('fiche-overlay').classList.add('open');
+  document.getElementById('fiche-body').innerHTML = '<p style="color:var(--grey);text-align:center;padding:40px">Chargement...</p>';
+  if (type === 'immo') {
+    document.getElementById('fiche-titre').textContent = code + (nom ? ' — ' + nom : '');
+    chargerFicheImmo(code);
+  } else {
+    document.getElementById('fiche-titre').textContent = nom + ' (' + code + ')';
+    chargerFicheEmploye(code, nom);
+  }
+}
+
+function fermerFiche() {
+  document.getElementById('fiche-overlay').classList.remove('open');
+}
+
+async function chargerFicheImmo(codeIM) {
+  try {
+    var res = await fetch(W + '?immo=' + encodeURIComponent(codeIM));
+    var hist = await res.json();
+    var immoInfo = im[codeIM] || {};
+    var lib = immoInfo.Libelle || codeIM;
+
+    // Localisation actuelle
+    var loc = hist.length > 0 ? hist[0] : null;
+    var estDepot = !loc || loc.type_mouvement === 'Retour' || loc.code_chantier === 'DEPOT';
+    var locHtml = estDepot
+      ? '<div class="loc-card" style="background:#E8F5E9;color:#1B5E20">🏭 Au dépôt</div>'
+      : '<div class="loc-card" style="background:#FFF3E0;color:#E65100">👤 Avec <strong>' + loc.nom_employe + '</strong> <span style="font-size:12px;color:#888">(' + loc.code_employe + ')</span> depuis le ' + fmtD(loc.horodatage) + '</div>';
+
+    // Stats
+    var nbMouvements = hist.length;
+    var detenteurs = new Set(hist.filter(function(m){return m.type_mouvement!=='Retour';}).map(function(m){return m.code_employe;})).size;
+    var fdsUrl = immoInfo.FDS_URL ? (immoInfo.FDS_URL.includes('sharepoint.com') ? W+'?fds='+encodeURIComponent(codeIM) : immoInfo.FDS_URL) : '';
+
+    var html = '<div class="stat-row">';
+    html += '<div class="stat-box"><div class="sv">' + nbMouvements + '</div><div class="sl">Mouvements</div></div>';
+    html += '<div class="stat-box"><div class="sv">' + detenteurs + '</div><div class="sl">Détenteurs</div></div>';
+    html += '<div class="stat-box"><div class="sv">' + (immoInfo.Categorie || '—') + '</div><div class="sl">Catégorie</div></div>';
+    html += '</div>';
+    html += locHtml;
+
+    // Liens
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+    if (fdsUrl) html += '<a href="' + fdsUrl + '" target="_blank" style="padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">📄 Voir FDS</a>';
+    var photosBtn=document.createElement('button');
+    photosBtn.textContent='🖼️ Photos';
+    photosBtn.style.cssText='padding:7px 14px;background:#FFF8F0;color:var(--orange);border:2px solid var(--orange);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
+    photosBtn.setAttribute('data-cim',codeIM);
+    photosBtn.onclick=function(){ouvrirModalPhotos(this.dataset.cim);};
+    // On ajoute temporairement dans une string, on injectera le bouton après
+    html += '<span id="photos-btn-placeholder"></span>';
+    html += '</div>';
+
+    // Boutons action admin
+    html += '<div class="action-bar">';
+    html += '<span id="action-retour-ph"></span><span id="action-transf-ph"></span>';
+    html += '</div>';
+
+    // Info
+    if (immoInfo.N_Serie) html += '<p style="font-size:13px;color:var(--grey);margin-bottom:12px">N° série : <strong>' + immoInfo.N_Serie + '</strong></p>';
+
+    // Historique
+    html += '<h3 style="color:var(--blue);font-size:14px;margin-bottom:10px">Historique (' + hist.length + ')</h3>';
+    if (!hist.length) {
+      html += '<p style="color:var(--grey);font-size:13px">Aucun mouvement enregistré.</p>';
+    } else {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+      ['Date','Type','Employé','Donneur','État','Note'].forEach(function(h){
+        html += '<th style="padding:6px 8px;background:#F8FAFC;border-bottom:2px solid #eee;text-align:left;font-size:11px;color:var(--grey)">' + h + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+      hist.forEach(function(m) {
+        var donneur = '';
+        if (m.type_mouvement === 'Transfert' && m.code_chantier && m.code_chantier.includes('|')) {
+          donneur = m.code_chantier.split('|')[1] || '';
+        }
+        html += '<tr style="border-bottom:1px solid #f0f0f0">';
+        html += '<td style="padding:6px 8px;white-space:nowrap">' + fmtDT(m.horodatage) + '</td>';
+        html += '<td style="padding:6px 8px">' + (m.type_mouvement==='Retour'?'📥':'🔄') + ' ' + m.type_mouvement + '</td>';
+        html += '<td style="padding:6px 8px"><span class="link-emp" data-emp="' + m.code_employe + '" data-nom="' + m.nom_employe.replace(/"/g,'') + '" onclick="ouvrirFicheEmpFromData(this)">' + m.nom_employe + '</span></td>';
+        html += '<td style="padding:6px 8px;color:var(--grey)">' + (donneur || '—') + '</td>';
+        html += '<td style="padding:6px 8px">' + ebadge(m.etat || '') + '</td>';
+        html += '<td style="padding:6px 8px;color:var(--grey)">' + (m.note || '—') + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+
+    document.getElementById('fiche-body').innerHTML = html;
+    var ph = document.getElementById('photos-btn-placeholder');
+    if (ph) {
+      var photosBtn2 = document.createElement('button');
+      photosBtn2.textContent = '🖼️ Photos';
+      photosBtn2.style.cssText = 'padding:7px 14px;background:#FFF8F0;color:var(--orange);border:2px solid var(--orange);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px';
+      var _cim = codeIM; var _lib = lib;
+      photosBtn2.onclick = function() { ouvrirModalPhotos(_cim); };
+      ph.replaceWith(photosBtn2);
+    }
+    function makeBtn(txt, cls, cb) {
+      var b = document.createElement('button'); b.textContent = txt; b.className = cls; b.onclick = cb; return b;
+    }
+    var ph1 = document.getElementById('action-retour-ph');
+    var ph2 = document.getElementById('action-transf-ph');
+    var _c = codeIM, _l = lib;
+    if (ph1) ph1.replaceWith(makeBtn('📥 Créer un retour','ab-orange',function(){ ouvrirActionMouvement('Retour',_c,_l,'',''); }));
+    if (ph2) ph2.replaceWith(makeBtn('🔄 Transférer','ab-blue',function(){ ouvrirActionMouvement('Transfert',_c,_l,'',''); }));
+  } catch(e) {
+    document.getElementById('fiche-body').innerHTML = '<p style="color:var(--red);padding:20px">Erreur : ' + e.message + '</p>';
+  }
+}
+
+async function chargerFicheEmploye(code, nom) {
+  try {
+    var res = await fetch(W + '?employe=' + encodeURIComponent(code));
+    var data = await res.json();
+    var actuel = data.actuel || [];
+    var hist = data.historique || [];
+
+    // Stats
+    var durees = actuel.map(function(m) { return m.horodatage ? (Date.now() - new Date(m.horodatage).getTime()) / 86400000 : 0; });
+    var moyDuree = durees.length ? Math.round(durees.reduce(function(a,b){return a+b;},0) / durees.length * 10) / 10 : 0;
+
+    var html = '<div class="stat-row">';
+    html += '<div class="stat-box"><div class="sv">' + actuel.length + '</div><div class="sl">En possession</div></div>';
+    html += '<div class="stat-box"><div class="sv">' + hist.length + '</div><div class="sl">Total mvt</div></div>';
+    html += '<div class="stat-box"><div class="sv">' + moyDuree + 'j</div><div class="sl">Durée moy.</div></div>';
+    html += '</div>';
+
+    // Action admin
+    html += '<div class="action-bar">';
+    html += '<span id="emp-action-ph"></span>';
+    html += '</div>';
+
+    // Stock actuel
+    html += '<h3 style="color:var(--blue);font-size:14px;margin-bottom:10px">En sa possession (' + actuel.length + ')</h3>';
+    if (!actuel.length) {
+      html += '<p style="color:var(--grey);font-size:13px;margin-bottom:16px">Aucune immo en cours.</p>';
+    } else {
+      actuel.forEach(function(m) {
+        var lib = im[m.code_im] ? im[m.code_im].Libelle || m.code_im : m.code_im;
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">';
+        html += '<span><span class="link-im" data-cim="' + m.code_im + '" data-lib="' + lib.replace(/"/g,'') + '" onclick="ouvrirFicheImFromData(this)">' + m.code_im + '</span> <span style="font-size:13px">' + lib + '</span></span>';
+        html += '<span>' + ebadge(m.etat || '') + '</span>';
+        html += '</div>';
+      });
+    }
+
+    // Historique
+    html += '<h3 style="color:var(--blue);font-size:14px;margin:16px 0 10px">Historique complet (' + hist.length + ')</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+    ['Date','Code IM','Libellé','Type','Donneur','État'].forEach(function(h){
+      html += '<th style="padding:6px 8px;background:#F8FAFC;border-bottom:2px solid #eee;text-align:left;font-size:11px;color:var(--grey)">' + h + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+    hist.slice(0, 100).forEach(function(m) {
+      var lib = im[m.code_im] ? im[m.code_im].Libelle || '' : '';
+      var donneur = '';
+      if (m.type_mouvement === 'Transfert' && m.code_chantier && m.code_chantier.includes('|')) {
+        donneur = m.code_chantier.split('|')[1] || '';
+      }
+      html += '<tr style="border-bottom:1px solid #f0f0f0">';
+      html += '<td style="padding:5px 8px;white-space:nowrap">' + fmtDT(m.horodatage) + '</td>';
+      html += '<td style="padding:5px 8px"><span class="link-im" data-cim="' + m.code_im + '" data-lib="' + lib.replace(/"/g,'') + '" onclick="ouvrirFicheImFromData(this)">' + m.code_im + '</span></td>';
+      html += '<td style="padding:5px 8px;font-size:11px">' + lib + '</td>';
+      html += '<td style="padding:5px 8px">' + (m.type_mouvement==='Retour'?'📥':'🔄') + ' ' + m.type_mouvement + '</td>';
+      html += '<td style="padding:5px 8px;color:var(--grey)">' + (donneur || '—') + '</td>';
+      html += '<td style="padding:5px 8px">' + ebadge(m.etat || '') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    document.getElementById('fiche-body').innerHTML = html;
+    var epBtn = document.getElementById('emp-action-ph');
+    var _ec = code, _en = nom;
+    if (epBtn) {
+      var eb = document.createElement('button');
+      eb.textContent = '🔄 Transférer une immo vers cet employé';
+      eb.className = 'ab-blue';
+      eb.onclick = function() { ouvrirActionMouvement('Transfert','','',_ec,_en); };
+      epBtn.replaceWith(eb);
+    }
+  } catch(e) {
+    document.getElementById('fiche-body').innerHTML = '<p style="color:var(--red);padding:20px">Erreur : ' + e.message + '</p>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ── ACTIONS ADMIN DEPUIS DASHBOARD ──────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+var actionCourante = null;
+
+function ouvrirActionMouvement(type, codeIM, libIM, codeEmp, nomEmp) {
+  actionCourante = { type: type, codeIM: codeIM, libIM: libIM, codeEmp: codeEmp, nomEmp: nomEmp };
+  document.getElementById('action-titre').textContent = type === 'Retour' ? '📥 Créer un retour au dépôt' : '🔄 Créer un transfert';
+  var empOptions = Object.values(d.inventory || [])
+    .filter(function(i){return i.statut==='En circulation';})
+    .map(function(i){return i.detenteur_code;})
+    .filter(function(v,i,a){return a.indexOf(v)===i;});
+
+  // Options employés depuis all_movements
+  var allEmps = {};
+  (d.all_movements||[]).forEach(function(m){ if(m.code_employe&&m.nom_employe) allEmps[m.code_employe]=m.nom_employe; });
+
+  var empOptHtml = '<option value="">-- Sélectionner --</option>' +
+    Object.keys(allEmps).sort().map(function(c){ return '<option value="' + c + '" data-nom="' + allEmps[c].replace(/"/g,'') + '">' + allEmps[c] + ' (' + c + ')</option>'; }).join('');
+
+  var immoOptHtml = '<option value="">-- Sélectionner --</option>' +
+    (d.inventory||[]).map(function(i){ var l=im[i.code_im]?im[i.code_im].Libelle||i.code_im:i.code_im; return '<option value="' + i.code_im + '">' + i.code_im + ' — ' + l + ' (' + i.statut + ')</option>'; }).join('');
+
+  var html = '';
+  // Immo
+  html += '<div class="form-row"><label>Code IM</label>';
+  if (codeIM) html += '<input type="text" id="act-immo" value="' + codeIM + '" readonly style="background:#F8FAFC">';
+  else html += '<select id="act-immo">' + immoOptHtml + '</select>';
+  html += '</div>';
+
+  if (type === 'Transfert') {
+    html += '<div class="form-row"><label>Transférer à</label>';
+    if (codeEmp) html += '<input type="text" id="act-emp" value="' + codeEmp + '" readonly style="background:#F8FAFC"><input type="hidden" id="act-emp-nom" value="' + nomEmp + '">';
+    else html += '<select id="act-emp"><option value="">-- Sélectionner --</option>' + Object.keys(allEmps).sort().map(function(c){ return '<option value="' + c + '" data-nom="' + allEmps[c].replace(/"/g,'') + '">' + allEmps[c] + ' (' + c + ')</option>'; }).join('') + '</select><input type="hidden" id="act-emp-nom" value="">';
+    html += '</div>';
+  }
+
+  html += '<div class="form-row"><label>État constaté</label><select id="act-etat"><option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option><option value="Hors service">🔴 Hors service</option></select></div>';
+  html += '<div class="form-row"><label>Note</label><textarea id="act-note" rows="2" placeholder="Motif, contexte..."></textarea></div>';
+
+  document.getElementById('action-form').innerHTML = html;
+  document.getElementById('action-overlay').classList.add('open');
+}
+
+function fermerAction() {
+  document.getElementById('action-overlay').classList.remove('open');
+  actionCourante = null;
+}
+
+async function soumettreAction() {
+  if (!actionCourante) return;
+  var codeIM = (document.getElementById('act-immo') || {}).value;
+  var etat = (document.getElementById('act-etat') || {}).value || 'Bon état';
+  var note = (document.getElementById('act-note') || {}).textContent || (document.getElementById('act-note') || {}).value || '';
+  note = note || '';
+  if (!codeIM) { alert('Sélectionne une immo.'); return; }
+
+  var payload = { code_im: codeIM, etat: etat, note: note + (note ? ' ' : '') + '[Dashboard]', horodatage: new Date().toISOString() };
+
+  if (actionCourante.type === 'Retour') {
+    payload.code_employe = 'CONI';
+    payload.nom_employe = 'Dépôt logistique';
+    payload.type_mouvement = 'Retour';
+    payload.code_chantier = 'DEPOT';
+  } else {
+    var empSel = document.getElementById('act-emp');
+    var empCode = empSel ? empSel.value : actionCourante.codeEmp;
+    var empNom = (document.getElementById('act-emp-nom') || {}).value || empCode;
+    if (!empCode) { alert('Sélectionne un employé.'); return; }
+    payload.code_employe = empCode;
+    payload.nom_employe = empNom;
+    payload.type_mouvement = 'Transfert';
+    payload.code_chantier = 'DASH|Dashboard admin';
+  }
+
+  var btn = document.querySelector('#action-overlay .form-actions button');
+  if (btn) { btn.textContent = '...'; btn.disabled = true; }
+
+  try {
+    var res = await fetch(W, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    var data = await res.json();
+    if (data.success !== false) {
+      fermerAction(); fermerFiche();
+      setTimeout(loadDashboard, 500);
+    } else { alert('Erreur lors de l enregistrement.'); if(btn){btn.textContent='✅ Confirmer';btn.disabled=false;} }
+  } catch(e) { alert('Erreur : ' + e.message); if(btn){btn.textContent='✅ Confirmer';btn.disabled=false;} }
+}
+
+// Photos dans le drawer
+async function ouvrirModalPhotos(codeIM) {
+  var body = document.getElementById('fiche-body');
+  var old = body.innerHTML;
+  body.innerHTML = '<div style="text-align:center;padding:20px">Chargement photos...</div>';
+  try {
+    var res = await fetch(W + '?photos=' + encodeURIComponent(codeIM));
+    var photos = await res.json();
+    var html = '<button id="btn-retour-photos" style="margin-bottom:12px;padding:6px 14px;background:#eee;border:none;border-radius:8px;cursor:pointer">← Retour</button>';
+    html += '<h3 style="color:var(--blue);margin-bottom:12px">Photos — ' + codeIM + ' (' + photos.length + ')</h3>';
+    if (!photos.length) { html += '<p style="color:var(--grey)">Aucune photo enregistrée.</p>'; }
+    else {
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+      photos.forEach(function(p){
+        html += '<div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">';
+        html += '<img src="' + p.url + '" loading="lazy" style="width:100%;height:150px;object-fit:cover;cursor:pointer" onclick="window.open(this.src)">';
+        html += '<p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">' + fmtD(p.created) + '</p></div>';
+      });
+      html += '</div>';
+    }
+    body.innerHTML = html;
+  } catch(e) { body.innerHTML = '<p style="color:var(--red)">Erreur : ' + e.message + '</p>'; }
+}
+
+// Recherche employé dans dashboard
+var rechEmpTimer = null;
+function rechercherEmployeDash() {
+  clearTimeout(rechEmpTimer);
+  rechEmpTimer = setTimeout(function() {
+    var q = (document.getElementById('emp-search-input') || {}).value || '';
+    if (!q || q.length < 2) { document.getElementById('emp-results').innerHTML = ''; return; }
+    q = q.toUpperCase();
+    var allEmps = {};
+    (d.all_movements||[]).forEach(function(m){ if(m.code_employe&&m.nom_employe) allEmps[m.code_employe]=m.nom_employe; });
+    var matches = Object.keys(allEmps).filter(function(c){ return c.includes(q)||allEmps[c].toUpperCase().includes(q); }).slice(0,8);
+    document.getElementById('emp-results').innerHTML = matches.length === 0 ? '<p style="color:var(--grey);font-size:13px;padding:8px">Aucun résultat.</p>' :
+      matches.map(function(c){ var d2=document.createElement('div');d2.style.cssText='padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:13px';d2.innerHTML='<b class="link-emp">'+allEmps[c]+'</b> <span style="font-size:11px;color:var(--grey)">'+c+'</span>';(function(_c,_n){d2.onclick=function(){ouvrirFiche('emp',_c,_n);};})(c,allEmps[c]);return d2.outerHTML; }).join('');
+  }, 300);
+}
+
+// Rendre les codes IM cliquables dans les tableaux
+function lien(codeIM) {
+  var lib = im[codeIM] ? im[codeIM].Libelle || '' : '';
+  return '<span class="link-im" data-cim="' + codeIM + '" data-lib="' + lib.replace(/"/g,'') + '" onclick="ouvrirFicheImFromData(this)">' + codeIM + '</span>';
+}
+function lienEmp(code, nom) {
+  return '<span class="link-emp" data-emp="' + code + '" data-nom="' + (nom||'').replace(/"/g,'') + '" onclick="ouvrirFicheEmpFromData(this)">' + (nom||code) + '</span>';
+}
+
 function exportExcel(){
   if(!d){alert('Chargez le tableau de bord.');return;}
   var wb=XLSX.utils.book_new();var now=new Date();
@@ -716,13 +1199,44 @@ function exportExcel(){
   var r2=[['Statut','Code IM','Libelle','Demandeur','Chantier','Du','Au','Note']];
   reservations.forEach(function(r){r2.push([r.statut,r.code_im,im[r.code_im]?im[r.code_im].Libelle||'':'',r.nom_employe,r.nom_chantier||'',fmtDT(r.date_debut),fmtDT(r.date_fin),r.note||'']);});
   var ws2=XLSX.utils.aoa_to_sheet(r2);ws2['!cols']=[14,12,40,28,28,20,20,30].map(function(w){return{wch:w};});hdr(ws2,r2[0].length);XLSX.utils.book_append_sheet(wb,ws2,'Reservations');
-  var r3=[['Date','Code IM','Libelle','Type','Employe','Code','Etat','Note']];
-  (d.all_movements||[]).forEach(function(m){r3.push([fmtDT(m.horodatage),m.code_im,im[m.code_im]?im[m.code_im].Libelle||'':'',m.type_mouvement,m.nom_employe,m.code_employe,m.etat||'',m.note||'']);});
-  var ws3=XLSX.utils.aoa_to_sheet(r3);ws3['!cols']=[20,14,40,14,28,12,14,30].map(function(w){return{wch:w};});hdr(ws3,r3[0].length);XLSX.utils.book_append_sheet(wb,ws3,'Historique');
+  var r3=[['Date (UTC+4)','Code IM','Libelle','Categorie','Type','Employe','Code','Donneur','Etat','Note']];
+  (d.all_movements||[]).forEach(function(m){
+    var lib=im[m.code_im]?im[m.code_im].Libelle||'':'';
+    var cat=im[m.code_im]?im[m.code_im].Categorie||'':'';
+    var donneur='';
+    if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){
+      donneur=m.code_chantier.split('|')[1]||'';
+    }
+    r3.push([fmtDT(m.horodatage),m.code_im,lib,cat,m.type_mouvement,m.nom_employe,m.code_employe,donneur,m.etat||'',m.note||'']);
+  });
+  var ws3=XLSX.utils.aoa_to_sheet(r3);ws3['!cols']=[20,14,40,18,14,28,12,28,14,30].map(function(w){return{wch:w};});hdr(ws3,r3[0].length);XLSX.utils.book_append_sheet(wb,ws3,'Historique complet');
   var s=d.stats||{};
+  // Onglet par immo : une ligne par immo avec détenteur actuel et dernier mouvement
+  var invMap={};(d.all_movements||[]).forEach(function(m){if(!invMap[m.code_im]){invMap[m.code_im]=m;}});
+  var r35=[['Code IM','Libelle','Categorie','Statut','Detenteur','Code','Etat','Depuis','Donneur dernier mvt']];
+  (d.inventory||[]).forEach(function(i){
+    var lib=im[i.code_im]?im[i.code_im].Libelle||'':'';
+    var cat=im[i.code_im]?im[i.code_im].Categorie||'':'';
+    var last=invMap[i.code_im]||{};
+    var donneur='';if(last.type_mouvement==='Transfert'&&last.code_chantier&&last.code_chantier.includes('|'))donneur=last.code_chantier.split('|')[1]||'';
+    r35.push([i.code_im,lib,cat,i.statut,i.statut==='Au depot'?'Depot':i.detenteur_nom,i.statut==='Au depot'?'DEPOT':i.detenteur_code,i.etat||'',i.since?fmtDT(i.since):'',donneur]);
+  });
+  var ws35=XLSX.utils.aoa_to_sheet(r35);ws35['!cols']=[14,40,18,16,28,12,14,20,28].map(function(w){return{wch:w};});hdr(ws35,r35[0].length);XLSX.utils.book_append_sheet(wb,ws35,'Par immo');
+
   var r4=[['Espace Soleil — Tableau de bord'],['Genere le '+fmtDT(now.toISOString())],[],['Indicateur','Valeur'],['Immos tracees',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au depot',s.au_depot||0],['Total mouvements',s.total_mouvements||0],['Duree moy. hors depot',s.moyenne_jours_hors_depot+'j'],['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0]];
   var ws4=XLSX.utils.aoa_to_sheet(r4);ws4['!cols']=[{wch:35},{wch:20}];XLSX.utils.book_append_sheet(wb,ws4,'Resume');
   XLSX.writeFile(wb,'EspaceSoleil_Immos_'+now.toISOString().slice(0,10)+'.xlsx');
+}
+
+function ouvrirFicheEmpFromData(el) {
+  var code = el.dataset.emp;
+  var nom = el.dataset.nom || code;
+  ouvrirFiche('emp', code, nom);
+}
+function ouvrirFicheImFromData(el) {
+  var cim = el.dataset.cim;
+  var lib = el.dataset.lib || cim;
+  ouvrirFiche('immo', cim, lib);
 }
 
 // ── Init ──────────────────────────────────────────────────────────
