@@ -1069,6 +1069,23 @@ function scannerPourResa() {
   });
 }
 
+// Vérifier les conflits de réservation
+async function verifierConflits(codeIM, dateDebut, dateFin) {
+  try {
+    var res = await fetch(CONFIG.webhookMouvements + '?reservations=1');
+    var resas = await res.json();
+    var debut = new Date(dateDebut);
+    var fin = new Date(dateFin);
+    return resas.filter(function(r) {
+      if (r.code_im !== codeIM) return false;
+      if (r.statut === 'Annulee' || r.statut === 'Rendue') return false;
+      var rDebut = new Date(r.date_debut);
+      var rFin = new Date(r.date_fin);
+      return !(fin < rDebut || debut > rFin);
+    });
+  } catch (e) { return []; }
+}
+
 // Soumettre la demande de réservation
 async function soumettreReservation() {
   if (!state.resaImmoCode) { alert('Sélectionne ou scanne une immo.'); return; }
@@ -1076,6 +1093,16 @@ async function soumettreReservation() {
   var fin = document.getElementById('resa-date-fin').value;
   if (!debut || !fin) { alert('Indique les dates de départ et de retour.'); return; }
   if (new Date(fin) <= new Date(debut)) { alert('La date de retour doit être après la date de départ.'); return; }
+
+  // Vérifier conflits
+  var conflits = await verifierConflits(state.resaImmoCode, debut, fin);
+  if (conflits.length > 0) {
+    var msg = conflits.map(function(c) {
+      return c.nom_employe + ' du ' + new Date(c.date_debut).toLocaleDateString('fr-FR') + ' au ' + new Date(c.date_fin).toLocaleDateString('fr-FR') + ' (' + c.statut + ')';
+    }).join(' | ');
+    var continuer = confirm('Cette immo est deja reservee : ' + msg + '. Envoyer quand meme ?');
+    if (!continuer) return;
+  }
   var chantier = document.getElementById('resa-chantier').value.trim();
   var note = document.getElementById('resa-note').value.trim();
 
@@ -1121,31 +1148,45 @@ async function afficherMesReservations() {
   try {
     var res = await fetch(CONFIG.webhookMouvements + '?mes_reservations=' + state.employe.code);
     var resas = await res.json();
-    if (!resas.length) {
-      div.innerHTML = '<p class="empty-msg">Aucune réservation. Clique sur "Nouvelle réservation" pour commencer.</p>';
+    if (!Array.isArray(resas) || !resas.length) {
+      div.innerHTML = '<p class="empty-msg">Aucune réservation en cours.</p>';
       return;
     }
-    var retards = resas.filter(function(r) { return r.statut === 'En retard'; });
+    var actives  = resas.filter(function(r) { return r.statut !== 'Rendue' && r.statut !== 'Annulee'; });
+    var termines = resas.filter(function(r) { return r.statut === 'Rendue' || r.statut === 'Annulee'; });
+    var retards  = actives.filter(function(r) { return r.statut === 'En retard'; });
     var html = '';
     if (retards.length > 0) {
       html += '<div style="background:#FFEBEE;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:4px solid #E74C3C">' +
         '<strong style="color:#B71C1C">⚠️ ' + retards.length + ' retard(s) de restitution</strong><br>' +
-        '<small style="color:#666">La logistique a été notifiée. Retourne le matériel au dépôt.</small></div>';
+        '<small style="color:#666">Retourne le matériel au dépôt dès que possible.</small></div>';
     }
-    html += resas.map(function(r) {
-      var lib = getLibelle(r.code_im);
-      var dDebut = new Date(r.date_debut).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' });
-      var dFin = new Date(r.date_fin).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' });
-      return '<div class="materiel-card" style="border-left-color:' + (STATUT_COLORS[r.statut] || STATUT_COLORS['Demandee']).color + '">' +
-        '<strong style="font-size:15px">' + lib + '</strong><br>' +
-        '<span style="font-size:11px;color:#999;font-family:monospace">' + r.code_im + '</span><br>' +
-        statutBadgeResa(r.statut) + '<br>' +
-        '<small>📅 ' + dDebut + ' → ' + dFin + '</small>' +
-        (r.note ? '<br><small style="color:#888">📝 ' + r.note + '</small>' : '') +
+    function carteResa(r) {
+      var lib = r.code_im ? getLibelle(r.code_im) : '—';
+      var s = STATUT_COLORS[r.statut] || STATUT_COLORS['Demandee'];
+      var dDebut = r.date_debut ? new Date(r.date_debut).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' }) : '—';
+      var dFin   = r.date_fin   ? new Date(r.date_fin).toLocaleDateString('fr-FR',   { timeZone: 'Indian/Reunion' }) : '—';
+      return '<div class="materiel-card" style="border-left:4px solid ' + s.color + '">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div><strong style="font-size:15px;color:#1A3A6B">' + lib + '</strong>' +
+        (r.code_im ? '<br><span style="font-size:11px;color:#999;font-family:monospace">' + r.code_im + '</span>' : '') + '</div>' +
+        '<span style="display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:' + s.bg + ';color:' + s.color + '">' + s.label + '</span>' +
+        '</div>' +
+        '<div style="margin-top:6px;font-size:13px">📅 ' + dDebut + ' → ' + dFin + '</div>' +
+        (r.nom_chantier ? '<div style="font-size:12px;color:#666;margin-top:2px">🏗️ ' + r.nom_chantier + '</div>' : '') +
+        (r.note ? '<div style="font-size:12px;color:#888;margin-top:2px">📝 ' + r.note + '</div>' : '') +
         '</div>';
-    }).join('');
+    }
+    if (actives.length) {
+      html += '<h3 style="color:#1A3A6B;font-size:14px;margin:8px 0 6px">En cours (' + actives.length + ')</h3>';
+      html += actives.map(carteResa).join('');
+    }
+    if (termines.length) {
+      html += '<h3 style="color:#999;font-size:13px;margin:12px 0 6px">Terminées / Annulées (' + termines.length + ')</h3>';
+      html += termines.map(carteResa).join('');
+    }
     div.innerHTML = html;
   } catch (e) {
-    div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>';
+    div.innerHTML = '<p class="empty-msg">Erreur de connexion : ' + e.message + '</p>';
   }
 }
