@@ -1050,10 +1050,11 @@ function renderAnalyse(){
   html+='</tbody></table></div></div>';
 
   // ── Candidats au remplacement ────────────────────────────────────────────
-  // Immos en panne ≥3 fois OU coût annuel élevé
+  // Critères : pannes répétées (≥2) OU coûts de réparation réels élevés
   var candidats=[];
   Object.keys(immoP).forEach(function(code){if(immoP[code]>=2){var c=im[code]||{};var cout=parseFloat(c.Cout_Maintenance)||0;candidats.push({code_im:code,libelle:getLib(code),nb_pannes:immoP[code],cout_maint:cout,raison:immoP[code]+'x en panne'});}});
-  coutMaint.forEach(function(x){if(x.cout_annuel>500&&!candidats.find(function(c){return c.code_im===x.code_im;}))candidats.push({code_im:x.code_im,libelle:x.libelle,nb_pannes:immoP[x.code_im]||0,cout_maint:x.cout_unitaire,raison:'Coût annuel >500€'});});
+  // Ajouter depuis les coûts réels (topCout déjà calculé ci-dessus)
+  topCout.forEach(function(x){if(x.total>500&&!candidats.find(function(c){return c.code_im===x.code_im;}))candidats.push({code_im:x.code_im,libelle:getLib(x.code_im),nb_pannes:immoP[x.code_im]||0,cout_maint:x.total,raison:'Coût réparations : '+x.total.toFixed(0)+'€'});});
   candidats.sort(function(a,b){return b.nb_pannes-a.nb_pannes||b.cout_maint-a.cout_maint;});
   html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>🔄 Candidats au remplacement</h3></div>';
   if(!candidats.length)html+='<p class="es" style="padding:16px">Aucun candidat identifié — parc en bonne santé !</p>';
@@ -1150,6 +1151,18 @@ async function chargerFicheImmo(codeIM){
       var btnPh=document.createElement('button');btnPh.className='fiche-btn orange';btnPh.textContent='🖼️ Photos';(function(_c){btnPh.onclick=function(){ouvrirPhotosModal(_c);};})(codeIM);actDiv.appendChild(btnPh);
       var btnRet=document.createElement('button');btnRet.className='fiche-btn green';btnRet.textContent='📥 Créer un retour';(function(_c,_l){btnRet.onclick=function(){fermerFiche();ouvrirActionMouvement('Retour',_c,_l,'','');};})(codeIM,l);actDiv.appendChild(btnRet);
       var btnTr=document.createElement('button');btnTr.className='fiche-btn blue';btnTr.textContent='🔄 Transférer';(function(_c,_l){btnTr.onclick=function(){fermerFiche();ouvrirActionMouvement('Transfert',_c,_l,'','');};})(codeIM,l);actDiv.appendChild(btnTr);
+      // Bouton panne
+      var panneBtn2=document.createElement('button');panneBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#FFF3E0;color:#E65100;border:2px solid #E65100';
+      var estEnPanneDash=(hist.length>0&&hist[0].type_mouvement==='Panne');
+      panneBtn2.textContent=estEnPanneDash?'✅ Résoudre la panne':'📢 Déclarer une panne';
+      (function(_c,_ep){panneBtn2.onclick=function(){if(_ep)resoudrePanneComplet(_c);else declarerPanneDash(_c);};})(codeIM,estEnPanneDash);actDiv.appendChild(panneBtn2);
+      // Boutons HS / Perdu / Volé / Disparu
+      var hsBtn2=document.createElement('button');hsBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#424242;color:#fff';hsBtn2.textContent='⚫ HS définitif';
+      (function(_c,_l){hsBtn2.onclick=function(){marquerImmoInactive(_c,_l,'Hors service définitif');};})(codeIM,l);actDiv.appendChild(hsBtn2);
+      var volBtn2=document.createElement('button');volBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#4A148C;color:#fff';volBtn2.textContent='🚨 Volé';
+      (function(_c,_l){volBtn2.onclick=function(){declarerVol(_c,_l,'Volé');};})(codeIM,l);actDiv.appendChild(volBtn2);
+      var dispBtn2=document.createElement('button');dispBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#37474F;color:#fff';dispBtn2.textContent='🔍 Disparu';
+      (function(_c,_l){dispBtn2.onclick=function(){declarerVol(_c,_l,'Disparu');};})(codeIM,l);actDiv.appendChild(dispBtn2);
     }
   }catch(e){body.innerHTML='<p style="color:var(--red);padding:20px">Erreur : '+e.message+'</p>';}
 }
