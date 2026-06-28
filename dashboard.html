@@ -186,9 +186,11 @@ tr:hover td{background:#FAFBFC;}
 /* ── Responsive ── */
 @media(max-width:768px){
   :root{--sidebar:0px;}
-  #sidebar{display:none;}
-  #main{margin-left:0;}
-  #action-banner{margin-left:0;}
+  #hamburger{display:block!important;}
+  #sidebar{transform:translateX(-100%);transition:transform .25s ease;width:240px;box-shadow:4px 0 20px rgba(0,0,0,.3);}
+  #sidebar.open{transform:translateX(0);}
+  #main{margin-left:0!important;}
+  #action-banner{margin-left:0!important;}
 }
 </style>
 </head>
@@ -210,6 +212,7 @@ tr:hover td{background:#FAFBFC;}
 <div id="header">
   <img src="logo.png" alt="ES" onerror="this.style.display='none'">
   <h1>Immo Tracker — Espace Soleil</h1>
+  <button id="hamburger" onclick="toggleSidebar()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;display:none">☰</button>
   <div id="header-actions">
     <span id="last-upd"></span>
     <button id="btn-export" onclick="exportExcel()">📥 Excel</button>
@@ -239,6 +242,7 @@ tr:hover td{background:#FAFBFC;}
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
   <div class="nav-item" data-tab="analyses"><span class="nav-icon">📈</span><span class="nav-label">Analyses</span></div>
 </nav>
+<div id="sidebar-overlay" onclick="closeSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:89"></div>
 
 <!-- Bandeau alertes -->
 <div id="action-banner"><span style="font-size:11px;font-weight:800;color:var(--orange);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px">Actions requises</span><div id="ab-items" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
@@ -424,7 +428,9 @@ function renderTab(name){
     case 'vue-generale':   renderVueGenerale(); break;
     case 'circulation':    renderCirc(); break;
     case 'depot':          renderDepot(); break;
-    case 'historique':     break; // On demand
+    case 'historique':
+      if(!dataLoaded.historique){dataLoaded.historique=true;autoLoadHist();}
+      break;
     case 'transferts':     renderTransferts(); break;
     case 'reservations':   renderResa(); break;
     case 'documents':      if(!dataLoaded.docs)loadDocs(); else renderDocs(); break;
