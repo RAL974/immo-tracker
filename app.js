@@ -271,19 +271,39 @@ async function majBadgeTransferts() {
 
 async function majBadgeResas() {
   if (!S.employe) return;
+  const isAdmin = CONFIG.admins.includes(S.employe.code);
   try {
-    const r = await fetch(CONFIG.proxy + '?mes_reservations=' + S.employe.code);
-    const d = await r.json();
-    const actives  = (d || []).filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee');
-    const retards  = actives.filter(r => r.statut === 'En retard');
-    const el = document.getElementById('badge-resa');
-    if (el) {
-      const n = actives.length;
-      if (n > 0) {
-        el.textContent = n;
-        el.style.background = retards.length > 0 ? 'var(--red)' : 'var(--orange)';
-        el.classList.remove('hidden');
-      } else { el.classList.add('hidden'); }
+    let resas;
+    if (isAdmin) {
+      // Admin/CONI : charger TOUTES les réservations, compter les "Demandee"
+      const r = await fetch(CONFIG.proxy + '?reservations=1');
+      resas = await r.json();
+      const demandees = resas.filter(function(r) { return r.statut === 'Demandee'; }).length;
+      const retards   = resas.filter(function(r) { return r.statut === 'En retard'; }).length;
+      const el = document.getElementById('badge-resa');
+      if (el) {
+        const total = demandees + retards;
+        if (total > 0) {
+          el.textContent = total;
+          el.style.background = retards > 0 ? 'var(--red)' : 'var(--orange)';
+          el.classList.remove('hidden');
+        } else { el.classList.add('hidden'); }
+      }
+    } else {
+      // Utilisateur : ses propres réservations actives
+      const r = await fetch(CONFIG.proxy + '?mes_reservations=' + S.employe.code);
+      resas = await r.json();
+      const actives = resas.filter(function(r) { return r.statut !== 'Rendue' && r.statut !== 'Annulee'; });
+      const retards = actives.filter(function(r) { return r.statut === 'En retard'; });
+      const el = document.getElementById('badge-resa');
+      if (el) {
+        const n = actives.length;
+        if (n > 0) {
+          el.textContent = n;
+          el.style.background = retards.length > 0 ? 'var(--red)' : 'var(--orange)';
+          el.classList.remove('hidden');
+        } else { el.classList.add('hidden'); }
+      }
     }
   } catch (e) {}
 }
@@ -524,7 +544,11 @@ async function afficherTransfertsEnAttente() {
         <br><button class="btn btn-secondary" style="margin-top:8px;font-size:14px;padding:10px"
           onclick="demarrerValidation('${t.id}','${t.code_im}')">📷 Scanner pour valider</button>
       </div>`).join('');
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>'; }
+  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>'; return; }
+  // Attacher boutons panne
+  document.querySelectorAll('.btn-panne-mat').forEach(function(btn) {
+    btn.onclick = function() { signalerPannePWA(btn.dataset.cim); };
+  });
 }
 
 function demarrerValidation(tid, codeIM) {
@@ -563,11 +587,19 @@ async function afficherMonMateriel() {
     div.innerHTML = items.map(m => {
       const u = fdsUrl(m.code_im);
       const fdsBtn = u ? `<a href="${u}" target="_blank" style="font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;margin-left:6px">📄 FDS</a>` : '';
+      const code_snap = m.code_im;
+      const libelle_snap = lib(m.code_im);
       return `<div class="materiel-card">
-        <strong>${lib(m.code_im)}</strong>${fdsBtn}<br>
-        <span class="chantier-tag">${m.code_im}</span>
+        <strong>${libelle_snap}</strong>${fdsBtn}<br>
+        <span class="chantier-tag">${code_snap}</span>
         ${ebadge(m.etat)} <small style="color:var(--grey)">${fmt(m.horodatage)}</small>
         ${m.note ? `<br><small style="color:var(--grey)">📝 ${m.note}</small>` : ''}
+        <div style="margin-top:8px">
+          <button class="btn-panne-mat" data-cim="${code_snap}"
+            style="padding:6px 12px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;width:100%">
+            📢 Signaler une panne sur ${libelle_snap}
+          </button>
+        </div>
       </div>`;
     }).join('');
   } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>'; }
@@ -1025,6 +1057,44 @@ async function validerModifResa() {
     resaEnCoursId = null;
     showScreen('screen-mes-reservations');
   } catch (e) { toast('Erreur', 'error'); }
+}
+
+// ── Déclarer une panne depuis la PWA ────────────────────────────────────
+async function signalerPannePWA(codeIM) {
+  const libIM = lib(codeIM);
+  const motif = prompt('Signaler une panne sur ' + libIM + ' (' + codeIM + ')\nDécrivez brièvement le problème (obligatoire, 5 car. min.) :');
+  if (!motif || motif.trim().length < 5) {
+    toast('Motif obligatoire pour signaler une panne', 'error');
+    return;
+  }
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=declarer_panne', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code_im: codeIM,
+        code_employe: S.employe.code,
+        nom_employe: S.employe.nom,
+        motif: motif.trim() + ' [signalé par ' + S.employe.nom + ']',
+      }),
+    });
+    const d = await r.json();
+    if (d.success !== false) {
+      vib(300);
+      toast('📢 Panne signalée — la logistique est notifiée', 'success', 4000);
+      // Afficher un écran de confirmation
+      document.getElementById('recap').innerHTML =
+        '<strong>📢 Panne signalée</strong><br>' +
+        '<strong>Immo :</strong> ' + libIM + ' (' + codeIM + ')<br>' +
+        '<strong>Signalé par :</strong> ' + S.employe.nom + '<br>' +
+        '<strong>Motif :</strong> ' + motif + '<br>' +
+        '<em style="color:var(--grey)">La logistique va être contactée pour intervention.</em>';
+      document.getElementById('alerte-degradation')?.classList.add('hidden');
+      showScreen('screen-confirmation');
+      rafraichirBadges();
+    } else {
+      toast('Erreur lors du signalement', 'error');
+    }
+  } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
 }
 
 // ══════════════════════════════════════════════════════════
