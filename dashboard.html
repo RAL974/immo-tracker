@@ -653,13 +653,26 @@ function updateBadgesResa(){
 function renderVueGenerale(){
   if(!d)return;
   var s=d.stats;
+  // Compter pannes depuis les mouvements
+  var now_ts=Date.now();
+  var panneCodes={};var resolvedCodes={};
+  (d.all_movements||[]).forEach(function(m){
+    if(m.type_mouvement==='Panne')panneCodes[m.code_im]=(panneCodes[m.code_im]||[]).concat([m]);
+    if(m.type_mouvement==='Réparation')resolvedCodes[m.code_im]=(resolvedCodes[m.code_im]||[]).concat([m]);
+  });
+  var nbPannes=Object.keys(panneCodes).filter(function(c){var lastPanne=panneCodes[c][0];var lastRepare=resolvedCodes[c]?resolvedCodes[c][0]:null;return!lastRepare||(new Date(lastPanne.horodatage)>new Date(lastRepare.horodatage));}).length;
+  var nbHSDef=(d.all_movements||[]).filter(function(m){return m.type_mouvement==='Archivage'&&m.etat==='Hors service définitif';}).map(function(m){return m.code_im;}).filter(function(v,i,a){return a.indexOf(v)===i;}).length;
+  var nbPerdus=(d.all_movements||[]).filter(function(m){return m.type_mouvement==='Archivage'&&m.etat==='Perdu';}).map(function(m){return m.code_im;}).filter(function(v,i,a){return a.indexOf(v)===i;}).length;
   var kpis=[
     {ic:'📦',v:s.total_mouvementes,l:'Immos tracées',cl:'blue',tab:'depot'},
     {ic:'🔄',v:s.en_circulation,l:'En circulation',cl:'orange',tab:'circulation'},
     {ic:'🏭',v:s.au_depot,l:'Au dépôt',cl:'green',tab:'depot'},
     {ic:'⏱',v:s.moyenne_jours_hors_depot+'j',l:'Durée moy. hors dépôt',cl:'grey',tab:'analyses'},
     {ic:'📦',v:s.transferts_en_attente,l:'Transferts en attente',cl:s.transferts_en_attente>0?'yellow':'green',tab:'transferts'},
-    {ic:'🔴',v:s.hors_service,l:'Hors service',cl:s.hors_service>0?'red':'green',tab:'alertes'},
+    {ic:'🔴',v:s.hors_service,l:'Hors service (actuel)',cl:s.hors_service>0?'red':'green',tab:'alertes'},
+    {ic:'📢',v:nbPannes,l:'En panne',cl:nbPannes>0?'red':'green',tab:'alertes'},
+    {ic:'⚫',v:nbHSDef,l:'HS définitif',cl:nbHSDef>0?'grey':'green',tab:'analyses'},
+    {ic:'❌',v:nbPerdus,l:'Perdues',cl:nbPerdus>0?'red':'green',tab:'analyses'},
   ];
   document.getElementById('kpi-grid').innerHTML=kpis.map(function(k){return'<div class="kpi '+k.cl+'" onclick="goTab(\''+k.tab+'\')"><div style="font-size:18px;margin-bottom:6px">'+k.ic+'</div><div class="kv">'+k.v+'</div><div class="kl">'+k.l+'</div></div>';}).join('');
   var eList=[{k:'Neuf',c:'neuf',i:'⭐'},{k:'Bon état',c:'bon',i:'✅'},{k:'Usé',c:'use',i:'🔶'},{k:'Abîmé',c:'abime',i:'⚠️'},{k:'Hors service',c:'hs',i:'🔴'},{k:'Inconnu',c:'inc',i:'❓'}];
@@ -974,11 +987,14 @@ function renderAnalyse(){
   html+='</tbody></table></div></div>';
 
   // ── Top demandeurs (volume de mouvements) ─────────────────────────────────
-  var empFreq={};var empNom={};all.forEach(function(m){empFreq[m.code_employe]=(empFreq[m.code_employe]||0)+1;empNom[m.code_employe]=m.nom_employe;});
+  var empFreq={};var empNom={};
+  all.forEach(function(m){empFreq[m.code_employe]=(empFreq[m.code_employe]||0)+1;empNom[m.code_employe]=m.nom_employe;});
+  // Ajouter les réservations dans le décompte
+  reservations.forEach(function(r){if(r.code_employe&&r.statut!=='Annulee'){empFreq[r.code_employe]=(empFreq[r.code_employe]||0)+1;if(!empNom[r.code_employe])empNom[r.code_employe]=r.nom_employe;}});
   var topEmp=Object.keys(empFreq).sort(function(a,b){return empFreq[b]-empFreq[a];}).slice(0,10);
-  html+='<div class="card"><div class="card-head"><h3>👷 Top demandeurs (volume)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Code</th><th>Mouvements</th></tr></thead><tbody>';
-  topEmp.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);
-    html+='<tr><td>'+m+'</td><td><span class="link-emp" data-emp="'+code+'" data-nom="'+empNom[code].replace(/"/g,'')+'">'+empNom[code]+'</span></td><td style="font-size:11px;color:var(--grey)">'+code+'</td><td><b>'+empFreq[code]+'</b></td></tr>';
+  html+='<div class="card"><div class="card-head"><h3>👷 Top demandeurs (mouvements + réservations)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Code</th><th>Total actions</th></tr></thead><tbody>';
+  topEmp.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);var nom=empNom[code]||code;
+    html+='<tr><td>'+m+'</td><td><span class="link-emp" data-emp="'+code+'" data-nom="'+nom.replace(/"/g,'')+'">'+nom+'</span></td><td style="font-size:11px;color:var(--grey)">'+code+'</td><td><b>'+empFreq[code]+'</b></td></tr>';
   });
   html+='</tbody></table></div></div>';
 
@@ -994,7 +1010,7 @@ function renderAnalyse(){
   var catTotal={};var catCirc={};
   inv.forEach(function(i){var c=getCat(i.code_im)||'Sans catégorie';catTotal[c]=(catTotal[c]||0)+1;if(i.statut==='En circulation')catCirc[c]=(catCirc[c]||0)+1;});
   html+='<div class="card"><div class="card-head"><h3>📈 Taux d utilisation par catégorie</h3></div><div style="padding:12px">';
-  Object.keys(catTotal).sort().forEach(function(c){var tot=catTotal[c];var circ=catCirc[c]||0;var pct=Math.round(circ/tot*100);
+  Object.keys(catTotal).sort(function(a,b){var pa=Math.round((catCirc[a]||0)/catTotal[a]*100);var pb=Math.round((catCirc[b]||0)/catTotal[b]*100);return pb-pa;}).forEach(function(c){var tot=catTotal[c];var circ=catCirc[c]||0;var pct=Math.round(circ/tot*100);
     html+='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+c+'</span><span><b>'+circ+'</b>/'+tot+' ('+pct+'%)</span></div><div style="background:#eee;border-radius:4px;height:6px"><div style="background:var(--orange);width:'+pct+'%;height:6px;border-radius:4px"></div></div></div>';
   });
   html+='</div></div>';
@@ -1246,6 +1262,40 @@ function ouvrirModifTransfert(tid,cim,recCode,recNom){
       fetch(W+'?action=maj_transfert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_employe_receveur:newRec,nom_receveur:newNom,note:note})}).then(function(){fermerAction();renderTransferts();});
     }else{fermerAction();}
   };
+}
+
+
+// ── Gestion statut immo (panne, HS, perdu) ──────────────────────────────
+function declarerPanneDash(codeIM){
+  var motif=prompt('Motif de la panne pour ' + getLib(codeIM) + ' :');
+  if(!motif||motif.trim().length<5){alert('Le motif est obligatoire (5 caractères min.)');return;}
+  if(!confirm('Déclarer une panne sur ' + codeIM + ' ? Motif : "' + motif + '"'))return;
+  fetch(W+'?action=declarer_panne',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code_im:codeIM,code_employe:'ADMIN',nom_employe:'Dashboard Admin',motif:motif})})
+    .then(function(){fermerFiche();refreshAll();alert('✅ Panne déclarée. Immo marquée "En panne".');})
+    .catch(function(e){alert('Erreur : '+e.message);});
+}
+
+function marquerImmoInactive(codeIM,libelle,type){
+  var motif=prompt('Motif pour ' + codeIM + ' [' + type + '] - min 10 car. :');
+  if(!motif||motif.trim().length<10){alert('Motif obligatoire, 10 car. minimum.');return;}
+  if(!confirm('1ere CONFIRMATION : Marquer ' + codeIM + ' comme [' + type + '] ? Cette action exclut l immo des reservations.'))return;
+  if(!confirm('CONFIRMATION FINALE IRREVERSIBLE : Confirmer definitvement le statut [' + type + '] pour ' + codeIM + ' ?'))return;
+  fetch(W+'?action=marquer_statut_immo',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'ADMIN',par_nom:'Dashboard Admin'})})
+    .then(function(){fermerFiche();refreshAll();alert('✅ Immo marquée comme ' + type + '.');})
+    .catch(function(e){alert('Erreur : '+e.message);});
+}
+
+function resoudrePanne(codeIM){
+  var etat=prompt('Etat de l immo ' + codeIM + ' apres reparation :', 'Bon état');
+  if(!etat)return;
+  var note=prompt('Note de resolution (optionnel) :', '') || '';
+  if(!confirm('Panne resolue sur ' + codeIM + ' ? Nouvel etat : ' + etat))return;
+  fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:'CONI',par_nom:'CONI'})})
+    .then(function(){fermerFiche();refreshAll();alert('✅ Panne résolue !');})
+    .catch(function(e){alert('Erreur : '+e.message);});
 }
 
 // Actualisation auto toutes les 5 min
