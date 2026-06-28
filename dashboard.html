@@ -199,7 +199,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
           <input type="text" id="hist-q" placeholder="Code immo (ex: 328) ou nom employe...">
           <button onclick="searchHist()">Rechercher</button>
         </div>
-        <div style="overflow-x:auto"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libelle</th><th>Type</th><th>Employe</th><th>Etat</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libelle</th><th>Type</th><th>Employe</th><th>Donneur</th><th>Etat</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
       </div>
     </div>
 
@@ -476,8 +476,17 @@ function searchHist(){
   var all=d.all_movements||[];
   var res=all.filter(function(m){return m.code_im.toUpperCase().includes(q)||m.code_employe.toUpperCase().includes(q)||m.nom_employe.toUpperCase().includes(q);});
   document.getElementById('tb-hist').innerHTML=res.length===0?'<tr><td colspan="7" class="es">Aucun résultat.</td></tr>':
-    res.map(function(m){var lib=im[m.code_im]?im[m.code_im].Libelle||'':'';var icon=m.type_mouvement==='Retour'?'📥':m.type_mouvement==='Transfert'?'🔄':'📤';
-      return'<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td><td class="icode">'+m.code_im+'</td><td style="font-size:12px">'+lib+'</td><td>'+icon+' '+m.type_mouvement+'</td><td><b style="font-size:12px">'+m.nom_employe+'</b><br><span style="font-size:10px;color:var(--grey)">'+m.code_employe+'</span></td><td>'+ebadge(m.etat||'')+'</td><td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
+    res.map(function(m){
+      var lib=im[m.code_im]?im[m.code_im].Libelle||'':'';
+      var icon=m.type_mouvement==='Retour'?'📥':m.type_mouvement==='Transfert'?'🔄':'📤';
+      var donneur='—';
+      if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){
+        donneur=m.code_chantier.split('|')[1]||'—';
+      }
+      return '<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td><td class="icode">'+m.code_im+'</td><td style="font-size:12px">'+lib+'</td><td>'+icon+' '+m.type_mouvement+'</td>'+
+        '<td><b style="font-size:12px">'+m.nom_employe+'</b><br><span style="font-size:10px;color:var(--grey)">'+m.code_employe+'</span></td>'+
+        '<td style="font-size:12px;color:var(--grey)">'+donneur+'</td>'+
+        '<td>'+ebadge(m.etat||'')+'</td><td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
     }).join('');
 }
 
