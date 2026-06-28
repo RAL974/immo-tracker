@@ -32,6 +32,7 @@
     <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-immo')">🔍 Suivi immo</button>
     <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-employe')">👤 Suivi employé</button>
     <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-admin')">⚙️ Administration</button>
+    <button class="btn btn-link" onclick="showScreen('screen-mes-reservations')">📅 Mes réservations <span id="badge-resa-retard" class="btn-badge-count hidden" style="background:var(--red,#E74C3C)"></span></button>
     <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
     <button class="btn btn-link" onclick="showScreen('screen-activation')">Première utilisation ?</button>
   </div>
@@ -208,3 +209,42 @@
   <script src="app.js"></script>
 </body>
 </html>
+
+  <!-- ÉCRAN : Réservation -->
+  <div id="screen-reserver" class="screen">
+    <img src="logo.png" alt="ES" class="logo-img-small">
+    <h2>📅 Réserver une immo</h2>
+    <p id="resa-immo-info" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
+    <label class="field-label">Immo à réserver</label>
+    <div style="display:flex;gap:8px;width:100%">
+      <input type="text" id="resa-immo-search" class="select-input" style="flex:1" placeholder="Code IM ou libellé..." oninput="rechercherImmoResa()">
+      <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourResa()">📷</button>
+    </div>
+    <div id="resa-immo-suggestions" class="liste-materiel"></div>
+    <label class="field-label">Date de départ</label>
+    <input type="date" id="resa-date-debut" class="select-input">
+    <label class="field-label">Date de retour prévue</label>
+    <input type="date" id="resa-date-fin" class="select-input">
+    <label class="field-label">Chantier concerné (optionnel)</label>
+    <input type="text" id="resa-chantier" class="select-input" placeholder="Nom ou code du chantier...">
+    <label class="field-label">Note (optionnel)</label>
+    <textarea id="resa-note" class="note-textarea" placeholder="Précisions sur l'utilisation prévue..."></textarea>
+    <button class="btn btn-primary" onclick="soumettreReservation()">✅ Envoyer la demande</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
+
+  <!-- ÉCRAN : Mes réservations -->
+  <div id="screen-mes-reservations" class="screen">
+    <h2>📅 Mes réservations</h2>
+    <div id="mes-resa-liste" class="liste-materiel"></div>
+    <button class="btn btn-primary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+  </div>
+
+  <!-- ÉCRAN : Scanner pour réservation -->
+  <div id="screen-scan-resa" class="screen">
+    <h2>Scanner une immo</h2>
+    <p>Scanne le QR code du matériel à réserver</p>
+    <div id="scanner-resa" class="scanner-box"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-reserver')">Annuler</button>
+  </div>
