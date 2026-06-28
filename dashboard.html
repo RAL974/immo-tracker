@@ -297,7 +297,7 @@ function fmtD(s){if(!s)return'—';return new Date(s).toLocaleDateString('fr-FR'
 function fmtDT(s){if(!s)return'—';return new Date(s).toLocaleString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function getFdsUrl(fv,code){if(!fv)return'';if(!fv.startsWith('http'))return W+'?fds='+encodeURIComponent(code);if(fv.includes('sharepoint.com'))return W+'?fds='+encodeURIComponent(code);return fv;}
 function ebadge(e){var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh'};return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';}
-function rsLabel(s){return'<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:'+(SCOL[s]||'#999')+'22;color:'+(SCOL[s]||'#999')+'">'+(SLAB[s]||s)+'</span>';}
+function rsLabel(s){var c=SCOL[s]||'#999';var l=SLAB[s]||s;return '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:'+c+'22;color:'+c+'">'+l+'</span>';}
 
 // ── Chargement initial : dashboard seulement ──────────────────────
 async function loadDashboard(){
@@ -488,43 +488,108 @@ function renderResa(){
   var q=(document.getElementById('resa-q').value||'').toUpperCase();
   var sf=document.getElementById('resa-statut').value;
   var data=reservations.filter(function(r){
-    return(!q||(r.code_im.includes(q)||r.nom_employe.toUpperCase().includes(q)||(r.nom_chantier||'').toUpperCase().includes(q)||(im[r.code_im]&&(im[r.code_im].Libelle||'').toUpperCase().includes(q))))&&(!sf||r.statut===sf);
+    var lib=im[r.code_im]?im[r.code_im].Libelle||'':'';
+    return(!q||(r.code_im.includes(q)||r.nom_employe.toUpperCase().includes(q)||(r.nom_chantier||'').toUpperCase().includes(q)||lib.toUpperCase().includes(q)))&&(!sf||r.statut===sf);
   });
-  // Trier : retards en premier, puis demandées, puis autres
   var order={'En retard':0,'Demandee':1,'Confirmee':2,'En cours':3,'Rendue':4,'Annulee':5};
-  data.sort(function(a,b){return (order[a.statut]||9)-(order[b.statut]||9);});
-  // Sous-totaux
-  var counts={};reservations.forEach(function(r){counts[r.statut]=(counts[r.statut]||0)+1;});
-  document.getElementById('resa-stats').innerHTML=Object.keys(counts).map(function(s){
-    return'<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:12px;font-weight:700;background:'+(SCOL[s]||'#999')+'22;color:'+(SCOL[s]||'#999');})+'cursor:pointer" onclick="document.getElementById(\'resa-statut\').value=\''+s+'\';renderResa()">'+
-      (SLAB[s]||s)+' <span style="background:'+(SCOL[s]||'#999')+';color:white;border-radius:10px;padding:1px 6px">'+counts[s]+'</span></span>';
-  }).join('');
-  // Gantt 6 semaines
+  data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9);});
+  var counts={};
+  reservations.forEach(function(r){counts[r.statut]=(counts[r.statut]||0)+1;});
+  var statsHtml='';
+  Object.keys(counts).forEach(function(s){
+    var col=SCOL[s]||'#999';
+    var lbl=SLAB[s]||s;
+    var span=document.createElement('span');
+    span.style.cssText='display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:12px;font-weight:700;background:'+col+'22;color:'+col+';cursor:pointer';
+    span.innerHTML=lbl+' <span style="background:'+col+';color:white;border-radius:10px;padding:1px 6px">'+counts[s]+'</span>';
+    span.setAttribute('data-statut',s);
+    span.onclick=function(){document.getElementById('resa-statut').value=this.getAttribute('data-statut');renderResa();};
+    document.getElementById('resa-stats').appendChild(span);
+  });
   var today=new Date(),lundi=new Date(today);
   lundi.setDate(today.getDate()-((today.getDay()+6)%7));lundi.setHours(0,0,0,0);
-  var NB=42;var joursFR=['L','M','M','J','V','S','D'];var moisFR=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-  var cols=[];for(var ci=0;ci<NB;ci++){var dd=new Date(lundi.getTime()+ci*86400000);cols.push(dd);}
+  var NB=42;
+  var joursFR=['L','M','M','J','V','S','D'];
+  var moisFR=['Jan','Fev','Mar','Avr','Mai','Jun','Jul','Aou','Sep','Oct','Nov','Dec'];
+  var cols=[];
+  for(var ci=0;ci<NB;ci++){cols.push(new Date(lundi.getTime()+ci*86400000));}
   var periodeDebut=lundi,periodeFin=new Date(lundi.getTime()+NB*86400000);
-  var ganttData=reservations.filter(function(r){if(!r.date_debut&&!r.date_fin)return false;var rd=r.date_debut?new Date(r.date_debut):periodeDebut;var rf=r.date_fin?new Date(r.date_fin):periodeFin;return!(rf<periodeDebut||rd>periodeFin);});
-  var gh='<table style="border-collapse:collapse;font-size:11px"><thead><tr><th style="padding:3px 8px;text-align:left;min-width:140px;position:sticky;left:0;background:white;z-index:1">Immo</th>';
-  var lastM=-1;cols.forEach(function(dd,i){if(dd.getMonth()!==lastM){var span=cols.filter(function(c){return c.getMonth()===dd.getMonth();}).length;gh+='<th colspan="'+span+'" style="padding:2px 4px;background:#F0F4F8;color:var(--blue);font-weight:700;text-align:center;border:1px solid #ddd">'+moisFR[dd.getMonth()]+' '+dd.getFullYear()+'</th>';lastM=dd.getMonth();}});
+  var ganttData=reservations.filter(function(r){
+    if(!r.date_debut&&!r.date_fin)return false;
+    var rd=r.date_debut?new Date(r.date_debut):periodeDebut;
+    var rf=r.date_fin?new Date(r.date_fin):periodeFin;
+    return!(rf<periodeDebut||rd>periodeFin);
+  });
+  var gh='<table style="border-collapse:collapse;font-size:11px"><thead><tr>';
+  gh+='<th style="padding:3px 8px;text-align:left;min-width:140px;position:sticky;left:0;background:white;z-index:1">Immo</th>';
+  var lastM=-1;
+  cols.forEach(function(dd){
+    if(dd.getMonth()!==lastM){
+      var span=cols.filter(function(c){return c.getMonth()===dd.getMonth();}).length;
+      gh+='<th colspan="'+span+'" style="padding:2px 4px;background:#F0F4F8;color:var(--blue);font-weight:700;text-align:center;border:1px solid #ddd">'+moisFR[dd.getMonth()]+' '+dd.getFullYear()+'</th>';
+      lastM=dd.getMonth();
+    }
+  });
   gh+='</tr><tr><th style="position:sticky;left:0;background:white;z-index:1"></th>';
-  cols.forEach(function(dd){var isT=dd.toDateString()===today.toDateString();var isW=dd.getDay()===0||dd.getDay()===6;gh+='<th style="padding:2px 1px;text-align:center;width:20px;min-width:20px;'+(isT?'background:var(--orange);color:white;border-radius:3px;':isW?'color:#ccc;':'color:var(--grey);')+'">'+joursFR[(dd.getDay()+6)%7]+'<br>'+dd.getDate()+'</th>';});
+  cols.forEach(function(dd){
+    var isT=dd.toDateString()===today.toDateString();
+    var isW=dd.getDay()===0||dd.getDay()===6;
+    var style=isT?'background:var(--orange);color:white;border-radius:3px;':isW?'color:#ccc;':'color:var(--grey);';
+    gh+='<th style="padding:2px 1px;text-align:center;width:20px;min-width:20px;'+style+'">'+joursFR[(dd.getDay()+6)%7]+'<br>'+dd.getDate()+'</th>';
+  });
   gh+='</tr></thead><tbody>';
-  if(ganttData.length===0){gh+='<tr><td colspan="'+(NB+1)+'" class="es">Aucune réservation sur cette période.</td></tr>';}
-  else{ganttData.forEach(function(r){var lib=im[r.code_im]?(im[r.code_im].Libelle||r.code_im).substring(0,20):(r.code_im||'—');var col=SCOL[r.statut]||'#999';gh+='<tr><td style="padding:3px 8px;white-space:nowrap;position:sticky;left:0;background:white;border-right:1px solid #eee;z-index:1"><span style="font-size:11px">'+lib+'</span><br><span style="font-size:10px;color:var(--grey)">'+r.nom_employe+'</span></td>';cols.forEach(function(dd){var isW=dd.getDay()===0||dd.getDay()===6;var isT=dd.toDateString()===today.toDateString();var deb=r.date_debut?new Date(r.date_debut):null;var fin=r.date_fin?new Date(r.date_fin):null;var debJ=deb?new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()):null;var finJ=fin?new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()):null;var inR=debJ&&finJ&&dd>=debJ&&dd<=finJ;var bg=inR?col:(isW?'#F8F8F8':'transparent');gh+='<td style="width:20px;min-width:20px;padding:2px;background:'+bg+';border:'+(isT?'2px solid var(--orange)':'1px solid #f0f0f0')+'" title="'+(inR?rsLabel(r.statut):'')+'"></td>';});gh+='</tr>';});}
+  if(ganttData.length===0){
+    gh+='<tr><td colspan="'+(NB+1)+'" class="es">Aucune reservation sur cette periode.</td></tr>';
+  }else{
+    ganttData.forEach(function(r){
+      var lib2=im[r.code_im]?(im[r.code_im].Libelle||r.code_im).substring(0,20):(r.code_im||'');
+      var col=SCOL[r.statut]||'#999';
+      gh+='<tr><td style="padding:3px 8px;white-space:nowrap;position:sticky;left:0;background:white;border-right:1px solid #eee;z-index:1"><span style="font-size:11px">'+lib2+'</span><br><span style="font-size:10px;color:var(--grey)">'+r.nom_employe+'</span></td>';
+      cols.forEach(function(dd){
+        var isT2=dd.toDateString()===today.toDateString();
+        var isW2=dd.getDay()===0||dd.getDay()===6;
+        var deb=r.date_debut?new Date(r.date_debut):null;
+        var fin=r.date_fin?new Date(r.date_fin):null;
+        var debJ=deb?new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()):null;
+        var finJ=fin?new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()):null;
+        var inR=debJ&&finJ&&dd>=debJ&&dd<=finJ;
+        var bg=inR?col:(isW2?'#F8F8F8':'transparent');
+        var brd=isT2?'2px solid var(--orange)':'1px solid #f0f0f0';
+        gh+='<td style="width:20px;min-width:20px;padding:2px;background:'+bg+';border:'+brd+'"></td>';
+      });
+      gh+='</tr>';
+    });
+  }
   gh+='</tbody></table>';
   document.getElementById('resa-gantt').innerHTML=gh;
-  document.getElementById('cnt-resa').textContent=data.length+' réservations';
-  document.getElementById('tb-resa').innerHTML=data.length===0?'<tr><td colspan="8" class="es">Aucune réservation.</td></tr>':
-    data.map(function(r){var lib=im[r.code_im]?im[r.code_im].Libelle||r.code_im:r.code_im;var isUrgent=r.statut==='En retard';var isDemandee=r.statut==='Demandee';
-      return'<tr class="'+(isUrgent?'urgent-row':isDemandee?'arow':'')+'"><td>'+rsLabel(r.statut)+'</td><td class="icode">'+r.code_im+'</td><td style="font-size:12px">'+lib+'</td><td style="font-size:12px"><b>'+r.nom_employe+'</b></td><td style="font-size:12px">'+(r.nom_chantier||'—')+'</td><td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td><td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_fin)+'</td><td><select onchange="majStatutResa(\''+r.id+'\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Changer...</option><option value="Confirmee">Confirmer</option><option value="Annulee">Annuler</option><option value="Rendue">Rendue</option></select></td></tr>';
-    }).join('');
+  document.getElementById('cnt-resa').textContent=data.length+' reservations';
+  var tbHtml='';
+  if(data.length===0){
+    tbHtml='<tr><td colspan="8" class="es">Aucune reservation.</td></tr>';
+  }else{
+    data.forEach(function(r){
+      var lib3=im[r.code_im]?im[r.code_im].Libelle||r.code_im:r.code_im;
+      var isU=r.statut==='En retard';
+      var isD=r.statut==='Demandee';
+      var rc=isU?'urgent-row':isD?'arow':'';
+      tbHtml+='<tr class="'+rc+'">';
+      tbHtml+='<td>'+rsLabel(r.statut)+'</td>';
+      tbHtml+='<td class="icode">'+r.code_im+'</td>';
+      tbHtml+='<td style="font-size:12px">'+lib3+'</td>';
+      tbHtml+='<td style="font-size:12px"><b>'+r.nom_employe+'</b></td>';
+      tbHtml+='<td style="font-size:12px">'+(r.nom_chantier||'')+'</td>';
+      tbHtml+='<td style="font-size:11px">'+fmtD(r.date_debut)+'</td>';
+      tbHtml+='<td style="font-size:11px">'+fmtD(r.date_fin)+'</td>';
+      tbHtml+='<td><select data-rid="'+r.id+'" onchange="majStatutResa(this.dataset.rid,this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Changer...</option><option value="Confirmee">Confirmer</option><option value="Annulee">Annuler</option><option value="Rendue">Rendue</option></select></td>';
+      tbHtml+='</tr>';
+    });
+  }
+  document.getElementById('tb-resa').innerHTML=tbHtml;
 }
 
 async function majStatutResa(id,statut){
   if(!statut)return;
-  await fetch(W+'?action=statut_resa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,statut})});
+  await fetch(W+'?action=statut_resa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,statut:statut})});
   await loadReservations();renderResa();
 }
 
