@@ -184,13 +184,20 @@ tr:hover td{background:#FAFBFC;}
 .fact-btns button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;}
 
 /* ── Responsive ── */
+#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--blue);z-index:200;flex-direction:row;border-top:1px solid rgba(255,255,255,.15);overflow-x:auto;}
+.bnav-item{flex:1;min-width:52px;padding:6px 4px;color:rgba(255,255,255,.65);text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background .15s;}
+.bnav-item .bi{font-size:18px;line-height:1;}
+.bnav-item span:last-child{font-size:9px;margin-top:2px;white-space:nowrap;}
+.bnav-item.active{color:#fff;background:rgba(255,255,255,.18);}
+.bnav-item:hover{background:rgba(255,255,255,.12);}
 @media(max-width:768px){
   :root{--sidebar:0px;}
-  #hamburger{display:block!important;}
-  #sidebar{transform:translateX(-100%);transition:transform .25s ease;width:240px;box-shadow:4px 0 20px rgba(0,0,0,.3);}
-  #sidebar.open{transform:translateX(0);}
-  #main{margin-left:0!important;}
+  #hamburger{display:none!important;}
+  #sidebar{display:none;}
+  #bottom-nav{display:flex;}
+  #main{margin-left:0!important;padding-bottom:64px;}
   #action-banner{margin-left:0!important;}
+  #header h1{font-size:12px;}
 }
 </style>
 </head>
@@ -264,7 +271,7 @@ tr:hover td{background:#FAFBFC;}
     <h3 id="act-titre">Action</h3>
     <div id="act-form"></div>
     <div class="fact-btns">
-      <button style="background:var(--orange);color:#fff" onclick="soumettreAction()">✅ Confirmer</button>
+      <button id="act-confirm-btn" style="background:var(--orange);color:#fff">✅ Confirmer</button>
       <button style="background:#eee;color:#444" onclick="fermerAction()">Annuler</button>
     </div>
   </div>
@@ -396,6 +403,27 @@ tr:hover td{background:#FAFBFC;}
   </div>
 </div>
 
+<!-- Bottom Navigation Mobile -->
+<nav id="bottom-nav">
+  <div class="bnav-item active" data-tab="vue-generale" onclick="goTabMobile(this)"><span class="bi">📊</span><span>Général</span></div>
+  <div class="bnav-item" data-tab="circulation" onclick="goTabMobile(this)"><span class="bi">🔄</span><span>Circ.</span></div>
+  <div class="bnav-item" data-tab="transferts" onclick="goTabMobile(this)"><span class="bi">📦</span><span id="bnb-t">Transf.</span></div>
+  <div class="bnav-item" data-tab="reservations" onclick="goTabMobile(this)"><span class="bi">📅</span><span id="bnb-r">Résas</span></div>
+  <div class="bnav-item" data-tab="alertes" onclick="goTabMobile(this)"><span class="bi">⚠️</span><span>Alertes</span></div>
+  <div class="bnav-item" onclick="openMobileMenu()"><span class="bi">☰</span><span>Plus</span></div>
+</nav>
+<!-- Menu mobile "Plus" -->
+<div id="mobile-menu" style="display:none;position:fixed;bottom:56px;left:0;right:0;background:var(--blue);z-index:300;padding:8px">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+    <div class="bnav-item" data-tab="depot" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🏭</span><span>Dépôt</span></div>
+    <div class="bnav-item" data-tab="historique" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📋</span><span>Historique</span></div>
+    <div class="bnav-item" data-tab="documents" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📄</span><span>FDS</span></div>
+    <div class="bnav-item" data-tab="maintenance" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🔧</span><span>Maint.</span></div>
+    <div class="bnav-item" data-tab="analyses" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📈</span><span>Analyses</span></div>
+    <div class="bnav-item" onclick="closeMobileMenu()"><span class="bi">✕</span><span>Fermer</span></div>
+  </div>
+</div>
+
 <script>
 var W='https://immo-proxy.ral-85d.workers.dev/';
 var TZ='Indian/Reunion';
@@ -427,6 +455,11 @@ function checkPin(){
 }
 document.getElementById('pin-input').addEventListener('keydown',function(e){if(e.key==='Enter')checkPin();});
 if(sessionStorage.getItem('auth')==='1'){document.getElementById('pin-overlay').style.display='none';loadAll();}
+// Initialiser le handler par défaut du bouton modal
+document.addEventListener('DOMContentLoaded',function(){
+  var btn=document.getElementById('act-confirm-btn');
+  if(btn) btn.onclick=soumettreAction;
+});
 
 // ── Navigation sidebar ───────────────────────────────────
 document.querySelectorAll('.nav-item').forEach(function(item){
@@ -1086,7 +1119,12 @@ function ouvrirActionMouvement(type,codeIM,libIM,codeEmp,nomEmp){
   document.getElementById('act-form').innerHTML=html;
   document.getElementById('act-overlay').classList.add('open');
 }
-function fermerAction(){document.getElementById('act-overlay').classList.remove('open');actionCourante=null;}
+function fermerAction(){
+  document.getElementById('act-overlay').classList.remove('open');
+  actionCourante=null;
+  var btn=document.getElementById('act-confirm-btn');
+  if(btn){btn.onclick=soumettreAction;}
+}
 
 async function soumettreAction(){
   if(!actionCourante)return;
