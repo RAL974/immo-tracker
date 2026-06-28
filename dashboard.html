@@ -466,8 +466,36 @@ document.querySelectorAll('.nav-item').forEach(function(item){
   item.addEventListener('click',function(){goTab(this.dataset.tab);});
 });
 
+function goTabMobile(el){
+  var tab = el ? el.dataset.tab : null;
+  if (!tab) return;
+  // Mise à jour visuelle bottom nav
+  document.querySelectorAll('#bottom-nav .bnav-item, #mobile-menu .bnav-item').forEach(function(i){
+    i.classList.toggle('active', i.dataset && i.dataset.tab === tab);
+  });
+  goTab(tab);
+}
+
+function openMobileMenu(){
+  var m = document.getElementById('mobile-menu');
+  if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+}
+function closeMobileMenu(){
+  var m = document.getElementById('mobile-menu');
+  if (m) m.style.display = 'none';
+}
+
 function goTab(name){
-  if(!d&&name!=='vue-generale'){return;}
+  // Autoriser la navigation même si d est en cours de chargement
+  if(!d&&name!=='vue-generale'){
+    // Afficher un message de chargement
+    document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
+    var pane=document.getElementById('pane-'+name);
+    if(pane){pane.classList.add('active');pane.innerHTML='<p style="text-align:center;padding:40px;color:var(--grey)">Chargement en cours...</p>';}
+    document.querySelectorAll('.nav-item').forEach(function(i){i.classList.toggle('active',i.dataset.tab===name);});
+    document.querySelectorAll('.bnav-item').forEach(function(i){i.classList.toggle('active',i.dataset&&i.dataset.tab===name);});
+    return;
+  }
   activeTab=name;
   document.querySelectorAll('.nav-item').forEach(function(i){i.classList.toggle('active',i.dataset.tab===name);});
   document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
@@ -476,13 +504,25 @@ function goTab(name){
   renderTab(name);
 }
 
+function autoLoadHist(){
+  if(!d){
+    document.getElementById('tb-hist').innerHTML='<tr><td colspan="8" class="es">Données non chargées.</td></tr>';
+    return;
+  }
+  var all=d.all_movements||[];
+  var q=(document.getElementById('hist-q')||{}).value||'';
+  var type=(document.getElementById('hist-type')||{}).value||'';
+  var nb=parseInt(((document.getElementById('hist-nb')||{}).value)||'50')||50;
+  autoLoadHist_internal(all,q,type,nb);
+}
+
 function renderTab(name){
   switch(name){
     case 'vue-generale':   renderVueGenerale(); break;
     case 'circulation':    renderCirc(); break;
     case 'depot':          renderDepot(); break;
     case 'historique':
-      if(!dataLoaded.historique){dataLoaded.historique=true;autoLoadHist();}
+      autoLoadHist(); // Toujours rafraîchir l'historique
       break;
     case 'transferts':     renderTransferts(); break;
     case 'reservations':   renderResa(); break;
