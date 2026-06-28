@@ -957,6 +957,9 @@ function renderAlertes(){
     if(m.type_mouvement==='Réparation'&&!resolvedTS[m.code_im])resolvedTS[m.code_im]=m.horodatage;
   });
   var pannesActives=Object.values(panneCodes).filter(function(p){return!resolvedTS[p.code_im]||(new Date(p.since)>new Date(resolvedTS[p.code_im]));});
+  // Ajouter durée en temps réel
+  pannesActives.forEach(function(p){var j=Math.floor((now-new Date(p.since).getTime())/86400000);p.dureeJ=j;});
+  pannesActives.sort(function(a,b){return b.dureeJ-a.dureeJ;});
   var html='';
   if(pannesActives.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--orange)"><div class="card-head"><h3>📢 Pannes en cours ('+pannesActives.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Signalé par</th><th>Depuis</th><th>Motif</th><th>Action</th></tr></thead><tbody>'+
     pannesActives.map(function(p){return'<tr class="warn-row"><td><span class="link-im" data-cim="'+p.code_im+'" data-lib="'+getLib(p.code_im).replace(/"/g,'')+'">'+p.code_im+'</span></td><td style="font-size:12px">'+getLib(p.code_im)+'</td><td style="font-size:12px">'+p.detenteur+'</td><td style="font-size:11px;white-space:nowrap">'+fmtDT(p.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(p.note||'—')+'</td><td><button class="btn-res-p" data-cim="'+p.code_im+'">" style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">✅ Résoudre</button></td></tr>';}).join('')+'</tbody></table></div></div>';
@@ -964,9 +967,12 @@ function renderAlertes(){
   if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span></td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
   if(!html)html='<div class="es" style="padding:40px">Aucune alerte active. Tout est OK ✅</div>';
   div.innerHTML=html;
-  // Attacher handlers des boutons résoudre
-  div.querySelectorAll('.btn-resoudre-panne').forEach(function(btn){
-    btn.onclick=function(){resoudrePanne(this.dataset.cim);};
+  // Attacher handlers des boutons Suivi et Résoudre
+  div.querySelectorAll('.btn-res-p').forEach(function(btn){
+    btn.onclick=function(){resoudrePanneComplet(this.dataset.cim);};
+  });
+  div.querySelectorAll('.btn-maj-p').forEach(function(btn){
+    btn.onclick=function(){ouvrirSuiviPanne(this.dataset.cim);};
   });
 }
 
@@ -1029,12 +1035,17 @@ function renderAnalyse(){
   html+='</tbody></table></div></div>';
 
   // ── Top coûts maintenance ─────────────────────────────────────────────────
-  var coutMaint=[];Object.keys(im).forEach(function(code){var c=im[code];var cout=parseFloat(c.Cout_Maintenance)||0;var per=parseInt(c.Periodicite_Maintenance_Mois)||0;if(cout>0){var coutAnnuel=per>0?Math.round(cout*(12/per)):cout;coutMaint.push({code_im:code,libelle:c.Libelle||code,cout_unitaire:cout,periodicite:per,cout_annuel:coutAnnuel});}});
-  coutMaint.sort(function(a,b){return b.cout_annuel-a.cout_annuel;}).slice(0,8);
-  html+='<div class="card" style="border-top:3px solid var(--yellow)"><div class="card-head"><h3>💶 Top coûts maintenance (annualisé)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Coût/inter.</th><th>Périodicité</th><th>Coût annuel est.</th></tr></thead><tbody>';
-  if(!coutMaint.length)html+='<tr><td colspan="5" class="es">Renseignez Cout_Maintenance dans SharePoint.</td></tr>';
-  else coutMaint.slice(0,8).forEach(function(x){
-    html+='<tr><td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td><td style="font-size:12px">'+x.libelle+'</td><td>'+x.cout_unitaire+'€</td><td style="font-size:11px">'+(x.periodicite?x.periodicite+'m':'—')+'</td><td style="font-weight:800;color:var(--orange)">~'+x.cout_annuel+'€/an</td></tr>';
+  // Statistiques réparations depuis les mouvements réels
+  var reparations=all.filter(function(m){return m.type_mouvement==='Réparation';});
+  var costByImmo={};reparations.forEach(function(m){
+    var note=m.note||'';var costMatch=note.match(/Coût réel\s*:\s*([\d.,]+)/i);
+    if(costMatch){var c=parseFloat(costMatch[1].replace(',','.'));if(!isNaN(c)){if(!costByImmo[m.code_im])costByImmo[m.code_im]={code_im:m.code_im,total:0,count:0};costByImmo[m.code_im].total+=c;costByImmo[m.code_im].count++;}}
+  });
+  var topCout=Object.values(costByImmo).sort(function(a,b){return b.total-a.total;}).slice(0,8);
+  html+='<div class="card" style="border-top:3px solid var(--yellow)"><div class="card-head"><h3>💶 Top coûts réparations (réels)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Réparations</th><th>Coût total</th></tr></thead><tbody>';
+  if(!topCout.length)html+='<tr><td colspan="4" class="es">Coûts saisis lors des résolutions de panne.</td></tr>';
+  else topCout.forEach(function(x){
+    html+='<tr><td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+getLib(x.code_im).replace(/"/g,'')+'">'+x.code_im+'</span></td><td style="font-size:12px">'+getLib(x.code_im)+'</td><td>'+x.count+'</td><td style="font-weight:800;color:var(--orange)">'+x.total.toFixed(2)+'€</td></tr>';
   });
   html+='</tbody></table></div></div>';
 
@@ -1318,7 +1329,64 @@ function ouvrirModifTransfert(tid,cim,recCode,recNom){
 }
 
 
+// ── Suivi panne : mettre à jour prestataire, coût, note ─────────────────
+function ouvrirSuiviPanne(codeIM){
+  document.getElementById('act-titre').textContent = '✏️ Suivi panne — ' + getLib(codeIM);
+  document.getElementById('act-form').innerHTML =
+    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:#F8FAFC"></div>' +
+    '<div class="frow"><label>Prestataire SAV</label><input type="text" id="sp-prest" placeholder="Nom du réparateur / atelier..."></div>' +
+    '<div class="frow"><label>Coût estimé (€)</label><input type="number" id="sp-cout" placeholder="0" step="0.01"></div>' +
+    '<div class="frow"><label>Note de suivi</label><textarea id="sp-note" rows="3" placeholder="Avancement, pièces commandées, délai estimé..."></textarea></div>';
+  var btn = document.getElementById('act-confirm-btn');
+  if(btn) btn.onclick = function(){
+    var prest = (document.getElementById('sp-prest')||{}).value||'';
+    var cout  = (document.getElementById('sp-cout')||{}).value||'';
+    var note  = (document.getElementById('sp-note')||{}).value||'';
+    if(!prest && !note){ alert('Renseignez au moins le prestataire ou une note.'); return; }
+    fetch(W+'?action=maj_panne',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code_im:codeIM,prestataire:prest,cout_estime:cout,note_suivi:note,par_code:'CONI',par_nom:'CONI'})})
+      .then(function(){fermerAction();renderAlertes();})
+      .catch(function(e){alert('Erreur : '+e.message);});
+  };
+  document.getElementById('act-overlay').classList.add('open');
+}
+
+// ── Résolution panne enrichie ─────────────────────────────────────────────
+function resoudrePanneComplet(codeIM){
+  document.getElementById('act-titre').textContent = '✅ Résoudre la panne — ' + getLib(codeIM);
+  document.getElementById('act-form').innerHTML =
+    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:#F8FAFC"></div>' +
+    '<div class="frow"><label>État après réparation</label><select id="rp-etat"><option value="Bon état">✅ Bon état</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option><option value="Neuf">⭐ Neuf</option></select></div>' +
+    '<div class="frow"><label>Prestataire SAV</label><input type="text" id="rp-prest" placeholder="Nom du réparateur..."></div>' +
+    '<div class="frow"><label>Coût réel de réparation (€)</label><input type="number" id="rp-cout" placeholder="0" step="0.01"></div>' +
+    '<div class="frow"><label>Note de résolution <span style="color:var(--red)">*</span></label><textarea id="rp-note" rows="3" placeholder="Obligatoire — détailler la réparation effectuée..."></textarea></div>';
+  var btn = document.getElementById('act-confirm-btn');
+  if(btn) btn.onclick = function(){
+    var etat  = (document.getElementById('rp-etat')||{}).value||'Bon état';
+    var prest = (document.getElementById('rp-prest')||{}).value||'';
+    var cout  = (document.getElementById('rp-cout')||{}).value||'';
+    var note  = (document.getElementById('rp-note')||{}).value||'';
+    if(!note||note.trim().length<10){ alert('La note de résolution est obligatoire (10 car. min.).'); return; }
+    fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:'CONI',par_nom:'CONI'})})
+      .then(function(){fermerAction();refreshAll();alert('✅ Panne résolue ! ' + codeIM + ' est de retour dans le parc.');})
+      .catch(function(e){alert('Erreur : '+e.message);});
+  };
+  document.getElementById('act-overlay').classList.add('open');
+}
+
 // ── Gestion statut immo (panne, HS, perdu) ──────────────────────────────
+function declarerVol(codeIM,libelle,type){
+  var motif=prompt('MOTIF OBLIGATOIRE - Declarer ' + codeIM + ' comme [' + type + '] - min 10 car. :');
+  if(!motif||motif.trim().length<10){alert('Motif obligatoire, 10 car. minimum.');return;}
+  if(!confirm('1ere CONFIRMATION : Declarer ' + codeIM + ' [' + type + '] ? Immo retirée définitivement du parc.'))return;
+  if(!confirm('CONFIRMATION FINALE : Cette action est irreversible. Confirmer [' + type + '] pour ' + codeIM + ' ?'))return;
+  fetch(W+'?action=declarer_vol',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:'ADMIN',par_nom:'Admin Dashboard'})})
+    .then(function(){fermerFiche();refreshAll();alert('✅ Immo ' + codeIM + ' déclarée [' + type + ']. Retirée du parc.');})
+    .catch(function(e){alert('Erreur : '+e.message);});
+}
+
 function declarerPanneDash(codeIM){
   var motif=prompt('Motif de la panne pour ' + getLib(codeIM) + ' :');
   if(!motif||motif.trim().length<5){alert('Le motif est obligatoire (5 caractères min.)');return;}
