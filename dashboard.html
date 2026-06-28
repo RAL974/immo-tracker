@@ -138,6 +138,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
         <button class="tab" onclick="tab('hist')">Historique</button>
         <button class="tab" onclick="tab('analyse')">Analyses</button>
         <button class="tab" onclick="tab('docs')">Documents <span class="tbadge" style="background:var(--orange)" id="tc-docs">0</span></button>
+        <button class="tab" onclick="tab('resa')">Réservations <span class="tbadge" style="background:var(--blue)" id="tc-resa">0</span></button>
+        <button class="tab" onclick="tab('maint')">Maintenance <span class="tbadge" style="background:var(--red)" id="tc-maint">0</span></button>
         <button class="tab" onclick="tab('alertes')">Alertes <span class="tbadge" id="tc-alert">0</span></button>
       </div>
     </div>
@@ -169,6 +171,32 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
         <div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Categorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
       </div>
       <div id="pane-alertes" style="display:none"><div class="thead"><h3>Points d attention</h3></div><div id="alertes-content"></div></div>
+      <div id="pane-resa" style="display:none">
+        <div class="thead"><h3>Calendrier des réservations</h3><span class="tcnt" id="cnt-resa"></span></div>
+        <div class="srch-hist">
+          <input type="text" id="resa-q" placeholder="Immo, employe, chantier..." oninput="renderResa()">
+          <select id="resa-statut" onchange="renderResa()">
+            <option value="">Tous statuts</option>
+            <option value="Demandee">Demandée</option>
+            <option value="Confirmee">Confirmée</option>
+            <option value="En cours">En cours</option>
+            <option value="En retard">En retard</option>
+            <option value="Rendue">Rendue</option>
+            <option value="Annulee">Annulée</option>
+          </select>
+          <button onclick="renderResa()" style="padding:9px 18px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer">Filtrer</button>
+        </div>
+        <div id="resa-gantt" style="overflow-x:auto;padding:14px"></div>
+        <div class="thead" style="border-top:1px solid #eee;margin-top:8px"><h3>Liste des réservations</h3></div>
+        <div style="overflow-x:auto"><table><thead><tr>
+          <th>Code IM</th><th>Libelle</th><th>Demandeur</th><th>Chantier</th>
+          <th>Du</th><th>Au</th><th>Statut</th><th>Actions</th>
+        </tr></thead><tbody id="tb-resa"></tbody></table></div>
+      </div>
+      <div id="pane-maint" style="display:none">
+        <div class="thead"><h3>Maintenance & Garanties</h3></div>
+        <div id="maint-content" style="padding:14px"></div>
+      </div>
     </div>
   </div>
 </main>
@@ -178,6 +206,8 @@ var W = 'https://immo-proxy.ral-85d.workers.dev/';
 var TZ = 'Indian/Reunion';
 var PIN = 'ES974';
 var d = null;
+var reservations = [];
+var maintenance = null;
 var im = {};
 var fdsMap = {};
 var photosMap = {};
@@ -211,8 +241,14 @@ async function loadData() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('dash').style.display = 'none';
   try {
-    var dashRes = await fetch(W + '?dashboard=1');
+    var [dashRes, resaRes, maintRes] = await Promise.all([
+      fetch(W + '?dashboard=1'),
+      fetch(W + '?reservations=1').catch(function(){ return {json:function(){return Promise.resolve([]);}}; }),
+      fetch(W + '?maintenance=1').catch(function(){ return {json:function(){return Promise.resolve({});}}; }),
+    ]);
     d = await dashRes.json();
+    try { reservations = await resaRes.json(); } catch(e) { reservations = []; }
+    try { maintenance = await maintRes.json(); } catch(e) { maintenance = {}; }
     fdsMap = {};
     photosMap = {};
     try {
@@ -300,7 +336,7 @@ function drawCharts() {
   charts.det = new Chart(document.getElementById('ch-det'),{type:'bar',data:{labels:top.map(function(x){return x.nom.split(' ')[0];}),datasets:[{data:top.map(function(x){return x.count;}),backgroundColor:'#E87722',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});
 }
 
-var tabs=['circ','depot','all','pending','hist','analyse','docs','alertes'];
+var tabs=['circ','depot','all','pending','hist','analyse','docs','alertes','resa','maint'];
 function tab(t) {
   curTab=t;
   document.querySelectorAll('.tab').forEach(function(el,i){el.classList.toggle('active',tabs[i]===t);});
@@ -394,6 +430,10 @@ function renderDocs() {
   var sansFds=rows.filter(function(r){return!r.fds;}).length;
   var avecPhotos=rows.filter(function(r){return!!photosMap[r.code_im];}).length;
   document.getElementById('tc-docs').textContent=sansFds+' sans FDS';
+  var resaEnCours = reservations.filter(function(r){ return r.statut==='Confirmee'||r.statut==='En cours'||r.statut==='Demandee'; }).length;
+  var resaRetard = reservations.filter(function(r){ return r.statut==='En retard'; }).length;
+  document.getElementById('tc-resa').textContent = resaEnCours;
+  document.getElementById('tc-maint').textContent = ((maintenance.maintenances_urgentes||[]).length + (maintenance.garanties_bientot||[]).length);
   document.getElementById('cnt-docs').textContent=rows.length+' immos — '+avecPhotos+' avec photos';
   document.getElementById('tb-docs').innerHTML=rows.length===0?'<tr><td colspan="6" class="es">Aucune immo.</td></tr>':
     rows.map(function(r){
@@ -452,6 +492,117 @@ async function showPhotosModal(codeIM) {
     photos.forEach(function(p){grid+='<div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)"><img src="'+p.url+'" loading="lazy" style="width:100%;height:160px;object-fit:cover;cursor:pointer;display:block" onclick="window.open(this.src)"><p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">'+fmtD(p.created)+' — '+Math.round(p.size/1024)+' Ko</p></div>';});
     grid+='</div>';body.outerHTML=grid;
   } catch(e){var b=document.getElementById('pm-body');if(b)b.textContent='Erreur : '+e.message;}
+}
+
+// ── RÉSERVATIONS ─────────────────────────────────────────────────
+var SCOL = { 'Demandee':'#F39C12','Confirmee':'#27AE60','En cours':'#2980B9','En retard':'#E74C3C','Rendue':'#95A5A6','Annulee':'#BDC3C7' };
+var SLAB = { 'Demandee':'⏳ Demandée','Confirmee':'✅ Confirmée','En cours':'🔄 En cours','En retard':'⚠️ En retard','Rendue':'📦 Rendue','Annulee':'❌ Annulée' };
+
+function rsLabel(s){ return '<span style="display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:'+(SCOL[s]||'#999')+'22;color:'+(SCOL[s]||'#999')+'">'+(SLAB[s]||s)+'</span>'; }
+
+function renderResa() {
+  var q = (document.getElementById('resa-q').value||'').toUpperCase();
+  var sf = document.getElementById('resa-statut').value;
+  var data = reservations.filter(function(r){
+    return (!q||(r.code_im.includes(q)||r.nom_employe.toUpperCase().includes(q)||(r.nom_chantier||'').toUpperCase().includes(q)||(r.code_im && im[r.code_im] && (im[r.code_im].Libelle||'').toUpperCase().includes(q))))&&(!sf||r.statut===sf);
+  });
+  document.getElementById('cnt-resa').textContent = data.length + ' réservations';
+
+  // Gantt simplifié
+  var now = new Date();
+  var mois = [now.getFullYear(), now.getMonth()];
+  var jours = new Date(mois[0], mois[1]+1, 0).getDate();
+  var ganttData = data.filter(function(r){ return r.date_debut || r.date_fin; }).slice(0,20);
+  var ganttHtml = '';
+  if (ganttData.length > 0) {
+    ganttHtml = '<div style="margin-bottom:12px"><strong style="color:var(--blue)">Vue calendrier — ' + new Date(mois[0],mois[1],1).toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'Indian/Reunion'}) + '</strong></div>';
+    ganttHtml += '<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:600px"><thead><tr><th style="padding:4px 8px;font-size:11px;color:var(--grey);text-align:left;width:160px">Immo</th>';
+    for (var j=1;j<=jours;j++) ganttHtml += '<th style="padding:2px 3px;font-size:10px;color:var(--grey);text-align:center;width:18px">' + j + '</th>';
+    ganttHtml += '</tr></thead><tbody>';
+    ganttData.forEach(function(r){
+      var lib = im[r.code_im] ? (im[r.code_im].Libelle||r.code_im).substring(0,20) : r.code_im;
+      var col = SCOL[r.statut] || '#999';
+      ganttHtml += '<tr><td style="padding:3px 8px;font-size:11px;white-space:nowrap" title="'+r.nom_employe+'">'+lib+'</td>';
+      for (var j=1;j<=jours;j++) {
+        var d = new Date(mois[0],mois[1],j);
+        var deb = r.date_debut ? new Date(r.date_debut) : null;
+        var fin = r.date_fin ? new Date(r.date_fin) : null;
+        var inRange = deb && fin && d >= new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()) && d <= new Date(fin.getFullYear(),fin.getMonth(),fin.getDate());
+        ganttHtml += '<td style="padding:2px;background:' + (inRange ? col : 'transparent') + ';border:1px solid #f0f0f0"></td>';
+      }
+      ganttHtml += '</tr>';
+    });
+    ganttHtml += '</tbody></table></div>';
+    if (data.length > 20) ganttHtml += '<p style="font-size:12px;color:var(--grey);margin-top:6px">Affichage limité aux 20 premières réservations dans le Gantt.</p>';
+  } else {
+    ganttHtml = '<p style="color:var(--grey);font-size:13px;text-align:center;padding:20px">Aucune réservation avec dates à afficher.</p>';
+  }
+  document.getElementById('resa-gantt').innerHTML = ganttHtml;
+
+  // Tableau
+  document.getElementById('tb-resa').innerHTML = data.length === 0
+    ? '<tr><td colspan="8" class="es">Aucune réservation.</td></tr>'
+    : data.map(function(r){
+        var lib = im[r.code_im] ? im[r.code_im].Libelle||r.code_im : r.code_im;
+        return '<tr><td class="icode">'+r.code_im+'</td><td style="font-size:12px">'+lib+'</td>'+
+          '<td style="font-size:12px"><b>'+r.nom_employe+'</b></td>'+
+          '<td style="font-size:12px">'+(r.nom_chantier||'—')+'</td>'+
+          '<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td>'+
+          '<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_fin)+'</td>'+
+          '<td>'+rsLabel(r.statut)+'</td>'+
+          '<td><select onchange="majStatutResa(\''+r.id+'\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Changer...</option><option value="Confirmee">Confirmer</option><option value="Annulee">Annuler</option><option value="Rendue">Marquée rendue</option></select></td></tr>';
+      }).join('');
+}
+
+async function majStatutResa(id, statut) {
+  if (!statut) return;
+  await fetch(W + '?action=statut_resa', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id, statut }) });
+  loadData();
+}
+
+// ── MAINTENANCE & GARANTIES ───────────────────────────────────────
+function renderMaint() {
+  if (!maintenance) { document.getElementById('maint-content').innerHTML = '<p class="es">Données non chargées.</p>'; return; }
+  var mu = maintenance.maintenances_urgentes || [];
+  var mb = maintenance.maintenances_bientot || [];
+  var gb = maintenance.garanties_bientot || [];
+  var ge = maintenance.garanties_expirees || [];
+  var all = maintenance.all || [];
+  var html = '';
+
+  function tableImmos(titre, items, col, fields) {
+    if (items.length === 0) return '';
+    var h = '<div class="thead" style="border-top:3px solid '+col+';margin-top:12px"><h3>'+titre+' ('+items.length+')</h3></div>';
+    h += '<div style="overflow-x:auto"><table><thead><tr>'+fields.map(function(f){ return '<th>'+f+'</th>'; }).join('')+'</tr></thead><tbody>';
+    h += items.map(function(i){
+      return '<tr style="background:#FFF8F0"><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+i.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+i.categorie+'</td>'+
+        (fields.length > 3 ? '<td style="font-size:12px">'+fmtD(i.prochaine_maintenance||i.date_garantie_fin)+'</td>' : '')+
+        '<td style="font-size:12px">'+(i.prestataire_sav||'—')+'</td>'+
+        (fields.length > 4 ? '<td style="font-size:12px">'+(i.cout_maintenance ? i.cout_maintenance+'€' : '—')+'</td>' : '')+
+        '</tr>';
+    }).join('');
+    return h + '</tbody></table></div>';
+  }
+
+  html += tableImmos('🔴 Maintenance urgente (≤ 7 jours)', mu, 'var(--red)', ['Code IM','Libelle','Catégorie','Date prévue','Prestataire','Coût estimé']);
+  html += tableImmos('🟠 Maintenance dans les 30 jours', mb, 'var(--orange)', ['Code IM','Libelle','Catégorie','Date prévue','Prestataire','Coût estimé']);
+  html += tableImmos('⚠️ Garanties expirant dans 30 jours', gb, 'var(--yellow)', ['Code IM','Libelle','Catégorie','Fin garantie','Prestataire']);
+  html += tableImmos('❌ Garanties expirées', ge, '#9E9E9E', ['Code IM','Libelle','Catégorie','Expirée le','Prestataire']);
+
+  if (!html) {
+    html = '<div style="text-align:center;padding:40px;color:var(--grey)">Aucune alerte maintenance ou garantie. Renseigne les dates dans la liste Immos SharePoint (colonnes Prochaine_Maintenance et Date_Garantie_Fin).</div>';
+  }
+
+  // Résumé financier
+  var coutTotal = all.filter(function(i){ return i.prochaine_maintenance; }).reduce(function(acc, i){ return acc + (parseFloat(i.cout_maintenance)||0); }, 0);
+  html += '<div style="margin-top:20px;background:#F8FAFC;border-radius:10px;padding:14px"><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">';
+  html += '<div><div style="font-size:24px;font-weight:800;color:var(--red)">' + mu.length + '</div><div style="font-size:12px;color:var(--grey)">Urgentes</div></div>';
+  html += '<div><div style="font-size:24px;font-weight:800;color:var(--orange)">' + mb.length + '</div><div style="font-size:12px;color:var(--grey)">Dans 30 jours</div></div>';
+  html += '<div><div style="font-size:24px;font-weight:800;color:var(--yellow)">' + gb.length + '</div><div style="font-size:12px;color:var(--grey)">Garanties à venir</div></div>';
+  html += '<div><div style="font-size:22px;font-weight:800;color:var(--blue)">' + Math.round(coutTotal) + '€</div><div style="font-size:12px;color:var(--grey)">Budget maintenance planifié</div></div>';
+  html += '</div></div>';
+
+  document.getElementById('maint-content').innerHTML = html;
 }
 
 function exportExcel() {
