@@ -199,12 +199,14 @@ function changerUtilisateur() {
   if (!confirm('Changer d\'utilisateur ?')) return;
   localStorage.removeItem('employe');
   S.employe = null;
-  document.getElementById('user-info')?.classList.add('hidden');
-  document.getElementById('badge-attente')?.classList.add('hidden');
-  document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
-  const btnMat   = document.getElementById('btn-mon-materiel');
-  const btnStock = document.getElementById('btn-stock-depot');
-  if (btnMat)   btnMat.classList.remove('hidden');
+  // Reset tous les badges
+  ['user-info','badge-attente','badge-mon-mat','badge-materiel','badge-resa'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.classList.add('hidden');
+  });
+  document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.add('hidden'); });
+  var btnMat = document.getElementById('btn-mon-materiel');
+  var btnStock = document.getElementById('btn-stock-depot');
+  if (btnMat) btnMat.classList.remove('hidden');
   if (btnStock) btnStock.classList.add('hidden');
   showScreen('screen-activation');
 }
