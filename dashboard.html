@@ -12,84 +12,111 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);}
 #pin-overlay{position:fixed;inset:0;background:var(--blue);display:flex;align-items:center;justify-content:center;z-index:1000;}
 #pin-box{background:#fff;border-radius:20px;padding:40px;text-align:center;width:320px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
-#pin-box img{width:80px;margin-bottom:16px;}
 #pin-box h2{color:var(--blue);margin-bottom:8px;}
 #pin-box p{color:var(--grey);font-size:13px;margin-bottom:20px;}
 #pin-input{width:100%;padding:14px;border:2px solid #ddd;border-radius:10px;font-size:20px;letter-spacing:6px;text-align:center;}
 #pin-input:focus{outline:none;border-color:var(--orange);}
 #pin-btn{width:100%;margin-top:12px;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
 #pin-error{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
-header{background:var(--blue);color:#fff;padding:0 24px;display:flex;align-items:center;height:60px;position:sticky;top:0;z-index:100;gap:10px;}
-header img{height:38px;}
-header h1{font-size:16px;font-weight:700;flex:1;}
-.hbtn{border:none;color:#fff;padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;}
-#btn-export{background:var(--green);}
-#btn-refresh{background:var(--orange);}
-#btn-logout{background:rgba(255,255,255,.15);}
+header{background:var(--blue);color:#fff;padding:0 20px;display:flex;align-items:center;height:56px;position:sticky;top:0;z-index:100;gap:10px;}
+header h1{font-size:15px;font-weight:700;flex:1;}
+.hbtn{border:none;color:#fff;padding:6px 12px;border-radius:7px;cursor:pointer;font-weight:600;font-size:12px;}
+#btn-export{background:var(--green);}#btn-refresh{background:var(--orange);}#btn-logout{background:rgba(255,255,255,.15);}
 #last-refresh{font-size:11px;opacity:.7;}
-main{max-width:1400px;margin:0 auto;padding:20px;}
-#loading{text-align:center;padding:60px;color:var(--grey);font-size:16px;}
-.section{margin-bottom:18px;}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;}
-.kpi{background:var(--card);border-radius:12px;padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--orange);}
-.kpi.g::before{background:var(--green);}.kpi.r::before{background:var(--red);}.kpi.b::before{background:var(--blue);}.kpi.y::before{background:var(--yellow);}
-.kpi-v{font-size:32px;font-weight:800;color:var(--blue);line-height:1;}
-.kpi-l{font-size:12px;color:var(--grey);margin-top:4px;}
-.etat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;}
-.ec{background:var(--card);border-radius:10px;padding:12px;box-shadow:var(--shadow);text-align:center;}
-.ec-v{font-size:24px;font-weight:800;}.ec-l{font-size:11px;color:var(--grey);margin-top:2px;}
+/* Bandeau alertes */
+#action-banner{background:#fff;border-left:4px solid var(--orange);box-shadow:var(--shadow);padding:10px 20px;display:none;align-items:center;gap:12px;flex-wrap:wrap;}
+#action-banner.visible{display:flex;}
+.ab-item{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;}
+.ab-item:hover{opacity:.85;}
+.ab-red{background:#FFEBEE;color:var(--red);}
+.ab-orange{background:#FFF3E0;color:var(--orange);}
+.ab-blue{background:#E3F2FD;color:var(--blue);}
+.ab-pulse{animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.04);}}
+/* Nav tabs horizontaux */
+.nav-tabs{background:var(--card);border-bottom:2px solid #eee;display:flex;overflow-x:auto;padding:0 20px;gap:0;}
+.nav-tab{padding:12px 18px;border:none;background:transparent;cursor:pointer;font-weight:600;font-size:13px;color:var(--grey);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;position:relative;}
+.nav-tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+.nav-tab:hover{color:var(--blue);}
+.ntbadge{display:inline-flex;align-items:center;justify-content:center;background:var(--red);color:#fff;font-size:10px;border-radius:10px;padding:1px 6px;margin-left:4px;min-width:18px;}
+.ntbadge.green{background:var(--green);}
+.ntbadge.orange{background:var(--orange);}
+.ntbadge.blue{background:var(--blue);}
+/* Contenu */
+main{max-width:1400px;margin:0 auto;padding:16px;}
+.tab-content{display:none;}.tab-content.active{display:block;}
+#loading-main{text-align:center;padding:60px;color:var(--grey);}
+/* KPIs */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
+.kpi{background:var(--card);border-radius:12px;padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:transform .1s;}
+.kpi:hover{transform:translateY(-2px);}
+.kpi::before{content:'';display:block;height:4px;border-radius:2px;margin-bottom:10px;}
+.kpi.orange::before{background:var(--orange);}
+.kpi.green::before{background:var(--green);}
+.kpi.blue::before{background:var(--blue);}
+.kpi.red::before{background:var(--red);}
+.kpi.yellow::before{background:var(--yellow);}
+.kpi.grey::before{background:var(--grey);}
+.kpi-v{font-size:30px;font-weight:800;color:var(--blue);line-height:1;}
+.kpi-l{font-size:11px;color:var(--grey);margin-top:4px;}
+/* États */
+.etat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px;}
+.ec{background:var(--card);border-radius:8px;padding:10px;box-shadow:var(--shadow);text-align:center;}
+.ec-v{font-size:22px;font-weight:800;}.ec-l{font-size:10px;color:var(--grey);}
 .neuf .ec-v{color:var(--green);}.bon .ec-v{color:#2980B9;}.use .ec-v{color:var(--yellow);}.abime .ec-v{color:var(--red);}.hs .ec-v{color:var(--grey);}.inc .ec-v{color:#BDC3C7;}
-.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
-.chart-card{background:var(--card);border-radius:12px;padding:18px;box-shadow:var(--shadow);}
-.chart-card h3{font-size:12px;color:var(--grey);font-weight:600;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;}
-.chart-wrap{position:relative;height:200px;}
-.search-bar{background:var(--card);border-radius:12px;padding:14px 18px;box-shadow:var(--shadow);display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.search-bar input,.search-bar select{padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;background:#fff;}
-.search-bar input{flex:1;min-width:200px;}
-.search-bar input:focus,.search-bar select:focus{outline:none;border-color:var(--orange);}
-.tabs{display:flex;gap:3px;background:var(--card);padding:5px;border-radius:10px;box-shadow:var(--shadow);overflow-x:auto;max-width:100%;}
-.tab{padding:9px 16px;border-radius:7px;border:none;background:transparent;cursor:pointer;font-weight:600;font-size:13px;color:var(--grey);white-space:nowrap;}
-.tab.active{background:var(--blue);color:#fff;}
-.tbadge{display:inline-block;background:var(--red);color:#fff;font-size:10px;border-radius:8px;padding:1px 5px;margin-left:3px;}
+/* Charts */
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px;}
+.chart-card{background:var(--card);border-radius:12px;padding:16px;box-shadow:var(--shadow);}
+.chart-card h3{font-size:11px;color:var(--grey);font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;}
+.chart-wrap{position:relative;height:180px;}
+/* Filtres */
+.filters{background:var(--card);border-radius:10px;padding:12px 16px;box-shadow:var(--shadow);display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.filters input,.filters select{padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff;}
+.filters input{flex:1;min-width:180px;}
+.filters input:focus,.filters select:focus{outline:none;border-color:var(--orange);}
+/* Tables */
 .tcard{background:var(--card);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;}
-.thead{padding:14px 18px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;}
+.thead{padding:12px 18px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;}
 .thead h3{font-size:14px;font-weight:700;color:var(--blue);}
 .tcnt{background:var(--bg);padding:3px 9px;border-radius:8px;font-size:12px;color:var(--grey);font-weight:600;}
 table{width:100%;border-collapse:collapse;}
-th{background:#F8FAFC;padding:10px 14px;text-align:left;font-size:11px;color:var(--grey);text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:2px solid #eee;cursor:pointer;}
+th{background:#F8FAFC;padding:9px 12px;text-align:left;font-size:11px;color:var(--grey);text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:2px solid #eee;cursor:pointer;}
 th:hover{background:#f0f4f8;}
-td{padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle;}
+td{padding:9px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle;}
 tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
 .icode{font-weight:700;color:var(--blue);font-family:monospace;font-size:12px;}
-.badge{display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:600;}
+.badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;}
 .bn{background:#E8F5E9;color:#1B5E20;}.bb{background:#E3F2FD;color:#0D47A1;}.bu{background:#FFF8E1;color:#E65100;}
 .ba{background:#FBE9E7;color:#B71C1C;}.bh{background:#ECEFF1;color:#37474F;}.bi{background:#F5F5F5;color:#9E9E9E;}
 .bc{background:#E3F2FD;color:#0D47A1;}.bd{background:#E8F5E9;color:#1B5E20;}
-.bret{background:#FFEBEE;color:var(--red);}.batt{background:#FFF3E0;color:#E65100;}
+.bret{background:#FFEBEE;color:var(--red);font-weight:700;}.batt{background:#FFF3E0;color:#E65100;}
 .arow td{background:#FFF8F0!important;}.arow td:first-child{border-left:3px solid var(--orange);}
+.urgent-row td{background:#FFEBEE!important;}.urgent-row td:first-child{border-left:3px solid var(--red);}
 .es{text-align:center;padding:30px;color:var(--grey);font-size:13px;}
-.dg{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;padding:14px;}
+/* Groupes cards */
+.dg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:14px;}
 .dc{background:#F8FAFC;border-radius:10px;padding:12px;border:1px solid #eee;}
 .dn{font-weight:700;color:var(--blue);font-size:14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
 .dcnt{background:var(--blue);color:#fff;font-size:11px;padding:1px 7px;border-radius:8px;}
 .ii{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;font-size:12px;}
 .ii:last-child{border-bottom:none;}
-.srch-hist{display:flex;gap:8px;padding:14px 18px;border-bottom:1px solid #eee;flex-wrap:wrap;}
-.srch-hist input{flex:1;min-width:180px;padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;}
+/* Hist search */
+.srch-hist{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #eee;flex-wrap:wrap;}
+.srch-hist input{flex:1;min-width:180px;padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;}
 .srch-hist input:focus{outline:none;border-color:var(--orange);}
-.srch-hist button{padding:9px 18px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;}
-.srch-hist select{padding:9px 14px;border:2px solid #ddd;border-radius:8px;font-size:14px;background:#fff;}
-@media(max-width:600px){main{padding:10px;}header h1{font-size:13px;}.kpi-v{font-size:24px;}th,td{padding:7px 9px;font-size:12px;}}
+.srch-hist button{padding:8px 16px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;}
+.srch-hist select{padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff;}
+/* Lazy load spinner */
+.lazy-loading{text-align:center;padding:40px;color:var(--grey);}
+@media(max-width:600px){main{padding:8px;}header h1{font-size:13px;}.kpi-v{font-size:22px;}th,td{padding:6px 8px;font-size:12px;}.nav-tab{padding:10px 12px;font-size:12px;}}
 </style>
 </head>
 <body>
 
 <div id="pin-overlay">
   <div id="pin-box">
-    <img src="logo.png" alt="ES" onerror="this.style.display='none'">
     <h2>Tableau de bord logistique</h2>
-    <p>Acces reserve encadrement — Espace Soleil</p>
+    <p>Espace Soleil — Acces encadrement</p>
     <input type="password" id="pin-input" maxlength="10" placeholder="&bull;&bull;&bull;&bull;" onkeydown="if(event.key==='Enter')checkPin()">
     <button id="pin-btn" onclick="checkPin()">Acceder</button>
     <p id="pin-error"></p>
@@ -97,58 +124,76 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
 </div>
 
 <header>
-  <img src="logo.png" alt="" onerror="this.style.display='none'">
+  <img src="logo.png" height="36" onerror="this.style.display='none'">
   <h1>Tableau de bord — Suivi des immobilisations</h1>
   <span id="last-refresh"></span>
   <button class="hbtn" id="btn-export" onclick="exportExcel()">Export Excel</button>
-  <button class="hbtn" id="btn-refresh" onclick="loadData()">Actualiser</button>
+  <button class="hbtn" id="btn-refresh" onclick="refreshAll()">Actualiser</button>
   <button class="hbtn" id="btn-logout" onclick="logout()">Deconnexion</button>
 </header>
 
+<!-- Bandeau alertes actions requises -->
+<div id="action-banner">
+  <span style="font-size:12px;font-weight:700;color:var(--orange);white-space:nowrap">Actions requises :</span>
+  <div id="ab-items"></div>
+</div>
+
+<!-- Navigation par onglets -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="showTab('vue-generale')">Vue générale</button>
+  <button class="nav-tab" onclick="showTab('circulation')">En circulation <span class="ntbadge blue" id="nb-circ">0</span></button>
+  <button class="nav-tab" onclick="showTab('depot')">Au dépôt <span class="ntbadge green" id="nb-depot">0</span></button>
+  <button class="nav-tab" onclick="showTab('historique')">Historique</button>
+  <button class="nav-tab" onclick="showTab('reservations')">Réservations <span class="ntbadge orange" id="nb-resa">0</span></button>
+  <button class="nav-tab" onclick="showTab('documents')">Documents <span class="ntbadge orange" id="nb-docs">0</span></button>
+  <button class="nav-tab" onclick="showTab('maintenance')">Maintenance <span class="ntbadge red" id="nb-maint">0</span></button>
+  <button class="nav-tab" onclick="showTab('alertes')">Alertes <span class="ntbadge red" id="nb-alert">0</span></button>
+  <button class="nav-tab" onclick="showTab('analyses')">Analyses</button>
+</div>
+
 <main>
-  <div id="loading">Chargement en cours...</div>
-  <div id="dash" style="display:none">
-    <div class="section"><div class="kpi-grid" id="kpi-grid"></div></div>
-    <div class="section"><div class="etat-grid" id="etat-grid"></div></div>
-    <div class="section charts-grid">
-      <div class="chart-card"><h3>Circulation vs Depot</h3><div class="chart-wrap"><canvas id="ch-rep"></canvas></div></div>
-      <div class="chart-card"><h3>Distribution par etat</h3><div class="chart-wrap"><canvas id="ch-etat"></canvas></div></div>
-      <div class="chart-card"><h3>Top detenteurs</h3><div class="chart-wrap"><canvas id="ch-det"></canvas></div></div>
-    </div>
-    <div class="section search-bar">
-      <span style="font-weight:700;color:var(--blue)">Filtres</span>
-      <input type="text" id="s-q" placeholder="Immo, employe..." oninput="filterTable()">
-      <select id="s-etat" onchange="filterTable()">
-        <option value="">Tous etats</option>
-        <option>Neuf</option><option>Bon état</option><option>Usé</option>
-        <option>Abîmé</option><option>Hors service</option><option>Inconnu</option>
-      </select>
-      <select id="s-statut" onchange="filterTable()">
-        <option value="">Tous statuts</option>
-        <option value="En circulation">En circulation</option>
-        <option value="Au depot">Au depot</option>
-      </select>
-    </div>
-    <div class="section">
-      <div class="tabs">
-        <button class="tab active" onclick="tab('circ')">En circulation <span class="tbadge" id="tc-circ">0</span></button>
-        <button class="tab" onclick="tab('depot')">Au depot <span class="tbadge" style="background:var(--green)" id="tc-depot">0</span></button>
-        <button class="tab" onclick="tab('all')">Tableau complet <span class="tbadge" style="background:var(--blue)" id="tc-all">0</span></button>
-        <button class="tab" onclick="tab('pending')">Transferts <span class="tbadge" id="tc-pend">0</span></button>
-        <button class="tab" onclick="tab('hist')">Historique</button>
-        <button class="tab" onclick="tab('analyse')">Analyses</button>
-        <button class="tab" onclick="tab('docs')">Documents <span class="tbadge" style="background:var(--orange)" id="tc-docs">0</span></button>
-        <button class="tab" onclick="tab('resa')">Réservations <span class="tbadge" style="background:var(--blue)" id="tc-resa">0</span></button>
-        <button class="tab" onclick="tab('maint')">Maintenance <span class="tbadge" style="background:var(--red)" id="tc-maint">0</span></button>
-        <button class="tab" onclick="tab('alertes')">Alertes <span class="tbadge" id="tc-alert">0</span></button>
+  <div id="loading-main">Chargement en cours...</div>
+  <div id="dash-content" style="display:none">
+
+    <!-- VUE GENERALE -->
+    <div id="tab-vue-generale" class="tab-content active">
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div class="etat-grid" id="etat-grid"></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Circulation vs Dépôt</h3><div class="chart-wrap"><canvas id="ch-rep"></canvas></div></div>
+        <div class="chart-card"><h3>Distribution par état</h3><div class="chart-wrap"><canvas id="ch-etat"></canvas></div></div>
+        <div class="chart-card"><h3>Top détenteurs</h3><div class="chart-wrap"><canvas id="ch-det"></canvas></div></div>
       </div>
     </div>
-    <div class="tcard">
-      <div id="pane-circ"><div class="thead"><h3>Materiel en circulation</h3><span class="tcnt" id="cnt-circ"></span></div><div class="dg" id="dg-circ"></div></div>
-      <div id="pane-depot" style="display:none"><div class="thead"><h3>Au depot</h3><span class="tcnt" id="cnt-depot"></span></div><div style="overflow-x:auto"><table><thead><tr><th onclick="sort('depot','code_im')">Code IM</th><th>Libelle</th><th onclick="sort('depot','etat')">Etat</th><th onclick="sort('depot','since')">Depuis</th><th>Note</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
-      <div id="pane-all" style="display:none"><div class="thead"><h3>Inventaire complet</h3><span class="tcnt" id="cnt-all"></span></div><div style="overflow-x:auto"><table><thead><tr><th onclick="sort('all','code_im')">Code IM</th><th>Libelle</th><th onclick="sort('all','statut')">Statut</th><th onclick="sort('all','detenteur_nom')">Detenteur</th><th onclick="sort('all','etat')">Etat</th><th onclick="sort('all','since')">Depuis</th><th>Note</th></tr></thead><tbody id="tb-all"></tbody></table></div></div>
-      <div id="pane-pending" style="display:none"><div class="thead"><h3>Transferts en attente</h3><span class="tcnt" id="cnt-pend"></span></div><div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Donneur</th><th>Receveur</th><th>Etat</th><th>Attente</th><th>Note</th></tr></thead><tbody id="tb-pend"></tbody></table></div></div>
-      <div id="pane-hist" style="display:none">
+
+    <!-- EN CIRCULATION -->
+    <div id="tab-circulation" class="tab-content">
+      <div class="filters">
+        <input type="text" id="circ-q" placeholder="Immo, employe..." oninput="renderCirc()">
+        <select id="circ-etat" onchange="renderCirc()">
+          <option value="">Tous etats</option>
+          <option>Neuf</option><option>Bon état</option><option>Usé</option><option>Abîmé</option><option>Hors service</option>
+        </select>
+      </div>
+      <div class="tcard"><div class="thead"><h3>Matériel en circulation</h3><span class="tcnt" id="cnt-circ"></span></div><div class="dg" id="dg-circ"></div></div>
+    </div>
+
+    <!-- AU DEPOT -->
+    <div id="tab-depot" class="tab-content">
+      <div class="filters">
+        <input type="text" id="depot-q" placeholder="Code IM, libelle..." oninput="renderDepot()">
+        <select id="depot-etat" onchange="renderDepot()">
+          <option value="">Tous etats</option>
+          <option>Neuf</option><option>Bon état</option><option>Usé</option><option>Abîmé</option><option>Hors service</option><option>Inconnu</option>
+        </select>
+      </div>
+      <div class="tcard"><div class="thead"><h3>Au dépôt</h3><span class="tcnt" id="cnt-depot"></span></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Etat</th><th>Depuis</th><th>Note</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
+    </div>
+
+    <!-- HISTORIQUE -->
+    <div id="tab-historique" class="tab-content">
+      <div class="tcard">
         <div class="thead"><h3>Historique des mouvements</h3></div>
         <div class="srch-hist">
           <input type="text" id="hist-q" placeholder="Code immo (ex: 328) ou nom employe...">
@@ -156,11 +201,47 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
         </div>
         <div style="overflow-x:auto"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libelle</th><th>Type</th><th>Employe</th><th>Etat</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
       </div>
-      <div id="pane-analyse" style="display:none"><div class="thead"><h3>Analyses</h3></div><div id="analyse-content" style="padding:16px"></div></div>
-      <div id="pane-docs" style="display:none">
-        <div class="thead"><h3>Suivi des documents par immo</h3><span class="tcnt" id="cnt-docs"></span></div>
-        <div class="srch-hist">
-          <input type="text" id="docs-q" placeholder="Filtrer par libelle, categorie, code..." oninput="renderDocs()">
+    </div>
+
+    <!-- RÉSERVATIONS -->
+    <div id="tab-reservations" class="tab-content">
+      <div class="lazy-loading" id="resa-loading">Chargement des réservations...</div>
+      <div id="resa-content" style="display:none">
+        <div class="filters">
+          <input type="text" id="resa-q" placeholder="Immo, employe, chantier..." oninput="renderResa()">
+          <select id="resa-statut" onchange="renderResa()">
+            <option value="">Tous statuts</option>
+            <option value="Demandee">En attente de confirmation</option>
+            <option value="Confirmee">Confirmée</option>
+            <option value="En cours">En cours</option>
+            <option value="En retard">En retard</option>
+            <option value="Rendue">Rendue</option>
+            <option value="Annulee">Annulée</option>
+          </select>
+        </div>
+        <!-- Sous-totaux par statut -->
+        <div id="resa-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:0 2px"></div>
+        <!-- Gantt -->
+        <div class="tcard" style="margin-bottom:12px">
+          <div class="thead"><h3>Calendrier — 6 semaines</h3></div>
+          <div id="resa-gantt" style="overflow-x:auto;padding:14px"></div>
+        </div>
+        <!-- Tableau -->
+        <div class="tcard">
+          <div class="thead"><h3>Liste des réservations</h3><span class="tcnt" id="cnt-resa"></span></div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th>Statut</th><th>Code IM</th><th>Libelle</th><th>Demandeur</th><th>Chantier</th><th>Du</th><th>Au</th><th>Action</th>
+          </tr></thead><tbody id="tb-resa"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCUMENTS -->
+    <div id="tab-documents" class="tab-content">
+      <div class="lazy-loading" id="docs-loading">Chargement des documents...</div>
+      <div id="docs-content" style="display:none">
+        <div class="filters">
+          <input type="text" id="docs-q" placeholder="Filtrer..." oninput="renderDocs()">
           <select id="docs-filter" onchange="renderDocs()">
             <option value="">Tous</option>
             <option value="manque_fds">Sans FDS</option>
@@ -168,260 +249,293 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFBFC;}
             <option value="avec_photos">Avec photos</option>
           </select>
         </div>
-        <div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Categorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
-      </div>
-      <div id="pane-alertes" style="display:none"><div class="thead"><h3>Points d attention</h3></div><div id="alertes-content"></div></div>
-      <div id="pane-resa" style="display:none">
-        <div class="thead"><h3>Calendrier des réservations</h3><span class="tcnt" id="cnt-resa"></span></div>
-        <div class="srch-hist">
-          <input type="text" id="resa-q" placeholder="Immo, employe, chantier..." oninput="renderResa()">
-          <select id="resa-statut" onchange="renderResa()">
-            <option value="">Tous statuts</option>
-            <option value="Demandee">Demandée</option>
-            <option value="Confirmee">Confirmée</option>
-            <option value="En cours">En cours</option>
-            <option value="En retard">En retard</option>
-            <option value="Rendue">Rendue</option>
-            <option value="Annulee">Annulée</option>
-          </select>
-          <button onclick="renderResa()" style="padding:9px 18px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer">Filtrer</button>
-        </div>
-        <div id="resa-gantt" style="overflow-x:auto;padding:14px"></div>
-        <div class="thead" style="border-top:1px solid #eee;margin-top:8px"><h3>Liste des réservations</h3></div>
-        <div style="overflow-x:auto"><table><thead><tr>
-          <th>Code IM</th><th>Libelle</th><th>Demandeur</th><th>Chantier</th>
-          <th>Du</th><th>Au</th><th>Statut</th><th>Actions</th>
-        </tr></thead><tbody id="tb-resa"></tbody></table></div>
-      </div>
-      <div id="pane-maint" style="display:none">
-        <div class="thead"><h3>Maintenance & Garanties</h3></div>
-        <div id="maint-content" style="padding:14px"></div>
+        <div class="tcard"><div class="thead"><h3>Suivi des documents</h3><span class="tcnt" id="cnt-docs"></span></div>
+          <div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Categorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div></div>
       </div>
     </div>
+
+    <!-- MAINTENANCE -->
+    <div id="tab-maintenance" class="tab-content">
+      <div class="lazy-loading" id="maint-loading">Chargement maintenance...</div>
+      <div id="maint-content" style="display:none"></div>
+    </div>
+
+    <!-- ALERTES -->
+    <div id="tab-alertes" class="tab-content">
+      <div id="alertes-content"></div>
+    </div>
+
+    <!-- ANALYSES -->
+    <div id="tab-analyses" class="tab-content">
+      <div id="analyse-content" style="padding:16px"></div>
+    </div>
+
   </div>
 </main>
 
 <script>
-var W = 'https://immo-proxy.ral-85d.workers.dev/';
-var TZ = 'Indian/Reunion';
-var PIN = 'ES974';
-var d = null;
-var reservations = [];
-var maintenance = null;
-var im = {};
-var fdsMap = {};
-var photosMap = {};
-var sc = {field:'code_im',asc:true};
-var curTab = 'circ';
-var charts = {};
+var W='https://immo-proxy.ral-85d.workers.dev/';
+var TZ='Indian/Reunion';
+var PIN='ES974';
+var d=null,im={},fdsMap={},photosMap={},reservations=[],maintenance=null;
+var tabLoaded={};
+var charts={};
+var sc={field:'code_im',asc:true};
 
-function checkPin() {
-  if (document.getElementById('pin-input').value === PIN) {
-    document.getElementById('pin-overlay').style.display = 'none';
+var SCOL={'Demandee':'#F39C12','Confirmee':'#27AE60','En cours':'#2980B9','En retard':'#E74C3C','Rendue':'#95A5A6','Annulee':'#BDC3C7'};
+var SLAB={'Demandee':'⏳ En attente','Confirmee':'✅ Confirmée','En cours':'🔄 En cours','En retard':'⚠️ En retard','Rendue':'📦 Rendue','Annulee':'❌ Annulée'};
+
+function checkPin(){
+  if(document.getElementById('pin-input').value===PIN){
+    document.getElementById('pin-overlay').style.display='none';
     sessionStorage.setItem('da','1');
-    loadData();
-  } else {
-    document.getElementById('pin-error').textContent = 'Code incorrect.';
-    document.getElementById('pin-input').value = '';
+    loadDashboard();
+  }else{document.getElementById('pin-error').textContent='Code incorrect.';document.getElementById('pin-input').value='';}
+}
+function logout(){sessionStorage.removeItem('da');location.reload();}
+function fmtD(s){if(!s)return'—';return new Date(s).toLocaleDateString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDT(s){if(!s)return'—';return new Date(s).toLocaleString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function getFdsUrl(fv,code){if(!fv)return'';if(!fv.startsWith('http'))return W+'?fds='+encodeURIComponent(code);if(fv.includes('sharepoint.com'))return W+'?fds='+encodeURIComponent(code);return fv;}
+function ebadge(e){var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh'};return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';}
+function rsLabel(s){return'<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:'+(SCOL[s]||'#999')+'22;color:'+(SCOL[s]||'#999')+'">'+(SLAB[s]||s)+'</span>';}
+
+// ── Chargement initial : dashboard seulement ──────────────────────
+async function loadDashboard(){
+  document.getElementById('loading-main').style.display='block';
+  document.getElementById('dash-content').style.display='none';
+  try{
+    var r=await fetch(W+'?dashboard=1');
+    d=await r.json();
+    // immos.json en parallèle
+    try{var ir=await fetch('immos.json');var il=await ir.json();il.forEach(function(i){im[i.Code_IM]=i;});}catch(e){}
+    // Compléter avec immos sans mouvement
+    var invSet={};(d.inventory||[]).forEach(function(i){invSet[i.code_im]=true;});
+    Object.keys(im).forEach(function(code){
+      if(!invSet[code]){var item={code_im:code,lib:im[code].Libelle||'',libelle:im[code].Libelle||'',fds:'',statut:'Au depot',detenteur_code:'DEPOT',detenteur_nom:'Depot',etat:'Inconnu',note:'',since:null,dernier_mouvement:'Jamais sorti'};d.inventory.push(item);d.au_depot.push(item);}
+    });
+    d.stats.total_mouvementes=d.inventory.length;
+    d.stats.au_depot=d.au_depot.length;
+    d.stats.par_etat['Inconnu']=d.inventory.filter(function(i){var e=['Neuf','Bon état','Usé','Abîmé','Hors service'];return !e.includes(i.etat);}).length;
+    function enrich(x){if(!x||!x.code_im)return x;if(im[x.code_im]){x.lib=im[x.code_im].Libelle||'';x.fds=im[x.code_im].FDS_URL||'';}return x;}
+    ['inventory','en_circulation','au_depot','pending','hors_service','all_movements'].forEach(function(k){if(d[k])d[k].forEach(enrich);});
+    renderVueGenerale();
+    updateBadges();
+    // Charger réservations en arrière-plan
+    loadReservations();
+    document.getElementById('last-refresh').textContent='Actualise '+fmtDT(new Date().toISOString());
+  }catch(e){document.getElementById('loading-main').textContent='Erreur : '+e.message;}
+}
+
+async function loadReservations(){
+  try{
+    var r=await fetch(W+'?reservations=1');
+    reservations=await r.json();
+    updateBadgesResa();
+    if(tabLoaded['reservations']) renderResa();
+  }catch(e){reservations=[];}
+}
+
+async function loadFdsPhotos(){
+  try{
+    var [fr,pr]=await Promise.all([fetch(W+'?fds_map=1'),fetch(W+'?photos_map=1')]);
+    fdsMap=await fr.json();
+    photosMap=await pr.json();
+    Object.keys(fdsMap).forEach(function(c){if(!im[c])im[c]={Code_IM:c,Libelle:c,Categorie:'',N_Serie:'',FDS_URL:''};im[c].FDS_URL=fdsMap[c];});
+    var sansFds=(d.inventory||[]).filter(function(i){return !fdsMap[i.code_im]&&!(im[i.code_im]&&im[i.code_im].FDS_URL);}).length;
+    document.getElementById('nb-docs').textContent=sansFds;
+    if(tabLoaded['documents']) renderDocs();
+  }catch(e){}
+}
+
+async function loadMaintenance(){
+  try{
+    var r=await fetch(W+'?maintenance=1');
+    maintenance=await r.json();
+    var n=((maintenance.maintenances_urgentes||[]).length+(maintenance.garanties_bientot||[]).length+(maintenance.garanties_expirees||[]).length);
+    document.getElementById('nb-maint').textContent=n;
+    if(tabLoaded['maintenance']) renderMaint();
+  }catch(e){}
+}
+
+function refreshAll(){loadDashboard();}
+
+// ── Navigation ────────────────────────────────────────────────────
+function showTab(name){
+  document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');});
+  event.currentTarget.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  // Lazy load
+  if(!tabLoaded[name]){
+    tabLoaded[name]=true;
+    if(name==='circulation') renderCirc();
+    else if(name==='depot') renderDepot();
+    else if(name==='reservations'){loadReservations().then(function(){renderResa();});}
+    else if(name==='documents'){loadFdsPhotos().then(function(){renderDocs();});}
+    else if(name==='maintenance'){loadMaintenance().then(function(){renderMaint();});}
+    else if(name==='alertes') renderAlertes();
+    else if(name==='analyses') renderAnalyse();
   }
 }
-function logout() { sessionStorage.removeItem('da'); location.reload(); }
 
-function fmtD(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric'}); }
-function fmtDT(s) { if (!s) return '—'; return new Date(s).toLocaleString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
-
-function getFdsUrl(fdsValue, codeIM) {
-  if (!fdsValue) return '';
-  if (!fdsValue.startsWith('http')) return W + '?fds=' + encodeURIComponent(codeIM);
-  if (fdsValue.includes('sharepoint.com')) return W + '?fds=' + encodeURIComponent(codeIM);
-  return fdsValue;
+// ── Badges ────────────────────────────────────────────────────────
+function updateBadges(){
+  var s=d.stats;
+  document.getElementById('nb-circ').textContent=s.en_circulation;
+  document.getElementById('nb-depot').textContent=s.au_depot;
+  document.getElementById('nb-alert').textContent=s.alertes_delai+s.hors_service;
+  // Bandeau alertes
+  var items=[];
+  if(s.hors_service>0) items.push({cls:'ab-red ab-pulse',txt:'🔴 '+s.hors_service+' hors service',tab:'alertes'});
+  if(s.alertes_delai>0) items.push({cls:'ab-orange ab-pulse',txt:'⏰ '+s.alertes_delai+' transfert(s) >24h',tab:'alertes'});
+  if(s.transferts_en_attente>0) items.push({cls:'ab-blue',txt:'⏳ '+s.transferts_en_attente+' transfert(s) en attente',tab:'circulation'});
+  var banner=document.getElementById('action-banner');
+  if(items.length>0){
+    banner.classList.add('visible');
+    document.getElementById('ab-items').innerHTML=items.map(function(it){return'<div class="ab-item '+it.cls+'" onclick="showTab(\''+it.tab+'\')">'+it.txt+'</div>';}).join('');
+  }
 }
 
-async function loadData() {
-  document.getElementById('loading').style.display = 'block';
-  document.getElementById('dash').style.display = 'none';
-  try {
-    var [dashRes, resaRes, maintRes] = await Promise.all([
-      fetch(W + '?dashboard=1'),
-      fetch(W + '?reservations=1').catch(function(){ return {json:function(){return Promise.resolve([]);}}; }),
-      fetch(W + '?maintenance=1').catch(function(){ return {json:function(){return Promise.resolve({});}}; }),
-    ]);
-    d = await dashRes.json();
-    try { reservations = await resaRes.json(); } catch(e) { reservations = []; }
-    try { maintenance = await maintRes.json(); } catch(e) { maintenance = {}; }
-    fdsMap = {};
-    photosMap = {};
-    try {
-      var results = await Promise.all([
-        fetch(W + '?fds_map=1').then(function(r){return r.json();}),
-        fetch(W + '?photos_map=1').then(function(r){return r.json();}),
-        fetch('immos.json').then(function(r){return r.json();})
-      ]);
-      fdsMap = results[0] || {};
-      photosMap = results[1] || {};
-      var imList = results[2] || [];
-      imList.forEach(function(i) { im[i.Code_IM] = i; });
-      Object.keys(fdsMap).forEach(function(code) {
-        if (!im[code]) im[code] = {Code_IM:code,Libelle:code,Categorie:'',N_Serie:'',FDS_URL:''};
-        im[code].FDS_URL = fdsMap[code];
-      });
-    } catch(e2) {}
-
-    function enrich(x) {
-      if (!x || !x.code_im) return x;
-      x.lib = im[x.code_im] ? im[x.code_im].Libelle||'' : '';
-      x.fds = fdsMap[x.code_im] || (im[x.code_im] ? im[x.code_im].FDS_URL||'' : '');
-      return x;
-    }
-    ['inventory','en_circulation','au_depot','pending','hors_service','all_movements'].forEach(function(k) {
-      if (d[k]) d[k].forEach(enrich);
-    });
-
-    // Ajouter les immos sans mouvement
-    var invSet = {};
-    (d.inventory||[]).forEach(function(i) { invSet[i.code_im] = true; });
-    Object.keys(im).forEach(function(code) {
-      if (!invSet[code]) {
-        var item = {code_im:code,lib:im[code].Libelle||'',libelle:im[code].Libelle||'',fds:fdsMap[code]||(im[code].FDS_URL||''),statut:'Au depot',detenteur_code:'DEPOT',detenteur_nom:'Depot',etat:'Inconnu',note:'',since:null,dernier_mouvement:'Jamais sorti'};
-        d.inventory.push(item);
-        d.au_depot.push(item);
-      }
-    });
-    d.stats.total_mouvementes = d.inventory.length;
-    d.stats.au_depot = d.au_depot.length;
-    d.stats.par_etat['Inconnu'] = d.inventory.filter(function(i){var e=['Neuf','Bon état','Usé','Abîmé','Hors service'];return !e.includes(i.etat);}).length;
-
-    render();
-    document.getElementById('last-refresh').textContent = 'Actualise ' + fmtDT(new Date().toISOString());
-  } catch(e) { document.getElementById('loading').textContent = 'Erreur : ' + e.message; }
+function updateBadgesResa(){
+  var demandees=reservations.filter(function(r){return r.statut==='Demandee';}).length;
+  var retards=reservations.filter(function(r){return r.statut==='En retard';}).length;
+  var actives=reservations.filter(function(r){return r.statut!=='Rendue'&&r.statut!=='Annulee';}).length;
+  document.getElementById('nb-resa').textContent=actives;
+  if(demandees>0||retards>0){
+    var banner=document.getElementById('action-banner');
+    banner.classList.add('visible');
+    var existing=document.getElementById('ab-items').innerHTML;
+    if(demandees>0&&!existing.includes('confirmation'))
+      document.getElementById('ab-items').innerHTML+='<div class="ab-item ab-orange ab-pulse" onclick="showTab(\'reservations\')">📅 '+demandees+' résa en attente de confirmation</div>';
+    if(retards>0&&!existing.includes('retard resa'))
+      document.getElementById('ab-items').innerHTML+='<div class="ab-item ab-red ab-pulse" onclick="showTab(\'reservations\')">⚠️ '+retards+' retard(s) de restitution</div>';
+  }
 }
 
-function render() {
-  var s = d.stats;
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('dash').style.display = 'block';
-  document.getElementById('kpi-grid').innerHTML = [
-    {ic:'📦',v:s.total_mouvementes,l:'Immos tracees',cl:''},
-    {ic:'🔄',v:s.en_circulation,l:'En circulation',cl:'b'},
-    {ic:'🏭',v:s.au_depot,l:'Au depot',cl:'g'},
-    {ic:'📋',v:s.total_mouvements,l:'Total mouvements',cl:''},
-    {ic:'⏱',v:s.moyenne_jours_hors_depot+'j',l:'Duree moy. hors depot',cl:''},
-    {ic:'⏳',v:s.transferts_en_attente,l:'Transferts en attente',cl:s.transferts_en_attente>0?'y':''},
-    {ic:'🔴',v:s.hors_service,l:'Hors service',cl:s.hors_service>0?'r':'g'},
-    {ic:'⚠',v:s.alertes_delai,l:'Transferts >24h',cl:s.alertes_delai>0?'r':'g'},
-  ].map(function(k){return '<div class="kpi '+k.cl+'"><div style="font-size:22px;margin-bottom:6px">'+k.ic+'</div><div class="kpi-v">'+k.v+'</div><div class="kpi-l">'+k.l+'</div></div>';}).join('');
-
-  var eList=[{k:'Neuf',c:'neuf',i:'⭐'},{k:'Bon état',c:'bon',i:'✅'},{k:'Usé',c:'use',i:'🔶'},{k:'Abîmé',c:'abime',i:'⚠'},{k:'Hors service',c:'hs',i:'🔴'},{k:'Inconnu',c:'inc',i:'❓'}];
-  document.getElementById('etat-grid').innerHTML = eList.map(function(e){return '<div class="ec '+e.c+'"><div class="ec-v">'+(s.par_etat[e.k]||0)+'</div><div class="ec-l">'+e.i+' '+e.k+'</div></div>';}).join('');
-
-  document.getElementById('tc-circ').textContent = s.en_circulation;
-  document.getElementById('tc-depot').textContent = s.au_depot;
-  document.getElementById('tc-all').textContent = s.total_mouvementes;
-  document.getElementById('tc-pend').textContent = s.transferts_en_attente;
-  document.getElementById('tc-alert').textContent = s.alertes_delai + s.hors_service;
-  var sansFds = (d.inventory||[]).filter(function(i){return !i.fds;}).length;
-  document.getElementById('tc-docs').textContent = sansFds + ' sans FDS';
-
+// ── Vue générale ──────────────────────────────────────────────────
+function renderVueGenerale(){
+  var s=d.stats;
+  document.getElementById('loading-main').style.display='none';
+  document.getElementById('dash-content').style.display='block';
+  document.getElementById('kpi-grid').innerHTML=[
+    {ic:'📦',v:s.total_mouvementes,l:'Immos tracées',cl:'blue',tab:'depot'},
+    {ic:'🔄',v:s.en_circulation,l:'En circulation',cl:'orange',tab:'circulation'},
+    {ic:'🏭',v:s.au_depot,l:'Au dépôt',cl:'green',tab:'depot'},
+    {ic:'📋',v:s.total_mouvements,l:'Total mouvements',cl:'grey',tab:'historique'},
+    {ic:'⏱',v:s.moyenne_jours_hors_depot+'j',l:'Durée moy. hors dépôt',cl:'grey',tab:'analyses'},
+    {ic:'⏳',v:s.transferts_en_attente,l:'Transferts en attente',cl:s.transferts_en_attente>0?'yellow':'green',tab:'circulation'},
+    {ic:'🔴',v:s.hors_service,l:'Hors service',cl:s.hors_service>0?'red':'green',tab:'alertes'},
+    {ic:'⚠️',v:s.alertes_delai,l:'Transferts >24h',cl:s.alertes_delai>0?'red':'green',tab:'alertes'},
+  ].map(function(k){return'<div class="kpi '+k.cl+'" onclick="showTab(\''+k.tab+'\')" title="Cliquer pour voir"><div style="font-size:20px;margin-bottom:6px">'+k.ic+'</div><div class="kpi-v">'+k.v+'</div><div class="kpi-l">'+k.l+'</div></div>';}).join('');
+  var eList=[{k:'Neuf',c:'neuf',i:'⭐'},{k:'Bon état',c:'bon',i:'✅'},{k:'Usé',c:'use',i:'🔶'},{k:'Abîmé',c:'abime',i:'⚠️'},{k:'Hors service',c:'hs',i:'🔴'},{k:'Inconnu',c:'inc',i:'❓'}];
+  document.getElementById('etat-grid').innerHTML=eList.map(function(e){return'<div class="ec '+e.c+'"><div class="ec-v">'+(s.par_etat[e.k]||0)+'</div><div class="ec-l">'+e.i+' '+e.k+'</div></div>';}).join('');
   drawCharts();
-  tab(curTab);
 }
 
-function drawCharts() {
-  var s = d.stats;
+function drawCharts(){
+  var s=d.stats;
   ['rep','etat','det'].forEach(function(k){if(charts[k])charts[k].destroy();});
-  charts.rep = new Chart(document.getElementById('ch-rep'),{type:'doughnut',data:{labels:['En circulation','Au depot'],datasets:[{data:[s.en_circulation,s.au_depot],backgroundColor:['#1A3A6B','#27AE60'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
-  var ek=['Neuf','Bon état','Usé','Abîmé','Hors service','Inconnu'];var ec=['#27AE60','#2980B9','#F39C12','#E74C3C','#7F8C8D','#BDC3C7'];
-  charts.etat = new Chart(document.getElementById('ch-etat'),{type:'bar',data:{labels:ek,datasets:[{data:ek.map(function(k){return s.par_etat[k]||0;}),backgroundColor:ec,borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}});
+  charts.rep=new Chart(document.getElementById('ch-rep'),{type:'doughnut',data:{labels:['En circulation','Au dépôt'],datasets:[{data:[s.en_circulation,s.au_depot],backgroundColor:['#1A3A6B','#27AE60'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  var ek=['Neuf','Bon état','Usé','Abîmé','Hors service','Inconnu'],ec=['#27AE60','#2980B9','#F39C12','#E74C3C','#7F8C8D','#BDC3C7'];
+  charts.etat=new Chart(document.getElementById('ch-etat'),{type:'bar',data:{labels:ek,datasets:[{data:ek.map(function(k){return s.par_etat[k]||0;}),backgroundColor:ec,borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}});
   var top=(d.top_detenteurs||[]).slice(0,8);
-  charts.det = new Chart(document.getElementById('ch-det'),{type:'bar',data:{labels:top.map(function(x){return x.nom.split(' ')[0];}),datasets:[{data:top.map(function(x){return x.count;}),backgroundColor:'#E87722',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});
+  charts.det=new Chart(document.getElementById('ch-det'),{type:'bar',data:{labels:top.map(function(x){return x.nom.split(' ')[0];}),datasets:[{data:top.map(function(x){return x.count;}),backgroundColor:'#E87722',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});
 }
 
-var tabs=['circ','depot','all','pending','hist','analyse','docs','alertes','resa','maint'];
-function tab(t) {
-  curTab=t;
-  document.querySelectorAll('.tab').forEach(function(el,i){el.classList.toggle('active',tabs[i]===t);});
-  tabs.forEach(function(x){document.getElementById('pane-'+x).style.display=x===t?'block':'none';});
-  if(t==='circ')renderCirc();
-  else if(t==='depot')renderDepot();
-  else if(t==='all')renderAll();
-  else if(t==='pending')renderPending();
-  else if(t==='alertes')renderAlertes();
-  else if(t==='analyse')renderAnalyse();
-  else if(t==='docs')renderDocs();
-}
-
-function filterTable(){if(curTab==='circ')renderCirc();else if(curTab==='depot')renderDepot();else if(curTab==='all')renderAll();}
-
-function ebadge(e){var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh'};return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';}
-
-function renderCirc() {
-  var q=document.getElementById('s-q').value.toUpperCase(),fe=document.getElementById('s-etat').value;
+// ── En circulation ────────────────────────────────────────────────
+function renderCirc(){
+  var q=(document.getElementById('circ-q').value||'').toUpperCase();
+  var fe=document.getElementById('circ-etat').value;
   var data=(d.en_circulation||[]).filter(function(i){return(!q||(i.code_im.includes(q)||i.detenteur_nom.toUpperCase().includes(q)||(i.lib||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe);});
   var grp={};data.forEach(function(i){if(!grp[i.detenteur_code])grp[i.detenteur_code]={nom:i.detenteur_nom,code:i.detenteur_code,list:[]};grp[i.detenteur_code].list.push(i);});
   document.getElementById('cnt-circ').textContent=data.length+' immos';
   var sorted=Object.values(grp).sort(function(a,b){return b.list.length-a.list.length;});
-  document.getElementById('dg-circ').innerHTML=sorted.length===0?'<p class="es">Aucun resultat.</p>':sorted.map(function(g){
-    return '<div class="dc"><div class="dn">'+g.nom+' <span><span class="dcnt">'+g.list.length+'</span> <span style="font-size:10px;color:var(--grey);margin-left:4px">'+g.code+'</span></span></div>'+
-      g.list.map(function(i){var fdsU=getFdsUrl(i.fds,i.code_im);var fds=fdsU?'<a href="'+fdsU+'" target="_blank" style="font-size:10px;color:var(--blue);margin-left:4px">FDS</a>':'';
-        return '<div class="ii"><span><b style="font-family:monospace;font-size:11px">'+i.code_im+'</b>'+fds+'<br><span style="font-size:11px;color:#555">'+(i.lib||'')+'</span></span><span>'+ebadge(i.etat)+' <span style="font-size:10px;color:var(--grey)">'+fmtD(i.since)+'</span></span></div>';
+  document.getElementById('dg-circ').innerHTML=sorted.length===0?'<p class="es">Aucun résultat.</p>':sorted.map(function(g){
+    return'<div class="dc"><div class="dn">'+g.nom+' <span><span class="dcnt">'+g.list.length+'</span><span style="font-size:10px;color:var(--grey);margin-left:4px">'+g.code+'</span></span></div>'+
+      g.list.map(function(i){var fu=getFdsUrl(i.fds,i.code_im);var fds=fu?'<a href="'+fu+'" target="_blank" style="font-size:10px;color:var(--blue);margin-left:4px">FDS</a>':'';
+        return'<div class="ii"><span><b style="font-family:monospace;font-size:11px">'+i.code_im+'</b>'+fds+'<br><span style="font-size:11px;color:#555">'+(i.lib||'')+'</span></span><span>'+ebadge(i.etat)+'<br><span style="font-size:10px;color:var(--grey)">'+fmtD(i.since)+'</span></span></div>';
       }).join('')+'</div>';
   }).join('');
 }
 
-function renderDepot() {
-  var q=document.getElementById('s-q').value.toUpperCase(),fe=document.getElementById('s-etat').value;
-  var data=srt((d.au_depot||[]).filter(function(i){return(!q||(i.code_im.includes(q)||(i.lib||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe);}),sc.field,sc.asc);
+// ── Au dépôt ──────────────────────────────────────────────────────
+function renderDepot(){
+  var q=(document.getElementById('depot-q').value||'').toUpperCase();
+  var fe=document.getElementById('depot-etat').value;
+  var data=(d.au_depot||[]).filter(function(i){return(!q||(i.code_im.includes(q)||(i.lib||i.libelle||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe);});
+  data.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
   document.getElementById('cnt-depot').textContent=data.length+' immos';
   document.getElementById('tb-depot').innerHTML=data.length===0?'<tr><td colspan="5" class="es">Aucun.</td></tr>':
-    data.map(function(i){return '<tr><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey);max-width:200px">'+(i.note||'—')+'</td></tr>';}).join('');
+    data.map(function(i){return'<tr><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(i.note||'—')+'</td></tr>';}).join('');
 }
 
-function renderAll() {
-  var q=document.getElementById('s-q').value.toUpperCase(),fe=document.getElementById('s-etat').value,fs=document.getElementById('s-statut').value;
-  var data=srt((d.inventory||[]).filter(function(i){return(!q||(i.code_im.includes(q)||i.detenteur_nom.toUpperCase().includes(q)||(i.lib||i.libelle||'').toUpperCase().includes(q)))&&(!fe||i.etat===fe)&&(!fs||i.statut===fs);}),sc.field,sc.asc);
-  document.getElementById('cnt-all').textContent=data.length+' immos';
-  document.getElementById('tb-all').innerHTML=data.length===0?'<tr><td colspan="7" class="es">Aucun.</td></tr>':
-    data.map(function(i){var hs=i.etat==='Hors service';return '<tr'+(hs?' class="arow"':'')+'>'+
-      '<td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td>'+
-      '<td>'+(i.statut==='En circulation'?'<span class="badge bc">Circ.</span>':'<span class="badge bd">Depot</span>')+'</td>'+
-      '<td><b style="font-size:12px">'+i.detenteur_nom+'</b><br><span style="font-size:10px;color:var(--grey)">'+i.detenteur_code+'</span></td>'+
-      '<td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td>'+
-      '<td style="font-size:11px;color:var(--grey);max-width:180px">'+(i.note||'—')+'</td></tr>';}).join('');
-}
-
-function renderPending() {
-  var data=d.pending||[],now=Date.now();
-  document.getElementById('cnt-pend').textContent=data.length+' en attente';
-  document.getElementById('tb-pend').innerHTML=data.length===0?'<tr><td colspan="7" class="es">Aucun transfert en attente.</td></tr>':
-    data.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);var ret=h>24;
-      return '<tr'+(ret?' class="arow"':'')+'>'+
-        '<td class="icode">'+t.code_im+'</td><td style="font-size:12px">'+(t.lib||t.libelle||'')+'</td>'+
-        '<td><b style="font-size:12px">'+t.donneur_nom+'</b><br><span style="font-size:10px;color:var(--grey)">'+t.donneur_code+'</span></td>'+
-        '<td><b style="font-size:12px">'+t.receveur_nom+'</b><br><span style="font-size:10px;color:var(--grey)">'+t.receveur_code+'</span></td>'+
-        '<td>'+ebadge(t.etat||'Inconnu')+'</td>'+
-        '<td>'+(ret?'<span class="badge bret">'+h+'h</span>':'<span class="badge batt">'+h+'h</span>')+'</td>'+
-        '<td style="font-size:11px;color:var(--grey)">'+(t.note||'—')+'</td></tr>';}).join('');
-}
-
-function searchHist() {
+// ── Historique ────────────────────────────────────────────────────
+function searchHist(){
   var q=document.getElementById('hist-q').value.trim().toUpperCase();
   if(!q)return;
   var all=d.all_movements||[];
   var res=all.filter(function(m){return m.code_im.toUpperCase().includes(q)||m.code_employe.toUpperCase().includes(q)||m.nom_employe.toUpperCase().includes(q);});
-  document.getElementById('tb-hist').innerHTML=res.length===0?'<tr><td colspan="7" class="es">Aucun resultat.</td></tr>':
+  document.getElementById('tb-hist').innerHTML=res.length===0?'<tr><td colspan="7" class="es">Aucun résultat.</td></tr>':
     res.map(function(m){var lib=im[m.code_im]?im[m.code_im].Libelle||'':'';var icon=m.type_mouvement==='Retour'?'📥':m.type_mouvement==='Transfert'?'🔄':'📤';
-      return '<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td><td class="icode">'+m.code_im+'</td><td style="font-size:12px">'+lib+'</td><td>'+icon+' '+m.type_mouvement+'</td><td><b style="font-size:12px">'+m.nom_employe+'</b><br><span style="font-size:10px;color:var(--grey)">'+m.code_employe+'</span></td><td>'+ebadge(m.etat||'')+'</td><td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
+      return'<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td><td class="icode">'+m.code_im+'</td><td style="font-size:12px">'+lib+'</td><td>'+icon+' '+m.type_mouvement+'</td><td><b style="font-size:12px">'+m.nom_employe+'</b><br><span style="font-size:10px;color:var(--grey)">'+m.code_employe+'</span></td><td>'+ebadge(m.etat||'')+'</td><td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
     }).join('');
 }
 
-function renderDocs() {
+// ── Réservations ──────────────────────────────────────────────────
+function renderResa(){
+  document.getElementById('resa-loading').style.display='none';
+  document.getElementById('resa-content').style.display='block';
+  var q=(document.getElementById('resa-q').value||'').toUpperCase();
+  var sf=document.getElementById('resa-statut').value;
+  var data=reservations.filter(function(r){
+    return(!q||(r.code_im.includes(q)||r.nom_employe.toUpperCase().includes(q)||(r.nom_chantier||'').toUpperCase().includes(q)||(im[r.code_im]&&(im[r.code_im].Libelle||'').toUpperCase().includes(q))))&&(!sf||r.statut===sf);
+  });
+  // Trier : retards en premier, puis demandées, puis autres
+  var order={'En retard':0,'Demandee':1,'Confirmee':2,'En cours':3,'Rendue':4,'Annulee':5};
+  data.sort(function(a,b){return (order[a.statut]||9)-(order[b.statut]||9);});
+  // Sous-totaux
+  var counts={};reservations.forEach(function(r){counts[r.statut]=(counts[r.statut]||0)+1;});
+  document.getElementById('resa-stats').innerHTML=Object.keys(counts).map(function(s){
+    return'<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:12px;font-weight:700;background:'+(SCOL[s]||'#999')+'22;color:'+(SCOL[s]||'#999');})+'cursor:pointer" onclick="document.getElementById(\'resa-statut\').value=\''+s+'\';renderResa()">'+
+      (SLAB[s]||s)+' <span style="background:'+(SCOL[s]||'#999')+';color:white;border-radius:10px;padding:1px 6px">'+counts[s]+'</span></span>';
+  }).join('');
+  // Gantt 6 semaines
+  var today=new Date(),lundi=new Date(today);
+  lundi.setDate(today.getDate()-((today.getDay()+6)%7));lundi.setHours(0,0,0,0);
+  var NB=42;var joursFR=['L','M','M','J','V','S','D'];var moisFR=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  var cols=[];for(var ci=0;ci<NB;ci++){var dd=new Date(lundi.getTime()+ci*86400000);cols.push(dd);}
+  var periodeDebut=lundi,periodeFin=new Date(lundi.getTime()+NB*86400000);
+  var ganttData=reservations.filter(function(r){if(!r.date_debut&&!r.date_fin)return false;var rd=r.date_debut?new Date(r.date_debut):periodeDebut;var rf=r.date_fin?new Date(r.date_fin):periodeFin;return!(rf<periodeDebut||rd>periodeFin);});
+  var gh='<table style="border-collapse:collapse;font-size:11px"><thead><tr><th style="padding:3px 8px;text-align:left;min-width:140px;position:sticky;left:0;background:white;z-index:1">Immo</th>';
+  var lastM=-1;cols.forEach(function(dd,i){if(dd.getMonth()!==lastM){var span=cols.filter(function(c){return c.getMonth()===dd.getMonth();}).length;gh+='<th colspan="'+span+'" style="padding:2px 4px;background:#F0F4F8;color:var(--blue);font-weight:700;text-align:center;border:1px solid #ddd">'+moisFR[dd.getMonth()]+' '+dd.getFullYear()+'</th>';lastM=dd.getMonth();}});
+  gh+='</tr><tr><th style="position:sticky;left:0;background:white;z-index:1"></th>';
+  cols.forEach(function(dd){var isT=dd.toDateString()===today.toDateString();var isW=dd.getDay()===0||dd.getDay()===6;gh+='<th style="padding:2px 1px;text-align:center;width:20px;min-width:20px;'+(isT?'background:var(--orange);color:white;border-radius:3px;':isW?'color:#ccc;':'color:var(--grey);')+'">'+joursFR[(dd.getDay()+6)%7]+'<br>'+dd.getDate()+'</th>';});
+  gh+='</tr></thead><tbody>';
+  if(ganttData.length===0){gh+='<tr><td colspan="'+(NB+1)+'" class="es">Aucune réservation sur cette période.</td></tr>';}
+  else{ganttData.forEach(function(r){var lib=im[r.code_im]?(im[r.code_im].Libelle||r.code_im).substring(0,20):(r.code_im||'—');var col=SCOL[r.statut]||'#999';gh+='<tr><td style="padding:3px 8px;white-space:nowrap;position:sticky;left:0;background:white;border-right:1px solid #eee;z-index:1"><span style="font-size:11px">'+lib+'</span><br><span style="font-size:10px;color:var(--grey)">'+r.nom_employe+'</span></td>';cols.forEach(function(dd){var isW=dd.getDay()===0||dd.getDay()===6;var isT=dd.toDateString()===today.toDateString();var deb=r.date_debut?new Date(r.date_debut):null;var fin=r.date_fin?new Date(r.date_fin):null;var debJ=deb?new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()):null;var finJ=fin?new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()):null;var inR=debJ&&finJ&&dd>=debJ&&dd<=finJ;var bg=inR?col:(isW?'#F8F8F8':'transparent');gh+='<td style="width:20px;min-width:20px;padding:2px;background:'+bg+';border:'+(isT?'2px solid var(--orange)':'1px solid #f0f0f0')+'" title="'+(inR?rsLabel(r.statut):'')+'"></td>';});gh+='</tr>';});}
+  gh+='</tbody></table>';
+  document.getElementById('resa-gantt').innerHTML=gh;
+  document.getElementById('cnt-resa').textContent=data.length+' réservations';
+  document.getElementById('tb-resa').innerHTML=data.length===0?'<tr><td colspan="8" class="es">Aucune réservation.</td></tr>':
+    data.map(function(r){var lib=im[r.code_im]?im[r.code_im].Libelle||r.code_im:r.code_im;var isUrgent=r.statut==='En retard';var isDemandee=r.statut==='Demandee';
+      return'<tr class="'+(isUrgent?'urgent-row':isDemandee?'arow':'')+'"><td>'+rsLabel(r.statut)+'</td><td class="icode">'+r.code_im+'</td><td style="font-size:12px">'+lib+'</td><td style="font-size:12px"><b>'+r.nom_employe+'</b></td><td style="font-size:12px">'+(r.nom_chantier||'—')+'</td><td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td><td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_fin)+'</td><td><select onchange="majStatutResa(\''+r.id+'\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Changer...</option><option value="Confirmee">Confirmer</option><option value="Annulee">Annuler</option><option value="Rendue">Rendue</option></select></td></tr>';
+    }).join('');
+}
+
+async function majStatutResa(id,statut){
+  if(!statut)return;
+  await fetch(W+'?action=statut_resa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,statut})});
+  await loadReservations();renderResa();
+}
+
+// ── Documents ─────────────────────────────────────────────────────
+function renderDocs(){
+  document.getElementById('docs-loading').style.display='none';
+  document.getElementById('docs-content').style.display='block';
   var q=(document.getElementById('docs-q').value||'').toUpperCase();
   var f=document.getElementById('docs-filter').value;
   var invMap={};(d.inventory||[]).forEach(function(i){invMap[i.code_im]=i;});
-  var rows=Object.keys(im).map(function(code){
-    var immo=im[code];var inv=invMap[code];
-    return {code_im:code,libelle:immo.Libelle||'',categorie:immo.Categorie||'',fds:fdsMap[code]||(immo.FDS_URL||''),statut:inv?inv.statut:'Au depot',detenteur:inv?inv.detenteur_nom:'Depot'};
-  });
+  var rows=Object.keys(im).map(function(code){var immo=im[code];var inv=invMap[code];return{code_im:code,libelle:immo.Libelle||'',categorie:immo.Categorie||'',fds:fdsMap[code]||(immo.FDS_URL||''),statut:inv?inv.statut:'Au depot',detenteur:inv?inv.detenteur_nom:'Depot'};});
   if(q)rows=rows.filter(function(r){return r.code_im.includes(q)||r.libelle.toUpperCase().includes(q)||r.categorie.toUpperCase().includes(q);});
   if(f==='manque_fds')rows=rows.filter(function(r){return!r.fds;});
   if(f==='a_fds')rows=rows.filter(function(r){return!!r.fds;});
@@ -429,52 +543,78 @@ function renderDocs() {
   rows.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
   var sansFds=rows.filter(function(r){return!r.fds;}).length;
   var avecPhotos=rows.filter(function(r){return!!photosMap[r.code_im];}).length;
-  document.getElementById('tc-docs').textContent=sansFds+' sans FDS';
-  var resaEnCours = reservations.filter(function(r){ return r.statut==='Confirmee'||r.statut==='En cours'||r.statut==='Demandee'; }).length;
-  var resaRetard = reservations.filter(function(r){ return r.statut==='En retard'; }).length;
-  document.getElementById('tc-resa').textContent = resaEnCours;
-  document.getElementById('tc-maint').textContent = ((maintenance.maintenances_urgentes||[]).length + (maintenance.garanties_bientot||[]).length);
+  document.getElementById('nb-docs').textContent=sansFds;
   document.getElementById('cnt-docs').textContent=rows.length+' immos — '+avecPhotos+' avec photos';
-  document.getElementById('tb-docs').innerHTML=rows.length===0?'<tr><td colspan="6" class="es">Aucune immo.</td></tr>':
-    rows.map(function(r){
-      var hasFds=!!r.fds;var hasPhotos=!!photosMap[r.code_im];
-      var fdsUrl=getFdsUrl(r.fds,r.code_im);
-      var fdsCell=hasFds?'<a href="'+fdsUrl+'" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">Voir FDS</a>':'<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>';
-      var photosCell=hasPhotos?'<button onclick="showPhotosModal(\''+r.code_im+'\')" style="font-size:11px;padding:4px 9px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>':'<span style="font-size:11px;color:#ccc">—</span>';
-      var statBadge=r.statut==='En circulation'?'<span class="badge bc" style="font-size:11px">Circ.</span>':'<span class="badge bd" style="font-size:11px">Depot</span>';
-      var bg=hasFds?' style="background:#F0FFF4"':'';
-      return '<tr'+bg+'><td class="icode">'+r.code_im+'</td><td style="font-size:12px">'+r.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+r.categorie+'</td><td>'+statBadge+'</td><td>'+fdsCell+'</td><td>'+photosCell+'</td></tr>';
+  document.getElementById('tb-docs').innerHTML=rows.length===0?'<tr><td colspan="6" class="es">Aucune.</td></tr>':
+    rows.map(function(r){var hasFds=!!r.fds;var hasPh=!!photosMap[r.code_im];var fu=getFdsUrl(r.fds,r.code_im);
+      return'<tr'+(hasFds?' style="background:#F0FFF4"':'')+'><td class="icode">'+r.code_im+'</td><td style="font-size:12px">'+r.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+r.categorie+'</td>'+
+        '<td>'+(r.statut==='En circulation'?'<span class="badge bc">Circ.</span>':'<span class="badge bd">Dépôt</span>')+'</td>'+
+        '<td>'+(hasFds?'<a href="'+fu+'" target="_blank" style="color:#0D47A1;font-weight:600;font-size:12px">Voir FDS</a>':'<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>')+'</td>'+
+        '<td>'+(hasPh?'<button onclick="showPhotosModal(\''+r.code_im+'\')" style="font-size:11px;padding:3px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>':'<span style="font-size:11px;color:#ccc">—</span>')+'</td></tr>';
     }).join('');
 }
 
-function renderAnalyse() {
-  var cl=d.classement_duree||[];var s=d.stats||{};
-  var html='<h3 style="color:var(--blue);margin-bottom:12px">Classement employes — duree moyenne de detention</h3>';
-  if(cl.length===0){html+='<p class="es">Aucune donnee.</p>';}
-  else{html+='<table><thead><tr><th>Rang</th><th>Employe</th><th>Immos en cours</th><th>Duree moy.</th><th>Total cumule</th></tr></thead><tbody>';
-    html+=cl.map(function(r,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';return '<tr><td>'+m+' '+(i+1)+'</td><td><b>'+r.nom+'</b></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';}).join('')+'</tbody></table>';}
-  html+='<div style="margin-top:20px;background:#F8FAFC;border-radius:10px;padding:14px"><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">';
-  html+='<div><div style="font-size:24px;font-weight:800;color:var(--blue)">'+s.total_mouvements+'</div><div style="font-size:12px;color:var(--grey)">Total mouvements</div></div>';
-  html+='<div><div style="font-size:24px;font-weight:800;color:var(--orange)">'+s.moyenne_jours_hors_depot+'j</div><div style="font-size:12px;color:var(--grey)">Duree moy. hors depot</div></div>';
-  html+='<div><div style="font-size:24px;font-weight:800;color:var(--green)">'+s.au_depot+'</div><div style="font-size:12px;color:var(--grey)">Immos au depot</div></div>';
-  html+='</div></div>';
-  document.getElementById('analyse-content').innerHTML=html;
+// ── Maintenance ───────────────────────────────────────────────────
+function renderMaint(){
+  document.getElementById('maint-loading').style.display='none';
+  document.getElementById('maint-content').style.display='block';
+  if(!maintenance){document.getElementById('maint-content').innerHTML='<p class="es">Renseignez les dates dans la liste Immos SharePoint.</p>';return;}
+  var mu=maintenance.maintenances_urgentes||[];var mb=maintenance.maintenances_bientot||[];var gb=maintenance.garanties_bientot||[];var ge=maintenance.garanties_expirees||[];
+  function tbl(titre,items,col,champs){
+    if(!items.length)return'';
+    var h='<div class="tcard" style="margin-bottom:12px"><div class="thead" style="border-top:3px solid '+col+'"><h3>'+titre+' ('+items.length+')</h3></div>';
+    h+='<div style="overflow-x:auto"><table><thead><tr>'+champs.map(function(c){return'<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>';
+    h+=items.map(function(i){return'<tr class="'+(col===SCOL['En retard']||col==='var(--red)'?'urgent-row':'arow')+'"><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+i.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+i.categorie+'</td>'+
+      (champs.length>3?'<td>'+fmtD(i.prochaine_maintenance||i.date_garantie_fin)+'</td>':'')+
+      '<td style="font-size:12px">'+(i.prestataire_sav||'—')+'</td>'+
+      (champs.length>4?'<td style="font-size:12px">'+(i.cout_maintenance?i.cout_maintenance+'€':'—')+'</td>':'')+
+      '</tr>';}).join('');
+    return h+'</tbody></table></div></div>';
+  }
+  var html=tbl('🔴 Maintenance urgente (≤7j)',mu,'var(--red)',['Code IM','Libelle','Catégorie','Date prévue','Prestataire','Coût']);
+  html+=tbl('🟠 Maintenance dans 30j',mb,'var(--orange)',['Code IM','Libelle','Catégorie','Date prévue','Prestataire','Coût']);
+  html+=tbl('⚠️ Garanties expirant dans 30j',gb,'var(--yellow)',['Code IM','Libelle','Catégorie','Fin garantie','Prestataire']);
+  html+=tbl('❌ Garanties expirées',ge,'var(--grey)',['Code IM','Libelle','Catégorie','Expirée le','Prestataire']);
+  if(!html)html='<div class="es" style="padding:40px">Aucune alerte maintenance ou garantie.<br><small>Renseignez Prochaine_Maintenance et Date_Garantie_Fin dans la liste Immos SharePoint.</small></div>';
+  var coutTotal=(maintenance.all||[]).filter(function(i){return i.prochaine_maintenance;}).reduce(function(a,i){return a+(parseFloat(i.cout_maintenance)||0);},0);
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:16px;background:var(--card);border-radius:12px;box-shadow:var(--shadow)">';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--red)">'+mu.length+'</div><div style="font-size:12px;color:var(--grey)">Urgentes</div></div>';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--orange)">'+mb.length+'</div><div style="font-size:12px;color:var(--grey)">Dans 30j</div></div>';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--yellow)">'+gb.length+'</div><div style="font-size:12px;color:var(--grey)">Garanties à venir</div></div>';
+  html+='<div><div style="font-size:22px;font-weight:800;color:var(--blue)">'+Math.round(coutTotal)+'€</div><div style="font-size:12px;color:var(--grey)">Budget planifié</div></div>';
+  html+='</div>';
+  document.getElementById('maint-content').innerHTML=html;
 }
 
-function renderAlertes() {
-  var html='',now=Date.now();
+// ── Alertes ───────────────────────────────────────────────────────
+function renderAlertes(){
+  var html='';var now=Date.now();
   var hs=d.hors_service||[];var ret=d.alertes_delai||[];
-  if(hs.length>0){html+='<div class="thead" style="border-top:3px solid var(--red)"><h3>Hors service ('+hs.length+')</h3></div>';html+='<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Depuis</th><th>Note</th></tr></thead><tbody>';html+=hs.map(function(i){return '<tr class="arow"><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td><td>'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(i.note||'—')+'</td></tr>';}).join('');html+='</tbody></table></div>';}
-  if(ret.length>0){html+='<div class="thead" style="border-top:3px solid var(--orange);margin-top:8px"><h3>Transferts +24h ('+ret.length+')</h3></div>';html+='<div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>';html+=ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return '<tr class="arow"><td class="icode">'+t.code_im+'</td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('');html+='</tbody></table></div>';}
+  if(hs.length>0){html+='<div class="tcard" style="margin-bottom:12px"><div class="thead" style="border-top:3px solid var(--red)"><h3>🔴 Hors service ('+hs.length+')</h3></div><div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Depuis</th><th>Note</th></tr></thead><tbody>';html+=hs.map(function(i){return'<tr class="urgent-row"><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+(i.lib||i.libelle||'')+'</td><td>'+fmtD(i.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(i.note||'—')+'</td></tr>';}).join('');html+='</tbody></table></div></div>';}
+  if(ret.length>0){html+='<div class="tcard"><div class="thead" style="border-top:3px solid var(--orange)"><h3>⏰ Transferts en attente >24h ('+ret.length+')</h3></div><div style="overflow-x:auto"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>';html+=ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="arow"><td class="icode">'+t.code_im+'</td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('');html+='</tbody></table></div></div>';}
   if(!html)html='<div class="es" style="padding:40px">Aucune alerte en cours.</div>';
   document.getElementById('alertes-content').innerHTML=html;
 }
 
-function sort(tbl,field){if(sc.field===field)sc.asc=!sc.asc;else{sc.field=field;sc.asc=true;}if(tbl==='depot')renderDepot();else if(tbl==='all')renderAll();}
-function srt(arr,field,asc){return arr.slice().sort(function(a,b){var av=(a[field]||'').toString().toLowerCase(),bv=(b[field]||'').toString().toLowerCase();return asc?av.localeCompare(bv):bv.localeCompare(av);});}
+// ── Analyses ──────────────────────────────────────────────────────
+function renderAnalyse(){
+  var cl=d.classement_duree||[];var s=d.stats||{};
+  var html='<div class="tcard"><div class="thead"><h3>Classement — durée moyenne de détention</h3></div>';
+  if(!cl.length){html+='<p class="es">Aucune donnée.</p></div>';}
+  else{html+='<div style="overflow-x:auto"><table><thead><tr><th>Rang</th><th>Employe</th><th>Immos en cours</th><th>Durée moyenne</th><th>Total cumulé</th></tr></thead><tbody>';
+    html+=cl.map(function(r,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';return'<tr><td>'+m+' '+(i+1)+'</td><td><b>'+r.nom+'</b></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';}).join('');
+    html+='</tbody></table></div></div>';}
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px;padding:16px;background:var(--card);border-radius:12px;box-shadow:var(--shadow)">';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--blue)">'+s.total_mouvements+'</div><div style="font-size:12px;color:var(--grey)">Total mouvements</div></div>';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--orange)">'+s.moyenne_jours_hors_depot+'j</div><div style="font-size:12px;color:var(--grey)">Durée moy. hors dépôt</div></div>';
+  html+='<div><div style="font-size:24px;font-weight:800;color:var(--green)">'+s.au_depot+'</div><div style="font-size:12px;color:var(--grey)">Immos au dépôt</div></div>';
+  html+='</div>';
+  document.getElementById('analyse-content').innerHTML=html;
+}
 
-async function showPhotosModal(codeIM) {
-  var oldM=document.getElementById('photos-modal');if(oldM)oldM.remove();
+// ── Photos modal ──────────────────────────────────────────────────
+async function showPhotosModal(codeIM){
+  var old=document.getElementById('photos-modal');if(old)old.remove();
   var modal=document.createElement('div');modal.id='photos-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   modal.onclick=function(e){if(e.target===modal)modal.remove();};
@@ -483,209 +623,37 @@ async function showPhotosModal(codeIM) {
   box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div><strong style="color:var(--blue)">'+lib+'</strong><br><span style="font-size:12px;color:var(--grey);font-family:monospace">'+codeIM+'</span></div><button id="close-pm" style="background:#eee;border:none;border-radius:50%;width:34px;height:34px;font-size:20px;cursor:pointer">x</button></div><p id="pm-body" style="color:var(--grey);text-align:center;padding:20px">Chargement...</p>';
   modal.appendChild(box);document.body.appendChild(modal);
   document.getElementById('close-pm').onclick=function(){modal.remove();};
-  try {
-    var res=await fetch(W+'?photos='+encodeURIComponent(codeIM));
-    var photos=await res.json();
-    var body=document.getElementById('pm-body');
+  try{var res=await fetch(W+'?photos='+encodeURIComponent(codeIM));var photos=await res.json();var body=document.getElementById('pm-body');
     if(!photos||!photos.length){body.textContent='Aucune photo pour '+codeIM+'.';return;}
     var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
     photos.forEach(function(p){grid+='<div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)"><img src="'+p.url+'" loading="lazy" style="width:100%;height:160px;object-fit:cover;cursor:pointer;display:block" onclick="window.open(this.src)"><p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">'+fmtD(p.created)+' — '+Math.round(p.size/1024)+' Ko</p></div>';});
     grid+='</div>';body.outerHTML=grid;
-  } catch(e){var b=document.getElementById('pm-body');if(b)b.textContent='Erreur : '+e.message;}
+  }catch(e){var b=document.getElementById('pm-body');if(b)b.textContent='Erreur : '+e.message;}
 }
 
-// ── RÉSERVATIONS ─────────────────────────────────────────────────
-var SCOL = { 'Demandee':'#F39C12','Confirmee':'#27AE60','En cours':'#2980B9','En retard':'#E74C3C','Rendue':'#95A5A6','Annulee':'#BDC3C7' };
-var SLAB = { 'Demandee':'⏳ Demandée','Confirmee':'✅ Confirmée','En cours':'🔄 En cours','En retard':'⚠️ En retard','Rendue':'📦 Rendue','Annulee':'❌ Annulée' };
-
-function rsLabel(s){ return '<span style="display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:'+(SCOL[s]||'#999')+'22;color:'+(SCOL[s]||'#999')+'">'+(SLAB[s]||s)+'</span>'; }
-
-function renderResa() {
-  var q = (document.getElementById('resa-q').value||'').toUpperCase();
-  var sf = document.getElementById('resa-statut').value;
-  var data = reservations.filter(function(r){
-    return (!q||(r.code_im.includes(q)||r.nom_employe.toUpperCase().includes(q)||(r.nom_chantier||'').toUpperCase().includes(q)||(r.code_im && im[r.code_im] && (im[r.code_im].Libelle||'').toUpperCase().includes(q))))&&(!sf||r.statut===sf);
-  });
-  document.getElementById('cnt-resa').textContent = data.length + ' réservations';
-
-  // Gantt 6 semaines à partir de la semaine en cours
-  var today = new Date();
-  // Lundi de la semaine courante
-  var lundi = new Date(today);
-  lundi.setDate(today.getDate() - ((today.getDay()+6)%7));
-  lundi.setHours(0,0,0,0);
-  var NB_JOURS = 42; // 6 semaines
-  var joursFR = ['L','M','M','J','V','S','D'];
-  var moisFR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-
-  // Filtrer les réservations qui intersectent la période
-  var periodeDebut = lundi;
-  var periodeFin = new Date(lundi.getTime() + NB_JOURS * 86400000);
-  var ganttData = data.filter(function(r){
-    if (!r.date_debut && !r.date_fin) return false;
-    var rd = r.date_debut ? new Date(r.date_debut) : periodeDebut;
-    var rf = r.date_fin ? new Date(r.date_fin) : periodeFin;
-    return !(rf < periodeDebut || rd > periodeFin);
-  });
-
-  // Construire les jours
-  var cols = [];
-  for (var ci=0; ci<NB_JOURS; ci++) {
-    var d = new Date(lundi.getTime() + ci * 86400000);
-    cols.push(d);
-  }
-
-  var ganttHtml = '<div style="margin-bottom:10px;display:flex;align-items:center;gap:12px">';
-  ganttHtml += '<strong style="color:var(--blue)">Calendrier des réservations — 6 semaines</strong>';
-  Object.keys(SCOL).forEach(function(s){ ganttHtml += '<span style="font-size:11px"><span style="display:inline-block;width:12px;height:12px;background:'+SCOL[s]+';border-radius:2px;margin-right:3px;vertical-align:middle"></span>'+(SLAB[s]||s)+'</span>'; });
-  ganttHtml += '</div>';
-  ganttHtml += '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px"><thead>';
-  // Ligne mois
-  ganttHtml += '<tr><th style="padding:3px 8px;text-align:left;min-width:160px;position:sticky;left:0;background:white;z-index:1">Immo</th>';
-  var lastMois = -1;
-  cols.forEach(function(d,i){
-    if (d.getMonth() !== lastMois) {
-      var span = cols.filter(function(c){ return c.getMonth()===d.getMonth(); }).length;
-      ganttHtml += '<th colspan="'+span+'" style="padding:2px 4px;background:#F0F4F8;color:var(--blue);font-weight:700;text-align:center;border:1px solid #ddd">'+moisFR[d.getMonth()]+' '+d.getFullYear()+'</th>';
-      lastMois = d.getMonth();
-    }
-  });
-  ganttHtml += '</tr>';
-  // Ligne jours
-  ganttHtml += '<tr><th style="position:sticky;left:0;background:white;z-index:1"></th>';
-  cols.forEach(function(d){
-    var isToday = d.toDateString() === today.toDateString();
-    var isWE = d.getDay()===0 || d.getDay()===6;
-    ganttHtml += '<th style="padding:2px 1px;text-align:center;width:22px;min-width:22px;' +
-      (isToday ? 'background:var(--orange);color:white;border-radius:3px;' : isWE ? 'background:#F8F8F8;color:#bbb;' : 'color:var(--grey);') + '">' +
-      joursFR[d.getDay()-1 < 0 ? 6 : d.getDay()-1] + '<br>' + d.getDate() + '</th>';
-  });
-  ganttHtml += '</tr></thead><tbody>';
-
-  if (ganttData.length === 0) {
-    ganttHtml += '<tr><td colspan="'+(NB_JOURS+1)+'" style="padding:20px;text-align:center;color:var(--grey)">Aucune réservation sur cette période.</td></tr>';
-  } else {
-    ganttData.forEach(function(r){
-      var lib = im[r.code_im] ? (im[r.code_im].Libelle||r.code_im).substring(0,22) : (r.code_im||'—');
-      var col = SCOL[r.statut] || '#999';
-      ganttHtml += '<tr><td style="padding:3px 8px;white-space:nowrap;position:sticky;left:0;background:white;border-right:1px solid #eee;z-index:1" title="'+r.nom_employe+'">'+lib+'<br><span style="font-size:10px;color:var(--grey)">'+r.nom_employe+'</span></td>';
-      cols.forEach(function(d){
-        var isWE = d.getDay()===0||d.getDay()===6;
-        var isToday = d.toDateString()===today.toDateString();
-        var deb = r.date_debut ? new Date(r.date_debut) : null;
-        var fin = r.date_fin   ? new Date(r.date_fin)   : null;
-        var debJ = deb ? new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()) : null;
-        var finJ = fin ? new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()) : null;
-        var inRange = debJ && finJ && d >= debJ && d <= finJ;
-        var bg = inRange ? col : (isWE ? '#F8F8F8' : 'transparent');
-        var border = isToday ? '2px solid var(--orange)' : '1px solid #f0f0f0';
-        ganttHtml += '<td style="width:22px;min-width:22px;padding:2px;background:'+bg+';border:'+border+'" title="'+(inRange?r.statut:'')+'"></td>';
-      });
-      ganttHtml += '</tr>';
-    });
-  }
-  ganttHtml += '</tbody></table></div>';
-  document.getElementById('resa-gantt').innerHTML = ganttHtml;
-
-  // Tableau
-  document.getElementById('tb-resa').innerHTML = data.length === 0
-    ? '<tr><td colspan="8" class="es">Aucune réservation.</td></tr>'
-    : data.map(function(r){
-        var lib = im[r.code_im] ? im[r.code_im].Libelle||r.code_im : r.code_im;
-        return '<tr><td class="icode">'+r.code_im+'</td><td style="font-size:12px">'+lib+'</td>'+
-          '<td style="font-size:12px"><b>'+r.nom_employe+'</b></td>'+
-          '<td style="font-size:12px">'+(r.nom_chantier||'—')+'</td>'+
-          '<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td>'+
-          '<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_fin)+'</td>'+
-          '<td>'+rsLabel(r.statut)+'</td>'+
-          '<td><select onchange="majStatutResa(\''+r.id+'\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Changer...</option><option value="Confirmee">Confirmer</option><option value="Annulee">Annuler</option><option value="Rendue">Marquée rendue</option></select></td></tr>';
-      }).join('');
-}
-
-async function majStatutResa(id, statut) {
-  if (!statut) return;
-  await fetch(W + '?action=statut_resa', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id, statut }) });
-  loadData();
-}
-
-// ── MAINTENANCE & GARANTIES ───────────────────────────────────────
-function renderMaint() {
-  if (!maintenance) { document.getElementById('maint-content').innerHTML = '<p class="es">Données non chargées.</p>'; return; }
-  var mu = maintenance.maintenances_urgentes || [];
-  var mb = maintenance.maintenances_bientot || [];
-  var gb = maintenance.garanties_bientot || [];
-  var ge = maintenance.garanties_expirees || [];
-  var all = maintenance.all || [];
-  var html = '';
-
-  function tableImmos(titre, items, col, fields) {
-    if (items.length === 0) return '';
-    var h = '<div class="thead" style="border-top:3px solid '+col+';margin-top:12px"><h3>'+titre+' ('+items.length+')</h3></div>';
-    h += '<div style="overflow-x:auto"><table><thead><tr>'+fields.map(function(f){ return '<th>'+f+'</th>'; }).join('')+'</tr></thead><tbody>';
-    h += items.map(function(i){
-      return '<tr style="background:#FFF8F0"><td class="icode">'+i.code_im+'</td><td style="font-size:12px">'+i.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+i.categorie+'</td>'+
-        (fields.length > 3 ? '<td style="font-size:12px">'+fmtD(i.prochaine_maintenance||i.date_garantie_fin)+'</td>' : '')+
-        '<td style="font-size:12px">'+(i.prestataire_sav||'—')+'</td>'+
-        (fields.length > 4 ? '<td style="font-size:12px">'+(i.cout_maintenance ? i.cout_maintenance+'€' : '—')+'</td>' : '')+
-        '</tr>';
-    }).join('');
-    return h + '</tbody></table></div>';
-  }
-
-  html += tableImmos('🔴 Maintenance urgente (≤ 7 jours)', mu, 'var(--red)', ['Code IM','Libelle','Catégorie','Date prévue','Prestataire','Coût estimé']);
-  html += tableImmos('🟠 Maintenance dans les 30 jours', mb, 'var(--orange)', ['Code IM','Libelle','Catégorie','Date prévue','Prestataire','Coût estimé']);
-  html += tableImmos('⚠️ Garanties expirant dans 30 jours', gb, 'var(--yellow)', ['Code IM','Libelle','Catégorie','Fin garantie','Prestataire']);
-  html += tableImmos('❌ Garanties expirées', ge, '#9E9E9E', ['Code IM','Libelle','Catégorie','Expirée le','Prestataire']);
-
-  if (!html) {
-    html = '<div style="text-align:center;padding:40px;color:var(--grey)">Aucune alerte maintenance ou garantie. Renseigne les dates dans la liste Immos SharePoint (colonnes Prochaine_Maintenance et Date_Garantie_Fin).</div>';
-  }
-
-  // Résumé financier
-  var coutTotal = all.filter(function(i){ return i.prochaine_maintenance; }).reduce(function(acc, i){ return acc + (parseFloat(i.cout_maintenance)||0); }, 0);
-  html += '<div style="margin-top:20px;background:#F8FAFC;border-radius:10px;padding:14px"><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">';
-  html += '<div><div style="font-size:24px;font-weight:800;color:var(--red)">' + mu.length + '</div><div style="font-size:12px;color:var(--grey)">Urgentes</div></div>';
-  html += '<div><div style="font-size:24px;font-weight:800;color:var(--orange)">' + mb.length + '</div><div style="font-size:12px;color:var(--grey)">Dans 30 jours</div></div>';
-  html += '<div><div style="font-size:24px;font-weight:800;color:var(--yellow)">' + gb.length + '</div><div style="font-size:12px;color:var(--grey)">Garanties à venir</div></div>';
-  html += '<div><div style="font-size:22px;font-weight:800;color:var(--blue)">' + Math.round(coutTotal) + '€</div><div style="font-size:12px;color:var(--grey)">Budget maintenance planifié</div></div>';
-  html += '</div></div>';
-
-  document.getElementById('maint-content').innerHTML = html;
-}
-
-function exportExcel() {
+// ── Export Excel ──────────────────────────────────────────────────
+function exportExcel(){
   if(!d){alert('Chargez le tableau de bord.');return;}
   var wb=XLSX.utils.book_new();var now=new Date();
   function hdr(ws,n){for(var c=0;c<n;c++){var ref=XLSX.utils.encode_cell({r:0,c:c});if(ws[ref])ws[ref].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1A3A6B'}}};}}
-  var r1=[['Code IM','Libelle','Statut','Detenteur','Code','Etat','Note','Mouvement','Depuis']];
-  (d.inventory||[]).forEach(function(i){r1.push([i.code_im,i.lib||i.libelle||'',i.statut,i.statut==='Au depot'?'Depot':i.detenteur_nom,i.statut==='Au depot'?'DEPOT':i.detenteur_code,i.etat||'Inconnu',i.note||'',i.dernier_mouvement||'',i.since?fmtDT(i.since):'']);});
-  var ws1=XLSX.utils.aoa_to_sheet(r1);ws1['!cols']=[12,40,16,28,10,14,30,16,20].map(function(w){return{wch:w};});hdr(ws1,r1[0].length);XLSX.utils.book_append_sheet(wb,ws1,'Inventaire complet');
-  var r2=[['Detenteur','Code','Code IM','Libelle','Etat','Note','Depuis']];
-  var grp={};(d.en_circulation||[]).forEach(function(i){if(!grp[i.detenteur_code])grp[i.detenteur_code]={nom:i.detenteur_nom,l:[]};grp[i.detenteur_code].l.push(i);});
-  Object.entries(grp).sort(function(a,b){return b[1].l.length-a[1].l.length;}).forEach(function(e){e[1].l.forEach(function(i){r2.push([e[1].nom,e[0],i.code_im,i.lib||i.libelle||'',i.etat||'',i.note||'',i.since?fmtDT(i.since):'']);});});
-  var ws2=XLSX.utils.aoa_to_sheet(r2);ws2['!cols']=[28,10,14,40,14,30,20].map(function(w){return{wch:w};});hdr(ws2,r2[0].length);XLSX.utils.book_append_sheet(wb,ws2,'En circulation');
-  var r3=[['Code IM','Libelle','Etat','Note','Depuis']];
-  (d.au_depot||[]).forEach(function(i){r3.push([i.code_im,i.lib||i.libelle||'',i.etat||'',i.note||'',i.since?fmtDT(i.since):'']);});
-  var ws3=XLSX.utils.aoa_to_sheet(r3);ws3['!cols']=[14,40,14,30,20].map(function(w){return{wch:w};});hdr(ws3,r3[0].length);XLSX.utils.book_append_sheet(wb,ws3,'Au depot');
-  var r4=[['Code IM','Libelle','Donneur','Donneur code','Receveur','Receveur code','Etat','Note','Depuis','Attente']];
-  var n4=Date.now();(d.pending||[]).forEach(function(t){var h=Math.round((n4-new Date(t.horodatage).getTime())/3600000);r4.push([t.code_im,t.lib||t.libelle||'',t.donneur_nom,t.donneur_code,t.receveur_nom,t.receveur_code,t.etat||'',t.note||'',fmtDT(t.horodatage),h+'h']);});
-  var ws4=XLSX.utils.aoa_to_sheet(r4);ws4['!cols']=[14,40,28,10,28,10,14,30,20,10].map(function(w){return{wch:w};});hdr(ws4,r4[0].length);XLSX.utils.book_append_sheet(wb,ws4,'Transferts en attente');
-  var r5=[['Date','Code IM','Libelle','Type','Employe','Code','Etat','Note']];
-  (d.all_movements||[]).forEach(function(m){r5.push([fmtDT(m.horodatage),m.code_im,m.lib||(im[m.code_im]?im[m.code_im].Libelle:''),m.type_mouvement,m.nom_employe,m.code_employe,m.etat||'',m.note||'']);});
-  var ws5=XLSX.utils.aoa_to_sheet(r5);ws5['!cols']=[20,14,40,14,28,12,14,30].map(function(w){return{wch:w};});hdr(ws5,r5[0].length);XLSX.utils.book_append_sheet(wb,ws5,'Historique');
+  var r1=[['Code IM','Libelle','Statut','Detenteur','Code','Etat','Note','Depuis']];
+  (d.inventory||[]).forEach(function(i){r1.push([i.code_im,i.lib||i.libelle||'',i.statut,i.statut==='Au depot'?'Depot':i.detenteur_nom,i.statut==='Au depot'?'DEPOT':i.detenteur_code,i.etat||'Inconnu',i.note||'',i.since?fmtDT(i.since):'']);});
+  var ws1=XLSX.utils.aoa_to_sheet(r1);ws1['!cols']=[12,40,16,28,10,14,30,20].map(function(w){return{wch:w};});hdr(ws1,r1[0].length);XLSX.utils.book_append_sheet(wb,ws1,'Inventaire complet');
+  var r2=[['Statut','Code IM','Libelle','Demandeur','Chantier','Du','Au','Note']];
+  reservations.forEach(function(r){r2.push([r.statut,r.code_im,im[r.code_im]?im[r.code_im].Libelle||'':'',r.nom_employe,r.nom_chantier||'',fmtDT(r.date_debut),fmtDT(r.date_fin),r.note||'']);});
+  var ws2=XLSX.utils.aoa_to_sheet(r2);ws2['!cols']=[14,12,40,28,28,20,20,30].map(function(w){return{wch:w};});hdr(ws2,r2[0].length);XLSX.utils.book_append_sheet(wb,ws2,'Reservations');
+  var r3=[['Date','Code IM','Libelle','Type','Employe','Code','Etat','Note']];
+  (d.all_movements||[]).forEach(function(m){r3.push([fmtDT(m.horodatage),m.code_im,im[m.code_im]?im[m.code_im].Libelle||'':'',m.type_mouvement,m.nom_employe,m.code_employe,m.etat||'',m.note||'']);});
+  var ws3=XLSX.utils.aoa_to_sheet(r3);ws3['!cols']=[20,14,40,14,28,12,14,30].map(function(w){return{wch:w};});hdr(ws3,r3[0].length);XLSX.utils.book_append_sheet(wb,ws3,'Historique');
   var s=d.stats||{};
-  var r6=[['Espace Soleil — Tableau de bord'],['Genere le '+fmtDT(now.toISOString())],[],['Indicateur','Valeur'],
-    ['Immos tracees',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au depot',s.au_depot||0],
-    ['Total mouvements',s.total_mouvements||0],['Duree moy. hors depot',s.moyenne_jours_hors_depot+'j'],
-    ['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0],['Alertes retard',s.alertes_delai||0],
-    [],['Distribution par etat',''],['Neuf',(s.par_etat||{})['Neuf']||0],['Bon etat',(s.par_etat||{})['Bon état']||0],
-    ['Use',(s.par_etat||{})['Usé']||0],['Abime',(s.par_etat||{})['Abîmé']||0],['Hors service',(s.par_etat||{})['Hors service']||0],['Inconnu',(s.par_etat||{})['Inconnu']||0]];
-  var ws6=XLSX.utils.aoa_to_sheet(r6);ws6['!cols']=[{wch:35},{wch:20}];XLSX.utils.book_append_sheet(wb,ws6,'Resume');
+  var r4=[['Espace Soleil — Tableau de bord'],['Genere le '+fmtDT(now.toISOString())],[],['Indicateur','Valeur'],['Immos tracees',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au depot',s.au_depot||0],['Total mouvements',s.total_mouvements||0],['Duree moy. hors depot',s.moyenne_jours_hors_depot+'j'],['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0]];
+  var ws4=XLSX.utils.aoa_to_sheet(r4);ws4['!cols']=[{wch:35},{wch:20}];XLSX.utils.book_append_sheet(wb,ws4,'Resume');
   XLSX.writeFile(wb,'EspaceSoleil_Immos_'+now.toISOString().slice(0,10)+'.xlsx');
 }
 
-if(sessionStorage.getItem('da')==='1'){document.getElementById('pin-overlay').style.display='none';loadData();}
-setInterval(function(){if(sessionStorage.getItem('da')==='1')loadData();},5*60*1000);
+// ── Init ──────────────────────────────────────────────────────────
+if(sessionStorage.getItem('da')==='1'){document.getElementById('pin-overlay').style.display='none';loadDashboard();}
+setInterval(function(){if(sessionStorage.getItem('da')==='1'){loadDashboard();}},5*60*1000);
 </script>
 </body>
 </html>
