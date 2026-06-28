@@ -5,8 +5,15 @@
 const CONFIG = {
   proxy:   'https://immo-proxy.ral-85d.workers.dev/',
   admins:  ['CONI', 'BAKA', 'AUAR', 'BOMA', 'AIWI', 'NAXA'],
+  // Codes des Chefs de Travaux autorisés à réserver (compléter selon organigramme)
+  CTs:     ['BAKA', 'AUAR', 'BOMA'],
   etats:   { 'Neuf': 5, 'Bon état': 4, 'Usé': 3, 'Abîmé': 2, 'Hors service': 1 },
 };
+
+// Peut-on faire une réservation ?
+function peutReserver(code) {
+  return CONFIG.admins.includes(code) || CONFIG.CTs.includes(code);
+}
 
 // ── État global ───────────────────────────────────────────
 const S = {
@@ -44,6 +51,7 @@ function fmt(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion', day: '2-digit', month: '2-digit', year: 'numeric' });
 }
+const fmtDate = fmt; // alias
 
 function fmtDT(d) {
   if (!d) return '—';
@@ -118,7 +126,7 @@ function stopScanner() {
 }
 
 // ── Navigation ────────────────────────────────────────────
-function showScreen(id) {
+function showScreen(id, skipInit) {
   stopScanner();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const sc = document.getElementById(id);
@@ -128,10 +136,10 @@ function showScreen(id) {
     case 'screen-activation':
       setTimeout(() => startScanner('scanner-activation', onScanActivation), 200);
       break;
-    case 'screen-mon-materiel':     afficherMonMateriel(); break;
+    case 'screen-mon-materiel':       afficherMonMateriel(); break;
     case 'screen-transferts-attente': afficherTransfertsEnAttente(); break;
-    case 'screen-mes-reservations': afficherMesReservations(); break;
-    case 'screen-reserver':         initReservationScreen(false); break;
+    case 'screen-mes-reservations':   afficherMesReservations(); break;
+    case 'screen-reserver':           if (!skipInit) initReservationScreen(false); break;
   }
 }
 
@@ -193,6 +201,13 @@ function afficherEmploye() {
   const btnStock = document.getElementById('btn-stock-depot');
   if (btnMat)   btnMat.classList.toggle('hidden', isAdmin);
   if (btnStock) btnStock.classList.toggle('hidden', !isAdmin);
+  // Label du bouton réservations selon le rôle
+  const btnResa = document.querySelector('[onclick*="mes-reservations"]');
+  if (btnResa) {
+    if (isAdmin) {
+      btnResa.innerHTML = '📋 Réservations <span id="badge-resa" class="badge-count ' + (document.getElementById('badge-resa')?.classList.contains('hidden') ? 'hidden' : '') + '">' + (document.getElementById('badge-resa')?.textContent || '') + '</span>';
+    }
+  }
 }
 
 function changerUtilisateur() {
@@ -419,7 +434,8 @@ async function confirmerAvecEtat() {
   const note = document.getElementById('note-texte').value.trim();
 
   if (S.typeMouvement === 'Retour') {
-    const mouv = { code_im: S.codeIM, code_employe: S.employe.code, nom_employe: S.employe.nom, type_mouvement: 'Retour', code_chantier: 'DEPOT', etat, note, horodatage: new Date().toISOString() };
+    const noteTrace = (note ? note + ' — ' : '') + '[retour enregistré par ' + S.employe.nom + ']';
+    const mouv = { code_im: S.codeIM, code_employe: S.employe.code, nom_employe: S.employe.nom, type_mouvement: 'Retour', code_chantier: 'DEPOT', etat, note: noteTrace, horodatage: new Date().toISOString() };
     showRecap('📥 Retour enregistré', mouv, null);
     enregistrerMouvement(mouv);
     uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
@@ -427,7 +443,8 @@ async function confirmerAvecEtat() {
   }
 
   // Transfert
-  const transfert = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: S.codeReceveur, nom_receveur: S.nomReceveur, etat, note };
+  const transfertNote = (note ? note + ' — ' : '') + '[transfert initié par ' + S.employe.nom + ']';
+  const transfert = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: S.codeReceveur, nom_receveur: S.nomReceveur, etat, note: transfertNote };
   showRecap('🔄 Transfert envoyé', { code_im: S.codeIM, nom_employe: S.nomReceveur, type_mouvement: 'Transfert', etat, note }, 'En attente de validation par ' + S.nomReceveur);
   try {
     const r = await fetch(CONFIG.proxy + '?action=transfert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transfert) });
@@ -861,8 +878,10 @@ function scannerPourResa() {
   startScanner('scanner-resa', code => {
     if (!code.startsWith('IM')) { toast('Ce n\'est pas une immo', 'error'); return; }
     stopScanner(); vib(200);
+    // Passer skipInit=true pour ne pas effacer les données
+    showScreen('screen-reserver', true);
     selImmoResa(code, lib(code));
-    showScreen('screen-reserver');
+    toast('📦 ' + lib(code) + ' sélectionné', 'success', 2000);
   });
 }
 
@@ -909,6 +928,11 @@ async function soumettreReservation() {
 }
 
 async function afficherMesReservations() {
+  if (!S.employe) { showScreen('screen-activation'); return; }
+  if (CONFIG.admins.includes(S.employe.code)) {
+    await afficherReservationsAdmin();
+    return;
+  }
   if (!S.employe) { showScreen('screen-activation'); return; }
   const div = document.getElementById('mes-resa-liste');
   div.innerHTML = '<p class="empty-msg">Chargement...</p>';
@@ -981,3 +1005,115 @@ async function validerModifResa() {
     showScreen('screen-mes-reservations');
   } catch (e) { toast('Erreur', 'error'); }
 }
+
+// ══════════════════════════════════════════════════════════
+// VUE RÉSERVATIONS POUR CONI / ADMIN
+// ══════════════════════════════════════════════════════════
+
+async function afficherReservationsAdmin() {
+  const div = document.getElementById('mes-resa-liste');
+  // Changer le titre
+  const h2 = document.querySelector('#screen-mes-reservations h2');
+  if (h2) h2.textContent = '📋 Réservations en cours';
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  try {
+    const r = await fetch(CONFIG.proxy + '?reservations=1');
+    const resas = await r.json();
+    const actives = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee');
+    actives.sort((a, b) => {
+      const order = { 'En retard': 0, 'Demandee': 1, 'Contre-proposition': 2, 'Confirmee': 3, 'En cours': 4 };
+      return (order[a.statut] || 9) - (order[b.statut] || 9);
+    });
+    if (!actives.length) { div.innerHTML = '<p class="empty-msg">Aucune réservation en cours.</p>'; return; }
+    // Compteurs par statut
+    const counts = {};
+    actives.forEach(r => { counts[r.statut] = (counts[r.statut] || 0) + 1; });
+    let html = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
+    Object.keys(counts).forEach(s => {
+      const c = STATUT_COLORS[s] || { bg: '#F5F5F5', color: '#999', label: s };
+      html += `<span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${c.bg};color:${c.color}">${c.label} · ${counts[s]}</span>`;
+    });
+    html += '</div>';
+    html += actives.map(r => {
+      const l = lib(r.code_im) || '—';
+      const s = STATUT_COLORS[r.statut] || { bg: '#F5F5F5', color: '#999', label: r.statut };
+      const dDebut = r.date_debut ? fmtDate(r.date_debut) : '—';
+      const dFin   = r.date_fin   ? fmtDate(r.date_fin)   : '—';
+      return `<div class="materiel-card" style="border-left:4px solid ${s.color}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+          <div><strong style="color:var(--blue)">${r.nom_employe}</strong> <small style="color:var(--grey)">${r.code_employe}</small></div>
+          <span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${s.bg};color:${s.color}">${s.label}</span>
+        </div>
+        <strong>${l}</strong> <span style="font-size:11px;color:#999;font-family:monospace">${r.code_im}</span>
+        <div style="font-size:13px;margin-top:4px">📅 ${dDebut} → ${dFin}</div>
+        ${r.nom_chantier ? `<div style="font-size:12px;color:var(--grey)">🏗️ ${r.nom_chantier}</div>` : ''}
+        ${r.note ? `<div style="font-size:12px;color:var(--orange)">📝 ${r.note}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          ${r.statut === 'Demandee' ? `<button onclick="actionResaPWA('${r.id}','Confirmee','${r.nom_employe.replace(/'/g,"\\'")}','${r.code_im}')" style="flex:1;padding:8px;background:#E8F5E9;color:#1B5E20;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✅ Confirmer</button>` : ''}
+          <button onclick="proposerModifPWA('${r.id}','${r.code_im}','${r.nom_employe.replace(/'/g,"\\'")}','${r.date_debut ? r.date_debut.slice(0,10) : ''}','${r.date_fin ? r.date_fin.slice(0,10) : ''}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>
+          <button onclick="actionResaPWA('${r.id}','Annulee','${r.nom_employe.replace(/'/g,"\\'")}','${r.code_im}')" style="flex:1;padding:8px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">❌ Annuler</button>
+        </div>
+      </div>`;
+    }).join('');
+    div.innerHTML = html;
+  } catch (e) {
+    div.innerHTML = `<p class="empty-msg">Erreur : ${e.message}</p>`;
+  }
+}
+
+async function actionResaPWA(id, statut, nomEmp, codeIM) {
+  const action = statut === 'Confirmee' ? 'Confirmer' : 'Annuler';
+  if (!confirm(`${action} la réservation de ${nomEmp} pour ${lib(codeIM)} ?`)) return;
+  try {
+    await fetch(CONFIG.proxy + '?action=statut_resa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, statut }),
+    });
+    toast(action === 'Confirmer' ? '✅ Réservation confirmée' : '❌ Réservation annulée', 'success');
+    afficherReservationsAdmin();
+  } catch (e) { toast('Erreur', 'error'); }
+}
+
+function proposerModifPWA(id, codeIM, nomEmp, dateDebut, dateFin) {
+  S.resaEnCoursId = id;
+  document.getElementById('modif-resa-info').textContent = `${lib(codeIM)} — demande de ${nomEmp}`;
+  if (dateDebut) document.getElementById('modif-date-debut').value = dateDebut;
+  if (dateFin)   document.getElementById('modif-date-fin').value   = dateFin;
+  document.getElementById('modif-chantier').value = '';
+  document.getElementById('modif-note').value = '';
+  showScreen('screen-modifier-resa');
+}
+
+// Remplacer validerModifResa pour supporter la contre-proposition admin
+const _origValiderModif = validerModifResa;
+validerModifResa = async function() {
+  if (!S.resaEnCoursId) return;
+  const debut = document.getElementById('modif-date-debut').value;
+  const fin   = document.getElementById('modif-date-fin').value;
+  const note  = document.getElementById('modif-note').value;
+  if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
+  const isAdmin = S.employe && CONFIG.admins.includes(S.employe.code);
+  const noteComplete = isAdmin
+    ? (note ? `[Modification par ${S.employe.nom} : ${note}]` : `[Dates modifiées par ${S.employe.nom}]`)
+    : note;
+  const statut = isAdmin ? 'Contre-proposition' : undefined;
+  try {
+    const body = { id: S.resaEnCoursId, date_debut: new Date(debut).toISOString(), date_fin: new Date(fin).toISOString(), nom_chantier: document.getElementById('modif-chantier').value, note: noteComplete };
+    if (statut) body.statut = statut;
+    await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    toast(isAdmin ? '✏️ Contre-proposition envoyée' : '✅ Réservation modifiée', 'success');
+    S.resaEnCoursId = null;
+    showScreen('screen-mes-reservations');
+  } catch (e) { toast('Erreur', 'error'); }
+};
+
+// Couleurs pour les statuts (utilisé dans afficherReservationsAdmin)
+const STATUT_COLORS = {
+  'Demandee':           { bg: '#FFF8E1', color: '#E65100', label: '⏳ En attente' },
+  'Confirmee':          { bg: '#E8F5E9', color: '#1B5E20', label: '✅ Confirmée' },
+  'En cours':           { bg: '#E3F2FD', color: '#0D47A1', label: '🔄 En cours' },
+  'Rendue':             { bg: '#F5F5F5', color: '#757575', label: '📦 Rendue' },
+  'En retard':          { bg: '#FFEBEE', color: '#B71C1C', label: '⚠️ En retard' },
+  'Annulee':            { bg: '#F5F5F5', color: '#9E9E9E', label: '❌ Annulée' },
+  'Contre-proposition': { bg: '#EDE7F6', color: '#4527A0', label: '✏️ Contre-proposition' },
+};
