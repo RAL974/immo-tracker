@@ -30,6 +30,17 @@ let state = {
 // ── Utilitaires ─────────────────────────────────────────────────
 function vibrer(ms) { if (navigator.vibrate) navigator.vibrate(ms || 150); }
 
+// ── Toast notification ──────────────────────────────────────────────────
+function toast(message, type, duration) {
+  var el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = message;
+  el.className = 'toast' + (type === 'error' ? ' error' : '') + ' show';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function () { el.classList.remove('show'); }, duration || 2500);
+}
+
+
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion' });
@@ -229,6 +240,10 @@ function onScanActivation(code) {
   chargerBadgeMateriel();
   verifierReservationsEnRetard();
   showScreen('screen-accueil');
+  // Message de bienvenue
+  setTimeout(function () {
+    toast('👋 Bienvenue ' + employe.nom + ' !', 'success', 3000);
+  }, 300);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -258,6 +273,7 @@ function startMouvement(type) {
 function onScanImmo(code) {
   if (!code.startsWith('IM')) { vibrer(50); return; }
   stopScanner(); vibrer(200);
+  toast('✅ ' + (state.immos[code] ? state.immos[code].Libelle : code), 'success', 2000);
   state.codeIM = code;
   var result = document.getElementById('immo-result');
   result.textContent = '✅ ' + getLibelle(code) + ' (' + code + ')';
@@ -406,6 +422,9 @@ function confirmerAvecEtat() {
   fetch(CONFIG.webhookMouvements + '?action=transfert', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(transfert),
+  }).then(function(r){return r.json();}).then(function(data){
+    if (data && data.success === false) toast('Erreur lors de la création du transfert', 'error');
+    else toast('✅ Transfert créé — en attente de validation', 'success', 3000);
   }).catch(function () {});
   if (state.photoEtatBase64) uploadPhotoSiPresente(state.codeIM, state.photoEtatBase64);
 }
@@ -535,7 +554,12 @@ function enregistrerMouvement(mouvement) {
   fetch(CONFIG.webhookMouvements, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mouvement),
-  }).then(function () { chargerBadgeMateriel(); }).catch(function () {});
+  }).then(function (r) {
+    chargerBadgeMateriel();
+    return r.json();
+  }).then(function (data) {
+    if (data && data.success === false) toast('Erreur d enregistrement', 'error');
+  }).catch(function () {});
 }
 
 // ── Recherche unifiée (admin) ────────────────────────────────────
@@ -952,6 +976,7 @@ async function soumettreReservation() {
     var data = await res.json();
     if (data.success) {
       vibrer(300);
+      toast('✅ Demande de réservation envoyée !', 'success', 3000);
       document.getElementById('recap').innerHTML =
         '<strong>✅ Demande envoyée !</strong><br>' +
         '<strong>Immo :</strong> ' + state.resaImmoLibelle + '<br>' +
