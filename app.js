@@ -706,10 +706,7 @@ async function voirDetailImmo(codeIM) {
       <span class="chantier-tag">${codeIM}</span>
       ${cat(codeIM) ? `<small style="color:var(--grey)"> · ${cat(codeIM)}</small>` : ''}<br>
       <div class="localisation-badge" style="${locStyle};margin:8px 0">${locTxt}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${u ? `<a href="${u}" target="_blank" style="padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">📄 FDS</a>` : ''}
-        <button onclick="ouvrirPhotos('${codeIM}')" style="padding:7px 14px;background:#FFF8F0;color:var(--orange);border:2px solid var(--orange);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖼️ Photos</button>
-      </div>
+      <div id="fiche-act-immo-${codeIM}" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"></div>
     </div>
     <h3 style="color:var(--blue);font-size:13px;margin:8px 0 4px">Historique (${hist.length})</h3>`;
     if (!hist.length) html += '<p class="empty-msg">Aucun mouvement.</p>';
@@ -741,6 +738,23 @@ async function voirDetailEmploye(code, nom) {
     if (!actuel.length) html += '<p class="empty-msg">Aucun matériel.</p>';
     else html += actuel.map(m => `<div class="materiel-card"><strong>${lib(m.code_im)}</strong> <span class="chantier-tag" onclick="voirDetailImmo('${m.code_im}')" style="cursor:pointer">${m.code_im}</span> ${ebadge(m.etat)}<br><small style="color:var(--grey)">${fmt(m.horodatage)}</small></div>`).join('');
     div.innerHTML = html;
+    // Attacher handlers (boutons admin : FDS, photos, panne, vol)
+    const actDiv2 = document.getElementById('fiche-act-immo-' + codeIM);
+    if (actDiv2) {
+      const u = fdsUrl(codeIM);
+      if (u) { const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.style.cssText = 'padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none'; a.textContent = '📄 FDS'; actDiv2.appendChild(a); }
+      const bPh = document.createElement('button'); bPh.style.cssText = 'padding:7px 14px;background:#FFF8F0;color:var(--orange);border:2px solid var(--orange);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bPh.textContent = '🖼️ Photos'; (function(_c){ bPh.onclick = function(){ ouvrirPhotos(_c); }; })(codeIM); actDiv2.appendChild(bPh);
+      const isAdminLocal2 = S.employe && CONFIG.admins.includes(S.employe.code);
+      if (isAdminLocal2) {
+        // Panne
+        const estEnPannePWA = hist.length > 0 && hist.some(function(m, i) { if(m.type_mouvement !== 'Panne') return false; for(let j = 0; j < i; j++){ if(hist[j].type_mouvement === 'Réparation' && new Date(hist[j].horodatage) > new Date(m.horodatage)) return false; } return true; });
+        const bPa = document.createElement('button'); bPa.style.cssText = 'padding:7px 14px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bPa.textContent = estEnPannePWA ? '✅ Panne résolue' : '📢 Signaler panne'; (function(_c, _ep){ bPa.onclick = function(){ if(_ep) resoudrePannePWA(_c); else signalerPannePWA(_c); }; })(codeIM, estEnPannePWA); actDiv2.appendChild(bPa);
+        // Vol / Disparu
+        const bVol = document.createElement('button'); bVol.style.cssText = 'padding:7px 14px;background:#4A148C;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bVol.textContent = '🚨 Volé / Disparu'; (function(_c){ bVol.onclick = function(){ declarerVolPWA(_c); }; })(codeIM); actDiv2.appendChild(bVol);
+        // HS définitif / Perdu
+        const bHS = document.createElement('button'); bHS.style.cssText = 'padding:7px 14px;background:#424242;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bHS.textContent = '⚫ HS définitif'; (function(_c){ bHS.onclick = function(){ marquerImmoHSPWA(_c); }; })(codeIM); actDiv2.appendChild(bHS);
+      }
+    }
   } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur.</p>'; }
 }
 
