@@ -1059,6 +1059,19 @@ async function validerModifResa() {
   } catch (e) { toast('Erreur', 'error'); }
 }
 
+// ── Scanner pour déclarer une panne (admin) ─────────────────────────────
+function scannerPourPanne() {
+  showScreen('screen-scan-immo', true);
+  document.getElementById('titre-mouvement').textContent = '📢 Scanner pour déclarer une panne';
+  document.getElementById('immo-result')?.classList.add('hidden');
+  startScanner('scanner-immo', function(code) {
+    if (!code.startsWith('IM')) { return; }
+    stopScanner(); vib(200);
+    showScreen('screen-accueil');
+    signalerPannePWA(code);
+  });
+}
+
 // ── Déclarer une panne depuis la PWA ────────────────────────────────────
 async function signalerPannePWA(codeIM) {
   const libIM = lib(codeIM);
