@@ -940,70 +940,123 @@ function renderMaint(){
 
 // ── Rendu — Alertes ──────────────────────────────────────
 function renderAlertes(){
+  if(!d)return;
+  var pane=document.getElementById('pane-alertes');
+  if(!pane)return;
+  // S'assurer que le container existe toujours
+  var div=document.getElementById('alertes-content');
+  if(!div){div=document.createElement('div');div.id='alertes-content';pane.appendChild(div);}
+  // Supprimer le spinner de chargement si présent
+  var sp=pane.querySelector('.loading-placeholder');if(sp)pane.removeChild(sp);
   var now=Date.now();
   var hs=d.hors_service||[];var ret=d.alertes_delai||[];
+  // Pannes en cours (mouvement type Panne sans Réparation ultérieure)
+  var panneCodes={};var resolvedTS={};
+  (d.all_movements||[]).forEach(function(m){
+    if(m.type_mouvement==='Panne'&&!panneCodes[m.code_im])panneCodes[m.code_im]={code_im:m.code_im,note:m.note,since:m.horodatage,detenteur:m.nom_employe};
+    if(m.type_mouvement==='Réparation'&&!resolvedTS[m.code_im])resolvedTS[m.code_im]=m.horodatage;
+  });
+  var pannesActives=Object.values(panneCodes).filter(function(p){return!resolvedTS[p.code_im]||(new Date(p.since)>new Date(resolvedTS[p.code_im]));});
   var html='';
-  if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+  if(pannesActives.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--orange)"><div class="card-head"><h3>📢 Pannes en cours ('+pannesActives.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Signalé par</th><th>Depuis</th><th>Motif</th><th>Action</th></tr></thead><tbody>'+
+    pannesActives.map(function(p){return'<tr class="warn-row"><td><span class="link-im" data-cim="'+p.code_im+'" data-lib="'+getLib(p.code_im).replace(/"/g,'')+'">'+p.code_im+'</span></td><td style="font-size:12px">'+getLib(p.code_im)+'</td><td style="font-size:12px">'+p.detenteur+'</td><td style="font-size:11px;white-space:nowrap">'+fmtDT(p.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(p.note||'—')+'</td><td><button class="btn-res-p" data-cim="'+p.code_im+'">" style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">✅ Résoudre</button></td></tr>';}).join('')+'</tbody></table></div></div>';
+  if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service actuel ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
   if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span></td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
-  if(!html)html='<div class="es" style="padding:40px">Aucune alerte.</div>';
-  document.getElementById('alertes-content').innerHTML=html;
+  if(!html)html='<div class="es" style="padding:40px">Aucune alerte active. Tout est OK ✅</div>';
+  div.innerHTML=html;
+  // Attacher handlers des boutons résoudre
+  div.querySelectorAll('.btn-resoudre-panne').forEach(function(btn){
+    btn.onclick=function(){resoudrePanne(this.dataset.cim);};
+  });
 }
 
 // ── Rendu — Analyses ─────────────────────────────────────
 function renderAnalyse(){
   if(!d){document.getElementById('analyse-content').innerHTML='<p class="es">Chargement...</p>';return;}
-  var all=d.all_movements||[];
-  var inv=d.inventory||[];
+  var pane=document.getElementById('pane-analyses');
+  var sp=pane?pane.querySelector('.loading-placeholder'):null;if(sp&&pane)pane.removeChild(sp);
+  var all=d.all_movements||[];var inv=d.inventory||[];var now=Date.now();
   var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">';
 
-  // ── KPI stats rapides ─────────────────────────────────────────────────────
+  // ── Synthèse globale ─────────────────────────────────────────────────────
   var nbRetours=all.filter(function(m){return m.type_mouvement==='Retour';}).length;
   var nbTransferts=all.filter(function(m){return m.type_mouvement==='Transfert';}).length;
-  var nbHS=all.filter(function(m){return m.etat==='Hors service';}).length;
-  var nbAbime=all.filter(function(m){return m.etat==='Abîmé';}).length;
-  html+='<div class="card"><div class="card-head"><h3>📊 Synthèse globale</h3></div><div style="padding:12px">';
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  [{v:all.length,l:'Mouvements totaux',c:'var(--blue)'},{v:nbTransferts,l:'Transferts',c:'var(--orange)'},{v:nbRetours,l:'Retours dépôt',c:'var(--green)'},{v:nbHS,l:'Pannes déclarées',c:'var(--red)'},{v:nbAbime,l:'Dégradations',c:'var(--yellow)'},{v:d.stats.moyenne_jours_hors_depot+'j',l:'Durée moy. hors dépôt',c:'var(--blue)'}].forEach(function(k){
+  var nbPannesTotal=all.filter(function(m){return m.type_mouvement==='Panne';}).length;
+  var nbReparations=all.filter(function(m){return m.type_mouvement==='Réparation';}).length;
+  html+='<div class="card"><div class="card-head"><h3>📊 Synthèse globale</h3></div><div style="padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  [{v:all.length,l:'Mouvements totaux',c:'var(--blue)'},{v:nbTransferts,l:'Transferts',c:'var(--orange)'},{v:nbRetours,l:'Retours dépôt',c:'var(--green)'},{v:nbPannesTotal,l:'Pannes déclarées',c:'var(--red)'},{v:nbReparations,l:'Réparations',c:'var(--yellow)'},{v:d.stats.moyenne_jours_hors_depot+'j',l:'Durée moy. hors dépôt',c:'var(--blue)'}].forEach(function(k){
     html+='<div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:'+k.c+'">'+k.v+'</div><div style="font-size:11px;color:var(--grey)">'+k.l+'</div></div>';
   });
   html+='</div></div></div>';
 
-  // ── Top immos les plus demandées ──────────────────────────────────────────
+  // ── Top immos mouvementées ────────────────────────────────────────────────
   var immoFreq={};all.forEach(function(m){immoFreq[m.code_im]=(immoFreq[m.code_im]||0)+1;});
   var topImmo=Object.keys(immoFreq).sort(function(a,b){return immoFreq[b]-immoFreq[a];}).slice(0,10);
-  html+='<div class="card"><div class="card-head"><h3>🔥 Top immos les plus mouvementées</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Mouvements</th></tr></thead><tbody>';
-  topImmo.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);
+  html+='<div class="card"><div class="card-head"><h3>🔥 Top immos mouvementées</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Mvts</th></tr></thead><tbody>';
+  topImmo.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
     html+='<tr><td>'+m+'</td><td><span class="link-im" data-cim="'+code+'" data-lib="'+getLib(code).replace(/"/g,'')+'">'+code+'</span></td><td style="font-size:12px">'+getLib(code)+'</td><td><b>'+immoFreq[code]+'</b></td></tr>';
   });
   html+='</tbody></table></div></div>';
 
-  // ── Top rétenteurs (durée) ────────────────────────────────────────────────
+  // ── Top rétenteurs ────────────────────────────────────────────────────────
   var cl=d.classement_duree||[];
   html+='<div class="card"><div class="card-head"><h3>⏱ Top rétenteurs (durée moy.)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Immos</th><th>Durée moy.</th><th>Total</th></tr></thead><tbody>';
   if(!cl.length)html+='<tr><td colspan="5" class="es">Aucune donnée.</td></tr>';
-  else cl.forEach(function(r,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);
-    html+='<tr><td>'+m+'</td><td><span class="link-emp" data-emp="" data-nom="'+r.nom.replace(/"/g,'')+'">'+r.nom+'</span></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';
+  else cl.forEach(function(r,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+    html+='<tr><td>'+m+'</td><td><span class="link-emp" data-emp="'+(r.code||'')+'" data-nom="'+r.nom.replace(/"/g,'')+'">'+r.nom+'</span></td><td>'+r.count+'</td><td><b>'+r.moyenneJours+'j</b></td><td>'+r.totalJours+'j</td></tr>';
   });
   html+='</tbody></table></div></div>';
 
-  // ── Top demandeurs (volume de mouvements) ─────────────────────────────────
+  // ── Top demandeurs (mouvements + réservations) ─────────────────────────
   var empFreq={};var empNom={};
   all.forEach(function(m){empFreq[m.code_employe]=(empFreq[m.code_employe]||0)+1;empNom[m.code_employe]=m.nom_employe;});
-  // Ajouter les réservations dans le décompte
   reservations.forEach(function(r){if(r.code_employe&&r.statut!=='Annulee'){empFreq[r.code_employe]=(empFreq[r.code_employe]||0)+1;if(!empNom[r.code_employe])empNom[r.code_employe]=r.nom_employe;}});
   var topEmp=Object.keys(empFreq).sort(function(a,b){return empFreq[b]-empFreq[a];}).slice(0,10);
-  html+='<div class="card"><div class="card-head"><h3>👷 Top demandeurs (mouvements + réservations)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Code</th><th>Total actions</th></tr></thead><tbody>';
-  topEmp.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '+(i+1);var nom=empNom[code]||code;
+  html+='<div class="card"><div class="card-head"><h3>👷 Top demandeurs (mouvements + résas)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Employé</th><th>Code</th><th>Total</th></tr></thead><tbody>';
+  topEmp.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);var nom=empNom[code]||code;
     html+='<tr><td>'+m+'</td><td><span class="link-emp" data-emp="'+code+'" data-nom="'+nom.replace(/"/g,'')+'">'+nom+'</span></td><td style="font-size:11px;color:var(--grey)">'+code+'</td><td><b>'+empFreq[code]+'</b></td></tr>';
   });
   html+='</tbody></table></div></div>';
 
+  // ── Top pires machines — pannes ───────────────────────────────────────────
+  var immoP={};all.filter(function(m){return m.type_mouvement==='Panne';}).forEach(function(m){immoP[m.code_im]=(immoP[m.code_im]||0)+1;});
+  var topP=Object.keys(immoP).sort(function(a,b){return immoP[b]-immoP[a];}).slice(0,8);
+  html+='<div class="card" style="border-top:3px solid var(--red)"><div class="card-head"><h3>⚠️ Pires machines — pannes (nb)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Pannes</th></tr></thead><tbody>';
+  if(!topP.length)html+='<tr><td colspan="4" class="es">Aucune panne enregistrée.</td></tr>';
+  else topP.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+    html+='<tr class="'+(i<3?'urgent-row':'')+'"><td>'+m+'</td><td><span class="link-im" data-cim="'+code+'" data-lib="'+getLib(code).replace(/"/g,'')+'">'+code+'</span></td><td style="font-size:12px">'+getLib(code)+'</td><td style="color:var(--red);font-weight:800">'+immoP[code]+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  // ── Top coûts maintenance ─────────────────────────────────────────────────
+  var coutMaint=[];Object.keys(im).forEach(function(code){var c=im[code];var cout=parseFloat(c.Cout_Maintenance)||0;var per=parseInt(c.Periodicite_Maintenance_Mois)||0;if(cout>0){var coutAnnuel=per>0?Math.round(cout*(12/per)):cout;coutMaint.push({code_im:code,libelle:c.Libelle||code,cout_unitaire:cout,periodicite:per,cout_annuel:coutAnnuel});}});
+  coutMaint.sort(function(a,b){return b.cout_annuel-a.cout_annuel;}).slice(0,8);
+  html+='<div class="card" style="border-top:3px solid var(--yellow)"><div class="card-head"><h3>💶 Top coûts maintenance (annualisé)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Coût/inter.</th><th>Périodicité</th><th>Coût annuel est.</th></tr></thead><tbody>';
+  if(!coutMaint.length)html+='<tr><td colspan="5" class="es">Renseignez Cout_Maintenance dans SharePoint.</td></tr>';
+  else coutMaint.slice(0,8).forEach(function(x){
+    html+='<tr><td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td><td style="font-size:12px">'+x.libelle+'</td><td>'+x.cout_unitaire+'€</td><td style="font-size:11px">'+(x.periodicite?x.periodicite+'m':'—')+'</td><td style="font-weight:800;color:var(--orange)">~'+x.cout_annuel+'€/an</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  // ── Candidats au remplacement ────────────────────────────────────────────
+  // Immos en panne ≥3 fois OU coût annuel élevé
+  var candidats=[];
+  Object.keys(immoP).forEach(function(code){if(immoP[code]>=2){var c=im[code]||{};var cout=parseFloat(c.Cout_Maintenance)||0;candidats.push({code_im:code,libelle:getLib(code),nb_pannes:immoP[code],cout_maint:cout,raison:immoP[code]+'x en panne'});}});
+  coutMaint.forEach(function(x){if(x.cout_annuel>500&&!candidats.find(function(c){return c.code_im===x.code_im;}))candidats.push({code_im:x.code_im,libelle:x.libelle,nb_pannes:immoP[x.code_im]||0,cout_maint:x.cout_unitaire,raison:'Coût annuel >500€'});});
+  candidats.sort(function(a,b){return b.nb_pannes-a.nb_pannes||b.cout_maint-a.cout_maint;});
+  html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>🔄 Candidats au remplacement</h3></div>';
+  if(!candidats.length)html+='<p class="es" style="padding:16px">Aucun candidat identifié — parc en bonne santé !</p>';
+  else html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Pannes</th><th>Coût maint.</th><th>Motif</th></tr></thead><tbody>'+candidats.slice(0,8).map(function(x){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td><td style="font-size:12px">'+x.libelle+'</td><td style="color:var(--red);font-weight:700">'+x.nb_pannes+'</td><td>'+(x.cout_maint?x.cout_maint+'€':'—')+'</td><td style="font-size:11px;color:var(--orange)">'+x.raison+'</td></tr>';}).join('')+'</tbody></table></div>';
+  html+='</div>';
+
   // ── Pannes et dégradations par catégorie ──────────────────────────────────
-  var pannes={};all.filter(function(m){return m.etat==='Hors service'||m.etat==='Abîmé';}).forEach(function(m){var c=getCat(m.code_im)||'Sans catégorie';if(!pannes[c])pannes[c]={hs:0,abime:0};if(m.etat==='Hors service')pannes[c].hs++;else pannes[c].abime++;});
-  html+='<div class="card"><div class="card-head"><h3>⚠️ Pannes & dégradations par catégorie</h3></div><div class="tbl-wrap"><table><thead><tr><th>Catégorie</th><th>🔴 Hors service</th><th>⚠️ Abîmé</th><th>Total</th></tr></thead><tbody>';
-  var panCats=Object.keys(pannes).sort(function(a,b){return(pannes[b].hs+pannes[b].abime)-(pannes[a].hs+pannes[a].abime);});
-  if(!panCats.length)html+='<tr><td colspan="4" class="es">Aucune panne ou dégradation enregistrée.</td></tr>';
-  else panCats.forEach(function(c){var p=pannes[c];html+='<tr><td style="font-size:12px">'+c+'</td><td style="color:var(--red);font-weight:700">'+p.hs+'</td><td style="color:var(--yellow);font-weight:700">'+p.abime+'</td><td><b>'+(p.hs+p.abime)+'</b></td></tr>';});
+  var catPannes={};var catMovs={};
+  all.forEach(function(m){var c=getCat(m.code_im)||'Sans catégorie';catMovs[c]=(catMovs[c]||0)+1;if(m.type_mouvement==='Panne')catPannes[c]=(catPannes[c]||0)+1;});
+  html+='<div class="card"><div class="card-head"><h3>📂 Catégories — pannes & demande</h3></div><div class="tbl-wrap"><table><thead><tr><th>Catégorie</th><th>Mouvements</th><th>Pannes</th><th>Taux panne</th></tr></thead><tbody>';
+  var catList=Object.keys(catMovs).sort(function(a,b){return catMovs[b]-catMovs[a];});
+  catList.forEach(function(c){var mvts=catMovs[c];var pan=catPannes[c]||0;var taux=mvts?Math.round(pan/mvts*100):0;
+    html+='<tr><td style="font-size:12px">'+c+'</td><td><b>'+mvts+'</b></td><td style="color:'+(pan>0?'var(--red)':'var(--green)')+'"><b>'+pan+'</b></td><td style="font-size:11px">'+(taux?taux+'%':'—')+'</td></tr>';
+  });
   html+='</tbody></table></div></div>';
 
   // ── Taux d'utilisation par catégorie ──────────────────────────────────────
@@ -1015,12 +1068,12 @@ function renderAnalyse(){
   });
   html+='</div></div>';
 
-  // ── Statistiques réservations ──────────────────────────────────────────────
+  // ── Stats réservations ────────────────────────────────────────────────────
   if(reservations&&reservations.length){
-    var resaDem={};reservations.forEach(function(r){resaDem[r.nom_employe]=(resaDem[r.nom_employe]||0)+1;});
-    var topResaDem=Object.keys(resaDem).sort(function(a,b){return resaDem[b]-resaDem[a];}).slice(0,5);
+    var resaDem={};reservations.forEach(function(r){if(r.statut!=='Annulee')resaDem[r.nom_employe]=(resaDem[r.nom_employe]||0)+1;});
+    var topResa=Object.keys(resaDem).sort(function(a,b){return resaDem[b]-resaDem[a];}).slice(0,5);
     html+='<div class="card"><div class="card-head"><h3>📅 Top demandeurs de réservations</h3></div><div class="tbl-wrap"><table><thead><tr><th>Employé</th><th>Réservations</th></tr></thead><tbody>';
-    topResaDem.forEach(function(n){html+='<tr><td style="font-size:12px">'+n+'</td><td><b>'+resaDem[n]+'</b></td></tr>';});
+    topResa.forEach(function(n){html+='<tr><td style="font-size:12px">'+n+'</td><td><b>'+resaDem[n]+'</b></td></tr>';});
     html+='</tbody></table></div></div>';
   }
 
