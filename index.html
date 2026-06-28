@@ -10,34 +10,39 @@
 </head>
 <body>
 
-  <!-- ÉCRAN 1 : Accueil -->
+  <!-- ACCUEIL -->
   <div id="screen-accueil" class="screen active">
     <img src="logo.png" alt="Espace Soleil" class="logo-img">
     <p class="subtitle">Suivi des immobilisations</p>
     <div id="user-info" class="user-badge hidden"></div>
     <div id="badge-attente" class="badge-attente hidden" onclick="showScreen('screen-transferts-attente')"></div>
     <div class="btn-group">
-      <button class="btn btn-primary btn-with-badge" onclick="startMouvement('Transfert')">
+      <button class="btn btn-secondary" onclick="startMouvement('Transfert')">
         🔄 Transfert
         <span id="badge-materiel" class="btn-badge-count hidden"></span>
       </button>
-      <button class="btn btn-secondary admin-only hidden" onclick="startMouvement('Retour')">📥 Retour dépôt</button>
+      <button class="btn btn-primary" onclick="startMouvement('Retour')">
+        📥 Retour au dépôt
+      </button>
     </div>
-    <div class="separator">Retour rapide</div>
-    <div class="retour-rapide-group">
-      <button class="btn btn-outline" onclick="retourRapide('CONI')">↩️ Rendre à CONI</button>
-      <button class="btn btn-outline" onclick="retourRapide('HEGE')">↩️ Rendre à HEGE</button>
+    <button class="btn btn-link btn-with-badge" onclick="showScreen('screen-mon-materiel')">
+      📦 Mon matériel
+    </button>
+    <button class="btn btn-link" onclick="showScreen('screen-mes-reservations')">
+      📅 Mes réservations <span id="badge-resa-retard" class="btn-badge-count hidden" style="background:#E74C3C"></span>
+    </button>
+    <!-- Admin seulement -->
+    <div class="admin-only hidden" style="width:100%;display:flex;flex-direction:column;gap:8px">
+      <div class="separator">Actions admin</div>
+      <button class="btn btn-tertiary" onclick="showScreen('screen-rechercher')">🔍 Rechercher</button>
+      <button class="btn btn-outline" onclick="showScreen('screen-force-attribution')">⚡ Forcer attribution</button>
+      <button class="btn btn-outline" onclick="showScreen('screen-reserver')">📅 Réserver pour quelqu'un</button>
     </div>
-    <button class="btn btn-link" onclick="showScreen('screen-mon-materiel')">📦 Mon matériel</button>
-    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-immo')">🔍 Suivi immo</button>
-    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-suivi-employe')">👤 Suivi employé</button>
-    <button class="btn btn-link admin-only hidden" onclick="showScreen('screen-admin')">⚙️ Administration</button>
-    <button class="btn btn-link" onclick="showScreen('screen-mes-reservations')">📅 Mes réservations <span id="badge-resa-retard" class="btn-badge-count hidden" style="background:var(--red,#E74C3C)"></span></button>
     <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
     <button class="btn btn-link" onclick="showScreen('screen-activation')">Première utilisation ?</button>
   </div>
 
-  <!-- ÉCRAN 2 : Activation -->
+  <!-- ACTIVATION -->
   <div id="screen-activation" class="screen">
     <img src="logo.png" alt="Espace Soleil" class="logo-img-small">
     <h2>Activation</h2>
@@ -46,7 +51,7 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 3 : Scan immo -->
+  <!-- SCAN IMMO -->
   <div id="screen-scan-immo" class="screen">
     <h2 id="titre-mouvement">Transfert</h2>
     <p>Scanne le QR code de l'immo</p>
@@ -55,7 +60,7 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 4 : Sélection receveur -->
+  <!-- SÉLECTION RECEVEUR -->
   <div id="screen-receveur" class="screen">
     <h2>À qui ?</h2>
     <p id="receveur-immo-info" style="font-weight:600;color:#1A3A6B;font-size:15px;"></p>
@@ -66,7 +71,7 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 5 : État et note -->
+  <!-- ÉTAT ET NOTE + PHOTO OPTIONNELLE -->
   <div id="screen-etat" class="screen">
     <h2>État du matériel</h2>
     <p id="etat-immo-info" style="font-weight:600;color:#1A3A6B;font-size:15px;"></p>
@@ -79,12 +84,21 @@
       <option value="Hors service">🔴 Hors service</option>
     </select>
     <label class="field-label">Note (optionnel)</label>
-    <textarea id="note-texte" class="note-textarea" placeholder="Ex : manque 3 pièces, câble abîmé, nécessite nettoyage..."></textarea>
+    <textarea id="note-texte" class="note-textarea" placeholder="Ex : câble abîmé, manque une pièce..."></textarea>
+    <!-- Photo optionnelle -->
+    <div style="width:100%;background:#FFF8F0;border:2px dashed #E87722;border-radius:12px;padding:12px;text-align:center">
+      <p style="font-size:12px;color:#888;margin-bottom:8px">📷 Photo optionnelle — état du matériel</p>
+      <label style="cursor:pointer;display:inline-block;padding:8px 16px;background:#E87722;color:white;border-radius:8px;font-size:13px;font-weight:600">
+        Prendre / Choisir
+        <input type="file" id="photo-etat-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhotoEtat(this)">
+      </label>
+      <div id="photo-etat-preview" style="margin-top:8px"></div>
+    </div>
     <button class="btn btn-primary" onclick="confirmerAvecEtat()">✅ Confirmer</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 6 : Confirmation -->
+  <!-- CONFIRMATION -->
   <div id="screen-confirmation" class="screen">
     <div class="check-anim">✅</div>
     <h2>Enregistré !</h2>
@@ -93,7 +107,7 @@
     <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Retour accueil</button>
   </div>
 
-  <!-- ÉCRAN 7 : Mon matériel -->
+  <!-- MON MATÉRIEL -->
   <div id="screen-mon-materiel" class="screen">
     <h2>📦 Mon matériel</h2>
     <p id="mon-materiel-user"></p>
@@ -101,7 +115,7 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 8 : Transferts en attente -->
+  <!-- TRANSFERTS EN ATTENTE -->
   <div id="screen-transferts-attente" class="screen">
     <h2>⚠️ Transferts en attente</h2>
     <p>Ces matériels t'ont été transmis — clique pour valider.</p>
@@ -109,7 +123,7 @@
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 9 : Accepter un transfert -->
+  <!-- ACCEPTER UN TRANSFERT -->
   <div id="screen-accepter" class="screen">
     <h2>📥 Réception de matériel</h2>
     <p id="accepter-texte" style="font-size:16px;font-weight:600;margin:8px 0;text-align:center;color:#1A3A6B;"></p>
@@ -125,11 +139,20 @@
     </select>
     <label class="field-label">Note (optionnel)</label>
     <textarea id="accepter-note" class="note-textarea" placeholder="Observations à la réception..."></textarea>
+    <!-- Photo optionnelle réception -->
+    <div style="width:100%;background:#FFF8F0;border:2px dashed #E87722;border-radius:12px;padding:12px;text-align:center">
+      <p style="font-size:12px;color:#888;margin-bottom:8px">📷 Photo optionnelle — état à la réception</p>
+      <label style="cursor:pointer;display:inline-block;padding:8px 16px;background:#E87722;color:white;border-radius:8px;font-size:13px;font-weight:600">
+        Prendre / Choisir
+        <input type="file" id="photo-reception-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhotoReception(this)">
+      </label>
+      <div id="photo-reception-preview" style="margin-top:8px"></div>
+    </div>
     <button class="btn btn-primary" onclick="accepterTransfert()">✅ Oui, j'accepte</button>
     <button class="btn btn-danger" onclick="refuserTransfert()">❌ Annuler</button>
   </div>
 
-  <!-- ÉCRAN 10 : Scanner pour validation -->
+  <!-- SCAN VALIDATION -->
   <div id="screen-scan-validation" class="screen">
     <h2>Scanner pour valider</h2>
     <p>Scanne le QR code du matériel reçu</p>
@@ -137,80 +160,86 @@
     <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 11 : Suivi immo -->
-  <div id="screen-suivi-immo" class="screen">
-    <h2>🔍 Suivi immo</h2>
+  <!-- RECHERCHER (écran unifié admin) -->
+  <div id="screen-rechercher" class="screen">
+    <h2>🔍 Rechercher</h2>
+    <p style="font-size:13px;color:#888;text-align:center">Immo (code ou libellé) ou employé (nom ou code)</p>
     <div class="admin-search">
-      <input type="text" id="suivi-immo-code" class="select-input" placeholder="Code (ex: 328 ou IM000328)">
-      <button class="btn btn-primary" onclick="rechercherSuiviImmo()">Go</button>
+      <input type="text" id="rech-input" class="select-input" placeholder="328, perceuse, GOLU..." oninput="rechercheAuto()">
+      <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourRecherche()">📷</button>
     </div>
-    <button class="btn btn-outline" onclick="scannerPourSuivi()">📷 Scanner un QR code</button>
-    <button class="btn btn-tertiary" id="btn-photos-suivi" onclick="ouvrirPhotos(document.getElementById('suivi-immo-code').value)" style="display:none">🖼️ Voir les photos</button>
-    <div id="suivi-immo-localisation"></div>
-    <div id="suivi-immo-resultats" class="liste-materiel">
-      <p class="empty-msg">Scanne ou tape un code immo.</p>
+    <div id="rech-resultats" class="liste-materiel">
+      <p class="empty-msg">Tape un code immo, un libellé ou un nom d'employé.</p>
     </div>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 12 : Scanner pour suivi -->
-  <div id="screen-scan-suivi" class="screen">
+  <!-- SCAN POUR RECHERCHE -->
+  <div id="screen-scan-recherche" class="screen">
     <h2>Scanner une immo</h2>
-    <div id="scanner-suivi" class="scanner-box"></div>
-    <button class="btn btn-outline" onclick="showScreen('screen-suivi-immo')">Annuler</button>
+    <div id="scanner-recherche" class="scanner-box"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN 13 : Suivi employé -->
-  <div id="screen-suivi-employe" class="screen">
-    <h2>👤 Suivi employé</h2>
-    <input type="text" id="suivi-employe-search" class="select-input" placeholder="Nom ou code employé..." oninput="rechercherSuggestionsEmploye()">
-    <div id="suivi-employe-suggestions" class="liste-materiel"></div>
-    <div id="suivi-employe-resultats" class="liste-materiel">
-      <p class="empty-msg">Tape un nom ou un code employé.</p>
-    </div>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
-  </div>
-
-  <!-- ÉCRAN : Photos d'une immo -->
+  <!-- PHOTOS D'UNE IMMO -->
   <div id="screen-photos" class="screen">
     <h2>🖼️ Photos</h2>
     <p id="photos-immo-titre" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
-
-    <!-- Upload -->
     <div class="admin-only hidden" id="upload-zone" style="width:100%;background:#FFF8F0;border:2px dashed #E87722;border-radius:14px;padding:16px;text-align:center;">
-      <p style="font-size:13px;color:#666;margin-bottom:10px;">Ajouter une photo (appareil photo ou galerie)</p>
-      <label style="cursor:pointer;display:inline-block;background:#E87722;color:white;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px;">
+      <p style="font-size:13px;color:#666;margin-bottom:10px">Ajouter une photo</p>
+      <label style="cursor:pointer;display:inline-block;background:#E87722;color:white;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px">
         📷 Prendre / Choisir
         <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="uploadPhoto(this)">
       </label>
       <div id="upload-progress" style="margin-top:10px;font-size:13px;color:#666;"></div>
     </div>
-
-    <!-- Galerie -->
     <div id="galerie-photos" style="width:100%;"></div>
-
-    <button class="btn btn-outline" onclick="showScreen('screen-suivi-immo')">Retour</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-rechercher')">Retour</button>
   </div>
 
-  <!-- ÉCRAN 14 : Administration -->
-  <div id="screen-admin" class="screen">
-    <h2>⚙️ Administration</h2>
-    <div class="admin-search">
-      <input type="text" id="admin-search" class="select-input" placeholder="Immo, employé, chantier...">
-      <button class="btn btn-primary" onclick="adminRechercher()">Go</button>
+  <!-- FORCE ATTRIBUTION (admin) -->
+  <div id="screen-force-attribution" class="screen">
+    <h2>⚡ Forcer attribution</h2>
+    <p style="font-size:13px;color:#888;text-align:center">Attribue une immo sans validation par le receveur</p>
+    <label class="field-label">Immo à attribuer</label>
+    <div style="display:flex;gap:8px;width:100%">
+      <input type="text" id="force-immo-search" class="select-input" style="flex:1" placeholder="Code IM ou libellé..." oninput="rechercherImmoPourForce()">
+      <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourForce()">📷</button>
     </div>
-    <div id="admin-resultats" class="liste-materiel">
-      <p class="empty-msg">Tapez un code immo, un nom ou un chantier.</p>
-    </div>
+    <p id="force-immo-info" style="font-weight:700;color:#1A3A6B;font-size:14px;"></p>
+    <label class="field-label">Attribuer à</label>
+    <select id="force-receveur" class="select-input">
+      <option value="">-- Sélectionne un employé --</option>
+    </select>
+    <label class="field-label">État</label>
+    <select id="force-etat" class="select-input">
+      <option value="Bon état">✅ Bon état</option>
+      <option value="Neuf">⭐ Neuf</option>
+      <option value="Usé">🔶 Usé</option>
+      <option value="Abîmé">⚠️ Abîmé</option>
+    </select>
+    <label class="field-label">Note (optionnel)</label>
+    <textarea id="force-note" class="note-textarea" placeholder="Raison de l'attribution forcée..."></textarea>
+    <button class="btn btn-secondary" onclick="validerForceAttribution()">⚡ Attribuer maintenant</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
+
+  <!-- SCAN POUR FORCE ATTRIBUTION -->
+  <div id="screen-scan-force" class="screen">
+    <h2>Scanner une immo</h2>
+    <div id="scanner-force" class="scanner-box"></div>
+    <button class="btn btn-outline" onclick="showScreen('screen-force-attribution')">Annuler</button>
+  </div>
+
+  <!-- MES RÉSERVATIONS -->
+  <div id="screen-mes-reservations" class="screen">
+    <h2>📅 Mes réservations</h2>
+    <div id="mes-resa-liste" class="liste-materiel"></div>
+    <button class="btn btn-primary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
   </div>
 
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
-
-  <!-- ÉCRAN : Réservation -->
+  <!-- RÉSERVATION -->
   <div id="screen-reserver" class="screen">
     <img src="logo.png" alt="ES" class="logo-img-small">
     <h2>📅 Réserver une immo</h2>
@@ -221,30 +250,49 @@
       <button class="btn btn-primary" style="width:auto;padding:14px 16px" onclick="scannerPourResa()">📷</button>
     </div>
     <div id="resa-immo-suggestions" class="liste-materiel"></div>
+    <!-- Pour qui (admin seulement) -->
+    <div class="admin-only hidden" style="width:100%">
+      <label class="field-label">Pour qui (admin — laisser vide = moi)</label>
+      <select id="resa-pour-qui" class="select-input">
+        <option value="">-- Moi-même --</option>
+      </select>
+    </div>
     <label class="field-label">Date de départ</label>
     <input type="date" id="resa-date-debut" class="select-input">
     <label class="field-label">Date de retour prévue</label>
     <input type="date" id="resa-date-fin" class="select-input">
-    <label class="field-label">Chantier concerné (optionnel)</label>
+    <label class="field-label">Chantier (optionnel)</label>
     <input type="text" id="resa-chantier" class="select-input" placeholder="Nom ou code du chantier...">
     <label class="field-label">Note (optionnel)</label>
-    <textarea id="resa-note" class="note-textarea" placeholder="Précisions sur l'utilisation prévue..."></textarea>
+    <textarea id="resa-note" class="note-textarea" placeholder="Précisions..."></textarea>
     <button class="btn btn-primary" onclick="soumettreReservation()">✅ Envoyer la demande</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN : Mes réservations -->
-  <div id="screen-mes-reservations" class="screen">
-    <h2>📅 Mes réservations</h2>
-    <div id="mes-resa-liste" class="liste-materiel"></div>
-    <button class="btn btn-primary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+  <!-- MODIFIER RÉSERVATION -->
+  <div id="screen-modifier-resa" class="screen">
+    <h2>✏️ Modifier la réservation</h2>
+    <p id="modif-resa-info" style="font-weight:700;color:#1A3A6B;font-size:15px;"></p>
+    <label class="field-label">Nouvelle date de départ</label>
+    <input type="date" id="modif-date-debut" class="select-input">
+    <label class="field-label">Nouvelle date de retour</label>
+    <input type="date" id="modif-date-fin" class="select-input">
+    <label class="field-label">Chantier</label>
+    <input type="text" id="modif-chantier" class="select-input">
+    <label class="field-label">Note</label>
+    <textarea id="modif-note" class="note-textarea"></textarea>
+    <button class="btn btn-primary" onclick="validerModifResa()">✅ Enregistrer</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-mes-reservations')">Annuler</button>
   </div>
 
-  <!-- ÉCRAN : Scanner pour réservation -->
+  <!-- SCANNERS DIVERS -->
   <div id="screen-scan-resa" class="screen">
     <h2>Scanner une immo</h2>
-    <p>Scanne le QR code du matériel à réserver</p>
     <div id="scanner-resa" class="scanner-box"></div>
     <button class="btn btn-outline" onclick="showScreen('screen-reserver')">Annuler</button>
   </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
