@@ -1072,6 +1072,50 @@ function scannerPourPanne() {
   });
 }
 
+// ── Résoudre une panne depuis la PWA (admin) ─────────────────────────────
+async function resoudrePannePWA(codeIM) {
+  const libIM = lib(codeIM);
+  const note = prompt('Résolution panne ' + libIM + ' — Décrivez la réparation (obligatoire) :');
+  if (!note || note.trim().length < 10) { toast('Note obligatoire (10 car. min.)', 'error'); return; }
+  const prest = prompt('Prestataire SAV (optionnel) :') || '';
+  const cout  = prompt('Coût réel de réparation en € (optionnel) :') || '';
+  if (!confirm('Confirmer le retour de ' + codeIM + ' dans le parc ?')) return;
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=resoudre_panne', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_im: codeIM, etat_resolution: 'Bon état', prestataire: prest, cout_reel: cout, note, par_code: S.employe.code, par_nom: S.employe.nom }),
+    });
+    const d = await r.json();
+    if (d.success !== false) {
+      vib(300);
+      document.getElementById('recap').innerHTML = '<strong>✅ Panne résolue !</strong><br><strong>Immo :</strong> ' + libIM + '<br><strong>Note :</strong> ' + note + '<br>' + (prest ? '<strong>Prestataire :</strong> ' + prest + '<br>' : '') + (cout ? '<strong>Coût :</strong> ' + cout + '€<br>' : '') + '<em style="color:var(--grey)">Immo de retour dans le parc.</em>';
+      document.getElementById('alerte-degradation')?.classList.add('hidden');
+      showScreen('screen-confirmation');
+    } else { toast('Erreur lors de la résolution', 'error'); }
+  } catch (e) { toast('Erreur réseau', 'error'); }
+}
+
+// ── Déclarer vol / disparition depuis PWA (admin) ─────────────────────────
+async function declarerVolPWA(codeIM) {
+  const libIM = lib(codeIM);
+  const type = confirm('Cliquez OK pour "Volé", Annuler pour "Disparu"') ? 'Volé' : 'Disparu';
+  const motif = prompt('Motif obligatoire pour [' + type + '] ' + codeIM + ' (min 10 car.) :');
+  if (!motif || motif.trim().length < 10) { toast('Motif obligatoire', 'error'); return; }
+  if (!confirm('1ère CONFIRMATION : ' + codeIM + ' sera déclaré [' + type + '] et retiré du parc.')) return;
+  if (!confirm('CONFIRMATION FINALE IRRÉVERSIBLE : Confirmer [' + type + '] pour ' + codeIM + ' ?')) return;
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=declarer_vol', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_im: codeIM, type_vol: type, motif, par_code: S.employe.code, par_nom: S.employe.nom }),
+    });
+    const d = await r.json();
+    if (d.success !== false) {
+      vib(300); toast('✅ ' + codeIM + ' déclaré ' + type, 'success', 4000);
+      showScreen('screen-accueil');
+    } else { toast('Erreur', 'error'); }
+  } catch (e) { toast('Erreur réseau', 'error'); }
+}
+
 // ── Déclarer une panne depuis la PWA ────────────────────────────────────
 async function signalerPannePWA(codeIM) {
   const libIM = lib(codeIM);
