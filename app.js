@@ -1476,3 +1476,57 @@ async function retraitConfirm2() {
 // Alias pour les anciens appels
 function marquerImmoHSPWA(codeIM) { ouvrirEcranHS(codeIM); }
 function declarerVolPWA(codeIM)    { ouvrirEcranVol(codeIM); }
+
+// ── Écran Sortie définitive (Volé / Disparu / HS) ────────────────────────
+function ouvrirEcranSortie(codeIM) {
+  PANNE_STATE.codeIM = codeIM;
+  PANNE_STATE.libelle = lib(codeIM);
+  const titreEl = document.getElementById('retrait-titre');
+  if (titreEl) titreEl.textContent = '⛔ Sortie définitive du parc';
+  const immoEl = document.getElementById('retrait-immo-titre');
+  if (immoEl) immoEl.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
+  const warn = document.getElementById('retrait-warning');
+  if (warn) warn.innerHTML =
+    '<select id="retrait-type" class="select-input" style="margin-bottom:8px">' +
+    '<option value="Hors service définitif">⚫ Hors service définitif</option>' +
+    '<option value="Perdu">❌ Perdu</option>' +
+    '<option value="Volé">🚨 Volé</option>' +
+    '<option value="Disparu">🔍 Disparu / introuvable</option>' +
+    '</select>' +
+    '<div style="background:#FFEBEE;border-radius:8px;padding:8px;font-size:12px;color:var(--red);font-weight:700;text-align:center">⚠️ Action définitive et irréversible</div>';
+  const motifEl = document.getElementById('retrait-motif');
+  if (motifEl) motifEl.placeholder = 'Décrivez en détail la raison... (10 car. min.)';
+  _reinitRetraitEcran();
+  PANNE_STATE.typeRetrait = null; // sera lu depuis le select au moment de valider
+  showScreen('screen-retrait-parc', true);
+}
+
+// Remplacer retraitConfirm2 pour lire le select type
+const _origRetraitConfirm2 = retraitConfirm2;
+retraitConfirm2 = async function() {
+  const motif = (document.getElementById('retrait-motif') || {}).value || '';
+  const typeFromSelect = (document.getElementById('retrait-type') || {}).value || '';
+  const typeRetrait = PANNE_STATE.typeRetrait || typeFromSelect || 'Perdu';
+  const actionEndpoint = (typeRetrait === 'Volé' || typeRetrait === 'Disparu') ? 'declarer_vol' : 'marquer_statut_immo';
+  const payload = actionEndpoint === 'declarer_vol'
+    ? { code_im: PANNE_STATE.codeIM, type_vol: typeRetrait, motif, par_code: S.employe.code, par_nom: S.employe.nom }
+    : { code_im: PANNE_STATE.codeIM, etat: typeRetrait, actif: false, motif, type_mouv: 'Archivage', par_code: S.employe.code, par_nom: S.employe.nom };
+  try {
+    await fetch(CONFIG.proxy + '?action=' + actionEndpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    vib(300);
+    document.getElementById('recap').innerHTML =
+      '<strong>⛔ ' + PANNE_STATE.libelle + ' — ' + typeRetrait + '</strong><br>' +
+      '<strong>Motif :</strong> ' + motif + '<br>' +
+      '<em style="color:var(--grey)">Immo retirée du parc. Toutes les statistiques sont conservées.</em>';
+    document.getElementById('alerte-degradation')?.classList.add('hidden');
+    showScreen('screen-confirmation', true);
+    rafraichirBadges();
+  } catch (e) { toast('Erreur réseau', 'error'); }
+};
+
+// Alias de compatibilité
+function ouvrirEcranVol(codeIM) { ouvrirEcranSortie(codeIM); }
+function ouvrirEcranHS(codeIM)  { ouvrirEcranSortie(codeIM); }
