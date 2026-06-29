@@ -313,7 +313,7 @@ tr:hover td{background:#FAFBFC;}
         </select>
       </div>
       <div class="card"><div class="card-head"><h3>Au dépôt</h3><span class="card-cnt" id="cnt-depot"></span></div>
-        <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>État</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
     </div>
 
     <!-- Historique -->
@@ -426,6 +426,12 @@ tr:hover td{background:#FAFBFC;}
 
 <script>
 var W='https://immo-proxy.ral-85d.workers.dev/';
+var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
+
+async function loadImmoMeta(){
+  if(Object.keys(immoMeta).length>0)return;
+  try{var r=await fetch(W+'?immo_metadata=1');immoMeta=await r.json();}catch(e){immoMeta={};}
+}
 var TZ='Indian/Reunion';
 var PIN='ES974';
 var d=null, im={}, fdsMap={}, photosMap={}, reservations=[], maintenance=null;
@@ -520,7 +526,9 @@ function renderTab(name){
   switch(name){
     case 'vue-generale':   renderVueGenerale(); break;
     case 'circulation':    renderCirc(); break;
-    case 'depot':          renderDepot(); break;
+    case 'depot':
+      loadImmoMeta().then(function(){renderDepot();});
+      break;
     case 'historique':
       autoLoadHist(); // Toujours rafraîchir l'historique
       break;
@@ -529,7 +537,9 @@ function renderTab(name){
     case 'documents':      if(!dataLoaded.docs)loadDocs(); else renderDocs(); break;
     case 'maintenance':    if(!dataLoaded.maint)loadMaint(); else renderMaint(); break;
     case 'alertes':        renderAlertes(); break;
-    case 'analyses':       renderAnalyse(); break;
+    case 'analyses':
+      loadImmoMeta().then(function(){renderAnalyse();});
+      break;
   }
 }
 
@@ -1064,16 +1074,46 @@ function renderAnalyse(){
   });
   html+='</tbody></table></div></div>';
 
-  // ── Candidats au remplacement ────────────────────────────────────────────
-  // Critères : pannes répétées (≥2) OU coûts de réparation réels élevés
+  // ── Candidats au remplacement — enrichis avec valeur d'achat ─────────────────
   var candidats=[];
-  Object.keys(immoP).forEach(function(code){if(immoP[code]>=2){var c=im[code]||{};var cout=parseFloat(c.Cout_Maintenance)||0;candidats.push({code_im:code,libelle:getLib(code),nb_pannes:immoP[code],cout_maint:cout,raison:immoP[code]+'x en panne'});}});
-  // Ajouter depuis les coûts réels (topCout déjà calculé ci-dessus)
-  topCout.forEach(function(x){if(x.total>500&&!candidats.find(function(c){return c.code_im===x.code_im;}))candidats.push({code_im:x.code_im,libelle:getLib(x.code_im),nb_pannes:immoP[x.code_im]||0,cout_maint:x.total,raison:'Coût réparations : '+x.total.toFixed(0)+'€'});});
-  candidats.sort(function(a,b){return b.nb_pannes-a.nb_pannes||b.cout_maint-a.cout_maint;});
-  html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>🔄 Candidats au remplacement</h3></div>';
-  if(!candidats.length)html+='<p class="es" style="padding:16px">Aucun candidat identifié — parc en bonne santé !</p>';
-  else html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Pannes</th><th>Coût maint.</th><th>Motif</th></tr></thead><tbody>'+candidats.slice(0,8).map(function(x){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td><td style="font-size:12px">'+x.libelle+'</td><td style="color:var(--red);font-weight:700">'+x.nb_pannes+'</td><td>'+(x.cout_maint?x.cout_maint+'€':'—')+'</td><td style="font-size:11px;color:var(--orange)">'+x.raison+'</td></tr>';}).join('')+'</tbody></table></div>';
+  var now_ts2=Date.now();
+  var allCodes=Object.keys(immoP).concat(topCout.map(function(x){return x.code_im;}));
+  allCodes=allCodes.filter(function(v,i,a){return a.indexOf(v)===i;});
+  allCodes.forEach(function(code){
+    var nbPannes=immoP[code]||0;
+    var metaC=immoMeta[code]||{};
+    var valAchat=metaC.valeur_achat||0;
+    var dateAchat=metaC.date_achat||'';
+    var ageMois=dateAchat?Math.max(1,Math.round((now_ts2-new Date(dateAchat).getTime())/(30*86400000))):0;
+    var coutTotalRep=(costByImmo[code]||{}).total||0;
+    var ratio=valAchat>0?Math.round(coutTotalRep/valAchat*100):0;
+    var coutMensuel=ageMois>0&&coutTotalRep>0?Math.round(coutTotalRep/ageMois*10)/10:0;
+    var raison='';
+    if(valAchat>0&&ratio>=50)raison=ratio+'% valeur achat en reparations'+(ratio>=100?' CRITIQUE':'');
+    else if(nbPannes>=2)raison=nbPannes+'x en panne';
+    else if(coutTotalRep>500)raison='Cout reparations : '+coutTotalRep.toFixed(0)+'EUR';
+    else return;
+    candidats.push({code_im:code,libelle:getLib(code),nb_pannes:nbPannes,val_achat:valAchat,cout_rep:coutTotalRep,ratio:ratio,age_mois:ageMois,cout_mensuel:coutMensuel,raison:raison});
+  });
+  candidats.sort(function(a,b){return b.ratio-a.ratio||b.nb_pannes-a.nb_pannes||b.cout_rep-a.cout_rep;});
+  html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>Candidats au remplacement</h3></div>';
+  if(!candidats.length){html+='<p class="es" style="padding:16px">Aucun candidat. Renseignez Valeur_Achat dans SharePoint pour plus de precision.</p>';}
+  else{
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Pannes</th><th>Valeur achat</th><th>Cout reparations</th><th>Ratio</th><th>Age (mois)</th><th>Cout/mois</th></tr></thead><tbody>';
+    html+=candidats.slice(0,10).map(function(x){
+      var ratioColor=x.ratio>=100?'var(--red)':x.ratio>=50?'var(--orange)':'var(--grey)';
+      var rowClass=x.ratio>=100?'urgent-row':x.ratio>=50?'warn-row':'';
+      return '<tr class="'+rowClass+'">'+
+        '<td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td>'+
+        '<td style="font-size:12px">'+x.libelle+'</td>'+
+        '<td style="color:var(--red);font-weight:700;text-align:center">'+x.nb_pannes+'</td>'+
+        '<td style="font-weight:600">'+(x.val_achat?x.val_achat.toLocaleString('fr-FR')+'EUR':'--')+'</td>'+
+        '<td style="font-weight:600;color:var(--orange)">'+(x.cout_rep?x.cout_rep.toFixed(0)+'EUR':'--')+'</td>'+
+        '<td style="font-weight:800;color:'+ratioColor+'">'+(x.ratio?x.ratio+'%':'--')+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+(x.age_mois?x.age_mois+'m':'--')+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+(x.cout_mensuel?x.cout_mensuel+'EUR/m':'--')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  }
   html+='</div>';
 
   // ── Pannes et dégradations par catégorie ──────────────────────────────────
@@ -1135,11 +1175,23 @@ async function chargerFicheImmo(codeIM){
       ?'<div class="loc-card" style="background:#E8F5E9;color:#1B5E20">🏭 Au dépôt</div>'
       :'<div class="loc-card" style="background:#FFF3E0;color:#E65100">👤 Avec <strong>'+loc.nom_employe+'</strong> depuis le '+fmtD(loc.horodatage)+'</div>';
     var nbDet=new Set(hist.filter(function(m){return m.type_mouvement!=='Retour';}).map(function(m){return m.code_employe;})).size;
+    var mt2=immoMeta[codeIM]||{};
     var html='<div class="fiche-stat-row">';
     html+='<div class="fiche-stat"><div class="sv">'+hist.length+'</div><div class="sl">Mouvements</div></div>';
     html+='<div class="fiche-stat"><div class="sv">'+nbDet+'</div><div class="sl">Détenteurs</div></div>';
     html+='<div class="fiche-stat"><div class="sv" style="font-size:14px">'+(immoInfo.Categorie||'—')+'</div><div class="sl">Catégorie</div></div>';
-    html+='</div>'+locHtml;
+    html+='</div>';
+    // Valeur et date d'achat
+    if(mt2.valeur_achat||mt2.date_achat){
+      html+='<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">';
+      if(mt2.valeur_achat)html+='<div style="background:#E8F5E9;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Valeur d achat :</span> <strong style="color:var(--green)">'+mt2.valeur_achat.toLocaleString('fr-FR')+'€</strong></div>';
+      if(mt2.date_achat)html+='<div style="background:#E3F2FD;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Date d achat :</span> <strong style="color:var(--blue)">'+fmtD(mt2.date_achat)+'</strong></div>';
+      // Calcul ratio réparations
+      var coutRep2=0;(d.all_movements||[]).filter(function(m){return m.code_im===codeIM&&m.type_mouvement==='Réparation';}).forEach(function(m){var n=m.note||'';var cm=n.match(/Coût réel\s*:\s*([\d.,]+)/i);if(cm){var c=parseFloat(cm[1].replace(',','.'));if(!isNaN(c))coutRep2+=c;}});
+      if(coutRep2>0&&mt2.valeur_achat>0){var ratio2=Math.round(coutRep2/mt2.valeur_achat*100);var ratioColor=ratio2>=100?'var(--red)':ratio2>=50?'var(--orange)':'var(--green)';html+='<div style="background:#FFF3E0;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Coût réparations :</span> <strong style="color:'+ratioColor+'">'+coutRep2.toFixed(0)+'€ ('+ratio2+'% valeur achat)</strong></div>';}
+      html+='</div>';
+    }
+    html+=locHtml;
     if(immoInfo.N_Serie)html+='<p style="font-size:13px;color:var(--grey);margin-bottom:10px">N° série : <strong>'+immoInfo.N_Serie+'</strong></p>';
     // Boutons
     html+='<div class="fiche-actions" id="fiche-act-immo-'+codeIM+'"></div>';
