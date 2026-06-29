@@ -715,7 +715,7 @@ function renderDepot(){
   data.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
   var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
   var affiche=nb===0?data:data.slice(0,nb);
-  document.getElementById('cnt-depot').textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
+  var cntEl=document.getElementById('cnt-depot');if(cntEl)cntEl.textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
   document.getElementById('tb-depot').innerHTML=affiche.length===0?'<tr><td colspan="5" class="es">Aucun résultat.</td></tr>':
     affiche.map(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return'<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+l+'</td><td style="font-size:11px;color:var(--grey)">'+c+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td></tr>';}).join('');
 }
@@ -962,7 +962,22 @@ function renderAlertes(){
   pannesActives.sort(function(a,b){return b.dureeJ-a.dureeJ;});
   var html='';
   if(pannesActives.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--orange)"><div class="card-head"><h3>📢 Pannes en cours ('+pannesActives.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Signalé par</th><th>Depuis</th><th>Motif</th><th>Action</th></tr></thead><tbody>'+
-    pannesActives.map(function(p){return'<tr class="warn-row"><td><span class="link-im" data-cim="'+p.code_im+'" data-lib="'+getLib(p.code_im).replace(/"/g,'')+'">'+p.code_im+'</span></td><td style="font-size:12px">'+getLib(p.code_im)+'</td><td style="font-size:12px">'+p.detenteur+'</td><td style="font-size:11px;white-space:nowrap">'+fmtDT(p.since)+'</td><td style="font-size:11px;color:var(--grey)">'+(p.note||'—')+'</td><td><button class="btn-res-p" data-cim="'+p.code_im+'">" style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">✅ Résoudre</button></td></tr>';}).join('')+'</tbody></table></div></div>';
+    pannesActives.map(function(p){
+      var dureeStr=p.dureeJ===0?"Aujourd'hui":p.dureeJ+"j";
+      var urgCls=p.dureeJ>7?"urgent-row":"warn-row";
+      var lib_=getLib(p.code_im).replace(/"/g,'');
+      var row=document.createElement('tr');row.className=urgCls;
+      row.innerHTML='<td><span class="link-im" data-cim="'+p.code_im+'" data-lib="'+lib_+'">'+p.code_im+'</span></td>'+
+        '<td style="font-size:12px">'+getLib(p.code_im)+'</td>'+
+        '<td style="font-size:12px">'+p.detenteur+'</td>'+
+        '<td><b style="color:'+(p.dureeJ>7?'var(--red)':'var(--orange)')+'">'+dureeStr+'</b><br><span style="font-size:10px;color:var(--grey)">'+fmtD(p.since)+'</span></td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+(p.note||'—')+'</td>'+
+        '<td style="white-space:nowrap">'+
+          '<button class="btn-maj-p" data-cim="'+p.code_im+'" style="padding:4px 8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:3px">✏️ Suivi</button>'+
+          '<button class="btn-res-p" data-cim="'+p.code_im+'" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">✅ Résoudre</button>'+
+        '</td>';
+      return row.outerHTML;
+    }).join('');
   if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service actuel ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
   if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span></td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
   if(!html)html='<div class="es" style="padding:40px">Aucune alerte active. Tout est OK ✅</div>';
@@ -1157,12 +1172,8 @@ async function chargerFicheImmo(codeIM){
       panneBtn2.textContent=estEnPanneDash?'✅ Résoudre la panne':'📢 Déclarer une panne';
       (function(_c,_ep){panneBtn2.onclick=function(){if(_ep)resoudrePanneComplet(_c);else declarerPanneDash(_c);};})(codeIM,estEnPanneDash);actDiv.appendChild(panneBtn2);
       // Boutons HS / Perdu / Volé / Disparu
-      var hsBtn2=document.createElement('button');hsBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#424242;color:#fff';hsBtn2.textContent='⚫ HS définitif';
-      (function(_c,_l){hsBtn2.onclick=function(){marquerImmoInactive(_c,_l,'Hors service définitif');};})(codeIM,l);actDiv.appendChild(hsBtn2);
-      var volBtn2=document.createElement('button');volBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#4A148C;color:#fff';volBtn2.textContent='🚨 Volé';
-      (function(_c,_l){volBtn2.onclick=function(){declarerVol(_c,_l,'Volé');};})(codeIM,l);actDiv.appendChild(volBtn2);
-      var dispBtn2=document.createElement('button');dispBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#37474F;color:#fff';dispBtn2.textContent='🔍 Disparu';
-      (function(_c,_l){dispBtn2.onclick=function(){declarerVol(_c,_l,'Disparu');};})(codeIM,l);actDiv.appendChild(dispBtn2);
+      var sortieBtn=document.createElement('button');sortieBtn.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#B71C1C;color:#fff';sortieBtn.textContent='⛔ Sortie définitive';
+      (function(_c,_l){sortieBtn.onclick=function(){ouvrirModalSortie(_c,_l);};})(codeIM,l);actDiv.appendChild(sortieBtn);
     }
   }catch(e){body.innerHTML='<p style="color:var(--red);padding:20px">Erreur : '+e.message+'</p>';}
 }
@@ -1389,6 +1400,36 @@ function resoudrePanneComplet(codeIM){
 }
 
 // ── Gestion statut immo (panne, HS, perdu) ──────────────────────────────
+function ouvrirContreProposition(id,cim,nom,deb,fin){
+  document.getElementById('act-titre').textContent='✏️ Modification proposée pour '+nom;
+  var dS=deb?deb.slice(0,10):'';var fS=fin?fin.slice(0,10):'';
+  var immoOpts='<option value="">-- Garder la même immo ('+cim+') --</option>'+
+    (d.inventory||[]).map(function(i){return'<option value="'+i.code_im+'">'+i.code_im+' — '+getLib(i.code_im)+'</option>';}).join('');
+  document.getElementById('act-form').innerHTML=
+    '<div class="frow"><label>Immo proposée</label><select id="cp-immo">'+immoOpts+'</select></div>'+
+    '<div class="frow"><label>Nouvelle date de départ</label><input type="date" id="cp-debut" value="'+dS+'"></div>'+
+    '<div class="frow"><label>Nouvelle date de retour</label><input type="date" id="cp-fin" value="'+fS+'"></div>'+
+    '<div class="frow"><label>Note / explication</label><textarea id="cp-note" rows="3" placeholder="Ex : immo indisponible cette semaine..."></textarea></div>';
+  window._cpId=id;window._cpCodeIM=cim;window._cpNom=nom;
+  document.getElementById('act-overlay').classList.add('open');
+  var btn=document.getElementById('act-confirm-btn');
+  if(btn) btn.onclick=soumettreContreProposition;
+}
+
+function soumettreContreProposition(){
+  var id=window._cpId;
+  var immoAlt=(document.getElementById('cp-immo')||{}).value||'';
+  var debut=(document.getElementById('cp-debut')||{}).value||'';
+  var fin=(document.getElementById('cp-fin')||{}).value||'';
+  var note=(document.getElementById('cp-note')||{}).value||'';
+  if(!debut||!fin){alert('Indique les nouvelles dates.');return;}
+  var noteC='[Contre-proposition logistique : '+(immoAlt?'immo '+immoAlt+', ':'')+debut+' → '+fin+(note?' — '+note:'')+']';
+  fetch(W+'?action=modifier_resa',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,date_debut:new Date(debut).toISOString(),date_fin:new Date(fin).toISOString(),statut:'Contre-proposition',note:noteC,code_im_alt:immoAlt||undefined})})
+    .then(function(){fermerAction();loadReservations();})
+    .catch(function(e){alert('Erreur : '+e.message);});
+}
+
 function declarerVol(codeIM,libelle,type){
   var motif=prompt('MOTIF OBLIGATOIRE - Declarer ' + codeIM + ' comme [' + type + '] - min 10 car. :');
   if(!motif||motif.trim().length<10){alert('Motif obligatoire, 10 car. minimum.');return;}
@@ -1397,6 +1438,42 @@ function declarerVol(codeIM,libelle,type){
   fetch(W+'?action=declarer_vol',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:'ADMIN',par_nom:'Admin Dashboard'})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo ' + codeIM + ' déclarée [' + type + ']. Retirée du parc.');})
+    .catch(function(e){alert('Erreur : '+e.message);});
+}
+
+function ouvrirModalSortie(codeIM,libelle){
+  document.getElementById('act-titre').textContent='⛔ Sortie définitive — '+libelle;
+  document.getElementById('act-form').innerHTML=
+    '<div class="frow"><label>Raison de la sortie <span style="color:var(--red)">*</span></label>'+
+    '<select id="sd-type" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:4px">'+
+    '<option value="Hors service définitif">⚫ Hors service définitif (réparation impossible)</option>'+
+    '<option value="Perdu">❌ Perdu</option>'+
+    '<option value="Volé">🚨 Volé</option>'+
+    '<option value="Disparu">🔍 Disparu / introuvable</option>'+
+    '</select></div>'+
+    '<div class="frow"><label>Justification détaillée <span style="color:var(--red)">*</span></label>'+
+    '<textarea id="sd-motif" rows="3" placeholder="Minimum 10 caractères obligatoires..." style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px"></textarea></div>'+
+    '<p style="font-size:12px;color:var(--red);font-weight:700;text-align:center;padding:8px;background:#FFEBEE;border-radius:8px">⚠️ Cette action est définitive et irréversible</p>';
+  window._sdCim=codeIM;window._sdLib=libelle;
+  document.getElementById('act-overlay').classList.add('open');
+  var btn=document.getElementById('act-confirm-btn');
+  if(btn) btn.onclick=validerSortieDefinitive;
+}
+
+function validerSortieDefinitive(){
+  var type=(document.getElementById('sd-type')||{}).value||'Hors service définitif';
+  var motif=(document.getElementById('sd-motif')||{}).value||'';
+  if(!motif||motif.trim().length<10){alert('Justification obligatoire (10 car. min.)');return;}
+  var codeIM=window._sdCim;
+  var lib2=window._sdLib;
+  // Deuxième confirmation intégrée dans la modale
+  if(!confirm('CONFIRMATION FINALE : Sortir définitivement '+codeIM+' du parc comme ['+type+'] ?'))return;
+  var endpoint=type==='Volé'||type==='Disparu'?'declarer_vol':'marquer_statut_immo';
+  var payload=endpoint==='declarer_vol'
+    ?{code_im:codeIM,type_vol:type,motif:motif,par_code:'ADMIN',par_nom:'Dashboard Admin'}
+    :{code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'ADMIN',par_nom:'Dashboard Admin'};
+  fetch(W+'?action='+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(){fermerAction();fermerFiche();refreshAll();alert('✅ '+codeIM+' sorti du parc : '+type);})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
 
