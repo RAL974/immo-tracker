@@ -434,6 +434,59 @@
   <button class="btn btn-outline" onclick="showScreen('screen-reserver')">Annuler</button>
 </div>
 
+<!-- ══════════ ÉCRAN SIGNALER PANNE ══════════ -->
+<div id="screen-signaler-panne" class="screen">
+  <h2>📢 Signaler une panne</h2>
+  <p id="panne-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <label class="field-label">Description du problème <span style="color:var(--red)">*</span></label>
+  <textarea id="panne-motif" class="note-textarea" placeholder="Décrivez précisément la panne, le dysfonctionnement... (5 car. min.)" style="min-height:120px"></textarea>
+  <button class="btn btn-secondary" onclick="soumettrePanne()">📢 Confirmer le signalement</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
+
+<!-- ══════════ ÉCRAN RÉSOUDRE PANNE ══════════ -->
+<div id="screen-resoudre-panne" class="screen">
+  <h2>✅ Résoudre la panne</h2>
+  <p id="resolution-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <label class="field-label">État après réparation</label>
+  <select id="resolution-etat" class="select-input">
+    <option value="Bon état">✅ Bon état</option>
+    <option value="Usé">🔶 Usé</option>
+    <option value="Abîmé">⚠️ Abîmé</option>
+    <option value="Neuf">⭐ Neuf</option>
+  </select>
+  <label class="field-label">Prestataire SAV (optionnel)</label>
+  <input type="text" id="resolution-prest" class="select-input" placeholder="Nom du réparateur / atelier...">
+  <label class="field-label">Coût de réparation en € (optionnel)</label>
+  <input type="number" id="resolution-cout" class="select-input" placeholder="0" step="0.01">
+  <label class="field-label">Note de résolution <span style="color:var(--red)">*</span></label>
+  <textarea id="resolution-note" class="note-textarea" placeholder="Décrivez la réparation effectuée... (10 car. min.)" style="min-height:100px"></textarea>
+  <button class="btn btn-secondary" onclick="soumettreResolution()">✅ Valider le retour dans le parc</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+</div>
+
+<!-- ══════════ ÉCRAN RETRAIT PARC ══════════ -->
+<div id="screen-retrait-parc" class="screen">
+  <h2 id="retrait-titre">🚨 Retrait du parc</h2>
+  <p id="retrait-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <div id="retrait-warning" style="background:#FFEBEE;border:2px solid var(--red);border-radius:12px;padding:12px;font-size:13px;color:var(--red);font-weight:700;text-align:center">
+    ⚠️ Action irréversible — l'immo sera retirée définitivement du parc
+  </div>
+  <label class="field-label">Motif obligatoire <span style="color:var(--red)">*</span></label>
+  <textarea id="retrait-motif" class="note-textarea" placeholder="Expliquez en détail la raison... (10 car. min.)" style="min-height:100px"></textarea>
+  <div id="retrait-confirm1" style="width:100%">
+    <button class="btn btn-danger" onclick="retraitConfirm1()">⚠️ 1ère confirmation — continuer</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
+  <div id="retrait-confirm2" class="hidden" style="width:100%">
+    <div style="background:#FFEBEE;border-radius:10px;padding:12px;font-size:14px;font-weight:700;color:var(--red);text-align:center;margin-bottom:8px">
+      🔴 CONFIRMATION FINALE IRRÉVERSIBLE
+    </div>
+    <button class="btn btn-danger" onclick="retraitConfirm2()">🔴 Confirmer définitivement</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
+</div>
+
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="app.js"></script>
 </body>
