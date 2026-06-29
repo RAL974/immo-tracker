@@ -1370,7 +1370,8 @@ function resoudrePannePWA(codeIM) { ouvrirEcranResolution(codeIM); }
 async function soumettreResolution() {
   const etat  = (document.getElementById('resolution-etat') || {}).value || 'Bon état';
   const prest = (document.getElementById('resolution-prest') || {}).value || '';
-  const cout  = (document.getElementById('resolution-cout') || {}).value || '';
+  const coutRaw = (document.getElementById('resolution-cout') || {}).value || '';
+  const cout  = coutRaw.replace(',', '.'); // normaliser virgule → point
   const note  = (document.getElementById('resolution-note') || {}).value || '';
   if (!note || note.trim().length < 10) {
     toast('La note de résolution est obligatoire (10 car. min.)', 'error'); return;
@@ -1387,18 +1388,26 @@ async function soumettreResolution() {
     const d = await r.json();
     if (d.success !== false) {
       vib(300);
-      document.getElementById('recap').innerHTML =
-        '<strong>✅ Panne résolue !</strong><br>' +
-        '<strong>Immo :</strong> ' + PANNE_STATE.libelle + '<br>' +
-        '<strong>État :</strong> ' + etat + '<br>' +
-        (prest ? '<strong>Prestataire :</strong> ' + prest + '<br>' : '') +
-        (cout  ? '<strong>Coût :</strong> ' + cout + '€<br>' : '') +
-        '<strong>Note :</strong> ' + note + '<br>' +
-        '<em style="color:var(--grey)">Immo de retour dans le parc.</em>';
-      document.getElementById('alerte-degradation')?.classList.add('hidden');
-      showScreen('screen-confirmation', true);
+      const recapEl = document.getElementById('recap');
+      const immoLabel = PANNE_STATE.libelle || PANNE_STATE.codeIM || 'Immo';
+      if (recapEl) {
+        recapEl.innerHTML =
+          '<strong>✅ Panne résolue !</strong><br>' +
+          '<strong>Immo :</strong> ' + immoLabel + '<br>' +
+          '<strong>État :</strong> ' + etat + '<br>' +
+          (prest ? '<strong>Prestataire :</strong> ' + prest + '<br>' : '') +
+          (cout  ? '<strong>Coût :</strong> ' + parseFloat(cout).toFixed(2) + '€<br>' : '') +
+          '<strong>Note :</strong> ' + note + '<br>' +
+          '<em style="color:var(--grey)">Immo de retour dans le parc.</em>';
+        document.getElementById('alerte-degradation')?.classList.add('hidden');
+        showScreen('screen-confirmation', true);
+      } else {
+        // Fallback si screen-confirmation non accessible
+        toast('✅ Panne résolue — ' + immoLabel + ' de retour dans le parc !', 'success', 5000);
+        showScreen('screen-accueil');
+      }
       rafraichirBadges();
-    } else { toast('Erreur', 'error'); }
+    } else { toast('Erreur lors de la résolution', 'error'); }
   } catch (e) { toast('Erreur réseau', 'error'); }
 }
 
