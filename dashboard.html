@@ -313,6 +313,14 @@ tr:hover td{background:#FAFBFC;}
         </select>
       </div>
       <div class="card"><div class="card-head"><h3>Au dépôt</h3><span class="card-cnt" id="cnt-depot"></span></div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:12px;color:var(--grey);font-weight:700">Trier par :</span>
+          <button onclick="sortDepot('code')" class="filter-btn" style="padding:4px 10px;font-size:12px">Code IM</button>
+          <button onclick="sortDepot('val')" class="filter-btn" style="padding:4px 10px;font-size:12px">Valeur achat</button>
+          <button onclick="sortDepot('date')" class="filter-btn" style="padding:4px 10px;font-size:12px">Date achat</button>
+          <button onclick="sortDepot('cat')" class="filter-btn" style="padding:4px 10px;font-size:12px">Catégorie</button>
+          <button onclick="sortDepot('since')" class="filter-btn" style="padding:4px 10px;font-size:12px">Durée au dépôt</button>
+        </div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
     </div>
 
@@ -715,6 +723,12 @@ function renderCirc(){
 }
 
 // ── Rendu — Au dépôt ────────────────────────────────────
+var depotSortKey='code';var depotSortDir=1;
+function sortDepot(key){
+  if(depotSortKey===key)depotSortDir*=-1;
+  else{depotSortKey=key;depotSortDir=1;}
+  renderDepot();
+}
 function renderDepot(){
   if(!d)return;
   var q=(document.getElementById('depot-q')||{}).value||'';
@@ -722,12 +736,35 @@ function renderDepot(){
   var fe=(document.getElementById('depot-etat')||{}).value||'';
   var qu=q.trim().toUpperCase();
   var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe);});
-  data.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
+  // Tri configurable
+  data.sort(function(a,b){
+    var dir=depotSortDir;
+    if(depotSortKey==='val'){var ma=immoMeta[a.code_im]||{};var mb=immoMeta[b.code_im]||{};return dir*((mb.valeur_achat||0)-(ma.valeur_achat||0));}
+    if(depotSortKey==='date'){var ma=immoMeta[a.code_im]||{};var mb=immoMeta[b.code_im]||{};var da=ma.date_achat?new Date(ma.date_achat).getTime():0;var db=mb.date_achat?new Date(mb.date_achat).getTime():0;return dir*(db-da);}
+    if(depotSortKey==='cat'){return dir*(getCat(a.code_im)||'').localeCompare(getCat(b.code_im)||'');}
+    if(depotSortKey==='since'){var ta=a.since?new Date(a.since).getTime():0;var tb=b.since?new Date(b.since).getTime():0;return dir*(ta-tb);}
+    return dir*a.code_im.localeCompare(b.code_im); // 'code' par défaut
+  });
   var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
   var affiche=nb===0?data:data.slice(0,nb);
   var cntEl=document.getElementById('cnt-depot');if(cntEl)cntEl.textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
   document.getElementById('tb-depot').innerHTML=affiche.length===0?'<tr><td colspan="5" class="es">Aucun résultat.</td></tr>':
-    affiche.map(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return'<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+l+'</td><td style="font-size:11px;color:var(--grey)">'+c+'</td><td>'+ebadge(i.etat)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td></tr>';}).join('');
+  document.getElementById('tb-depot').innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
+    affiche.map(function(i){
+      var l=getLib(i.code_im);var c=getCat(i.code_im);
+      var mt=immoMeta[i.code_im]||{};
+      var va=mt.valeur_achat?mt.valeur_achat.toLocaleString('fr-FR')+'\u20ac':'\u2014';
+      var da=mt.date_achat?fmtD(mt.date_achat):'\u2014';
+      return'<tr>'+
+        '<td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td>'+
+        '<td style="font-size:12px">'+l+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+c+'</td>'+
+        '<td>'+ebadge(i.etat)+'</td>'+
+        '<td style="font-size:12px;font-weight:600;color:var(--blue)">'+va+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+da+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td>'+
+      '</tr>';
+    }).join('');
 }
 
 // ── Rendu — Historique ───────────────────────────────────
@@ -1063,8 +1100,19 @@ function renderAnalyse(){
   // Statistiques réparations depuis les mouvements réels
   var reparations=all.filter(function(m){return m.type_mouvement==='Réparation';});
   var costByImmo={};reparations.forEach(function(m){
-    var note=m.note||'';var costMatch=note.match(/Coût réel\s*:\s*([\d.,]+)/i);
-    if(costMatch){var c=parseFloat(costMatch[1].replace(',','.'));if(!isNaN(c)){if(!costByImmo[m.code_im])costByImmo[m.code_im]={code_im:m.code_im,total:0,count:0};costByImmo[m.code_im].total+=c;costByImmo[m.code_im].count++;}}
+    var note=m.note||'';
+    // Multi-pattern : chercher le coût dans la note (format "Coût réel : X€" ou "COUT:X" ou premier nombre suivi de €)
+    var costMatch=note.match(/co[uû]t\s*r[eé]el\s*:?\s*([\d]+(?:[.,][\d]+)?)/i)
+      ||note.match(/([\d]+(?:[.,][\d]+)?)\s*[€EUR]/i)
+      ||note.match(/##COUT:([\d.,]+)##/i);
+    if(costMatch){
+      var c=parseFloat((costMatch[1]||'').replace(',','.'));
+      if(!isNaN(c)&&c>0){
+        if(!costByImmo[m.code_im])costByImmo[m.code_im]={code_im:m.code_im,total:0,count:0};
+        costByImmo[m.code_im].total+=c;
+        costByImmo[m.code_im].count++;
+      }
+    }
   });
   var topCout=Object.values(costByImmo).sort(function(a,b){return b.total-a.total;}).slice(0,8);
   html+='<div class="card" style="border-top:3px solid var(--yellow)"><div class="card-head"><h3>💶 Top coûts réparations (réels)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Réparations</th><th>Coût total</th></tr></thead><tbody>';
