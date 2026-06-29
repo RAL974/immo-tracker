@@ -673,12 +673,10 @@ function renderVueGenerale(){
   var s=d.stats;
   // Compter pannes depuis les mouvements
   var now_ts=Date.now();
-  var panneCodes={};var resolvedCodes={};
-  (d.all_movements||[]).forEach(function(m){
-    if(m.type_mouvement==='Panne')panneCodes[m.code_im]=(panneCodes[m.code_im]||[]).concat([m]);
-    if(m.type_mouvement==='Réparation')resolvedCodes[m.code_im]=(resolvedCodes[m.code_im]||[]).concat([m]);
-  });
-  var nbPannes=Object.keys(panneCodes).filter(function(c){var lastPanne=panneCodes[c][0];var lastRepare=resolvedCodes[c]?resolvedCodes[c][0]:null;return!lastRepare||(new Date(lastPanne.horodatage)>new Date(lastRepare.horodatage));}).length;
+  var _lPanne={};var _lRep={};
+  var _movS=(d.all_movements||[]).slice().sort(function(a,b){return new Date(b.horodatage)-new Date(a.horodatage);});
+  _movS.forEach(function(m){var t=m.type_mouvement||'';if(t==='Panne'&&!_lPanne[m.code_im])_lPanne[m.code_im]=m;if((t==='Réparation'||t==='Reparation')&&!_lRep[m.code_im])_lRep[m.code_im]=m;});
+  var nbPannes=Object.keys(_lPanne).filter(function(c){var lp=_lPanne[c];var lr=_lRep[c];return!lr||(new Date(lp.horodatage)>new Date(lr.horodatage));}).length;
   var nbHSDef=(d.all_movements||[]).filter(function(m){return m.type_mouvement==='Archivage'&&m.etat==='Hors service définitif';}).map(function(m){return m.code_im;}).filter(function(v,i,a){return a.indexOf(v)===i;}).length;
   var nbPerdus=(d.all_movements||[]).filter(function(m){return m.type_mouvement==='Archivage'&&m.etat==='Perdu';}).map(function(m){return m.code_im;}).filter(function(v,i,a){return a.indexOf(v)===i;}).length;
   var kpis=[
@@ -998,14 +996,20 @@ function renderAlertes(){
   var now=Date.now();
   var hs=d.hors_service||[];var ret=d.alertes_delai||[];
   // Pannes en cours (mouvement type Panne sans Réparation ultérieure)
-  var panneCodes={};var resolvedTS={};
-  (d.all_movements||[]).forEach(function(m){
-    if(m.type_mouvement==='Panne'&&!panneCodes[m.code_im])panneCodes[m.code_im]={code_im:m.code_im,note:m.note,since:m.horodatage,detenteur:m.nom_employe};
-    if(m.type_mouvement==='Réparation'&&!resolvedTS[m.code_im])resolvedTS[m.code_im]=m.horodatage;
+  // Detection pannes actives : aucune Reparation apres la derniere Panne
+  var immoLastPanne={};var immoLastRep={};
+  var movsSorted=(d.all_movements||[]).slice().sort(function(a,b){return new Date(b.horodatage)-new Date(a.horodatage);});
+  movsSorted.forEach(function(m){
+    var type=m.type_mouvement||'';
+    if(type==='Panne'&&!immoLastPanne[m.code_im])immoLastPanne[m.code_im]=m;
+    if((type==='Réparation'||type==='Reparation')&&!immoLastRep[m.code_im])immoLastRep[m.code_im]=m;
   });
-  var pannesActives=Object.values(panneCodes).filter(function(p){return!resolvedTS[p.code_im]||(new Date(p.since)>new Date(resolvedTS[p.code_im]));});
-  // Ajouter durée en temps réel
-  pannesActives.forEach(function(p){var j=Math.floor((now-new Date(p.since).getTime())/86400000);p.dureeJ=j;});
+  var pannesActives=[];
+  Object.keys(immoLastPanne).forEach(function(code){
+    var lastP=immoLastPanne[code];var lastR=immoLastRep[code];
+    var estActive=!lastR||(new Date(lastP.horodatage)>new Date(lastR.horodatage));
+    if(estActive){var j=Math.floor((now-new Date(lastP.horodatage).getTime())/86400000);pannesActives.push({code_im:code,note:lastP.note||'',since:lastP.horodatage,detenteur:lastP.nom_employe||'—',dureeJ:j});}
+  });
   pannesActives.sort(function(a,b){return b.dureeJ-a.dureeJ;});
   var html='';
   if(pannesActives.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--orange)"><div class="card-head"><h3>📢 Pannes en cours ('+pannesActives.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Signalé par</th><th>Depuis</th><th>Motif</th><th>Action</th></tr></thead><tbody>'+
@@ -1193,7 +1197,10 @@ function renderAnalyse(){
   }
 
   html+='</div>';
-  document.getElementById('analyse-content').innerHTML=html;
+  // Injection null-safe
+  var aDiv=document.getElementById('analyse-content');
+  if(!aDiv){var ap=document.getElementById('pane-analyses');if(ap){ap.innerHTML='<div id="analyse-content" style="padding:0"></div>';aDiv=document.getElementById('analyse-content');}}
+  if(aDiv)aDiv.innerHTML=html;
 }
 
 // ── Fiche immo ───────────────────────────────────────────
