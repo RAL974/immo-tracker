@@ -720,6 +720,24 @@ async function voirDetailImmo(codeIM) {
       </div>`;
     }).join('');
     div.innerHTML = html;
+    // ── Boutons admin : panne, vol, HS ─────────────────────────────────────
+    const actDiv2 = document.getElementById('fiche-act-immo-' + codeIM);
+    if (actDiv2) {
+      const uFds2 = fdsUrl(codeIM);
+      if (uFds2) { const aF = document.createElement('a'); aF.href=uFds2; aF.target='_blank'; aF.style.cssText='padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;display:inline-block'; aF.textContent='📄 FDS'; actDiv2.appendChild(aF); }
+      const bPh3 = document.createElement('button'); bPh3.style.cssText='padding:7px 14px;background:#FFF8F0;color:var(--orange);border:2px solid var(--orange);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bPh3.textContent='🖼️ Photos'; (function(_c){bPh3.onclick=function(){ouvrirPhotos(_c);};})(codeIM); actDiv2.appendChild(bPh3);
+      const isAdm2 = S.employe && CONFIG.admins.includes(S.employe.code);
+      if (isAdm2) {
+        const lastP2 = hist.find(function(m){return m.type_mouvement==='Panne';});
+        const lastR2 = hist.find(function(m){return m.type_mouvement==='Réparation';});
+        const enP2   = lastP2 && (!lastR2 || new Date(lastP2.horodatage) > new Date(lastR2.horodatage));
+        const bPan = document.createElement('button'); bPan.style.cssText='padding:7px 14px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer';
+        bPan.textContent = enP2 ? '✅ Résoudre panne' : '📢 Signaler panne';
+        (function(_c,_ep){bPan.onclick=function(){if(_ep)ouvrirEcranResolution(_c);else ouvrirEcranPanne(_c);};})(codeIM,!!enP2); actDiv2.appendChild(bPan);
+        const bVol2 = document.createElement('button'); bVol2.style.cssText='padding:7px 14px;background:#4A148C;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bVol2.textContent='🚨 Volé/Disparu'; (function(_c){bVol2.onclick=function(){ouvrirEcranVol(_c);};})(codeIM); actDiv2.appendChild(bVol2);
+        const bHS2 = document.createElement('button'); bHS2.style.cssText='padding:7px 14px;background:#424242;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bHS2.textContent='⚫ HS définitif'; (function(_c){bHS2.onclick=function(){ouvrirEcranHS(_c);};})(codeIM); actDiv2.appendChild(bHS2);
+      }
+    }
   } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur.</p>'; }
 }
 
@@ -1279,3 +1297,182 @@ const STATUT_COLORS = {
   'Annulee':            { bg: '#F5F5F5', color: '#9E9E9E', label: '❌ Annulée' },
   'Contre-proposition': { bg: '#EDE7F6', color: '#4527A0', label: '✏️ Contre-proposition' },
 };
+
+// ══════════════════════════════════════════════════════════
+// ÉCRANS PANNE / RÉSOLUTION / RETRAIT — sans prompt/confirm
+// ══════════════════════════════════════════════════════════
+
+// Immo en cours de traitement (état partagé entre les écrans)
+const PANNE_STATE = { codeIM: null, libelle: null, typeRetrait: null };
+
+// ── Ouvrir écran signalement panne ───────────────────────
+function ouvrirEcranPanne(codeIM) {
+  if (!codeIM) return;
+  PANNE_STATE.codeIM = codeIM;
+  PANNE_STATE.libelle = lib(codeIM);
+  const el = document.getElementById('panne-immo-titre');
+  if (el) el.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
+  const ta = document.getElementById('panne-motif');
+  if (ta) ta.value = '';
+  showScreen('screen-signaler-panne', true);
+}
+
+// Appelée aussi depuis le bouton "Mon matériel"
+function signalerPannePWA(codeIM) { ouvrirEcranPanne(codeIM); }
+
+async function soumettrePanne() {
+  const motif = (document.getElementById('panne-motif') || {}).value || '';
+  if (!motif || motif.trim().length < 5) {
+    toast('Décrivez la panne (5 caractères minimum)', 'error'); return;
+  }
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=declarer_panne', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code_im: PANNE_STATE.codeIM,
+        code_employe: S.employe.code,
+        nom_employe: S.employe.nom,
+        motif: motif.trim() + ' [signalé par ' + S.employe.nom + ']',
+      }),
+    });
+    const d = await r.json();
+    if (d.success !== false) {
+      vib(300);
+      document.getElementById('recap').innerHTML =
+        '<strong>📢 Panne signalée</strong><br>' +
+        '<strong>Immo :</strong> ' + PANNE_STATE.libelle + ' (' + PANNE_STATE.codeIM + ')<br>' +
+        '<strong>Signalé par :</strong> ' + S.employe.nom + '<br>' +
+        '<strong>Motif :</strong> ' + motif + '<br>' +
+        '<em style="color:var(--grey)">La logistique sera notifiée. L\'immo est suspendue des réservations.</em>';
+      document.getElementById('alerte-degradation')?.classList.add('hidden');
+      showScreen('screen-confirmation', true);
+      rafraichirBadges();
+    } else { toast('Erreur lors du signalement', 'error'); }
+  } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
+}
+
+// ── Ouvrir écran résolution panne ────────────────────────
+function ouvrirEcranResolution(codeIM) {
+  if (!codeIM) return;
+  PANNE_STATE.codeIM = codeIM;
+  PANNE_STATE.libelle = lib(codeIM);
+  const el = document.getElementById('resolution-immo-titre');
+  if (el) el.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
+  ['resolution-etat', 'resolution-prest', 'resolution-cout', 'resolution-note'].forEach(function(id) {
+    const el2 = document.getElementById(id);
+    if (el2) el2.value = id === 'resolution-etat' ? 'Bon état' : '';
+  });
+  showScreen('screen-resoudre-panne', true);
+}
+
+function resoudrePannePWA(codeIM) { ouvrirEcranResolution(codeIM); }
+
+async function soumettreResolution() {
+  const etat  = (document.getElementById('resolution-etat') || {}).value || 'Bon état';
+  const prest = (document.getElementById('resolution-prest') || {}).value || '';
+  const cout  = (document.getElementById('resolution-cout') || {}).value || '';
+  const note  = (document.getElementById('resolution-note') || {}).value || '';
+  if (!note || note.trim().length < 10) {
+    toast('La note de résolution est obligatoire (10 car. min.)', 'error'); return;
+  }
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=resoudre_panne', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code_im: PANNE_STATE.codeIM, etat_resolution: etat,
+        prestataire: prest, cout_reel: cout, note,
+        par_code: S.employe.code, par_nom: S.employe.nom,
+      }),
+    });
+    const d = await r.json();
+    if (d.success !== false) {
+      vib(300);
+      document.getElementById('recap').innerHTML =
+        '<strong>✅ Panne résolue !</strong><br>' +
+        '<strong>Immo :</strong> ' + PANNE_STATE.libelle + '<br>' +
+        '<strong>État :</strong> ' + etat + '<br>' +
+        (prest ? '<strong>Prestataire :</strong> ' + prest + '<br>' : '') +
+        (cout  ? '<strong>Coût :</strong> ' + cout + '€<br>' : '') +
+        '<strong>Note :</strong> ' + note + '<br>' +
+        '<em style="color:var(--grey)">Immo de retour dans le parc.</em>';
+      document.getElementById('alerte-degradation')?.classList.add('hidden');
+      showScreen('screen-confirmation', true);
+      rafraichirBadges();
+    } else { toast('Erreur', 'error'); }
+  } catch (e) { toast('Erreur réseau', 'error'); }
+}
+
+// ── Ouvrir écran retrait parc (vol, disparu, HS, perdu) ──
+function ouvrirEcranVol(codeIM) {
+  PANNE_STATE.codeIM = codeIM; PANNE_STATE.libelle = lib(codeIM);
+  PANNE_STATE.typeRetrait = null; // sera choisi par l'utilisateur
+  const titreEl = document.getElementById('retrait-titre');
+  if (titreEl) titreEl.textContent = '🚨 Vol ou disparition';
+  const immoEl = document.getElementById('retrait-immo-titre');
+  if (immoEl) immoEl.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
+  // Ajouter un select type dans le formulaire
+  const motifEl = document.getElementById('retrait-motif');
+  if (motifEl) motifEl.placeholder = 'Décrivez les circonstances du vol ou de la disparition... (10 car. min.)';
+  // Choix type
+  const warn = document.getElementById('retrait-warning');
+  if (warn) warn.innerHTML = '<select id="retrait-type" class="select-input" style="margin-bottom:8px"><option value="Volé">🚨 Volé</option><option value="Disparu">🔍 Disparu</option></select><br>⚠️ Action irréversible — l\'immo sera retirée définitivement du parc';
+  _reinitRetraitEcran();
+  showScreen('screen-retrait-parc', true);
+}
+
+function ouvrirEcranHS(codeIM) {
+  PANNE_STATE.codeIM = codeIM; PANNE_STATE.libelle = lib(codeIM);
+  PANNE_STATE.typeRetrait = 'Hors service définitif';
+  const titreEl = document.getElementById('retrait-titre');
+  if (titreEl) titreEl.textContent = '⚫ HS définitif';
+  const immoEl = document.getElementById('retrait-immo-titre');
+  if (immoEl) immoEl.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
+  const warn = document.getElementById('retrait-warning');
+  if (warn) warn.innerHTML = '⚠️ Marquer comme Hors Service Définitif — immo retirée du parc';
+  const motifEl = document.getElementById('retrait-motif');
+  if (motifEl) motifEl.placeholder = 'Décrivez pourquoi cette immo est mise hors service définitivement... (10 car. min.)';
+  _reinitRetraitEcran();
+  showScreen('screen-retrait-parc', true);
+}
+
+function _reinitRetraitEcran() {
+  const m = document.getElementById('retrait-motif'); if (m) m.value = '';
+  const c1 = document.getElementById('retrait-confirm1'); if (c1) c1.classList.remove('hidden');
+  const c2 = document.getElementById('retrait-confirm2'); if (c2) c2.classList.add('hidden');
+}
+
+function retraitConfirm1() {
+  const motif = (document.getElementById('retrait-motif') || {}).value || '';
+  if (!motif || motif.trim().length < 10) {
+    toast('Motif obligatoire (10 car. min.)', 'error'); return;
+  }
+  document.getElementById('retrait-confirm1').classList.add('hidden');
+  document.getElementById('retrait-confirm2').classList.remove('hidden');
+}
+
+async function retraitConfirm2() {
+  const motif = (document.getElementById('retrait-motif') || {}).value || '';
+  const typeRetrait = PANNE_STATE.typeRetrait || (document.getElementById('retrait-type') || {}).value || 'Volé';
+  const actionEndpoint = (typeRetrait === 'Volé' || typeRetrait === 'Disparu') ? 'declarer_vol' : 'marquer_statut_immo';
+  const payload = actionEndpoint === 'declarer_vol'
+    ? { code_im: PANNE_STATE.codeIM, type_vol: typeRetrait, motif, par_code: S.employe.code, par_nom: S.employe.nom }
+    : { code_im: PANNE_STATE.codeIM, etat: typeRetrait, actif: false, motif, type_mouv: 'Archivage', par_code: S.employe.code, par_nom: S.employe.nom };
+  try {
+    await fetch(CONFIG.proxy + '?action=' + actionEndpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    vib(300);
+    document.getElementById('recap').innerHTML =
+      '<strong>' + (typeRetrait === 'Volé' ? '🚨' : typeRetrait === 'Disparu' ? '🔍' : '⚫') + ' ' + PANNE_STATE.libelle + ' — ' + typeRetrait + '</strong><br>' +
+      '<strong>Motif :</strong> ' + motif + '<br>' +
+      '<em style="color:var(--grey)">Immo retirée définitivement du parc. Statistiques conservées.</em>';
+    document.getElementById('alerte-degradation')?.classList.add('hidden');
+    showScreen('screen-confirmation', true);
+    rafraichirBadges();
+  } catch (e) { toast('Erreur réseau', 'error'); }
+}
+
+// Alias pour les anciens appels
+function marquerImmoHSPWA(codeIM) { ouvrirEcranHS(codeIM); }
+function declarerVolPWA(codeIM)    { ouvrirEcranVol(codeIM); }
