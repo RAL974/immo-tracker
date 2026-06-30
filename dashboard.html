@@ -92,6 +92,7 @@ tr:hover td{background:#FAFBFC;}
 .bu{background:#FFF8E1;color:#E65100;}
 .ba{background:#FBE9E7;color:#B71C1C;}
 .bh{background:#ECEFF1;color:#37474F;}
+.bpanne{background:#FFF3E0;color:#E65100;}
 .bi{background:#F5F5F5;color:#9E9E9E;}
 .bret{background:#FFEBEE;color:var(--red);font-weight:700;}
 .batt{background:#FFF3E0;color:#E65100;}
@@ -470,7 +471,7 @@ function fmtD(s){if(!s)return'—';return new Date(s).toLocaleDateString('fr-FR'
 function fmtDT(s){if(!s)return'—';return new Date(s).toLocaleString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function getLib(code){return im[code]?im[code].Libelle||code:code;}
 function getCat(code){return im[code]?im[code].Categorie||'':''}
-function ebadge(e){var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh'};return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';}
+function ebadge(e){var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh','En panne':'bpanne'};return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';}
 function rsLabel(s){var c=SCOL[s]||'#999';var l=SLAB[s]||s;return '<span style="display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:'+c+'22;color:'+c+'">'+l+'</span>';}
 function getFdsUrl(code){var u=fdsMap[code]||(im[code]?im[code].FDS_URL||'':'');if(!u)return'';if(u.includes('sharepoint.com'))return W+'?fds='+encodeURIComponent(code);return u;}
 
@@ -1028,7 +1029,7 @@ function renderAlertes(){
   // Supprimer le spinner de chargement si présent
   var sp=pane.querySelector('.loading-placeholder');if(sp)pane.removeChild(sp);
   var now=Date.now();
-  var hs=d.hors_service||[];var ret=d.alertes_delai||[];
+  var hsAll=d.hors_service||[];var ret=d.alertes_delai||[];
   // Pannes en cours (mouvement type Panne sans Réparation ultérieure)
   // Detection pannes actives : aucune Reparation apres la derniere Panne
   var immoLastPanne={};var immoLastRep={};
@@ -1062,7 +1063,7 @@ function renderAlertes(){
           '<button class="btn-res-p" data-cim="'+p.code_im+'" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">✅ Résoudre</button>'+
         '</td>';
       return row.outerHTML;
-    }).join('');
+    }).join('')+'</tbody></table></div></div>';
   // Réservations imminentes sans réponse (départ <=24h, statut Demandee)
   var resaImminentes=(reservations||[]).filter(isImminenteSansReponse).sort(function(a,b){return new Date(a.date_debut)-new Date(b.date_debut);});
   if(resaImminentes.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>⏰ Réservations imminentes sans réponse ('+resaImminentes.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Demandeur</th><th>Code IM</th><th>Libellé</th><th>Départ demandé</th><th>Action</th></tr></thead><tbody>'+
@@ -1076,6 +1077,9 @@ function renderAlertes(){
         '<td><button onclick="goTab(\'reservations\')" style="padding:4px 10px;background:var(--orange);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">📅 Traiter</button></td></tr>';
     }).join('')+'</tbody></table></div></div>';
 
+  // Exclure de "Hors service actuel" les immos déjà affichées dans "Pannes en cours" (même panne, déjà actionnable plus haut)
+  var pannesActivesCodes={};pannesActives.forEach(function(p){pannesActivesCodes[p.code_im]=true;});
+  var hs=hsAll.filter(function(i){return !pannesActivesCodes[i.code_im];});
   if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service actuel ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
   if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span></td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
   if(!html)html='<div class="es" style="padding:40px">Aucune alerte active. Tout est OK ✅</div>';
