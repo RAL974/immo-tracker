@@ -783,14 +783,14 @@ function autoLoadHist_internal(all,q,type,nb){
     affiche.map(function(m){
       var l=getLib(m.code_im);
       var icon=m.type_mouvement==='Retour'?'📥':'🔄';
-      var donneur='—';
-      if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|'))donneur=m.code_chantier.split('|')[1]||'—';
+      var donneur='—';var donneurCode='';
+      if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
       return '<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
         '<td><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span></td>'+
         '<td style="font-size:12px">'+l+'</td>'+
         '<td>'+icon+' '+m.type_mouvement+'</td>'+
         '<td><span class="link-emp" data-emp="'+m.code_employe+'" data-nom="'+m.nom_employe.replace(/"/g,'')+'"><b style="font-size:12px">'+m.nom_employe+'</b></span></td>'+
-        '<td style="font-size:12px;color:var(--grey)">'+donneur+'</td>'+
+        '<td style="font-size:12px;color:var(--grey)">'+(donneurCode?'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>':donneur)+'</td>'+
         '<td>'+ebadge(m.etat||'')+'</td>'+
         '<td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
     }).join('');
@@ -895,7 +895,7 @@ function renderResa(){
   if(!ganttData.length)gh+='<tr><td colspan="'+(NB+1)+'" class="es">Aucune réservation sur cette période.</td></tr>';
   else ganttData.forEach(function(r){
     var l=getLib(r.code_im).substring(0,22);var col=SCOL[r.statut]||'#999';
-    gh+='<tr><td class="immo-col"><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+l+'</span><br><span style="font-size:10px;color:var(--grey)">'+r.nom_employe+'</span></td>';
+    gh+='<tr><td class="immo-col"><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+l+'</span><br><span class="link-emp" style="font-size:10px" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'">'+r.nom_employe+'</span></td>';
     cols.forEach(function(dd){var isT=dd.toDateString()===today.toDateString();var deb=r.date_debut?new Date(r.date_debut):null;var fin=r.date_fin?new Date(r.date_fin):null;var debJ=deb?new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()):null;var finJ=fin?new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()):null;var inR=debJ&&finJ&&dd>=debJ&&dd<=finJ;gh+='<td style="background:'+(inR?col:(dd.getDay()===0||dd.getDay()===6?'#F8F8F8':'transparent'))+'"'+(isT?' class="today-cell"':'')+'></td>';});
     gh+='</tr>';
   });
@@ -1008,7 +1008,7 @@ function renderAlertes(){
   Object.keys(immoLastPanne).forEach(function(code){
     var lastP=immoLastPanne[code];var lastR=immoLastRep[code];
     var estActive=!lastR||(new Date(lastP.horodatage)>new Date(lastR.horodatage));
-    if(estActive){var j=Math.floor((now-new Date(lastP.horodatage).getTime())/86400000);pannesActives.push({code_im:code,note:lastP.note||'',since:lastP.horodatage,detenteur:lastP.nom_employe||'—',dureeJ:j});}
+    if(estActive){var j=Math.floor((now-new Date(lastP.horodatage).getTime())/86400000);pannesActives.push({code_im:code,note:lastP.note||'',since:lastP.horodatage,detenteur:lastP.nom_employe||'—',detenteur_code:lastP.code_employe||'',dureeJ:j});}
   });
   pannesActives.sort(function(a,b){return b.dureeJ-a.dureeJ;});
   var html='';
@@ -1020,7 +1020,7 @@ function renderAlertes(){
       var row=document.createElement('tr');row.className=urgCls;
       row.innerHTML='<td><span class="link-im" data-cim="'+p.code_im+'" data-lib="'+lib_+'">'+p.code_im+'</span></td>'+
         '<td style="font-size:12px">'+getLib(p.code_im)+'</td>'+
-        '<td style="font-size:12px">'+p.detenteur+'</td>'+
+        '<td style="font-size:12px"><span class="link-emp" data-emp="'+p.detenteur_code+'" data-nom="'+p.detenteur.replace(/"/g,'')+'">'+p.detenteur+'</span></td>'+
         '<td><b style="color:'+(p.dureeJ>7?'var(--red)':'var(--orange)')+'">'+dureeStr+'</b><br><span style="font-size:10px;color:var(--grey)">'+fmtD(p.since)+'</span></td>'+
         '<td style="font-size:11px;color:var(--grey)">'+(p.note||'—')+'</td>'+
         '<td style="white-space:nowrap">'+
@@ -1189,10 +1189,11 @@ function renderAnalyse(){
 
   // ── Stats réservations ────────────────────────────────────────────────────
   if(reservations&&reservations.length){
-    var resaDem={};reservations.forEach(function(r){if(r.statut!=='Annulee')resaDem[r.nom_employe]=(resaDem[r.nom_employe]||0)+1;});
-    var topResa=Object.keys(resaDem).sort(function(a,b){return resaDem[b]-resaDem[a];}).slice(0,5);
+    var resaDem={};var resaDemNom={};
+    reservations.forEach(function(r){if(r.statut!=='Annulee'&&r.code_employe){resaDem[r.code_employe]=(resaDem[r.code_employe]||0)+1;resaDemNom[r.code_employe]=r.nom_employe;}});
+    var topResaCodes=Object.keys(resaDem).sort(function(a,b){return resaDem[b]-resaDem[a];}).slice(0,5);
     html+='<div class="card"><div class="card-head"><h3>📅 Top demandeurs de réservations</h3></div><div class="tbl-wrap"><table><thead><tr><th>Employé</th><th>Réservations</th></tr></thead><tbody>';
-    topResa.forEach(function(n){html+='<tr><td style="font-size:12px">'+n+'</td><td><b>'+resaDem[n]+'</b></td></tr>';});
+    topResaCodes.forEach(function(code){var nom=resaDemNom[code]||code;html+='<tr><td style="font-size:12px"><span class="link-emp" data-emp="'+code+'" data-nom="'+nom.replace(/"/g,'')+'">'+nom+'</span></td><td><b>'+resaDem[code]+'</b></td></tr>';});
     html+='</tbody></table></div></div>';
   }
 
@@ -1255,12 +1256,12 @@ async function chargerFicheImmo(codeIM){
     if(!hist.length)html+='<p style="color:var(--grey);font-size:13px">Aucun mouvement.</p>';
     else html+='<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Employé</th><th>Donneur</th><th>État</th><th>Note</th></tr></thead><tbody>'+
       hist.map(function(m){
-        var donneur='—';if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|'))donneur=m.code_chantier.split('|')[1]||'—';
+        var donneur='—';var donneurCode='';if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
         return '<tr style="border-bottom:1px solid #f0f0f0">'+
           '<td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
           '<td>'+(m.type_mouvement==='Retour'?'📥':'🔄')+' '+m.type_mouvement+'</td>'+
           '<td><span class="link-emp" data-emp="'+m.code_employe+'" data-nom="'+m.nom_employe.replace(/"/g,'')+'">'+m.nom_employe+'</span></td>'+
-          '<td style="color:var(--grey);font-size:12px">'+donneur+'</td>'+
+          '<td style="color:var(--grey);font-size:12px">'+(donneurCode?'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>':donneur)+'</td>'+
           '<td>'+ebadge(m.etat||'')+'</td>'+
           '<td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
       }).join('')+'</tbody></table></div>';
@@ -1302,13 +1303,13 @@ async function chargerFicheEmploye(code,nom){
     else html+='<div style="margin-bottom:14px">'+actuel.map(function(m){var l=getLib(m.code_im);return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0"><span><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span> <span style="font-size:12px">'+l+'</span></span>'+ebadge(m.etat||'')+'</div>';}).join('')+'</div>';
     html+='<h3 style="color:var(--blue);font-size:14px;margin-bottom:8px">Historique ('+Math.min(hist.length,80)+'</h3>';
     html+='<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Code IM</th><th>Libellé</th><th>Type</th><th>Donneur</th><th>État</th></tr></thead><tbody>'+
-      hist.slice(0,80).map(function(m){var l=getLib(m.code_im);var donneur='—';if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|'))donneur=m.code_chantier.split('|')[1]||'—';
+      hist.slice(0,80).map(function(m){var l=getLib(m.code_im);var donneur='—';var donneurCode='';if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
         return'<tr style="border-bottom:1px solid #f0f0f0">'+
           '<td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
           '<td><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span></td>'+
           '<td style="font-size:11px">'+l+'</td>'+
           '<td>'+(m.type_mouvement==='Retour'?'📥':'🔄')+' '+m.type_mouvement+'</td>'+
-          '<td style="color:var(--grey);font-size:11px">'+donneur+'</td>'+
+          '<td style="color:var(--grey);font-size:11px">'+(donneurCode?'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>':donneur)+'</td>'+
           '<td>'+ebadge(m.etat||'')+'</td></tr>';}).join('')+'</tbody></table></div>';
     body.innerHTML=html;
     var actEmpDiv=document.getElementById('fiche-act-emp-'+code);
@@ -1337,13 +1338,15 @@ async function ouvrirPhotosModal(codeIM){
 
 // ── Event delegation pour fiches cliquables ──────────────
 document.addEventListener('click',function(e){
-  var el=e.target;
-  if(el.classList.contains('link-im')){
-    var cim=el.dataset.cim; var lib=el.dataset.lib||cim;
-    if(cim)ouvrirFiche('immo',cim,lib);
+  // closest() remonte aux parents : fonctionne même si on clique sur un <b> ou <span> imbriqué
+  var elIm=e.target.closest('.link-im');
+  if(elIm){
+    var cim=elIm.dataset.cim; var lib=elIm.dataset.lib||cim;
+    if(cim){ouvrirFiche('immo',cim,lib);return;}
   }
-  if(el.classList.contains('link-emp')){
-    var code=el.dataset.emp; var nom=el.dataset.nom||code;
+  var elEmp=e.target.closest('.link-emp');
+  if(elEmp){
+    var code=elEmp.dataset.emp; var nom=elEmp.dataset.nom||code;
     if(code)ouvrirFiche('emp',code,nom);
   }
 });
@@ -1430,11 +1433,8 @@ function exportExcel(){
 // ── Annuler transfert ────────────────────────────────────
 async function annulerTransfert(tid){
   try{
-    var r=await fetch(W+'?action=modifier_resa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,statut:'Annule'})});
-    // En fait les transferts sont dans Transferts_En_Attente, utiliser un PATCH direct
-    var r2=await fetch(W,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({_action:'annuler_transfert',id:tid})});
-    renderTransferts();
-    setTimeout(refreshAll,1000);
+    await fetch(W+'?action=annuler_transfert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid})});
+    refreshAll();
   }catch(e){alert('Erreur : '+e.message);}
 }
 
