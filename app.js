@@ -89,7 +89,7 @@ function fdsUrl(code) {
 }
 
 function ebadge(e) {
-  const map = { 'Neuf': '#E8F5E9:#1B5E20', 'Bon état': '#E3F2FD:#0D47A1', 'Usé': '#FFF8E1:#E65100', 'Abîmé': '#FFEBEE:#B71C1C', 'Hors service': '#F5F5F5:#616161' };
+  const map = { 'Neuf': '#E8F5E9:#1B5E20', 'Bon état': '#E3F2FD:#0D47A1', 'Usé': '#FFF8E1:#E65100', 'Abîmé': '#FFEBEE:#B71C1C', 'Hors service': '#F5F5F5:#616161', 'En panne': '#FFF3E0:#E65100' };
   const c = map[e] || '#F5F5F5:#9E9E9E';
   const [bg, fg] = c.split(':');
   return e ? `<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${bg};color:${fg}">${e}</span>` : '';
