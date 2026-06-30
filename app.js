@@ -18,6 +18,13 @@ function peutReserver(code) {
   return CONFIG.autorises.includes(code);
 }
 
+// Une demande "Demandee" est imminente si le depart est dans moins de 24h (ou deja depasse sans reponse)
+function isImminenteSansReponse(r) {
+  if (r.statut !== 'Demandee' || !r.date_debut) return false;
+  const diff = new Date(r.date_debut).getTime() - Date.now();
+  return diff <= 24 * 3600 * 1000;
+}
+
 // ── État global ───────────────────────────────────────────
 const S = {
   employe:             null,
@@ -278,16 +285,19 @@ async function majBadgeResas() {
       // Admin/CONI : charger TOUTES les réservations, compter les "Demandee"
       const r = await fetch(CONFIG.proxy + '?reservations=1');
       resas = await r.json();
-      const demandees = resas.filter(function(r) { return r.statut === 'Demandee'; }).length;
-      const retards   = resas.filter(function(r) { return r.statut === 'En retard'; }).length;
+      const demandees  = resas.filter(function(r) { return r.statut === 'Demandee'; }).length;
+      const retards    = resas.filter(function(r) { return r.statut === 'En retard'; }).length;
+      const imminentes = resas.filter(isImminenteSansReponse).length;
       const el = document.getElementById('badge-resa');
       if (el) {
         const total = demandees + retards;
         if (total > 0) {
           el.textContent = total;
-          el.style.background = retards > 0 ? 'var(--red)' : 'var(--orange)';
+          el.style.background = (imminentes > 0 || retards > 0) ? 'var(--red)' : 'var(--orange)';
+          if (imminentes > 0) { el.style.animation = 'pulse 1.2s infinite'; }
+          else { el.style.animation = ''; }
           el.classList.remove('hidden');
-        } else { el.classList.add('hidden'); }
+        } else { el.classList.add('hidden'); el.style.animation = ''; }
       }
     } else {
       // Utilisateur : ses propres réservations actives
@@ -1201,6 +1211,9 @@ async function afficherReservationsAdmin() {
     const resas = await r.json();
     const actives = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee');
     actives.sort((a, b) => {
+      const aImm = isImminenteSansReponse(a) ? 0 : 1;
+      const bImm = isImminenteSansReponse(b) ? 0 : 1;
+      if (aImm !== bImm) return aImm - bImm; // imminentes en premier, avant même "En retard"
       const order = { 'En retard': 0, 'Demandee': 1, 'Contre-proposition': 2, 'Confirmee': 3, 'En cours': 4 };
       return (order[a.statut] || 9) - (order[b.statut] || 9);
     });
@@ -1219,11 +1232,13 @@ async function afficherReservationsAdmin() {
       const s = STATUT_COLORS[r.statut] || { bg: '#F5F5F5', color: '#999', label: r.statut };
       const dDebut = r.date_debut ? fmtDate(r.date_debut) : '—';
       const dFin   = r.date_fin   ? fmtDate(r.date_fin)   : '—';
-      return `<div class="materiel-card" style="border-left:4px solid ${s.color}">
+      const isImm  = isImminenteSansReponse(r);
+      return `<div class="materiel-card" style="border-left:4px solid ${isImm ? 'var(--red)' : s.color};${isImm ? 'background:#FFF5F5' : ''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
           <div><strong style="color:var(--blue)">${r.nom_employe}</strong> <small style="color:var(--grey)">${r.code_employe}</small></div>
           <span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${s.bg};color:${s.color}">${s.label}</span>
         </div>
+        ${isImm ? '<div style="background:var(--red);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:800;margin-bottom:6px;text-align:center">⏰ DÉPART IMMINENT — RÉPONSE REQUISE</div>' : ''}
         <strong>${l}</strong> <span style="font-size:11px;color:#999;font-family:monospace">${r.code_im}</span>
         <div style="font-size:13px;margin-top:4px">📅 ${dDebut} → ${dFin}</div>
         ${r.nom_chantier ? `<div style="font-size:12px;color:var(--grey)">🏗️ ${r.nom_chantier}</div>` : ''}
