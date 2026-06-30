@@ -437,6 +437,14 @@ var W='https://immo-proxy.ral-85d.workers.dev/';
 var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
 
 // Une demande "Demandee" est imminente si le départ est dans moins de 24h (ou déjà dépassé sans réponse)
+// La Réunion est UTC+4 toute l'année (pas d'heure d'été)
+function reunionISO(dateStr,heureLocale){
+  if(!dateStr)return null;
+  var p=dateStr.split('-').map(Number);
+  var utcHour=heureLocale-4;
+  return new Date(Date.UTC(p[0],p[1]-1,p[2],utcHour,0,0)).toISOString();
+}
+
 function isImminenteSansReponse(r){
   if(r.statut!=='Demandee'||!r.date_debut)return false;
   var diff=new Date(r.date_debut).getTime()-Date.now();
@@ -1553,8 +1561,8 @@ function ouvrirContreProposition(id,cim,nom,deb,fin){
     (d.inventory||[]).map(function(i){return'<option value="'+i.code_im+'">'+i.code_im+' — '+getLib(i.code_im)+'</option>';}).join('');
   document.getElementById('act-form').innerHTML=
     '<div class="frow"><label>Immo proposée</label><select id="cp-immo">'+immoOpts+'</select></div>'+
-    '<div class="frow"><label>Nouvelle date de départ</label><input type="date" id="cp-debut" value="'+dS+'"></div>'+
-    '<div class="frow"><label>Nouvelle date de retour</label><input type="date" id="cp-fin" value="'+fS+'"></div>'+
+    '<div class="frow"><label>Nouvelle date de départ (07h00)</label><input type="date" id="cp-debut" value="'+dS+'"></div>'+
+    '<div class="frow"><label>Nouvelle date de retour (avant 15h00)</label><input type="date" id="cp-fin" value="'+fS+'"></div>'+
     '<div class="frow"><label>Note / explication</label><textarea id="cp-note" rows="3" placeholder="Ex : immo indisponible cette semaine..."></textarea></div>';
   window._cpId=id;window._cpCodeIM=cim;window._cpNom=nom;
   document.getElementById('act-overlay').classList.add('open');
@@ -1571,7 +1579,7 @@ function soumettreContreProposition(){
   if(!debut||!fin){alert('Indique les nouvelles dates.');return;}
   var noteC='[Contre-proposition logistique : '+(immoAlt?'immo '+immoAlt+', ':'')+debut+' → '+fin+(note?' — '+note:'')+']';
   fetch(W+'?action=modifier_resa',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:id,date_debut:new Date(debut).toISOString(),date_fin:new Date(fin).toISOString(),statut:'Contre-proposition',note:noteC,code_im_alt:immoAlt||undefined})})
+    body:JSON.stringify({id:id,date_debut:reunionISO(debut,7),date_fin:reunionISO(fin,15),statut:'Contre-proposition',note:noteC,code_im_alt:immoAlt||undefined})})
     .then(function(){fermerAction();loadReservations();})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
