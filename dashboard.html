@@ -436,6 +436,13 @@ tr:hover td{background:#FAFBFC;}
 var W='https://immo-proxy.ral-85d.workers.dev/';
 var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
 
+// Une demande "Demandee" est imminente si le départ est dans moins de 24h (ou déjà dépassé sans réponse)
+function isImminenteSansReponse(r){
+  if(r.statut!=='Demandee'||!r.date_debut)return false;
+  var diff=new Date(r.date_debut).getTime()-Date.now();
+  return diff<=24*3600*1000; // <=24h avant départ, y compris négatif (déjà dépassé)
+}
+
 async function loadImmoMeta(){
   if(Object.keys(immoMeta).length>0)return;
   try{var r=await fetch(W+'?immo_metadata=1');immoMeta=await r.json();}catch(e){immoMeta={};}
@@ -583,8 +590,17 @@ async function loadReservations(){
     var r=await fetch(W+'?reservations=1');
     reservations=await r.json();
     updateBadgesResa();
+    updateBadgeAlertCount();
     if(activeTab==='reservations')renderResa();
+    if(activeTab==='alertes')renderAlertes();
   }catch(e){reservations=[];}
+}
+
+function updateBadgeAlertCount(){
+  if(!d)return;
+  var imminentes=(reservations||[]).filter(isImminenteSansReponse).length;
+  var el=document.getElementById('nb-alert');
+  if(el)el.textContent=(d.stats.alertes_delai+d.stats.hors_service+imminentes);
 }
 
 async function loadDocs(){
@@ -639,31 +655,40 @@ function updateBadges(){
 function updateBadgesResa(){
   var demandees=reservations.filter(function(r){return r.statut==='Demandee';}).length;
   var retards=reservations.filter(function(r){return r.statut==='En retard';}).length;
+  var imminentes=reservations.filter(isImminenteSansReponse).length;
   var actives=reservations.filter(function(r){return r.statut!=='Rendue'&&r.statut!=='Annulee';}).length;
   document.getElementById('nb-resa').textContent=actives;
   var banner=document.getElementById('action-banner');
   var abItems=document.getElementById('ab-items');
+  // Réinitialiser les chips résa existants pour éviter les doublons au refresh
+  ['resa','retard','imminent'].forEach(function(t){var old=abItems&&abItems.querySelector('[data-type="'+t+'"]');if(old)old.remove();});
+  if(imminentes>0&&abItems){
+    var chip0=document.createElement('div');
+    chip0.className='ab-chip ab-red';
+    chip0.setAttribute('data-type','imminent');
+    chip0.textContent='⏰ '+imminentes+' réservation(s) imminente(s) sans réponse !';
+    chip0.style.fontWeight='800';
+    chip0.onclick=function(){goTab('reservations');};
+    abItems.insertBefore(chip0,abItems.firstChild);
+    banner.classList.add('visible');
+  }
   if(demandees>0&&abItems){
-    if(!abItems.querySelector('[data-type="resa"]')){
-      var chip=document.createElement('div');
-      chip.className='ab-chip ab-orange';
-      chip.setAttribute('data-type','resa');
-      chip.textContent='📅 '+demandees+' résa en attente de confirmation';
-      chip.onclick=function(){goTab('reservations');};
-      abItems.appendChild(chip);
-      banner.classList.add('visible');
-    }
+    var chip=document.createElement('div');
+    chip.className='ab-chip ab-orange';
+    chip.setAttribute('data-type','resa');
+    chip.textContent='📅 '+demandees+' résa en attente de confirmation';
+    chip.onclick=function(){goTab('reservations');};
+    abItems.appendChild(chip);
+    banner.classList.add('visible');
   }
   if(retards>0&&abItems){
-    if(!abItems.querySelector('[data-type="retard"]')){
-      var chip2=document.createElement('div');
-      chip2.className='ab-chip ab-red';
-      chip2.setAttribute('data-type','retard');
-      chip2.textContent='⚠️ '+retards+' retard(s) de restitution';
-      chip2.onclick=function(){goTab('reservations');};
-      abItems.appendChild(chip2);
-      banner.classList.add('visible');
-    }
+    var chip2=document.createElement('div');
+    chip2.className='ab-chip ab-red';
+    chip2.setAttribute('data-type','retard');
+    chip2.textContent='⚠️ '+retards+' retard(s) de restitution';
+    chip2.onclick=function(){goTab('reservations');};
+    abItems.appendChild(chip2);
+    banner.classList.add('visible');
   }
 }
 
@@ -922,8 +947,9 @@ function renderResa(){
     data.map(function(r){
       var l=getLib(r.code_im);
       var isU=r.statut==='En retard',isD=r.statut==='Demandee';
-      var tr='<tr class="'+(isU?'urgent-row':isD?'warn-row':'')+'">';
-      tr+='<td>'+rsLabel(r.statut)+'</td>';
+      var isImm=isImminenteSansReponse(r);
+      var tr='<tr class="'+(isImm||isU?'urgent-row':isD?'warn-row':'')+'">';
+      tr+='<td>'+rsLabel(r.statut)+(isImm?' <span style="display:block;margin-top:2px;font-size:10px;font-weight:800;color:var(--red)">⏰ DÉPART IMMINENT</span>':'')+'</td>';
       tr+='<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+r.code_im+'</span></td>';
       tr+='<td style="font-size:12px">'+l+'</td>';
       tr+='<td><span class="link-emp" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'"><b style="font-size:12px">'+r.nom_employe+'</b></span></td>';
@@ -1029,6 +1055,19 @@ function renderAlertes(){
         '</td>';
       return row.outerHTML;
     }).join('');
+  // Réservations imminentes sans réponse (départ <=24h, statut Demandee)
+  var resaImminentes=(reservations||[]).filter(isImminenteSansReponse).sort(function(a,b){return new Date(a.date_debut)-new Date(b.date_debut);});
+  if(resaImminentes.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>⏰ Réservations imminentes sans réponse ('+resaImminentes.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Demandeur</th><th>Code IM</th><th>Libellé</th><th>Départ demandé</th><th>Action</th></tr></thead><tbody>'+
+    resaImminentes.map(function(r){
+      var diffH=Math.round((new Date(r.date_debut).getTime()-Date.now())/3600000);
+      var diffTxt=diffH<0?'Dépassé depuis '+Math.abs(diffH)+'h':'Dans '+diffH+'h';
+      return '<tr class="urgent-row"><td><span class="link-emp" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'">'+r.nom_employe+'</span></td>'+
+        '<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+getLib(r.code_im).replace(/"/g,'')+'">'+r.code_im+'</span></td>'+
+        '<td style="font-size:12px">'+getLib(r.code_im)+'</td>'+
+        '<td><b style="color:var(--red)">'+fmtDT(r.date_debut)+'</b><br><span style="font-size:10px;color:var(--grey)">'+diffTxt+'</span></td>'+
+        '<td><button onclick="goTab(\'reservations\')" style="padding:4px 10px;background:var(--orange);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">📅 Traiter</button></td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+
   if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service actuel ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
   if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span></td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
   if(!html)html='<div class="es" style="padding:40px">Aucune alerte active. Tout est OK ✅</div>';
