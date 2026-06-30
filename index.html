@@ -399,10 +399,11 @@
       <option value="">-- Moi-même --</option>
     </select>
   </div>
-  <label class="field-label">Date de départ</label>
+  <label class="field-label">Date de départ <span style="color:var(--grey);font-weight:400;text-transform:none">— prise à 07h00</span></label>
   <input type="date" id="resa-date-debut" class="select-input">
-  <label class="field-label">Date de retour prévue</label>
+  <label class="field-label">Date de retour prévue <span style="color:var(--grey);font-weight:400;text-transform:none">— restitution avant 15h00</span></label>
   <input type="date" id="resa-date-fin" class="select-input">
+  <p style="font-size:11px;color:var(--orange);background:#FFF3E0;border-radius:8px;padding:8px 10px;margin:-4px 0 4px">⏰ Au-delà de 15h00 le jour du retour, la réservation passe en retard et la logistique est notifiée.</p>
   <label class="field-label">Chantier (optionnel)</label>
   <input type="text" id="resa-chantier" class="select-input" placeholder="Nom ou code du chantier...">
   <label class="field-label">Note (optionnel)</label>
@@ -415,9 +416,9 @@
 <div id="screen-modifier-resa" class="screen">
   <h2>✏️ Modifier la réservation</h2>
   <p id="modif-resa-info" style="font-weight:700;color:var(--blue);font-size:15px"></p>
-  <label class="field-label">Nouvelle date de départ</label>
+  <label class="field-label">Nouvelle date de départ <span style="color:var(--grey);font-weight:400;text-transform:none">— 07h00</span></label>
   <input type="date" id="modif-date-debut" class="select-input">
-  <label class="field-label">Nouvelle date de retour</label>
+  <label class="field-label">Nouvelle date de retour <span style="color:var(--grey);font-weight:400;text-transform:none">— avant 15h00</span></label>
   <input type="date" id="modif-date-fin" class="select-input">
   <label class="field-label">Chantier</label>
   <input type="text" id="modif-chantier" class="select-input">
