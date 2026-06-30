@@ -19,6 +19,15 @@ function peutReserver(code) {
 }
 
 // Une demande "Demandee" est imminente si le depart est dans moins de 24h (ou deja depasse sans reponse)
+// La Réunion est UTC+4 toute l'année (pas d'heure d'été)
+// Convertit une date "YYYY-MM-DD" + heure locale Réunion en ISO string UTC
+function reunionISO(dateStr, heureLocale) {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const utcHour = heureLocale - 4; // Réunion = UTC+4
+  return new Date(Date.UTC(y, m - 1, d, utcHour, 0, 0)).toISOString();
+}
+
 function isImminenteSansReponse(r) {
   if (r.statut !== 'Demandee' || !r.date_debut) return false;
   const diff = new Date(r.date_debut).getTime() - Date.now();
@@ -994,7 +1003,7 @@ async function soumettreReservation() {
       code_im: S.resaImmoCode, code_employe: codeEmp, nom_employe: nomEmp,
       code_chantier: document.getElementById('resa-chantier').value,
       nom_chantier:  document.getElementById('resa-chantier').value,
-      date_debut: new Date(debut).toISOString(), date_fin: new Date(fin).toISOString(),
+      date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), // 07h00 départ / 15h00 retour max
       note: document.getElementById('resa-note').value,
     }) });
     const d = await r.json();
@@ -1094,7 +1103,7 @@ async function validerModifResa() {
   const fin   = document.getElementById('modif-date-fin').value;
   if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
   try {
-    await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: resaEnCoursId, date_debut: new Date(debut).toISOString(), date_fin: new Date(fin).toISOString(), nom_chantier: document.getElementById('modif-chantier').value, note: document.getElementById('modif-note').value }) });
+    await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: resaEnCoursId, date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), nom_chantier: document.getElementById('modif-chantier').value, note: document.getElementById('modif-note').value }) });
     toast('Réservation modifiée', 'success');
     resaEnCoursId = null;
     showScreen('screen-mes-reservations');
@@ -1293,7 +1302,7 @@ validerModifResa = async function() {
     : note;
   const statut = isAdmin ? 'Contre-proposition' : undefined;
   try {
-    const body = { id: S.resaEnCoursId, date_debut: new Date(debut).toISOString(), date_fin: new Date(fin).toISOString(), nom_chantier: document.getElementById('modif-chantier').value, note: noteComplete };
+    const body = { id: S.resaEnCoursId, date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), nom_chantier: document.getElementById('modif-chantier').value, note: noteComplete };
     if (statut) body.statut = statut;
     await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     toast(isAdmin ? '✏️ Contre-proposition envoyée' : '✅ Réservation modifiée', 'success');
