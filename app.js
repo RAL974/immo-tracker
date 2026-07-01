@@ -715,16 +715,39 @@ async function voirDetailImmo(codeIM) {
   try {
     const r = await fetch(CONFIG.proxy + '?immo=' + encodeURIComponent(codeIM));
     const hist = await r.json();
-    const dernier = hist[0] || null;
-    const estDepot = !dernier || dernier.type_mouvement === 'Retour' || dernier.code_chantier === 'DEPOT';
-    const locStyle = estDepot ? 'background:#E8F5E9;color:#1B5E20' : 'background:#FFF3E0;color:#E65100';
-    const locTxt   = estDepot ? '🏭 Au dépôt' : `👤 Avec ${dernier.nom_employe} depuis ${fmt(dernier.horodatage)}`;
+    // Une Panne/Suivi_Panne n'est jamais un changement de possession : on l'ignore pour la localisation
+    const dernier = hist.find(m => m.type_mouvement !== 'Panne' && m.type_mouvement !== 'Suivi_Panne') || null;
+    const estDepot = !dernier || dernier.type_mouvement === 'Retour' || dernier.type_mouvement === 'Réparation' || dernier.code_chantier === 'DEPOT';
+    // Panne active actuelle + prestataire éventuel
+    const lastPanne = hist.find(m => m.type_mouvement === 'Panne');
+    const lastRep   = hist.find(m => m.type_mouvement === 'Réparation');
+    const panneActive = lastPanne && (!lastRep || new Date(lastPanne.horodatage) > new Date(lastRep.horodatage));
+    let presta = null;
+    if (panneActive) {
+      for (const m of hist) {
+        if (new Date(m.horodatage) < new Date(lastPanne.horodatage)) break;
+        const match = (m.note || '').match(/##PRESTA:([^#]+)##/);
+        if (match) { presta = match[1]; break; }
+      }
+    }
+    let locStyle, locTxt;
+    if (presta) {
+      locStyle = 'background:#F3E5F5;color:#6A1B9A';
+      locTxt = `🔧 Chez le prestataire : ${presta}`;
+    } else if (estDepot) {
+      locStyle = 'background:#E8F5E9;color:#1B5E20';
+      locTxt = '🏭 Au dépôt';
+    } else {
+      locStyle = 'background:#FFF3E0;color:#E65100';
+      locTxt = `👤 Avec ${dernier.nom_employe} depuis ${fmt(dernier.horodatage)}`;
+    }
+    const panneTag = panneActive && !presta ? '<br><span style="font-size:11px;font-weight:700;color:#E65100">📢 Panne en cours — déclarée le ' + fmt(lastPanne.horodatage) + '</span>' : '';
     const u = fdsUrl(codeIM);
     let html = `<div class="materiel-card" style="border-left-color:var(--orange)">
       <strong style="font-size:16px;color:var(--blue)">${lib(codeIM)}</strong><br>
       <span class="chantier-tag">${codeIM}</span>
       ${cat(codeIM) ? `<small style="color:var(--grey)"> · ${cat(codeIM)}</small>` : ''}<br>
-      <div class="localisation-badge" style="${locStyle};margin:8px 0">${locTxt}</div>
+      <div class="localisation-badge" style="${locStyle};margin:8px 0">${locTxt}${panneTag}</div>
       <div id="fiche-act-immo-${codeIM}" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"></div>
     </div>
     <h3 style="color:var(--blue);font-size:13px;margin:8px 0 4px">Historique (${hist.length})</h3>`;
