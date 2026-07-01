@@ -721,6 +721,7 @@ function renderVueGenerale(){
     {ic:'📦',v:s.transferts_en_attente,l:'Transferts en attente',cl:s.transferts_en_attente>0?'yellow':'green',tab:'transferts'},
     {ic:'🔴',v:s.hors_service,l:'Hors service (actuel)',cl:s.hors_service>0?'red':'green',tab:'alertes'},
     {ic:'📢',v:nbPannes,l:'En panne',cl:nbPannes>0?'red':'green',tab:'alertes'},
+    {ic:'🔧',v:(s.chez_prestataire||0),l:'Chez prestataire',cl:(s.chez_prestataire||0)>0?'yellow':'green',tab:'alertes'},
     {ic:'⚫',v:nbHSDef,l:'HS définitif',cl:nbHSDef>0?'grey':'green',tab:'analyses'},
     {ic:'❌',v:nbPerdus,l:'Perdues',cl:nbPerdus>0?'red':'green',tab:'analyses'},
   ];
@@ -750,7 +751,7 @@ function renderCirc(){
   if(!sorted.length){div.innerHTML='<p class="es">Aucun résultat.</p>';return;}
   div.innerHTML=sorted.map(function(g){
     return '<div class="det-card"><div class="det-nom"><span class="link-emp" data-emp="'+g.code+'" data-nom="'+g.nom.replace(/"/g,'')+'">'+g.nom+'</span><span><span class="det-cnt">'+g.list.length+'</span> <span style="font-size:10px;color:var(--grey)">'+g.code+'</span></span></div>'+
-      g.list.map(function(i){var u=getFdsUrl(i.code_im);return'<div class="det-item"><span><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span> <span style="font-size:11px;color:#555">'+getLib(i.code_im)+'</span>'+(u?'':'')+' </span><span>'+ebadge(i.etat)+'</span></div>';}).join('')+'</div>';
+      g.list.map(function(i){return'<div class="det-item"><span><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span> <span style="font-size:11px;color:#555">'+getLib(i.code_im)+'</span>'+(i.en_panne?' <span style="font-size:10px;font-weight:700;color:#E65100">📢 EN PANNE</span>':'')+'</span><span>'+ebadge(i.etat)+'</span></div>';}).join('')+'</div>';
   }).join('');
 }
 
@@ -1064,6 +1065,18 @@ function renderAlertes(){
         '</td>';
       return row.outerHTML;
     }).join('')+'</tbody></table></div></div>';
+  // Immos chez le prestataire (panne avec prestataire renseigné)
+  var chezPresta=d.chez_prestataire||[];
+  if(chezPresta.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid #9C27B0"><div class="card-head"><h3>🔧 Chez le prestataire ('+chezPresta.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Prestataire</th><th>Depuis</th><th>Action</th></tr></thead><tbody>'+
+    chezPresta.map(function(i){
+      var presta=i.detenteur_nom.replace('Prestataire : ','');
+      return '<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td>'+
+        '<td style="font-size:12px">'+getLib(i.code_im)+'</td>'+
+        '<td style="font-size:12px;font-weight:700;color:#9C27B0">🔧 '+presta+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td>'+
+        '<td><button class="btn-res-p" data-cim="'+i.code_im+'" style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">✅ Résoudre</button></td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+
   // Réservations imminentes sans réponse (départ <=24h, statut Demandee)
   var resaImminentes=(reservations||[]).filter(isImminenteSansReponse).sort(function(a,b){return new Date(a.date_debut)-new Date(b.date_debut);});
   if(resaImminentes.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>⏰ Réservations imminentes sans réponse ('+resaImminentes.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Demandeur</th><th>Code IM</th><th>Libellé</th><th>Départ demandé</th><th>Action</th></tr></thead><tbody>'+
@@ -1276,11 +1289,26 @@ async function chargerFicheImmo(codeIM){
     var hist=await r.json();
     var immoInfo=im[codeIM]||{};
     var l=immoInfo.Libelle||codeIM;
-    var loc=hist.length>0?hist[0]:null;
-    var estDepot=!loc||loc.type_mouvement==='Retour'||loc.code_chantier==='DEPOT';
-    var locHtml=estDepot
-      ?'<div class="loc-card" style="background:#E8F5E9;color:#1B5E20">🏭 Au dépôt</div>'
-      :'<div class="loc-card" style="background:#FFF3E0;color:#E65100">👤 Avec <strong>'+loc.nom_employe+'</strong> depuis le '+fmtD(loc.horodatage)+'</div>';
+    // Une Panne/Suivi_Panne n'est jamais un changement de possession : on l'ignore pour la localisation
+    var loc=hist.find(function(m){return m.type_mouvement!=='Panne'&&m.type_mouvement!=='Suivi_Panne';})||null;
+    var estDepot=!loc||loc.type_mouvement==='Retour'||loc.type_mouvement==='Réparation'||loc.code_chantier==='DEPOT';
+    // Panne active + prestataire éventuel
+    var lastPanneF=hist.find(function(m){return m.type_mouvement==='Panne';});
+    var lastRepF=hist.find(function(m){return m.type_mouvement==='Réparation';});
+    var panneActiveF=lastPanneF&&(!lastRepF||new Date(lastPanneF.horodatage)>new Date(lastRepF.horodatage));
+    var prestaF=null;
+    if(panneActiveF){
+      for(var pi=0;pi<hist.length;pi++){
+        if(new Date(hist[pi].horodatage)<new Date(lastPanneF.horodatage))break;
+        var pm=(hist[pi].note||'').match(/##PRESTA:([^#]+)##/);
+        if(pm){prestaF=pm[1];break;}
+      }
+    }
+    var panneTagF=panneActiveF&&!prestaF?'<br><span style="font-size:11px;font-weight:700">📢 Panne en cours — déclarée le '+fmtD(lastPanneF.horodatage)+'</span>':'';
+    var locHtml;
+    if(prestaF) locHtml='<div class="loc-card" style="background:#F3E5F5;color:#6A1B9A">🔧 Chez le prestataire : <strong>'+prestaF+'</strong></div>';
+    else if(estDepot) locHtml='<div class="loc-card" style="background:#E8F5E9;color:#1B5E20">🏭 Au dépôt'+panneTagF+'</div>';
+    else locHtml='<div class="loc-card" style="background:#FFF3E0;color:#E65100">👤 Avec <strong>'+loc.nom_employe+'</strong> depuis le '+fmtD(loc.horodatage)+panneTagF+'</div>';
     var nbDet=new Set(hist.filter(function(m){return m.type_mouvement!=='Retour';}).map(function(m){return m.code_employe;})).size;
     var mt2=immoMeta[codeIM]||{};
     var html='<div class="fiche-stat-row">';
@@ -1517,6 +1545,7 @@ function ouvrirSuiviPanne(codeIM){
   document.getElementById('act-form').innerHTML =
     '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:#F8FAFC"></div>' +
     '<div class="frow"><label>Prestataire SAV</label><input type="text" id="sp-prest" placeholder="Nom du réparateur / atelier..."></div>' +
+    '<p style="font-size:11px;color:#6A1B9A;background:#F3E5F5;border-radius:8px;padding:6px 10px;margin:-4px 0 8px">🔧 Renseigner le prestataire affichera "Chez le prestataire" comme localisation de l\'immo, le temps de la réparation.</p>' +
     '<div class="frow"><label>Coût estimé (€)</label><input type="number" id="sp-cout" placeholder="0" step="0.01"></div>' +
     '<div class="frow"><label>Note de suivi</label><textarea id="sp-note" rows="3" placeholder="Avancement, pièces commandées, délai estimé..."></textarea></div>';
   var btn = document.getElementById('act-confirm-btn');
