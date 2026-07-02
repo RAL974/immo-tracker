@@ -1134,6 +1134,7 @@ function renderAlertes(){
 // Rôles/droits (dérivés en attendant la colonne SharePoint dédiée)
 var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
 var CT_CODES=['ROJO','LAHU','AUAR','BOMA','ADWI','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
+var USERS_CACHE=null;
 function roleUtilisateur(code,poste){
   // Si un rôle explicite existe déjà (futur champ Droits), il primera — sinon dérivation
   if(ADMINS_CODES.includes(code))return{label:'Admin / Logistique',color:'#1A3A6B',rank:0};
@@ -1154,14 +1155,14 @@ function renderUsers(){
   var possede={};
   if(d&&d.en_circulation)d.en_circulation.forEach(function(i){possede[i.detenteur_code]=(possede[i.detenteur_code]||0)+1;});
 
-  // Enrichir chaque employé avec rôle + tri
-  var users=employesList.map(function(e){
+  // Enrichir chaque employé avec rôle + tri (stocké en global pour le filtrage sans re-rendu complet)
+  USERS_CACHE=employesList.map(function(e){
     var r=roleUtilisateur(e.Code,e.Poste);
     return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0};
   });
 
   // Compteurs par rôle
-  var parRole={};users.forEach(function(u){parRole[u.role]=(parRole[u.role]||0)+1;});
+  var parRole={};USERS_CACHE.forEach(function(u){parRole[u.role]=(parRole[u.role]||0)+1;});
 
   var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
   [['Admin / Logistique','#1A3A6B','👑'],['Conducteur de travaux','#E87722','🏗️'],['Ouvrier spécialisé','#8E24AA','⚡'],['Ouvrier','#27AE60','👷'],['Encadrement','#1A3A6B','📋']].forEach(function(rc){
@@ -1171,23 +1172,32 @@ function renderUsers(){
   html+='</div>';
 
   // Barre d'info sur la future gestion des droits
-  html+='<div style="background:#EDE7F6;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#4527A0"><strong>ℹ️ Étape 1 — visualisation.</strong> Les rôles sont pour l\'instant dérivés automatiquement (admins, CT, postes). Prochaine étape : une colonne « Droits » dans SharePoint permettra de définir le statut de chacun directement, y compris les ouvriers spécialisés BT/fibre autorisés à réserver.</div>';
+  html+='<div style="background:#EDE7F6;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#4527A0"><strong>ℹ️ Étape 1 — visualisation.</strong> Les rôles sont pour l\'instant dérivés automatiquement (admins, CT, postes). Prochaine étape : gestion des droits directement depuis ce tableau de bord (colonne « Droits »), y compris les ouvriers spécialisés BT/fibre autorisés à réserver.</div>';
 
-  // Filtres
+  // Filtres — rendus UNE fois ; le filtrage ne régénère que le tbody (garde le focus de l\'input)
   html+='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+
-    '<input type="text" id="users-q" oninput="renderUsers()" placeholder="🔍 Rechercher un nom ou code..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
-    '<select id="users-role" onchange="renderUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
+    '<input type="text" id="users-q" oninput="filterUsers()" placeholder="🔍 Rechercher un nom ou code..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
+    '<select id="users-role" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
     '<option value="">Tous les rôles</option><option value="Admin / Logistique">Admin / Logistique</option><option value="Encadrement">Encadrement</option><option value="Conducteur de travaux">CT</option><option value="Ouvrier spécialisé">Ouvrier spécialisé</option><option value="Ouvrier">Ouvrier</option></select>'+
     '</div>';
 
-  // Application des filtres
+  html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Poste</th><th>Matériel détenu</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
+
+  div.innerHTML=html;
+  filterUsers(); // premier rendu du tableau
+}
+
+// Régénère uniquement le corps du tableau (ne touche pas aux inputs → conserve le focus)
+function filterUsers(){
+  var tbody=document.getElementById('users-tbody');
+  if(!tbody||!USERS_CACHE)return;
   var q=(document.getElementById('users-q')||{}).value||'';var qu=q.trim().toUpperCase();
   var fr=(document.getElementById('users-role')||{}).value||'';
-  var filtered=users.filter(function(u){return(!qu||u.nom.toUpperCase().includes(qu)||u.code.includes(qu))&&(!fr||u.role===fr);});
+  var filtered=USERS_CACHE.filter(function(u){return(!qu||u.nom.toUpperCase().includes(qu)||u.code.toUpperCase().includes(qu))&&(!fr||u.role===fr);});
   filtered.sort(function(a,b){return a.rank-b.rank||a.nom.localeCompare(b.nom);});
-
-  html+='<div class="card"><div class="card-head"><h3>👥 Tous les utilisateurs ('+filtered.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Poste</th><th>Matériel détenu</th></tr></thead><tbody>';
-  html+=filtered.map(function(u){
+  var titleEl=document.getElementById('users-title');
+  if(titleEl)titleEl.textContent='👥 Tous les utilisateurs ('+filtered.length+')';
+  tbody.innerHTML=filtered.map(function(u){
     return '<tr>'+
       '<td><span class="link-emp" data-emp="'+u.code+'" data-nom="'+u.nom.replace(/"/g,'')+'"><b style="font-size:13px">'+u.nom+'</b></span></td>'+
       '<td style="font-family:monospace;font-size:12px;color:var(--grey)">'+u.code+'</td>'+
@@ -1195,9 +1205,7 @@ function renderUsers(){
       '<td style="font-size:12px;color:var(--grey)">'+u.poste+'</td>'+
       '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
     '</tr>';
-  }).join('')+'</tbody></table></div></div>';
-
-  div.innerHTML=html;
+  }).join('')||'<tr><td colspan="5" class="es">Aucun utilisateur trouvé.</td></tr>';
 }
 
 // ── Rendu — Analyses ─────────────────────────────────────
@@ -1763,7 +1771,7 @@ function declarerPanneDash(codeIM){
   if(!motif||motif.trim().length<5){alert('Le motif est obligatoire (5 caractères min.)');return;}
   if(!confirm('Déclarer une panne sur ' + codeIM + ' ? Motif : "' + motif + '"'))return;
   fetch(W+'?action=declarer_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,code_employe:'ADMIN',nom_employe:'Dashboard Admin',motif:motif})})
+    body:JSON.stringify({code_im:codeIM,code_employe:'CONI',nom_employe:nomEmploye('CONI'),motif:motif})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne déclarée. Immo marquée "En panne".');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
