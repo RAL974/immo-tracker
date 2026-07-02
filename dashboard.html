@@ -249,6 +249,7 @@ tr:hover td{background:#FAFBFC;}
   <div class="nav-group">ANALYTICS</div>
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
   <div class="nav-item" data-tab="analyses"><span class="nav-icon">📈</span><span class="nav-label">Analyses</span></div>
+  <div class="nav-item" data-tab="utilisateurs"><span class="nav-icon">👥</span><span class="nav-label">Utilisateurs</span></div>
 </nav>
 <div id="sidebar-overlay" onclick="closeSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:89"></div>
 
@@ -408,6 +409,7 @@ tr:hover td{background:#FAFBFC;}
 
     <!-- Analyses -->
     <div id="pane-analyses" class="tab-pane"><div id="analyse-content" style="padding:0"></div></div>
+    <div id="pane-utilisateurs" class="tab-pane"><div id="users-content" style="padding:0"></div></div>
 
   </div>
 </div>
@@ -429,6 +431,7 @@ tr:hover td{background:#FAFBFC;}
     <div class="bnav-item" data-tab="documents" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📄</span><span>FDS</span></div>
     <div class="bnav-item" data-tab="maintenance" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🔧</span><span>Maint.</span></div>
     <div class="bnav-item" data-tab="analyses" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📈</span><span>Analyses</span></div>
+    <div class="bnav-item" data-tab="utilisateurs" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">👥</span><span>Users</span></div>
     <div class="bnav-item" onclick="closeMobileMenu()"><span class="bi">✕</span><span>Fermer</span></div>
   </div>
 </div>
@@ -436,6 +439,23 @@ tr:hover td{background:#FAFBFC;}
 <script>
 var W='https://immo-proxy.ral-85d.workers.dev/';
 var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
+var employesList=[]; // [{Code, Nom, Poste}]
+var employesByCode={}; // { CODE: {Nom, Poste} }
+
+async function loadEmployes(){
+  if(employesList.length>0)return;
+  try{
+    var r=await fetch('employes.json');
+    employesList=await r.json();
+    employesByCode={};
+    employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste||''};});
+  }catch(e){employesList=[];employesByCode={};}
+}
+// Résout le vrai nom d'un employé à partir de son code (évite les doublons "CONI (CONI)")
+function nomEmploye(code){
+  if(employesByCode[code])return employesByCode[code].nom;
+  return code; // fallback
+}
 
 // Une demande "Demandee" est imminente si le départ est dans moins de 24h (ou déjà dépassé sans réponse)
 // La Réunion est UTC+4 toute l'année (pas d'heure d'été)
@@ -564,11 +584,15 @@ function renderTab(name){
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
       break;
+    case 'utilisateurs':
+      loadEmployes().then(function(){renderUsers();});
+      break;
   }
 }
 
 // ── Chargement ───────────────────────────────────────────
 async function loadAll(){
+  loadEmployes(); // charge la liste employés en tâche de fond (idempotent)
   try{
     var r=await fetch(W+'?dashboard=1');
     d=await r.json();
@@ -960,8 +984,8 @@ function renderResa(){
       var isImm=isImminenteSansReponse(r);
       var tr='<tr class="'+(isImm||isU?'urgent-row':isD?'warn-row':'')+'">';
       tr+='<td>'+rsLabel(r.statut)+(isImm?' <span style="display:block;margin-top:2px;font-size:10px;font-weight:800;color:var(--red)">⏰ DÉPART IMMINENT</span>':'')+'</td>';
-      tr+='<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+r.code_im+'</span></td>';
-      tr+='<td style="font-size:12px">'+l+'</td>';
+      tr+='<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+r.code_im+'</span>'+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:9px;color:var(--orange);white-space:nowrap">✏️ initial : <span class="link-im" data-cim="'+r.code_im_initial+'" data-lib="'+getLib(r.code_im_initial).replace(/"/g,'')+'">'+r.code_im_initial+'</span></span>':'')+'</td>';
+      tr+='<td style="font-size:12px">'+l+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:10px;color:var(--grey)">au lieu de : '+getLib(r.code_im_initial)+'</span>':'')+'</td>';
       tr+='<td><span class="link-emp" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'"><b style="font-size:12px">'+r.nom_employe+'</b></span></td>';
       tr+='<td style="font-size:12px">'+(r.nom_chantier||'—')+'</td>';
       tr+='<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td>';
@@ -1104,6 +1128,76 @@ function renderAlertes(){
   div.querySelectorAll('.btn-maj-p').forEach(function(btn){
     btn.onclick=function(){ouvrirSuiviPanne(this.dataset.cim);};
   });
+}
+
+// ── Rendu — Utilisateurs ─────────────────────────────────
+// Rôles/droits (dérivés en attendant la colonne SharePoint dédiée)
+var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
+var CT_CODES=['ROJO','AUAR','BOMA','ADWI','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
+function roleUtilisateur(code,poste){
+  // Si un rôle explicite existe déjà (futur champ Droits), il primera — sinon dérivation
+  if(ADMINS_CODES.includes(code))return{label:'Admin / Logistique',color:'#1A3A6B',rank:0};
+  if(CT_CODES.includes(code))return{label:'Conducteur de travaux',color:'#E87722',rank:1};
+  var p=(poste||'').toLowerCase();
+  if(p.includes('encadr'))return{label:'Encadrement',color:'#1A3A6B',rank:0};
+  if(p.includes('bt')||p.includes('fibre'))return{label:'Ouvrier spécialisé',color:'#8E24AA',rank:2};
+  return{label:'Ouvrier',color:'#27AE60',rank:3};
+}
+function renderUsers(){
+  var pane=document.getElementById('pane-utilisateurs');
+  var sp=pane?pane.querySelector('.loading-placeholder'):null;if(sp&&pane)pane.removeChild(sp);
+  var div=document.getElementById('users-content');
+  if(!div){if(pane){pane.innerHTML='<div id="users-content"></div>';div=document.getElementById('users-content');}else return;}
+  if(!employesList.length){div.innerHTML='<p class="es" style="padding:40px">Chargement des utilisateurs…</p>';return;}
+
+  // Compter le matériel détenu par chaque employé (depuis l'inventaire en circulation)
+  var possede={};
+  if(d&&d.en_circulation)d.en_circulation.forEach(function(i){possede[i.detenteur_code]=(possede[i.detenteur_code]||0)+1;});
+
+  // Enrichir chaque employé avec rôle + tri
+  var users=employesList.map(function(e){
+    var r=roleUtilisateur(e.Code,e.Poste);
+    return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0};
+  });
+
+  // Compteurs par rôle
+  var parRole={};users.forEach(function(u){parRole[u.role]=(parRole[u.role]||0)+1;});
+
+  var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
+  [['Admin / Logistique','#1A3A6B','👑'],['Conducteur de travaux','#E87722','🏗️'],['Ouvrier spécialisé','#8E24AA','⚡'],['Ouvrier','#27AE60','👷'],['Encadrement','#1A3A6B','📋']].forEach(function(rc){
+    var n=parRole[rc[0]]||0;if(n===0)return;
+    html+='<div class="card" style="padding:14px;text-align:center;border-top:3px solid '+rc[1]+'"><div style="font-size:28px">'+rc[2]+'</div><div style="font-size:24px;font-weight:800;color:'+rc[1]+'">'+n+'</div><div style="font-size:12px;color:var(--grey)">'+rc[0]+'</div></div>';
+  });
+  html+='</div>';
+
+  // Barre d'info sur la future gestion des droits
+  html+='<div style="background:#EDE7F6;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#4527A0"><strong>ℹ️ Étape 1 — visualisation.</strong> Les rôles sont pour l\'instant dérivés automatiquement (admins, CT, postes). Prochaine étape : une colonne « Droits » dans SharePoint permettra de définir le statut de chacun directement, y compris les ouvriers spécialisés BT/fibre autorisés à réserver.</div>';
+
+  // Filtres
+  html+='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+
+    '<input type="text" id="users-q" oninput="renderUsers()" placeholder="🔍 Rechercher un nom ou code..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
+    '<select id="users-role" onchange="renderUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
+    '<option value="">Tous les rôles</option><option value="Admin / Logistique">Admin / Logistique</option><option value="Encadrement">Encadrement</option><option value="Conducteur de travaux">CT</option><option value="Ouvrier spécialisé">Ouvrier spécialisé</option><option value="Ouvrier">Ouvrier</option></select>'+
+    '</div>';
+
+  // Application des filtres
+  var q=(document.getElementById('users-q')||{}).value||'';var qu=q.trim().toUpperCase();
+  var fr=(document.getElementById('users-role')||{}).value||'';
+  var filtered=users.filter(function(u){return(!qu||u.nom.toUpperCase().includes(qu)||u.code.includes(qu))&&(!fr||u.role===fr);});
+  filtered.sort(function(a,b){return a.rank-b.rank||a.nom.localeCompare(b.nom);});
+
+  html+='<div class="card"><div class="card-head"><h3>👥 Tous les utilisateurs ('+filtered.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Poste</th><th>Matériel détenu</th></tr></thead><tbody>';
+  html+=filtered.map(function(u){
+    return '<tr>'+
+      '<td><span class="link-emp" data-emp="'+u.code+'" data-nom="'+u.nom.replace(/"/g,'')+'"><b style="font-size:13px">'+u.nom+'</b></span></td>'+
+      '<td style="font-family:monospace;font-size:12px;color:var(--grey)">'+u.code+'</td>'+
+      '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span></td>'+
+      '<td style="font-size:12px;color:var(--grey)">'+u.poste+'</td>'+
+      '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
+    '</tr>';
+  }).join('')+'</tbody></table></div></div>';
+
+  div.innerHTML=html;
 }
 
 // ── Rendu — Analyses ─────────────────────────────────────
@@ -1555,7 +1649,7 @@ function ouvrirSuiviPanne(codeIM){
     var note  = (document.getElementById('sp-note')||{}).value||'';
     if(!prest && !note){ alert('Renseignez au moins le prestataire ou une note.'); return; }
     fetch(W+'?action=maj_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code_im:codeIM,prestataire:prest,cout_estime:cout,note_suivi:note,par_code:'CONI',par_nom:'CONI'})})
+      body:JSON.stringify({code_im:codeIM,prestataire:prest,cout_estime:cout,note_suivi:note,par_code:'CONI',par_nom:nomEmploye('CONI')})})
       .then(function(){fermerAction();renderAlertes();})
       .catch(function(e){alert('Erreur : '+e.message);});
   };
@@ -1579,7 +1673,7 @@ function resoudrePanneComplet(codeIM){
     var note  = (document.getElementById('rp-note')||{}).value||'';
     if(!note||note.trim().length<10){ alert('La note de résolution est obligatoire (10 car. min.).'); return; }
     fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:'CONI',par_nom:'CONI'})})
+      body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:'CONI',par_nom:nomEmploye('CONI')})})
       .then(function(){fermerAction();refreshAll();alert('✅ Panne résolue ! ' + codeIM + ' est de retour dans le parc.');})
       .catch(function(e){alert('Erreur : '+e.message);});
   };
@@ -1623,7 +1717,7 @@ function declarerVol(codeIM,libelle,type){
   if(!confirm('1ere CONFIRMATION : Declarer ' + codeIM + ' [' + type + '] ? Immo retirée définitivement du parc.'))return;
   if(!confirm('CONFIRMATION FINALE : Cette action est irreversible. Confirmer [' + type + '] pour ' + codeIM + ' ?'))return;
   fetch(W+'?action=declarer_vol',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:'ADMIN',par_nom:'Admin Dashboard'})})
+    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:'CONI',par_nom:nomEmploye('CONI')})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo ' + codeIM + ' déclarée [' + type + ']. Retirée du parc.');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -1657,8 +1751,8 @@ function validerSortieDefinitive(){
   if(!confirm('CONFIRMATION FINALE : Sortir définitivement '+codeIM+' du parc comme ['+type+'] ?'))return;
   var endpoint=type==='Volé'||type==='Disparu'?'declarer_vol':'marquer_statut_immo';
   var payload=endpoint==='declarer_vol'
-    ?{code_im:codeIM,type_vol:type,motif:motif,par_code:'ADMIN',par_nom:'Dashboard Admin'}
-    :{code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'ADMIN',par_nom:'Dashboard Admin'};
+    ?{code_im:codeIM,type_vol:type,motif:motif,par_code:'CONI',par_nom:nomEmploye('CONI')}
+    :{code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'CONI',par_nom:nomEmploye('CONI')};
   fetch(W+'?action='+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(){fermerAction();fermerFiche();refreshAll();alert('✅ '+codeIM+' sorti du parc : '+type);})
     .catch(function(e){alert('Erreur : '+e.message);});
@@ -1680,7 +1774,7 @@ function marquerImmoInactive(codeIM,libelle,type){
   if(!confirm('1ere CONFIRMATION : Marquer ' + codeIM + ' comme [' + type + '] ? Cette action exclut l immo des reservations.'))return;
   if(!confirm('CONFIRMATION FINALE IRREVERSIBLE : Confirmer definitvement le statut [' + type + '] pour ' + codeIM + ' ?'))return;
   fetch(W+'?action=marquer_statut_immo',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'ADMIN',par_nom:'Dashboard Admin'})})
+    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'CONI',par_nom:nomEmploye('CONI')})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo marquée comme ' + type + '.');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -1691,7 +1785,7 @@ function resoudrePanne(codeIM){
   var note=prompt('Note de resolution (optionnel) :', '') || '';
   if(!confirm('Panne resolue sur ' + codeIM + ' ? Nouvel etat : ' + etat))return;
   fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:'CONI',par_nom:'CONI'})})
+    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:'CONI',par_nom:nomEmploye('CONI')})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne résolue !');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
