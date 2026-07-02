@@ -7,7 +7,7 @@ const CONFIG = {
   // Admins / logistique
   admins:  ['CONI', 'AIWI', 'NAXA', 'BAKA'],
   // Responsables d'affaires + CTs + admins : tous autorisés à réserver
-  autorises: ['CONI', 'AIWI', 'NAXA', 'BAKA', 'ROJO', 'AUAR', 'BOMA', 'ADWI',
+  autorises: ['CONI', 'AIWI', 'NAXA', 'BAKA', 'ROJO', 'LAHU', 'AUAR', 'BOMA', 'ADWI',
               'RIJB', 'MEJO', 'GOLU', 'SCST', 'CANI', 'DACH', 'TOHO'],
   etats:   { 'Neuf': 5, 'Bon état': 4, 'Usé': 3, 'Abîmé': 2, 'Hors service': 1 },
 };
@@ -1111,6 +1111,9 @@ async function ouvrirModifResa(id) {
     const resas = await r.json();
     const resa = resas.find(r => r.id === id);
     if (!resa) { toast('Réservation introuvable', 'error'); return; }
+    // Bloc changement d'immo réservé aux admins — masqué pour l'utilisateur standard
+    const blocImmo = document.getElementById('modif-immo-bloc');
+    if (blocImmo) blocImmo.classList.add('hidden');
     document.getElementById('modif-resa-info').textContent = lib(resa.code_im) + ' (' + resa.code_im + ')';
     if (resa.date_debut) document.getElementById('modif-date-debut').value = resa.date_debut.slice(0, 10);
     if (resa.date_fin)   document.getElementById('modif-date-fin').value   = resa.date_fin.slice(0, 10);
@@ -1303,12 +1306,37 @@ async function actionResaPWA(id, statut, nomEmp, codeIM) {
 
 function proposerModifPWA(id, codeIM, nomEmp, dateDebut, dateFin) {
   S.resaEnCoursId = id;
-  document.getElementById('modif-resa-info').textContent = `${lib(codeIM)} — demande de ${nomEmp}`;
+  S.resaImmoActuelle = codeIM;
+  document.getElementById('modif-resa-info').textContent = `Demande de ${nomEmp}`;
+  // Afficher le bloc de changement d'immo (admin uniquement)
+  const bloc = document.getElementById('modif-immo-bloc');
+  if (bloc) bloc.classList.remove('hidden');
+  const actuelle = document.getElementById('modif-immo-actuelle');
+  if (actuelle) actuelle.innerHTML = 'Demandé : <strong>' + lib(codeIM) + '</strong> (' + codeIM + ')';
+  const codeInput = document.getElementById('modif-immo-code');
+  if (codeInput) codeInput.value = '';
+  const lblInit = document.getElementById('modif-immo-label');
+  if (lblInit) lblInit.textContent = '';
   if (dateDebut) document.getElementById('modif-date-debut').value = dateDebut;
   if (dateFin)   document.getElementById('modif-date-fin').value   = dateFin;
   document.getElementById('modif-chantier').value = '';
   document.getElementById('modif-note').value = '';
   showScreen('screen-modifier-resa');
+}
+
+// Scanner une immo pour la contre-proposition
+function scannerModifImmo() {
+  showScreen('screen-scan-immo', true);
+  document.getElementById('titre-mouvement').textContent = '📷 Scanner l\'immo proposée';
+  startScanner('scanner-immo', function(code) {
+    if (!code.startsWith('IM')) return;
+    stopScanner(); vib(200);
+    const inp = document.getElementById('modif-immo-code');
+    if (inp) inp.value = code;
+    const lbl = document.getElementById('modif-immo-label');
+    if (lbl) lbl.textContent = '✅ ' + lib(code);
+    showScreen('screen-modifier-resa');
+  });
 }
 
 // Remplacer validerModifResa pour supporter la contre-proposition admin
@@ -1320,17 +1348,30 @@ validerModifResa = async function() {
   const note  = document.getElementById('modif-note').value;
   if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
   const isAdmin = S.employe && CONFIG.admins.includes(S.employe.code);
+  // Immo alternative (admin uniquement)
+  let immoAlt = '';
+  const codeInput = document.getElementById('modif-immo-code');
+  if (isAdmin && codeInput) {
+    const saisie = (codeInput.value || '').trim().toUpperCase();
+    if (saisie && saisie !== (S.resaImmoActuelle || '').toUpperCase()) {
+      if (!lib(saisie) || lib(saisie) === saisie) { toast('Code IM inconnu : ' + saisie, 'error'); return; }
+      immoAlt = saisie;
+    }
+  }
   const noteComplete = isAdmin
-    ? (note ? `[Modification par ${S.employe.nom} : ${note}]` : `[Dates modifiées par ${S.employe.nom}]`)
+    ? (note ? `[Modification par ${S.employe.nom} : ${note}]` : `[Modifiée par ${S.employe.nom}]`)
     : note;
   const statut = isAdmin ? 'Contre-proposition' : undefined;
   try {
     const body = { id: S.resaEnCoursId, date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), nom_chantier: document.getElementById('modif-chantier').value, note: noteComplete };
     if (statut) body.statut = statut;
+    if (immoAlt) body.code_im_alt = immoAlt;
     await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     toast(isAdmin ? '✏️ Contre-proposition envoyée' : '✅ Réservation modifiée', 'success');
     S.resaEnCoursId = null;
-    showScreen('screen-mes-reservations');
+    S.resaImmoActuelle = null;
+    afficherReservationsAdmin();
+    showScreen('screen-reservations-admin');
   } catch (e) { toast('Erreur', 'error'); }
 };
 
