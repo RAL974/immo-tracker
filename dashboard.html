@@ -458,9 +458,9 @@ async function loadEmployes(force){
     var r=await fetch(W+'?employes=1');
     var data=await r.json();
     if(Array.isArray(data)&&data.length){
-      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',itemId:e.itemId||null};});
+      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',itemId:e.itemId||null};});
       employesByCode={};
-      employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits};});
+      employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site};});
       return;
     }
   }catch(e){/* fallback ci-dessous */}
@@ -468,9 +468,9 @@ async function loadEmployes(force){
   try{
     var r2=await fetch('employes.json');
     var arr=await r2.json();
-    employesList=arr.map(function(e){return{Code:e.Code,Nom:e.Nom,Poste:e.Poste||'',Droits:'',itemId:null};});
+    employesList=arr.map(function(e){return{Code:e.Code,Nom:e.Nom,Poste:e.Poste||'',Droits:'',Site:'',itemId:null};});
     employesByCode={};
-    employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste||'',droits:''};});
+    employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste||'',droits:'',site:''};});
   }catch(e){employesList=[];employesByCode={};}
 }
 // Résout le vrai nom d'un employé à partir de son code (évite les doublons "CONI (CONI)")
@@ -1316,6 +1316,7 @@ function renderUsers(){
     '<input type="text" id="users-q" oninput="filterUsers()" placeholder="🔍 Rechercher un nom ou code..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
     '<select id="users-role" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
     '<option value="">Tous les rôles</option><option value="Administrateur">Administrateur</option><option value="Gestionnaire dépôt RUN">Gestionnaire dépôt RUN</option><option value="Logistique Mayotte">Logistique Mayotte</option><option value="Responsable d’affaires">Responsable d’affaires</option><option value="CT spécialisé">CT spécialisé</option><option value="Conducteur de travaux">CT</option><option value="Ouvrier spécialisé">Ouvrier spécialisé</option><option value="Ouvrier">Ouvrier</option><option value="Encadrement">Encadrement</option></select>'+
+    '<select id="users-site" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px"><option value="">Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>'+
     '</div>';
 
   html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
@@ -1330,7 +1331,8 @@ function filterUsers(){
   if(!tbody||!USERS_CACHE)return;
   var q=(document.getElementById('users-q')||{}).value||'';var qu=q.trim().toUpperCase();
   var fr=(document.getElementById('users-role')||{}).value||'';
-  var filtered=USERS_CACHE.filter(function(u){return(!qu||u.nom.toUpperCase().includes(qu)||u.code.toUpperCase().includes(qu))&&(!fr||u.role===fr);});
+  var fsite=(document.getElementById('users-site')||{}).value||'';
+  var filtered=USERS_CACHE.filter(function(u){return(!qu||u.nom.toUpperCase().includes(qu)||u.code.toUpperCase().includes(qu))&&(!fr||u.role===fr)&&(!fsite||u.site===fsite);});
   filtered.sort(function(a,b){return a.rank-b.rank||a.nom.localeCompare(b.nom);});
   var titleEl=document.getElementById('users-title');
   if(titleEl)titleEl.textContent='👥 Tous les utilisateurs ('+filtered.length+')';
@@ -1687,7 +1689,9 @@ async function chargerFicheEmploye(code,nom){
     var data=await r.json();
     var actuel=data.actuel||[],hist=data.historique||[];
     var moyD=actuel.length?Math.round(actuel.reduce(function(a,m){return a+(m.horodatage?(Date.now()-new Date(m.horodatage).getTime())/86400000:0);},0)/actuel.length*10)/10:0;
-    var html='<div class="fiche-stat-row">';
+    var siteEmp=(employesByCode[code]&&employesByCode[code].site)||'Reunion';
+    var html='<div style="margin-bottom:10px">'+badgeSiteD(siteEmp)+' <span style="font-size:12px;color:var(--grey)">Rattachement</span></div>';
+    html+='<div class="fiche-stat-row">';
     html+='<div class="fiche-stat"><div class="sv">'+actuel.length+'</div><div class="sl">En possession</div></div>';
     html+='<div class="fiche-stat"><div class="sv">'+hist.length+'</div><div class="sl">Total mvt</div></div>';
     html+='<div class="fiche-stat"><div class="sv">'+moyD+'j</div><div class="sl">Durée moy.</div></div>';
@@ -1893,10 +1897,12 @@ function resoudrePanneComplet(codeIM){
     var cout  = (document.getElementById('rp-cout')||{}).value||'';
     var note  = (document.getElementById('rp-note')||{}).value||'';
     if(!note||note.trim().length<10){ alert('La note de résolution est obligatoire (10 car. min.).'); return; }
+    if(btn.dataset.busy==='1')return; // anti double-clic
+    btn.dataset.busy='1'; btn.disabled=true;
     fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
-      .then(function(){fermerAction();refreshAll();alert('✅ Panne résolue ! ' + codeIM + ' est de retour dans le parc.');})
-      .catch(function(e){alert('Erreur : '+e.message);});
+      .then(function(){btn.dataset.busy='';btn.disabled=false;fermerAction();refreshAll();alert('✅ Panne résolue ! ' + codeIM + ' est de retour dans le parc.');})
+      .catch(function(e){btn.dataset.busy='';btn.disabled=false;alert('Erreur : '+e.message);});
   };
   document.getElementById('act-overlay').classList.add('open');
 }
