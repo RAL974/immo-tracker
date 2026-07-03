@@ -210,9 +210,17 @@ tr:hover td{background:#FAFBFC;}
     <img src="logo.png" alt="Espace Soleil" onerror="this.style.display='none'">
     <h2>Tableau de bord logistique</h2>
     <p>Espace Soleil — Accès encadrement</p>
-    <input type="password" id="pin-input" maxlength="10" placeholder="Code PIN" onkeydown="if(event.key==='Enter')checkPin()">
-    <button id="pin-btn" onclick="checkPin()">Accéder →</button>
-    <p id="pin-error"></p>
+    <div id="pin-step1">
+      <input type="password" id="pin-input" maxlength="10" placeholder="Code PIN" onkeydown="if(event.key==='Enter')checkPin()">
+      <button id="pin-btn" onclick="checkPin()">Accéder →</button>
+      <p id="pin-error"></p>
+    </div>
+    <div id="pin-step2" style="display:none">
+      <p style="font-size:14px;color:var(--blue);font-weight:700;margin-bottom:8px">Qui êtes-vous ?</p>
+      <select id="pin-identite" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:12px"></select>
+      <button id="pin-btn2" onclick="confirmerIdentite()">Continuer →</button>
+      <p style="font-size:11px;color:var(--grey);margin-top:8px">Vos actions (validations, résolutions de panne, sorties) seront tracées à votre nom.</p>
+    </div>
   </div>
 </div>
 
@@ -222,6 +230,7 @@ tr:hover td{background:#FAFBFC;}
   <h1>Immo Tracker — Espace Soleil</h1>
   <button id="hamburger" onclick="toggleSidebar()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;display:none">☰</button>
   <div id="header-actions">
+    <span id="admin-identite-badge" style="font-size:11px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px;white-space:nowrap;cursor:pointer" onclick="changerIdentite()" title="Changer d'identité"></span>
     <span id="last-upd"></span>
     <button id="btn-export" onclick="exportExcel()">📥 Excel</button>
     <button id="btn-refresh" onclick="refreshAll()">🔄 Actualiser</button>
@@ -442,13 +451,26 @@ var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
 var employesList=[]; // [{Code, Nom, Poste}]
 var employesByCode={}; // { CODE: {Nom, Poste} }
 
-async function loadEmployes(){
-  if(employesList.length>0)return;
+async function loadEmployes(force){
+  if(employesList.length>0&&!force)return;
+  // 1. Priorité : endpoint Worker (contient le champ Droits + itemId, données à jour)
   try{
-    var r=await fetch('employes.json');
-    employesList=await r.json();
+    var r=await fetch(W+'?employes=1');
+    var data=await r.json();
+    if(Array.isArray(data)&&data.length){
+      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',itemId:e.itemId||null};});
+      employesByCode={};
+      employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits};});
+      return;
+    }
+  }catch(e){/* fallback ci-dessous */}
+  // 2. Fallback : fichier statique (si Worker indisponible)
+  try{
+    var r2=await fetch('employes.json');
+    var arr=await r2.json();
+    employesList=arr.map(function(e){return{Code:e.Code,Nom:e.Nom,Poste:e.Poste||'',Droits:'',itemId:null};});
     employesByCode={};
-    employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste||''};});
+    employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste||'',droits:''};});
   }catch(e){employesList=[];employesByCode={};}
 }
 // Résout le vrai nom d'un employé à partir de son code (évite les doublons "CONI (CONI)")
@@ -478,6 +500,10 @@ async function loadImmoMeta(){
 }
 var TZ='Indian/Reunion';
 var PIN='ES974';
+var ADMIN_SESSION={code:null,nom:null}; // identité de l'admin connecté (traçabilité des actions)
+var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
+var CT_CODES=['ROJO','LAHU','AUAR','BOMA','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
+var USERS_CACHE=null;
 var d=null, im={}, fdsMap={}, photosMap={}, reservations=[], maintenance=null;
 var dataLoaded={}; // tracks which lazy data is loaded
 var charts={};
@@ -498,13 +524,79 @@ function getFdsUrl(code){var u=fdsMap[code]||(im[code]?im[code].FDS_URL||'':'');
 // ── Login ────────────────────────────────────────────────
 function checkPin(){
   if(document.getElementById('pin-input').value===PIN){
-    document.getElementById('pin-overlay').style.display='none';
-    sessionStorage.setItem('auth','1');
-    loadAll();
+    // Passer à l'étape 2 : sélection de l'identité (admin/logistique)
+    document.getElementById('pin-step1').style.display='none';
+    document.getElementById('pin-step2').style.display='block';
+    // Charger la liste des admins/logistique pour le sélecteur
+    peuplerSelecteurIdentite();
   }else{document.getElementById('pin-error').textContent='Code incorrect.';document.getElementById('pin-input').value='';}
 }
+
+// Remplit le sélecteur d'identité avec les admins + logistique
+async function peuplerSelecteurIdentite(){
+  var sel=document.getElementById('pin-identite');
+  await loadEmployes();
+  // Admins connus + toute personne dont le rôle est de niveau gestion (peut agir depuis le dashboard)
+  var candidats=employesList.filter(function(e){
+    if(ADMINS_CODES.includes(e.Code))return true;
+    var role=(e.Droits||e.role||'').toLowerCase().replace(/[\s-]+/g,'_');
+    if(role==='admin'||role==='logistique'||role==='logistique_mayotte'||role==='ra')return true;
+    var poste=(e.Poste||'').toLowerCase();
+    return poste.includes('encadr')||poste.includes('atelier');
+  });
+  // Toujours garantir la présence des 4 admins même si employes.json incomplet
+  ADMINS_CODES.forEach(function(code){
+    if(!candidats.find(function(c){return c.Code===code;})){
+      candidats.push({Code:code,Nom:nomEmploye(code),Poste:'Encadrement'});
+    }
+  });
+  candidats.sort(function(a,b){return a.Nom.localeCompare(b.Nom);});
+  sel.innerHTML=candidats.map(function(e){return'<option value="'+e.Code+'">'+e.Nom+' ('+e.Code+')</option>';}).join('');
+  // Pré-sélectionner la dernière identité utilisée
+  var last=localStorage.getItem('admin_identite');
+  if(last&&candidats.find(function(c){return c.Code===last;}))sel.value=last;
+}
+
+function confirmerIdentite(){
+  var sel=document.getElementById('pin-identite');
+  var code=sel.value;
+  if(!code)return;
+  ADMIN_SESSION={code:code,nom:nomEmploye(code)};
+  sessionStorage.setItem('auth','1');
+  sessionStorage.setItem('admin_code',code);
+  sessionStorage.setItem('admin_nom',ADMIN_SESSION.nom);
+  localStorage.setItem('admin_identite',code);
+  document.getElementById('pin-overlay').style.display='none';
+  afficherIdentiteConnectee();
+  loadAll();
+}
+
+// Affiche qui est connecté (petit badge en haut)
+function afficherIdentiteConnectee(){
+  if(!ADMIN_SESSION.code)return;
+  var el=document.getElementById('admin-identite-badge');
+  if(el)el.textContent='👤 '+ADMIN_SESSION.nom;
+}
+
+// Permet de changer d'identité sans ressaisir le PIN
+function changerIdentite(){
+  document.getElementById('pin-overlay').style.display='flex';
+  document.getElementById('pin-step1').style.display='none';
+  document.getElementById('pin-step2').style.display='block';
+  peuplerSelecteurIdentite();
+}
+
 document.getElementById('pin-input').addEventListener('keydown',function(e){if(e.key==='Enter')checkPin();});
-if(sessionStorage.getItem('auth')==='1'){document.getElementById('pin-overlay').style.display='none';loadAll();}
+// Reprise de session existante
+if(sessionStorage.getItem('auth')==='1'){
+  ADMIN_SESSION={code:sessionStorage.getItem('admin_code')||'CONI',nom:sessionStorage.getItem('admin_nom')||'CONI'};
+  document.getElementById('pin-overlay').style.display='none';
+  loadEmployes().then(function(){
+    if(!ADMIN_SESSION.nom||ADMIN_SESSION.nom===ADMIN_SESSION.code)ADMIN_SESSION.nom=nomEmploye(ADMIN_SESSION.code);
+    afficherIdentiteConnectee();
+  });
+  loadAll();
+}
 // Initialiser le handler par défaut du bouton modal
 document.addEventListener('DOMContentLoaded',function(){
   var btn=document.getElementById('act-confirm-btn');
@@ -663,7 +755,7 @@ async function loadMaint(){
   }catch(e){}
 }
 
-function refreshAll(){d=null;dataLoaded={};loadAll();loadReservations();}
+function refreshAll(){d=null;dataLoaded={};loadEmployes(true);loadAll();loadReservations();}
 
 // ── Badges ───────────────────────────────────────────────
 function updateBadges(){
@@ -1132,17 +1224,49 @@ function renderAlertes(){
 
 // ── Rendu — Utilisateurs ─────────────────────────────────
 // Rôles/droits (dérivés en attendant la colonne SharePoint dédiée)
-var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
-var CT_CODES=['ROJO','LAHU','AUAR','BOMA','ADWI','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
-var USERS_CACHE=null;
-function roleUtilisateur(code,poste){
-  // Si un rôle explicite existe déjà (futur champ Droits), il primera — sinon dérivation
-  if(ADMINS_CODES.includes(code))return{label:'Admin / Logistique',color:'#1A3A6B',rank:0};
-  if(CT_CODES.includes(code))return{label:'Conducteur de travaux',color:'#E87722',rank:1};
+// ── Drapeaux SVG d'emplacement (rendu identique partout) ──
+var FLAG_REUNION_D='<svg viewBox="0 0 60 40" width="18" height="12" style="border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.12)"><rect width="60" height="40" fill="#2A6BE0"/><g fill="#FFDD00"><path d="M30 21 L-31.8 15.8 L-30.8 9.0 Z"/><path d="M30 21 L-28.3 -0.0 L-25.6 -6.4 Z"/><path d="M30 21 L-20.9 -14.4 L-16.6 -19.8 Z"/><path d="M30 21 L-10.0 -26.4 L-4.5 -30.5 Z"/><path d="M30 21 L3.6 -35.1 L10.0 -37.7 Z"/><path d="M30 21 L19.0 -40.0 L25.9 -40.9 Z"/><path d="M30 21 L35.2 -40.8 L42.0 -39.8 Z"/><path d="M30 21 L51.0 -37.3 L57.4 -34.6 Z"/><path d="M30 21 L65.4 -29.9 L70.8 -25.6 Z"/><path d="M30 21 L77.4 -19.0 L81.5 -13.5 Z"/><path d="M30 21 L86.1 -5.4 L88.7 1.0 Z"/></g><path d="M30 21 L2 40 L58 40 Z" fill="#F42A2A"/></svg>';
+var FLAG_MAYOTTE_D='<svg viewBox="0 0 60 40" width="18" height="12" style="border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.12)"><rect width="60" height="40" fill="#fff"/><path d="M19 8 H41 V21 Q41 31 30 35 Q19 31 19 21 Z" fill="#C1121F" stroke="#8a0d16" stroke-width="0.6"/><path d="M20.2 9.2 H39.8 V20.5 H20.2 Z" fill="#1E4F9E"/><path d="M27 15.5 a4 4 0 1 0 4.5 -3.2 a5 5 0 1 1 -4.5 3.2 Z" fill="#fff"/><g fill="#FFD100" stroke="#E8A200" stroke-width="0.3"><g transform="translate(26,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g><g transform="translate(34,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g></g></svg>';
+function normSiteD(v){var s=(v||'').trim().toLowerCase();return s.indexOf('may')===0?'Mayotte':'Reunion';}
+function drapeauSiteD(site){return normSiteD(site)==='Mayotte'?FLAG_MAYOTTE_D:FLAG_REUNION_D;}
+function badgeSiteD(site){var s=normSiteD(site);var bg=s==='Mayotte'?'#E0F2F1':'#E3F2FD';var fg=s==='Mayotte'?'#00695C':'#0D47A1';var lbl=s==='Mayotte'?'MAYOTTE':'RÉUNION';return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:'+bg+';color:'+fg+';vertical-align:middle">'+drapeauSiteD(s)+' '+lbl+'</span>';}
+
+function roleUtilisateur(code,poste,droits){
+  // 1. Rôle explicite depuis SharePoint (champ Droits/Code_CT) — prioritaire
+  var dr=(droits||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
+  if(dr==='admin')return{label:'Administrateur',color:'#1A3A6B',rank:0};
+  if(dr==='logistique')return{label:'Gestionnaire dépôt RUN',color:'#1A3A6B',rank:0};
+  if(dr==='logistique_mayotte')return{label:'Logistique Mayotte',color:'#00695C',rank:0};
+  if(dr==='ra'||dr==='responsable_affaires'||dr==='responsable_d_affaires')return{label:'Responsable d’affaires',color:'#5E35B1',rank:1};
+  if(dr==='ct_specialise'||dr==='ct_spécialisé')return{label:'CT spécialisé',color:'#D84315',rank:1};
+  if(dr==='ct'||dr==='conducteur')return{label:'Conducteur de travaux',color:'#E87722',rank:2};
+  if(dr==='ouvrier_specialise'||dr==='ouvrier_spécialisé'||dr==='os')return{label:'Ouvrier spécialisé',color:'#8E24AA',rank:3};
+  if(dr==='ouvrier')return{label:'Ouvrier',color:'#27AE60',rank:4};
+  // 2. Sinon dérivation automatique (rétrocompatibilité)
+  if(ADMINS_CODES.includes(code))return{label:'Administrateur',color:'#1A3A6B',rank:0};
+  if(CT_CODES.includes(code))return{label:'Conducteur de travaux',color:'#E87722',rank:2};
   var p=(poste||'').toLowerCase();
   if(p.includes('encadr'))return{label:'Encadrement',color:'#1A3A6B',rank:0};
-  if(p.includes('bt')||p.includes('fibre'))return{label:'Ouvrier spécialisé',color:'#8E24AA',rank:2};
-  return{label:'Ouvrier',color:'#27AE60',rank:3};
+  if(p.includes('bt')||p.includes('fibre'))return{label:'Ouvrier spécialisé',color:'#8E24AA',rank:3};
+  return{label:'Ouvrier',color:'#27AE60',rank:4};
+}
+// Valeur brute du champ Droits (pour pré-sélectionner le menu déroulant d'édition)
+// Valeurs de rôle "propres" gérées par le dashboard (distinctes des anciennes valeurs Code_CT organisationnelles type "CT Mayotte")
+var ROLES_STANDARD={'admin':'Admin','logistique':'Logistique','logistique_mayotte':'Logistique_Mayotte','ra':'RA','responsable_affaires':'RA','responsable_d_affaires':'RA','ct_specialise':'CT_Specialise','ct_spécialisé':'CT_Specialise','ct':'CT','conducteur':'CT','ouvrier_specialise':'Ouvrier_Specialise','ouvrier_spécialisé':'Ouvrier_Specialise','os':'Ouvrier_Specialise','ouvrier':'Ouvrier'};
+function estRoleStandard(droits){
+  return ROLES_STANDARD.hasOwnProperty((droits||'').trim().toLowerCase().replace(/[\s-]+/g,'_'));
+}
+function droitsBrut(code,poste,droits){
+  var dr=(droits||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
+  // Ne considérer que les valeurs de rôle STANDARD comme un rôle explicite défini
+  if(dr&&ROLES_STANDARD[dr])return ROLES_STANDARD[dr];
+  // Sinon dérivation (les anciennes valeurs "CT Mayotte" etc. sont ignorées comme rôle)
+  if(ADMINS_CODES.includes(code))return'Admin';
+  if(CT_CODES.includes(code))return'CT';
+  var p=(poste||'').toLowerCase();
+  if(p.includes('encadr'))return'Admin';
+  if(p.includes('bt')||p.includes('fibre'))return'Ouvrier_Specialise';
+  return'Ouvrier';
 }
 function renderUsers(){
   var pane=document.getElementById('pane-utilisateurs');
@@ -1157,31 +1281,34 @@ function renderUsers(){
 
   // Enrichir chaque employé avec rôle + tri (stocké en global pour le filtrage sans re-rendu complet)
   USERS_CACHE=employesList.map(function(e){
-    var r=roleUtilisateur(e.Code,e.Poste);
-    return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0};
+    var r=roleUtilisateur(e.Code,e.Poste,e.Droits);
+    return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0,droits:droitsBrut(e.Code,e.Poste,e.Droits),itemId:e.itemId||null,explicite:estRoleStandard(e.Droits),site:normSiteD(e.Site||'')};
   });
 
   // Compteurs par rôle
   var parRole={};USERS_CACHE.forEach(function(u){parRole[u.role]=(parRole[u.role]||0)+1;});
 
-  var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
-  [['Admin / Logistique','#1A3A6B','👑'],['Conducteur de travaux','#E87722','🏗️'],['Ouvrier spécialisé','#8E24AA','⚡'],['Ouvrier','#27AE60','👷'],['Encadrement','#1A3A6B','📋']].forEach(function(rc){
+  var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
+  [['Administrateur','#1A3A6B','👑'],['Gestionnaire dépôt RUN','#1A3A6B','📦'],['Logistique Mayotte','#00695C','📦'],['Responsable d’affaires','#5E35B1','💼'],['CT spécialisé','#D84315','✈️'],['Conducteur de travaux','#E87722','🏗️'],['Ouvrier spécialisé','#8E24AA','⚡'],['Ouvrier','#27AE60','👷'],['Encadrement','#1A3A6B','📋']].forEach(function(rc){
     var n=parRole[rc[0]]||0;if(n===0)return;
     html+='<div class="card" style="padding:14px;text-align:center;border-top:3px solid '+rc[1]+'"><div style="font-size:28px">'+rc[2]+'</div><div style="font-size:24px;font-weight:800;color:'+rc[1]+'">'+n+'</div><div style="font-size:12px;color:var(--grey)">'+rc[0]+'</div></div>';
   });
   html+='</div>';
 
   // Barre d'info sur la future gestion des droits
-  html+='<div style="background:#EDE7F6;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#4527A0"><strong>ℹ️ Étape 1 — visualisation.</strong> Les rôles sont pour l\'instant dérivés automatiquement (admins, CT, postes). Prochaine étape : gestion des droits directement depuis ce tableau de bord (colonne « Droits »), y compris les ouvriers spécialisés BT/fibre autorisés à réserver.</div>';
+  html+='<div style="background:#E8F5E9;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:#1B5E20"><strong>✅ Gestion des droits & sites active.</strong> Le <strong>rôle</strong> détermine qui peut réserver et sur quel périmètre. Le <strong>site</strong> définit le rattachement : un CT ne voit que le matériel de son île ; Admin, gestionnaires, RA, CT et ouvriers spécialisés accèdent aux deux.</div>';
+  if(ADMIN_SESSION.code&&ADMINS_CODES.includes(ADMIN_SESSION.code)){
+    html+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="flex:1;min-width:200px;color:#8D6E00">⚙️ <strong>Initialisation en masse</strong> — applique en une fois les rôles et sites de référence à tous les employés (une seule fois, au démarrage).</span><button onclick="lancerSeedRolesSites()" style="padding:8px 16px;background:#F57F17;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap">⚙️ Initialiser rôles & sites</button></div>';
+  }
 
   // Filtres — rendus UNE fois ; le filtrage ne régénère que le tbody (garde le focus de l\'input)
   html+='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+
     '<input type="text" id="users-q" oninput="filterUsers()" placeholder="🔍 Rechercher un nom ou code..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
     '<select id="users-role" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
-    '<option value="">Tous les rôles</option><option value="Admin / Logistique">Admin / Logistique</option><option value="Encadrement">Encadrement</option><option value="Conducteur de travaux">CT</option><option value="Ouvrier spécialisé">Ouvrier spécialisé</option><option value="Ouvrier">Ouvrier</option></select>'+
+    '<option value="">Tous les rôles</option><option value="Administrateur">Administrateur</option><option value="Gestionnaire dépôt RUN">Gestionnaire dépôt RUN</option><option value="Logistique Mayotte">Logistique Mayotte</option><option value="Responsable d’affaires">Responsable d’affaires</option><option value="CT spécialisé">CT spécialisé</option><option value="Conducteur de travaux">CT</option><option value="Ouvrier spécialisé">Ouvrier spécialisé</option><option value="Ouvrier">Ouvrier</option><option value="Encadrement">Encadrement</option></select>'+
     '</div>';
 
-  html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Poste</th><th>Matériel détenu</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
+  html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
 
   div.innerHTML=html;
   filterUsers(); // premier rendu du tableau
@@ -1198,14 +1325,87 @@ function filterUsers(){
   var titleEl=document.getElementById('users-title');
   if(titleEl)titleEl.textContent='👥 Tous les utilisateurs ('+filtered.length+')';
   tbody.innerHTML=filtered.map(function(u){
+    var roles=['Admin','Logistique','Logistique_Mayotte','RA','CT_Specialise','CT','Ouvrier_Specialise','Ouvrier'];
+    var labels={'Admin':'Administrateur','Logistique':'Gestionnaire dépôt RUN','Logistique_Mayotte':'Logistique Mayotte','RA':'Responsable d’affaires','CT_Specialise':'CT spécialisé','CT':'Conducteur travaux','Ouvrier_Specialise':'Ouvrier spécialisé','Ouvrier':'Ouvrier'};
+    var opts=roles.map(function(r){return'<option value="'+r+'"'+(u.droits===r?' selected':'')+'>'+labels[r]+'</option>';}).join('');
+    var siteOpts='<option value="Reunion"'+(u.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(u.site==='Mayotte'?' selected':'')+'>Mayotte</option>';
     return '<tr>'+
       '<td><span class="link-emp" data-emp="'+u.code+'" data-nom="'+u.nom.replace(/"/g,'')+'"><b style="font-size:13px">'+u.nom+'</b></span></td>'+
       '<td style="font-family:monospace;font-size:12px;color:var(--grey)">'+u.code+'</td>'+
-      '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span></td>'+
-      '<td style="font-size:12px;color:var(--grey)">'+u.poste+'</td>'+
+      '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span>'+(u.explicite?'':' <span style="font-size:9px;color:#bbb" title="Rôle déduit automatiquement">(auto)</span>')+'</td>'+
+      '<td>'+badgeSiteD(u.site)+'<select class="site-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid #eee;border-radius:5px">'+siteOpts+'</select></td>'+
       '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
+      '<td><select class="role-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">'+opts+'</select></td>'+
     '</tr>';
-  }).join('')||'<tr><td colspan="5" class="es">Aucun utilisateur trouvé.</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="es">Aucun utilisateur trouvé.</td></tr>';
+  // Attacher les handlers
+  tbody.querySelectorAll('.role-edit-sel').forEach(function(sel){
+    sel.onchange=function(){majDroitsUtilisateur(this.getAttribute('data-code'),this.value,this.getAttribute('data-item'));};
+  });
+  tbody.querySelectorAll('.site-edit-sel').forEach(function(sel){
+    sel.onchange=function(){majSiteUtilisateur(this.getAttribute('data-code'),this.value,this.getAttribute('data-item'));};
+  });
+}
+
+// Enregistre le site de rattachement d'un utilisateur
+// Initialisation en masse des rôles + sites (one-shot)
+async function lancerSeedRolesSites(){
+  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('⚙️ Appliquer les rôles et sites de référence à TOUS les employés ?\n\nCela écrase les valeurs actuelles des colonnes Rôle (Code_CT) et Site avec le mapping validé. À faire une seule fois au démarrage.\n\nContinuer ?'))return;
+  try{
+    var r=await fetch(W+'?action=seed_roles_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
+    var res=await r.json();
+    if(res.success){
+      var msg='✅ Initialisation terminée !\n\n'+res.appliques+' / '+res.total_seed+' employés mis à jour.';
+      if(res.introuvables&&res.introuvables.length)msg+='\n\n⚠️ Introuvables ('+res.introuvables.length+') : '+res.introuvables.join(', ');
+      if(res.erreurs&&res.erreurs.length)msg+='\n\n❌ Erreurs ('+res.erreurs.length+') : '+res.erreurs.join(', ');
+      alert(msg);
+      loadEmployes(true).then(function(){renderUsers();});
+    }else{
+      alert('Échec : '+(res.error||'inconnu'));
+    }
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+async function majSiteUtilisateur(code,site,itemId){
+  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier le site.');filterUsers();return;}
+  try{
+    var body={code:code,site:site};if(itemId)body.item_id=itemId;
+    var r=await fetch(W+'?action=maj_site_employe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var res=await r.json();
+    if(res.success){
+      var u=USERS_CACHE.find(function(x){return x.code===code;});if(u)u.site=normSiteD(site);
+      if(employesByCode[code])employesByCode[code].site=normSiteD(site);
+      var el=employesList.find(function(x){return x.Code===code;});if(el)el.Site=normSiteD(site);
+      filterUsers();
+    }else{alert('Échec de la mise à jour du site'+(res.error==='employe_introuvable'?' : employé introuvable.':'.'));filterUsers();}
+  }catch(e){alert('Erreur réseau : '+e.message);filterUsers();}
+}
+
+// Enregistre le nouveau rôle d'un utilisateur
+async function majDroitsUtilisateur(code,role,itemId){
+  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){
+    alert('Seul un administrateur peut modifier les droits.');filterUsers();return;
+  }
+  if(!confirm('Attribuer le rôle « '+role.replace('_',' ')+' » à '+nomEmploye(code)+' ?')){filterUsers();return;}
+  try{
+    var body={code:code,role:role};
+    if(itemId)body.item_id=itemId;
+    var r=await fetch(W+'?action=maj_droits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var res=await r.json();
+    if(res.success){
+      // Mettre à jour le cache local sans tout recharger
+      var u=USERS_CACHE.find(function(x){return x.code===code;});
+      if(u){var ro=roleUtilisateur(code,u.poste,role);u.role=ro.label;u.color=ro.color;u.rank=ro.rank;u.droits=role;u.explicite=true;}
+      // Rafraîchir aussi employesByCode pour la cohérence
+      if(employesByCode[code])employesByCode[code].droits=role;
+      var el=employesList.find(function(x){return x.Code===code;});if(el)el.Droits=role;
+      filterUsers();
+    }else{
+      alert('Échec de la mise à jour'+(res.error==='employe_introuvable'?' : employé introuvable dans SharePoint.':'.'));
+      filterUsers();
+    }
+  }catch(e){alert('Erreur réseau : '+e.message);filterUsers();}
 }
 
 // ── Rendu — Analyses ─────────────────────────────────────
@@ -1387,6 +1587,7 @@ function fermerFiche(){document.getElementById('fiche-overlay').classList.remove
 async function chargerFicheImmo(codeIM){
   var body=document.getElementById('fiche-body');
   try{
+    if(!Object.keys(immoMeta).length){try{await loadImmoMeta();}catch(e){}}
     var r=await fetch(W+'?immo='+encodeURIComponent(codeIM));
     var hist=await r.json();
     var immoInfo=im[codeIM]||{};
@@ -1408,9 +1609,11 @@ async function chargerFicheImmo(codeIM){
     }
     var panneTagF=panneActiveF&&!prestaF?'<br><span style="font-size:11px;font-weight:700">📢 Panne en cours — déclarée le '+fmtD(lastPanneF.horodatage)+'</span>':'';
     var locHtml;
-    if(prestaF) locHtml='<div class="loc-card" style="background:#F3E5F5;color:#6A1B9A">🔧 Chez le prestataire : <strong>'+prestaF+'</strong></div>';
-    else if(estDepot) locHtml='<div class="loc-card" style="background:#E8F5E9;color:#1B5E20">🏭 Au dépôt'+panneTagF+'</div>';
-    else locHtml='<div class="loc-card" style="background:#FFF3E0;color:#E65100">👤 Avec <strong>'+loc.nom_employe+'</strong> depuis le '+fmtD(loc.horodatage)+panneTagF+'</div>';
+    var siteImmoF=(immoMeta[codeIM]&&immoMeta[codeIM].site)||'Reunion';
+    var drapImmoF=' '+badgeSiteD(siteImmoF);
+    if(prestaF) locHtml='<div class="loc-card" style="background:#F3E5F5;color:#6A1B9A">🔧 Chez le prestataire : <strong>'+prestaF+'</strong>'+drapImmoF+'</div>';
+    else if(estDepot) locHtml='<div class="loc-card" style="background:#E8F5E9;color:#1B5E20">🏭 Au dépôt'+drapImmoF+panneTagF+'</div>';
+    else locHtml='<div class="loc-card" style="background:#FFF3E0;color:#E65100">👤 Avec <strong>'+loc.nom_employe+'</strong> depuis le '+fmtD(loc.horodatage)+drapImmoF+panneTagF+'</div>';
     var nbDet=new Set(hist.filter(function(m){return m.type_mouvement!=='Retour';}).map(function(m){return m.code_employe;})).size;
     var mt2=immoMeta[codeIM]||{};
     var html='<div class="fiche-stat-row">';
@@ -1657,7 +1860,7 @@ function ouvrirSuiviPanne(codeIM){
     var note  = (document.getElementById('sp-note')||{}).value||'';
     if(!prest && !note){ alert('Renseignez au moins le prestataire ou une note.'); return; }
     fetch(W+'?action=maj_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code_im:codeIM,prestataire:prest,cout_estime:cout,note_suivi:note,par_code:'CONI',par_nom:nomEmploye('CONI')})})
+      body:JSON.stringify({code_im:codeIM,prestataire:prest,cout_estime:cout,note_suivi:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
       .then(function(){fermerAction();renderAlertes();})
       .catch(function(e){alert('Erreur : '+e.message);});
   };
@@ -1681,7 +1884,7 @@ function resoudrePanneComplet(codeIM){
     var note  = (document.getElementById('rp-note')||{}).value||'';
     if(!note||note.trim().length<10){ alert('La note de résolution est obligatoire (10 car. min.).'); return; }
     fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:'CONI',par_nom:nomEmploye('CONI')})})
+      body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
       .then(function(){fermerAction();refreshAll();alert('✅ Panne résolue ! ' + codeIM + ' est de retour dans le parc.');})
       .catch(function(e){alert('Erreur : '+e.message);});
   };
@@ -1725,7 +1928,7 @@ function declarerVol(codeIM,libelle,type){
   if(!confirm('1ere CONFIRMATION : Declarer ' + codeIM + ' [' + type + '] ? Immo retirée définitivement du parc.'))return;
   if(!confirm('CONFIRMATION FINALE : Cette action est irreversible. Confirmer [' + type + '] pour ' + codeIM + ' ?'))return;
   fetch(W+'?action=declarer_vol',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:'CONI',par_nom:nomEmploye('CONI')})})
+    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo ' + codeIM + ' déclarée [' + type + ']. Retirée du parc.');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -1759,8 +1962,8 @@ function validerSortieDefinitive(){
   if(!confirm('CONFIRMATION FINALE : Sortir définitivement '+codeIM+' du parc comme ['+type+'] ?'))return;
   var endpoint=type==='Volé'||type==='Disparu'?'declarer_vol':'marquer_statut_immo';
   var payload=endpoint==='declarer_vol'
-    ?{code_im:codeIM,type_vol:type,motif:motif,par_code:'CONI',par_nom:nomEmploye('CONI')}
-    :{code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'CONI',par_nom:nomEmploye('CONI')};
+    ?{code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')}
+    :{code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')};
   fetch(W+'?action='+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(){fermerAction();fermerFiche();refreshAll();alert('✅ '+codeIM+' sorti du parc : '+type);})
     .catch(function(e){alert('Erreur : '+e.message);});
@@ -1771,7 +1974,7 @@ function declarerPanneDash(codeIM){
   if(!motif||motif.trim().length<5){alert('Le motif est obligatoire (5 caractères min.)');return;}
   if(!confirm('Déclarer une panne sur ' + codeIM + ' ? Motif : "' + motif + '"'))return;
   fetch(W+'?action=declarer_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,code_employe:'CONI',nom_employe:nomEmploye('CONI'),motif:motif})})
+    body:JSON.stringify({code_im:codeIM,code_employe:ADMIN_SESSION.code||'CONI',nom_employe:ADMIN_SESSION.nom||nomEmploye('CONI'),motif:motif})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne déclarée. Immo marquée "En panne".');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -1782,7 +1985,7 @@ function marquerImmoInactive(codeIM,libelle,type){
   if(!confirm('1ere CONFIRMATION : Marquer ' + codeIM + ' comme [' + type + '] ? Cette action exclut l immo des reservations.'))return;
   if(!confirm('CONFIRMATION FINALE IRREVERSIBLE : Confirmer definitvement le statut [' + type + '] pour ' + codeIM + ' ?'))return;
   fetch(W+'?action=marquer_statut_immo',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:'CONI',par_nom:nomEmploye('CONI')})})
+    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo marquée comme ' + type + '.');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -1793,7 +1996,7 @@ function resoudrePanne(codeIM){
   var note=prompt('Note de resolution (optionnel) :', '') || '';
   if(!confirm('Panne resolue sur ' + codeIM + ' ? Nouvel etat : ' + etat))return;
   fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:'CONI',par_nom:nomEmploye('CONI')})})
+    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne résolue !');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
