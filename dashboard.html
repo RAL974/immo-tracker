@@ -19,8 +19,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #pin-box p{color:var(--grey);font-size:13px;margin-bottom:20px;}
 #pin-input{width:100%;padding:14px;border:2px solid #ddd;border-radius:10px;font-size:22px;letter-spacing:8px;text-align:center;font-weight:700;}
 #pin-input:focus{outline:none;border-color:var(--orange);}
-#pin-btn{width:100%;margin-top:12px;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
-#pin-btn:hover{background:#0d2a52;}
+#pin-btn,#pin-btn2{width:100%;margin-top:12px;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
+#pin-btn:hover,#pin-btn2:hover{background:#0d2a52;}
 #pin-error{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
 
 /* ── Header ── */
@@ -535,8 +535,11 @@ function checkPin(){
 // Remplit le sélecteur d'identité avec les admins + logistique
 async function peuplerSelecteurIdentite(){
   var sel=document.getElementById('pin-identite');
-  await loadEmployes();
-  // Admins connus + toute personne dont le rôle est de niveau gestion (peut agir depuis le dashboard)
+  // État de chargement visible immédiatement (évite le select vide pendant le fetch)
+  sel.innerHTML='<option value="">⏳ Chargement…</option>';
+  sel.disabled=true;
+  try{ await loadEmployes(); }catch(e){}
+  // Candidats : rôles de niveau gestion (peuvent agir depuis le dashboard)
   var candidats=employesList.filter(function(e){
     if(ADMINS_CODES.includes(e.Code))return true;
     var role=(e.Droits||e.role||'').toLowerCase().replace(/[\s-]+/g,'_');
@@ -544,17 +547,24 @@ async function peuplerSelecteurIdentite(){
     var poste=(e.Poste||'').toLowerCase();
     return poste.includes('encadr')||poste.includes('atelier');
   });
-  // Toujours garantir la présence des 4 admins même si employes.json incomplet
+  // Garantir la présence des 4 admins de référence
   ADMINS_CODES.forEach(function(code){
     if(!candidats.find(function(c){return c.Code===code;})){
       candidats.push({Code:code,Nom:nomEmploye(code),Poste:'Encadrement'});
     }
   });
-  candidats.sort(function(a,b){return a.Nom.localeCompare(b.Nom);});
-  sel.innerHTML=candidats.map(function(e){return'<option value="'+e.Code+'">'+e.Nom+' ('+e.Code+')</option>';}).join('');
-  // Pré-sélectionner la dernière identité utilisée
+  // Déduplication par code (au cas où la liste contiendrait des doublons)
+  var vus={},uniques=[];
+  candidats.forEach(function(c){if(!vus[c.Code]){vus[c.Code]=true;uniques.push(c);}});
+  uniques.sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+  // Remplir le select
+  sel.disabled=false;
+  sel.innerHTML='<option value="" disabled>— Choisissez votre identité —</option>'+
+    uniques.map(function(e){return'<option value="'+e.Code+'">'+e.Nom+' ('+e.Code+')</option>';}).join('');
+  // Pré-sélectionner la dernière identité utilisée, sinon la première vraie option
   var last=localStorage.getItem('admin_identite');
-  if(last&&candidats.find(function(c){return c.Code===last;}))sel.value=last;
+  if(last&&uniques.find(function(c){return c.Code===last;}))sel.value=last;
+  else if(uniques.length)sel.value=uniques[0].Code;
 }
 
 function confirmerIdentite(){
