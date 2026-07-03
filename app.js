@@ -1,1775 +1,672 @@
-// ══════════════════════════════════════════════════════════
-// IMMO TRACKER — Espace Soleil — app.js
-// ══════════════════════════════════════════════════════════
+addEventListener('fetch', event => { event.respondWith(handleRequest(event.request)); });
 
-const CONFIG = {
-  proxy:   'https://immo-proxy.ral-85d.workers.dev/',
-  // Admins / logistique
-  admins:  ['CONI', 'AIWI', 'NAXA', 'BAKA'],
-  // Responsables d'affaires + CTs + admins : tous autorisés à réserver
-  autorises: ['CONI', 'AIWI', 'NAXA', 'BAKA', 'ROJO', 'LAHU', 'AUAR', 'BOMA',
-              'RIJB', 'MEJO', 'GOLU', 'SCST', 'CANI', 'DACH', 'TOHO'],
-  etats:   { 'Neuf': 5, 'Bon état': 4, 'Usé': 3, 'Abîmé': 2, 'Hors service': 1 },
-};
+async function handleRequest(request) {
+  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
-// ══════════════════════════════════════════════════════════
-// MODÈLE RÔLES × SITES (source unique de vérité — cohérent avec le dashboard)
-// ══════════════════════════════════════════════════════════
-// Rôles (valeurs stockées dans Code_CT via le dashboard) :
-//   Admin, Logistique, Logistique_Mayotte, RA, CT_Specialise, CT, Ouvrier_Specialise, Ouvrier
-// Sites : Reunion, Mayotte
+  const TENANT_ID    = 'c7875e38-b2b0-4c10-a8c5-687c5a214e44';
+  const CLIENT_ID    = '3a901471-86c0-4fc7-8d37-319ead2c4b88';
+  const CLIENT_SECRET= 'PR88Q~DDRtCdh9FZ2r1n7xcxqgw2.z-6WSXKAaLX';
+  const SITE_ID      = 'espacesoleil97.sharepoint.com,4157ffef-a5f6-4e7e-8a19-4f6ab57d7128,d15dad00-7bed-4e78-bb2f-d0156e6e49a7';
+  const GL           = 'https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/lists';
+  const GESTIONNAIRES= ['CONI', 'AIWI', 'NAXA', 'BAKA'];
 
-// Normalise une valeur de rôle brute → clé standard (ou '' si non standard/ancienne valeur)
-function normRole(v) {
-  var r = (v || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
-  var map = {
-    'admin': 'Admin',
-    'logistique': 'Logistique',
-    'logistique_mayotte': 'Logistique_Mayotte',
-    'ra': 'RA',
-    'responsable_affaires': 'RA', 'responsable_d_affaires': 'RA',
-    'ct_specialise': 'CT_Specialise', 'ct_spécialisé': 'CT_Specialise',
-    'ct': 'CT', 'conducteur': 'CT',
-    'ouvrier_specialise': 'Ouvrier_Specialise', 'ouvrier_spécialisé': 'Ouvrier_Specialise', 'os': 'Ouvrier_Specialise',
-    'ouvrier': 'Ouvrier'
-  };
-  return map[r] || '';
-}
-
-// Normalise un site → 'Reunion' | 'Mayotte' (défaut Reunion)
-function normSite(v) {
-  var s = (v || '').trim().toLowerCase();
-  return s.indexOf('may') === 0 ? 'Mayotte' : 'Reunion';
-}
-
-// Rôles autorisés à réserver du matériel
-var ROLES_RESERVE = ['Admin', 'Logistique', 'Logistique_Mayotte', 'RA', 'CT_Specialise', 'CT', 'Ouvrier_Specialise'];
-// Rôles bi-site (voient les deux îles + drapeaux d'emplacement)
-var ROLES_BISITE = ['Admin', 'Logistique', 'RA', 'CT_Specialise', 'Ouvrier_Specialise'];
-
-// Peut-on réserver du matériel ?
-function peutReserver(code) {
-  if (!code) return false;
-  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
-  if (role) return ROLES_RESERVE.indexOf(role) !== -1;
-  // Fallback rétrocompatibilité (tant que le rôle n'est pas défini proprement)
-  return CONFIG.autorises.includes(code);
-}
-
-// Voit-il les deux sites (et donc les drapeaux d'emplacement) ?
-function voitDeuxSites(code) {
-  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
-  return ROLES_BISITE.indexOf(role) !== -1;
-}
-
-// Quels sites cette personne peut-elle voir/réserver ?
-function sitesAutorises(code) {
-  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
-  var site = normSite(S.siteByCode && S.siteByCode[code]);
-  if (ROLES_BISITE.indexOf(role) !== -1) return ['Reunion', 'Mayotte']; // bi-site
-  if (role === 'Logistique_Mayotte') return ['Mayotte'];               // logistique Mayotte
-  if (role === 'CT') return [site];                                     // CT mono-site (son île)
-  if (role === 'Ouvrier') return [];                                    // ne réserve pas
-  // Fallback : si code dans autorises sans rôle défini → voit son site (défaut Reunion)
-  if (CONFIG.autorises.includes(code)) return [site];
-  return [];
-}
-
-// Une immo est-elle réservable par cette personne (selon le site) ?
-function immoVisiblePour(code, codeIM) {
-  var sites = sitesAutorises(code);
-  if (!sites.length) return false;
-  var siteImmo = siteImmoDe(codeIM);
-  return sites.indexOf(siteImmo) !== -1;
-}
-
-// Site d'une immo (depuis la meta chargée, défaut Reunion)
-function siteImmoDe(codeIM) {
-  return normSite(S.siteImmoByCode && S.siteImmoByCode[codeIM]);
-}
-
-// Faut-il avertir (réservation hors de son île de rattachement) ?
-function avertirCroisement(code, codeIM) {
-  if (!voitDeuxSites(code)) return false; // seuls les bi-site peuvent croiser
-  var siteEmploye = normSite(S.siteByCode && S.siteByCode[code]);
-  var siteImmo = siteImmoDe(codeIM);
-  return siteImmo !== siteEmploye;
-}
-
-// ── Drapeaux SVG (rendu identique partout) ────────────────────────────────
-var FLAG_REUNION = '<svg viewBox="0 0 60 40" width="18" height="12" style="border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.12)"><rect width="60" height="40" fill="#2A6BE0"/><g fill="#FFDD00"><path d="M30 21 L-31.8 15.8 L-30.8 9.0 Z"/><path d="M30 21 L-28.3 -0.0 L-25.6 -6.4 Z"/><path d="M30 21 L-20.9 -14.4 L-16.6 -19.8 Z"/><path d="M30 21 L-10.0 -26.4 L-4.5 -30.5 Z"/><path d="M30 21 L3.6 -35.1 L10.0 -37.7 Z"/><path d="M30 21 L19.0 -40.0 L25.9 -40.9 Z"/><path d="M30 21 L35.2 -40.8 L42.0 -39.8 Z"/><path d="M30 21 L51.0 -37.3 L57.4 -34.6 Z"/><path d="M30 21 L65.4 -29.9 L70.8 -25.6 Z"/><path d="M30 21 L77.4 -19.0 L81.5 -13.5 Z"/><path d="M30 21 L86.1 -5.4 L88.7 1.0 Z"/></g><path d="M30 21 L2 40 L58 40 Z" fill="#F42A2A"/></svg>';
-var FLAG_MAYOTTE = '<svg viewBox="0 0 60 40" width="18" height="12" style="border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.12)"><rect width="60" height="40" fill="#fff"/><path d="M19 8 H41 V21 Q41 31 30 35 Q19 31 19 21 Z" fill="#C1121F" stroke="#8a0d16" stroke-width="0.6"/><path d="M20.2 9.2 H39.8 V20.5 H20.2 Z" fill="#1E4F9E"/><path d="M27 15.5 a4 4 0 1 0 4.5 -3.2 a5 5 0 1 1 -4.5 3.2 Z" fill="#fff"/><g fill="#FFD100" stroke="#E8A200" stroke-width="0.3"><g transform="translate(26,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g><g transform="translate(34,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g></g></svg>';
-function drapeauSite(site) {
-  return normSite(site) === 'Mayotte' ? FLAG_MAYOTTE : FLAG_REUNION;
-}
-function badgeSite(site) {
-  var s = normSite(site);
-  var bg = s === 'Mayotte' ? '#E0F2F1' : '#E3F2FD';
-  var fg = s === 'Mayotte' ? '#00695C' : '#0D47A1';
-  var lbl = s === 'Mayotte' ? 'MAYOTTE' : 'RÉUNION';
-  return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:' + bg + ';color:' + fg + ';vertical-align:middle">' + drapeauSite(s) + ' ' + lbl + '</span>';
-}
-
-// Une demande "Demandee" est imminente si le depart est dans moins de 24h (ou deja depasse sans reponse)
-// La Réunion est UTC+4 toute l'année (pas d'heure d'été)
-// Convertit une date "YYYY-MM-DD" + heure locale Réunion en ISO string UTC
-function reunionISO(dateStr, heureLocale) {
-  if (!dateStr) return null;
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const utcHour = heureLocale - 4; // Réunion = UTC+4
-  return new Date(Date.UTC(y, m - 1, d, utcHour, 0, 0)).toISOString();
-}
-
-function isImminenteSansReponse(r) {
-  if (r.statut !== 'Demandee' || !r.date_debut) return false;
-  const diff = new Date(r.date_debut).getTime() - Date.now();
-  return diff <= 24 * 3600 * 1000;
-}
-
-// ── État global ───────────────────────────────────────────
-const S = {
-  employe:             null,
-  droitsByCode:        {},
-  siteByCode:          {},
-  siteImmoByCode:      {},
-  typeMouvement:       null,
-  codeIM:              null,
-  codeReceveur:        null,
-  nomReceveur:         null,
-  transfertEnCours:    null,
-  photoEtatBase64:     null,
-  photoReceptionBase64:null,
-  resaImmoCode:        null,
-  resaImmoLibelle:     null,
-  resaEnCoursId:       null,
-  forceImmoCode:       null,
-  photoImmo:           null,
-  immos:               {},
-  employes:            [],
-  scanner:             null,
-};
-
-// ── Utilitaires ───────────────────────────────────────────
-function vib(ms) { if (navigator.vibrate) navigator.vibrate(ms || 150); }
-
-function toast(msg, type, ms) {
-  const el = document.getElementById('toast');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'toast show' + (type === 'error' ? ' error' : '');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove('show'), ms || 2500);
-}
-
-function fmt(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('fr-FR', { timeZone: 'Indian/Reunion', day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-const fmtDate = fmt; // alias
-
-function fmtDT(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleString('fr-FR', { timeZone: 'Indian/Reunion', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-function lib(code) { return S.immos[code] ? S.immos[code].Libelle || code : code; }
-function cat(code) { return S.immos[code] ? S.immos[code].Categorie || '' : ''; }
-function fds(code) { return S.immos[code] ? S.immos[code].FDS_URL || '' : ''; }
-
-function fdsUrl(code) {
-  const u = fds(code);
-  if (!u) return '';
-  if (u.includes('sharepoint.com')) return CONFIG.proxy + '?fds=' + encodeURIComponent(code);
-  return u;
-}
-
-function ebadge(e) {
-  const map = { 'Neuf': '#E8F5E9:#1B5E20', 'Bon état': '#E3F2FD:#0D47A1', 'Usé': '#FFF8E1:#E65100', 'Abîmé': '#FFEBEE:#B71C1C', 'Hors service': '#F5F5F5:#616161', 'En panne': '#FFF3E0:#E65100' };
-  const c = map[e] || '#F5F5F5:#9E9E9E';
-  const [bg, fg] = c.split(':');
-  return e ? `<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${bg};color:${fg}">${e}</span>` : '';
-}
-
-const SCOL = { 'Demandee': '#F39C12', 'Confirmee': '#27AE60', 'En cours': '#2980B9', 'En retard': '#E74C3C', 'Rendue': '#95A5A6', 'Annulee': '#BDC3C7' };
-const SLAB = { 'Demandee': '⏳ En attente', 'Confirmee': '✅ Confirmée', 'En cours': '🔄 En cours', 'En retard': '⚠️ En retard', 'Rendue': '📦 Rendue', 'Annulee': '❌ Annulée' };
-function rsLabel(s) { const c = SCOL[s] || '#999'; const l = SLAB[s] || s; return `<span style="padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:${c}22;color:${c}">${l}</span>`; }
-
-// ── Catégories ────────────────────────────────────────────
-function getCats() {
-  const c = {};
-  for (const k in S.immos) { c[S.immos[k].Categorie || 'Sans catégorie'] = true; }
-  return Object.keys(c).sort();
-}
-
-function buildCatSelect(id, fn) {
-  const sel = document.getElementById(id);
-  if (!sel) return;
-  const v = sel.value;
-  sel.innerHTML = '<option value="">Toutes catégories</option>' + getCats().map(c => `<option value="${c}">${c}</option>`).join('');
-  sel.value = v;
-  if (fn) sel.onchange = fn;
-}
-
-function immosFilt(cat, q, filtrerSite) {
-  const qu = (q || '').trim().toUpperCase();
-  // Sites autorisés pour la personne connectée (uniquement si filtrerSite demandé, ex: réservation)
-  const sitesOK = filtrerSite && S.employe ? sitesAutorises(S.employe.code) : null;
-  const res = [];
-  for (const k in S.immos) {
-    const im = S.immos[k];
-    // Filtrage géographique : ne montrer que les immos des sites autorisés
-    if (sitesOK && sitesOK.indexOf(siteImmoDe(k)) === -1) continue;
-    const mc = !cat || (im.Categorie || 'Sans catégorie') === cat;
-    const num = k.replace('IM', '').replace(/^0+/, '');
-    const mq = !qu || k.toUpperCase().includes(qu) || (im.Libelle || '').toUpperCase().includes(qu) || num === qu;
-    if (mc && mq) res.push(im);
-    if (res.length >= 30) break;
-  }
-  return res;
-}
-
-// ── Scanner ───────────────────────────────────────────────
-function startScanner(elId, cb) {
-  stopScanner();
-  const el = document.getElementById(elId);
-  if (!el) return;
-  S.scanner = new Html5Qrcode(elId);
-  S.scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 240, height: 240 } }, cb, () => {}).catch(() => {
-    if (el) el.innerHTML = '<p style="color:#fff;text-align:center;padding:40px 20px;font-size:14px">⚠️ Impossible d\'accéder à la caméra.<br>Vérifie les permissions.</p>';
+  const tok = await fetch('https://login.microsoftonline.com/' + TENANT_ID + '/oauth2/v2.0/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials&client_id=' + CLIENT_ID + '&client_secret=' + encodeURIComponent(CLIENT_SECRET) + '&scope=https://graph.microsoft.com/.default'
   });
-}
+  const td = await tok.json();
+  if (!td.access_token) return new Response(JSON.stringify({ error: 'token', d: td }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-function stopScanner() {
-  if (S.scanner) { S.scanner.stop().catch(() => {}); S.scanner = null; }
-}
+  const H = { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'application/json', 'Prefer': 'HonorNonIndexedQueriesWarningMayFailRandomly' };
+  const url = new URL(request.url);
+  const p   = url.searchParams;
+  const json = (data, s) => new Response(JSON.stringify(data), { status: s || 200, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-// ── Navigation ────────────────────────────────────────────
-function showScreen(id, skipInit) {
-  stopScanner();
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const sc = document.getElementById(id);
-  if (sc) sc.classList.add('active');
-
-  switch (id) {
-    case 'screen-activation':
-      setTimeout(() => startScanner('scanner-activation', onScanActivation), 200);
-      break;
-    case 'screen-mon-materiel':       afficherMonMateriel(); break;
-    case 'screen-transferts-attente': afficherTransfertsEnAttente(); break;
-    case 'screen-mes-reservations':   afficherMesReservations(); break;
-    case 'screen-reserver':           if (!skipInit) initReservationScreen(false); break;
-  }
-}
-
-// ── Init au chargement ────────────────────────────────────
-window.addEventListener('load', async () => {
-  const saved = localStorage.getItem('employe');
-  if (saved) {
-    S.employe = JSON.parse(saved);
-    afficherEmploye();
-  } else {
-    // Première visite → aller directement au scan
-    showScreen('screen-activation');
-    return;
-  }
-  await Promise.all([chargerImmos(), chargerEmployes()]);
-  rafraichirBadges();
-});
-
-async function chargerImmos() {
-  try {
-    const r = await fetch('immos.json');
-    const arr = await r.json();
-    arr.forEach(i => { S.immos[i.Code_IM] = i; });
-    ['resa-categorie', 'rech-cat', 'force-cat', 'stock-cat'].forEach(id => buildCatSelect(id));
-  } catch (e) {}
-  // Charger les sites réels des immos (colonne Site SharePoint via le Worker)
-  try {
-    const rm = await fetch(CONFIG.proxy + '?immo_metadata=1');
-    const meta = await rm.json();
-    S.siteImmoByCode = {};
-    for (const code in meta) { S.siteImmoByCode[code] = meta[code].site || 'Reunion'; }
-  } catch (e) { S.siteImmoByCode = {}; }
-}
-
-async function chargerEmployes() {
-  try {
-    // 1. Priorité : endpoint Worker (contient le champ Droits, à jour en temps réel)
-    let arr = null;
-    try {
-      const rw = await fetch(CONFIG.proxy + '?employes=1');
-      const data = await rw.json();
-      if (Array.isArray(data) && data.length) {
-        arr = data.map(e => ({ Code: e.code, Nom: e.nom, Poste: e.poste || '', Droits: e.role || '', Site: e.site || '' }));
-      }
-    } catch (e) { /* fallback ci-dessous */ }
-    // 2. Fallback : fichier statique
-    if (!arr) {
-      const r = await fetch('employes.json');
-      const raw = await r.json();
-      arr = raw.map(e => ({ Code: e.Code, Nom: e.Nom, Poste: e.Poste || '', Droits: '', Site: '' }));
+  async function paginate(url, max) {
+    let items = [], next = url, pages = 0;
+    while (next && pages < (max || 10)) {
+      const r = await fetch(next, { headers: H });
+      const d = await r.json();
+      items = items.concat(d.value || []);
+      next = d['@odata.nextLink'] || null;
+      pages++;
     }
-    S.employes = arr;
-    // Index code → droits + site (pour peutReserver / filtrage géographique)
-    S.droitsByCode = {};
-    S.siteByCode = {};
-    arr.forEach(e => { S.droitsByCode[e.Code] = e.Droits || ''; S.siteByCode[e.Code] = e.Site || ''; });
-    const selIds = ['select-receveur', 'force-receveur', 'resa-pour-qui'];
-    selIds.forEach(selId => {
-      const sel = document.getElementById(selId);
-      if (!sel) return;
-      const def = selId === 'resa-pour-qui' ? '<option value="">-- Moi-même --</option>' : '<option value="">-- Sélectionne --</option>';
-      sel.innerHTML = def;
-      const coniFirst = S.employes.filter(e => e.Code === 'CONI');
-      const autres    = S.employes.filter(e => e.Code !== 'CONI' && (!S.employe || e.Code !== S.employe.code));
-      if (coniFirst.length) {
-        const og = document.createElement('optgroup'); og.label = '⭐ Dépôt logistique';
-        coniFirst.forEach(e => { const o = document.createElement('option'); o.value = e.Code; o.textContent = e.Nom + ' (' + e.Code + ')'; og.appendChild(o); });
-        sel.appendChild(og);
-      }
-      const og2 = document.createElement('optgroup'); og2.label = 'Équipes';
-      autres.sort((a, b) => a.Nom.localeCompare(b.Nom)).forEach(e => { const o = document.createElement('option'); o.value = e.Code; o.textContent = e.Nom + ' (' + e.Code + ')'; og2.appendChild(o); });
-      sel.appendChild(og2);
-    });
-  } catch (e) {}
-}
-
-// ── Affichage employé ─────────────────────────────────────
-function afficherEmploye() {
-  const badge = document.getElementById('user-info');
-  if (badge) { badge.textContent = '👷 ' + S.employe.nom; badge.classList.remove('hidden'); }
-  const isAdmin = CONFIG.admins.includes(S.employe.code);
-  document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin));
-  const btnMat   = document.getElementById('btn-mon-materiel');
-  const btnStock = document.getElementById('btn-stock-depot');
-  if (btnMat)   btnMat.classList.toggle('hidden', isAdmin);
-  if (btnStock) btnStock.classList.toggle('hidden', !isAdmin);
-  // Adapter le bouton réservations selon le rôle
-  const btnResa = document.getElementById('btn-resa');
-  if (btnResa) {
-    if (!peutReserver(S.employe.code)) {
-      btnResa.style.display = 'none';
-    } else {
-      btnResa.style.display = '';
-      const label = isAdmin ? '📋 Réservations' : '📅 Mes réservations';
-      btnResa.innerHTML = label + ' <span id="badge-resa" class="badge-count hidden"></span>';
-    }
-  }
-}
-
-function changerUtilisateur() {
-  if (!confirm('Changer d\'utilisateur ?')) return;
-  localStorage.removeItem('employe');
-  S.employe = null;
-  // Reset tous les badges
-  ['user-info','badge-attente','badge-mon-mat','badge-materiel','badge-resa'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.classList.add('hidden');
-  });
-  document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.add('hidden'); });
-  var btnMat = document.getElementById('btn-mon-materiel');
-  var btnStock = document.getElementById('btn-stock-depot');
-  if (btnMat) btnMat.classList.remove('hidden');
-  if (btnStock) btnStock.classList.add('hidden');
-  showScreen('screen-activation');
-}
-
-// ── Badges ────────────────────────────────────────────────
-async function rafraichirBadges() {
-  if (!S.employe) return;
-  await Promise.all([majBadgeTransferts(), majBadgeMateriel(), majBadgeResas()]);
-}
-
-async function majBadgeMateriel() {
-  if (!S.employe) return;
-  try {
-    const r = await fetch(CONFIG.proxy + '?employe=' + S.employe.code);
-    const d = await r.json();
-    const n = (d.actuel || []).length;
-    const el = document.getElementById('badge-mon-mat');
-    if (el) { el.textContent = n; el.classList.toggle('hidden', n === 0); }
-    // Aussi mettre à jour le badge sur le bouton Transfert
-    const bm = document.getElementById('badge-materiel');
-    if (bm) { bm.textContent = n; bm.classList.toggle('hidden', n === 0); }
-  } catch (e) {}
-}
-
-async function majBadgeTransferts() {
-  if (!S.employe) return;
-  try {
-    const r = await fetch(CONFIG.proxy + '?transferts=' + S.employe.code);
-    const d = await r.json();
-    const n = (d || []).length;
-    const el = document.getElementById('badge-attente');
-    if (el) {
-      if (n > 0) {
-        el.textContent = '⚠️ ' + n + ' transfert' + (n > 1 ? 's' : '') + ' en attente — Cliquer pour valider';
-        el.classList.remove('hidden');
-      } else { el.classList.add('hidden'); }
-    }
-  } catch (e) {}
-}
-
-async function majBadgeResas() {
-  if (!S.employe) return;
-  const isAdmin = CONFIG.admins.includes(S.employe.code);
-  try {
-    let resas;
-    if (isAdmin) {
-      // Admin/CONI : charger TOUTES les réservations, compter les "Demandee"
-      const r = await fetch(CONFIG.proxy + '?reservations=1');
-      resas = await r.json();
-      const demandees  = resas.filter(function(r) { return r.statut === 'Demandee'; }).length;
-      const retards    = resas.filter(function(r) { return r.statut === 'En retard'; }).length;
-      const imminentes = resas.filter(isImminenteSansReponse).length;
-      const el = document.getElementById('badge-resa');
-      if (el) {
-        const total = demandees + retards;
-        if (total > 0) {
-          el.textContent = total;
-          el.style.background = (imminentes > 0 || retards > 0) ? 'var(--red)' : 'var(--orange)';
-          if (imminentes > 0) { el.style.animation = 'pulse 1.2s infinite'; }
-          else { el.style.animation = ''; }
-          el.classList.remove('hidden');
-        } else { el.classList.add('hidden'); el.style.animation = ''; }
-      }
-    } else {
-      // Utilisateur : ses propres réservations actives
-      const r = await fetch(CONFIG.proxy + '?mes_reservations=' + S.employe.code);
-      resas = await r.json();
-      const actives = resas.filter(function(r) { return r.statut !== 'Rendue' && r.statut !== 'Annulee'; });
-      const retards = actives.filter(function(r) { return r.statut === 'En retard'; });
-      const el = document.getElementById('badge-resa');
-      if (el) {
-        const n = actives.length;
-        if (n > 0) {
-          el.textContent = n;
-          el.style.background = retards.length > 0 ? 'var(--red)' : 'var(--orange)';
-          el.classList.remove('hidden');
-        } else { el.classList.add('hidden'); }
-      }
-    }
-  } catch (e) {}
-}
-
-// ── Activation (scan carte BTP) ───────────────────────────
-function onScanActivation(code) {
-  const parts = code.split('|');
-  if (parts.length < 2 || code.startsWith('IM')) {
-    // Pas une carte employé
-    toast('Ce QR code n\'est pas une carte employé', 'error');
-    return;
-  }
-  stopScanner(); vib(300);
-  const employe = { code: parts[0].trim(), nom: parts[1].trim() };
-  localStorage.setItem('employe', JSON.stringify(employe));
-  S.employe = employe;
-  afficherEmploye();
-  showScreen('screen-accueil');
-  toast('👋 Bienvenue ' + employe.nom + ' !', 'success', 3500);
-  chargerEmployes();
-  rafraichirBadges();
-  chargerImmos().then(() => { ['resa-categorie', 'rech-cat', 'force-cat', 'stock-cat'].forEach(id => buildCatSelect(id)); });
-}
-
-// ── Démarrer mouvement ────────────────────────────────────
-function startMouvement(type) {
-  if (!S.employe) { showScreen('screen-activation'); return; }
-  S.typeMouvement = type;
-  S.codeIM = null; S.codeReceveur = null; S.nomReceveur = null;
-  S.photoEtatBase64 = null;
-  document.getElementById('titre-mouvement').textContent = type === 'Retour' ? '📥 Retour au dépôt' : '🔄 Transférer';
-  document.getElementById('immo-result')?.classList.add('hidden');
-  showScreen('screen-scan-immo');
-  startScanner('scanner-immo', onScanImmo);
-}
-
-async function onScanImmo(code) {
-  if (!code.startsWith('IM')) { return; } // Ignorer les non-immos
-  stopScanner(); vib(200);
-  S.codeIM = code;
-  const res = document.getElementById('immo-result');
-  if (res) { res.textContent = '✅ ' + lib(code) + ' (' + code + ')'; res.classList.remove('hidden'); }
-  toast('📦 ' + lib(code), 'success', 2000);
-
-  await new Promise(r => setTimeout(r, 600));
-
-  if (S.typeMouvement === 'Retour') {
-    document.getElementById('etat-immo-info').textContent = lib(code) + ' → 🏭 Dépôt';
-    document.getElementById('select-etat').value = 'Bon état';
-    document.getElementById('note-texte').value = '';
-    document.getElementById('photo-etat-preview').innerHTML = '';
-    S.photoEtatBase64 = null;
-    showScreen('screen-etat');
-    return;
+    return items;
   }
 
-  // Vérifier si transfert en attente pour cet employé sur cette immo
-  try {
-    const r   = await fetch(CONFIG.proxy + '?transferts=' + S.employe.code);
-    const trs = await r.json();
-    const pending = (trs || []).find(t => t.code_im === code);
-    if (pending) {
-      S.transfertEnCours = pending;
-      const elTxt = document.getElementById('accepter-texte');
-      if (elTxt) elTxt.textContent = lib(code) + ' de ' + pending.nom_donneur;
-      const elEtat = document.getElementById('accepter-etat-donneur');
-      if (elEtat) { if (pending.etat) { elEtat.textContent = 'État déclaré : ' + pending.etat; elEtat.classList.remove('hidden'); } else elEtat.classList.add('hidden'); }
-      const elNote = document.getElementById('accepter-note-donneur');
-      if (elNote) elNote.innerHTML = pending.note ? `<p style="font-size:13px;color:var(--grey);padding:8px;background:#f9f9f9;border-radius:8px">📝 ${pending.note}</p>` : '';
-      document.getElementById('accepter-etat').value = pending.etat || 'Bon état';
-      document.getElementById('accepter-note').value = '';
-      document.getElementById('photo-reception-preview').innerHTML = '';
-      S.photoReceptionBase64 = null;
-      showScreen('screen-accepter');
-      return;
-    }
-  } catch (e) {}
-
-  // Aller à sélection receveur
-  document.getElementById('receveur-immo-info').textContent = lib(code) + ' (' + code + ')';
-  showScreen('screen-receveur');
-}
-
-// ── Receveur — scan carte ─────────────────────────────────
-function scannerCarteReceveur() {
-  showScreen('screen-scan-receveur');
-  startScanner('scanner-receveur', code => {
-    const parts = code.split('|');
-    if (parts.length < 2 || code.startsWith('IM')) {
-      toast('Ce n\'est pas une carte employé', 'error');
-      return;
-    }
-    stopScanner(); vib(200);
-    S.codeReceveur = parts[0].trim();
-    S.nomReceveur  = parts[1].trim();
-    toast('✅ ' + S.nomReceveur + ' sélectionné', 'success');
-    // Aller directement à l'état
-    document.getElementById('etat-immo-info').textContent = lib(S.codeIM) + ' → ' + S.nomReceveur;
-    document.getElementById('select-etat').value = 'Bon état';
-    document.getElementById('note-texte').value = '';
-    document.getElementById('photo-etat-preview').innerHTML = '';
-    S.photoEtatBase64 = null;
-    showScreen('screen-etat');
-  });
-}
-
-// ── Receveur — liste déroulante ───────────────────────────
-function validerReceveur() {
-  const sel = document.getElementById('select-receveur');
-  if (!sel || !sel.value) { toast('Sélectionne un employé', 'error'); return; }
-  S.codeReceveur = sel.value;
-  S.nomReceveur  = sel.options[sel.selectedIndex]?.textContent.split(' (')[0] || sel.value;
-  document.getElementById('etat-immo-info').textContent = lib(S.codeIM) + ' → ' + S.nomReceveur;
-  document.getElementById('select-etat').value = 'Bon état';
-  document.getElementById('note-texte').value = '';
-  document.getElementById('photo-etat-preview').innerHTML = '';
-  S.photoEtatBase64 = null;
-  showScreen('screen-etat');
-}
-
-// ── Photos inline ─────────────────────────────────────────
-function previewPhoto(input, previewId, stateKey) {
-  if (!input.files?.[0]) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ratio  = Math.min(1200 / img.width, 1200 / img.height, 1);
-      canvas.width  = Math.round(img.width  * ratio);
-      canvas.height = Math.round(img.height * ratio);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      const b64 = canvas.toDataURL('image/jpeg', 0.75);
-      S[stateKey] = b64;
-      const prev = document.getElementById(previewId);
-      if (prev) prev.innerHTML = `<img src="${b64}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;margin-top:6px">`;
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-
-async function uploadPhotoSiPresente(codeIM, b64) {
-  if (!b64) return;
-  const now = new Date();
-  const fn  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.jpg`;
-  try {
-    await fetch(CONFIG.proxy + '?action=upload_photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code_im: codeIM, data: b64, filename: fn }) });
-  } catch (e) {}
-}
-
-// ── Confirmer état ────────────────────────────────────────
-async function confirmerAvecEtat() {
-  const etat = document.getElementById('select-etat').value;
-  const note = document.getElementById('note-texte').value.trim();
-
-  if (S.typeMouvement === 'Retour') {
-    const noteTrace = (note ? note + ' — ' : '') + '[retour enregistré par ' + S.employe.nom + ']';
-    const mouv = { code_im: S.codeIM, code_employe: S.employe.code, nom_employe: S.employe.nom, type_mouvement: 'Retour', code_chantier: 'DEPOT', etat, note: noteTrace, horodatage: new Date().toISOString() };
-    showRecap('📥 Retour enregistré', mouv, null);
-    enregistrerMouvement(mouv);
-    uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
-    return;
-  }
-
-  // Transfert
-  const transfertNote = (note ? note + ' — ' : '') + '[transfert initié par ' + S.employe.nom + ']';
-  const transfert = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: S.codeReceveur, nom_receveur: S.nomReceveur, etat, note: transfertNote };
-  showRecap('🔄 Transfert envoyé', { code_im: S.codeIM, nom_employe: S.nomReceveur, type_mouvement: 'Transfert', etat, note }, 'En attente de validation par ' + S.nomReceveur);
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=transfert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transfert) });
-    const d = await r.json();
-    if (!d.success) toast('Erreur lors de la création du transfert', 'error');
-    else toast('✅ Transfert créé — en attente de ' + S.nomReceveur, 'success', 3500);
-  } catch (e) { toast('Erreur réseau', 'error'); }
-  uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
-}
-
-function showRecap(titre, mouv, mention) {
-  document.getElementById('recap').innerHTML =
-    `<strong>${titre}</strong><br>
-     <strong>Immo :</strong> ${lib(mouv.code_im)} (${mouv.code_im})<br>
-     <strong>Employé :</strong> ${mouv.nom_employe}<br>
-     <strong>Type :</strong> ${mouv.type_mouvement}<br>
-     <strong>État :</strong> ${mouv.etat || '—'}` +
-    (mouv.note ? `<br><strong>Note :</strong> ${mouv.note}` : '') +
-    (mention ? `<br><em style="color:var(--grey)">${mention}</em>` : '');
-  document.getElementById('alerte-degradation')?.classList.add('hidden');
-  vib(300); showScreen('screen-confirmation');
-}
-
-function enregistrerMouvement(m) {
-  fetch(CONFIG.proxy, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) })
-    .then(() => rafraichirBadges())
-    .catch(() => {});
-}
-
-// ── Accepter un transfert ─────────────────────────────────
-async function accepterTransfert() {
-  const t    = S.transfertEnCours;
-  const etat = document.getElementById('accepter-etat').value;
-  const note = document.getElementById('accepter-note').value.trim();
-  const dRank = CONFIG.etats[t?.etat] || 4;
-  const rRank = CONFIG.etats[etat] || 4;
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, code_im: t.code_im, code_employe: S.employe.code, nom_employe: S.employe.nom, etat_reception: etat, note_reception: note, etat_donneur: t.etat || '' }) });
-    const d = await r.json();
-    if (d.success !== false) {
-      const alertDiv = document.getElementById('alerte-degradation');
-      document.getElementById('recap').innerHTML = `<strong>✅ Réception confirmée !</strong><br><strong>Immo :</strong> ${lib(t.code_im)}<br><strong>De :</strong> ${t.nom_donneur}<br><strong>État constaté :</strong> ${etat}`;
-      if (rRank < dRank) { alertDiv.textContent = `⚠️ Dégradation constatée : déclaré "${t.etat}" → reçu "${etat}"`; alertDiv.classList.remove('hidden'); }
-      else alertDiv?.classList.add('hidden');
-      vib(300); showScreen('screen-confirmation');
-      uploadPhotoSiPresente(t.code_im, S.photoReceptionBase64);
-      rafraichirBadges();
-    } else { toast('Erreur lors de la validation', 'error'); }
-  } catch (e) { toast('Erreur réseau', 'error'); }
-}
-
-function refuserTransfert() { showScreen('screen-accueil'); }
-
-// ── Transferts en attente ─────────────────────────────────
-async function afficherTransfertsEnAttente() {
-  const div = document.getElementById('liste-attente');
-  if (!div) return;
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    const r = await fetch(CONFIG.proxy + '?transferts=' + S.employe.code);
-    const trs = await r.json();
-    if (!trs.length) { div.innerHTML = '<p class="empty-msg">Aucun transfert en attente.</p>'; return; }
-    div.innerHTML = trs.map(t => `
-      <div class="materiel-card">
-        <strong>${lib(t.code_im)}</strong>
-        <span class="chantier-tag" style="margin-left:6px">${t.code_im}</span><br>
-        <small>📤 De : <strong>${t.nom_donneur}</strong></small>
-        ${t.etat ? ` — <small>État déclaré : <strong>${t.etat}</strong></small>` : ''}
-        ${t.note ? `<br><small style="color:var(--grey)">📝 ${t.note}</small>` : ''}
-        <br><button class="btn btn-secondary" style="margin-top:8px;font-size:14px;padding:10px"
-          onclick="demarrerValidation('${t.id}','${t.code_im}')">📷 Scanner pour valider</button>
-      </div>`).join('');
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>'; return; }
-  // Attacher boutons panne
-  document.querySelectorAll('.btn-panne-mat').forEach(function(btn) {
-    btn.onclick = function() { signalerPannePWA(btn.dataset.cim); };
-  });
-}
-
-function demarrerValidation(tid, codeIM) {
-  showScreen('screen-scan-validation');
-  startScanner('scanner-validation', code => {
-    if (code !== codeIM) { toast('Mauvais QR code — attendu : ' + codeIM, 'error'); return; }
-    stopScanner(); vib(200);
-    S.codeIM = code;
-    fetch(CONFIG.proxy + '?transferts=' + S.employe.code).then(r => r.json()).then(trs => {
-      const t = (trs || []).find(t => t.id === tid) || { id: tid, code_im: code, nom_donneur: '—', etat: '', note: '' };
-      S.transfertEnCours = t;
-      document.getElementById('accepter-texte').textContent = lib(code) + ' de ' + t.nom_donneur;
-      const elE = document.getElementById('accepter-etat-donneur');
-      if (elE) { if (t.etat) { elE.textContent = 'État déclaré : ' + t.etat; elE.classList.remove('hidden'); } else elE.classList.add('hidden'); }
-      document.getElementById('accepter-note-donneur').innerHTML = t.note ? `<p style="font-size:13px;color:var(--grey);padding:8px;background:#f9f9f9;border-radius:8px">📝 ${t.note}</p>` : '';
-      document.getElementById('accepter-etat').value = t.etat || 'Bon état';
-      document.getElementById('accepter-note').value = '';
-      document.getElementById('photo-reception-preview').innerHTML = '';
-      S.photoReceptionBase64 = null;
-      showScreen('screen-accepter');
-    }).catch(() => { S.transfertEnCours = { id: tid, code_im: code, nom_donneur: '—', etat: '', note: '' }; showScreen('screen-accepter'); });
-  });
-}
-
-// ── Mon matériel ──────────────────────────────────────────
-async function afficherMonMateriel() {
-  if (!S.employe) { showScreen('screen-activation'); return; }
-  document.getElementById('mon-materiel-user').textContent = S.employe.nom;
-  const div = document.getElementById('liste-materiel');
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    const r = await fetch(CONFIG.proxy + '?employe=' + S.employe.code);
-    const d = await r.json();
-    const items = d.actuel || [];
-    if (!items.length) { div.innerHTML = '<p class="empty-msg">Aucun matériel en ta possession.</p>'; return; }
-    div.innerHTML = items.map(m => {
-      const u = fdsUrl(m.code_im);
-      const fdsBtn = u ? `<a href="${u}" target="_blank" style="font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;margin-left:6px">📄 FDS</a>` : '';
-      const code_snap = m.code_im;
-      const libelle_snap = lib(m.code_im);
-      return `<div class="materiel-card">
-        <strong>${libelle_snap}</strong>${fdsBtn}<br>
-        <span class="chantier-tag">${code_snap}</span>
-        ${ebadge(m.etat)} <small style="color:var(--grey)">${fmt(m.horodatage)}</small>
-        ${m.note ? `<br><small style="color:var(--grey)">📝 ${m.note}</small>` : ''}
-        <div style="margin-top:8px">
-          <button class="btn-panne-mat" data-cim="${code_snap}"
-            style="padding:6px 12px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;width:100%">
-            📢 Signaler une panne sur ${libelle_snap}
-          </button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>'; }
-}
-
-// ── Stock au dépôt (admin) ────────────────────────────────
-async function ouvrirStockDepot() {
-  showScreen('screen-stock-depot');
-  buildCatSelect('stock-cat', filtrerStockDepot);
-  await filtrerStockDepot();
-}
-
-async function filtrerStockDepot() {
-  const cat = document.getElementById('stock-cat')?.value || '';
-  const q   = document.getElementById('stock-search')?.value || '';
-  const div = document.getElementById('stock-depot-liste');
-  if (!div) return;
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    // Chercher les immos en circulation
-    let enCircSet = {};
-    try {
-      const r   = await fetch(CONFIG.proxy + '?dashboard=1');
-      const d   = await r.json();
-      (d.en_circulation || []).forEach(i => { enCircSet[i.code_im] = true; });
-    } catch (e) {}
-    const filtered = immosFilt(cat, q).filter(im => !enCircSet[im.Code_IM]);
-    filtered.sort((a, b) => a.Code_IM.localeCompare(b.Code_IM));
-    const countEl = document.getElementById('stock-count');
-    if (countEl) countEl.textContent = filtered.length + ' immos au dépôt';
-    if (!filtered.length) { div.innerHTML = '<p class="empty-msg">Aucune immo.</p>'; return; }
-    div.innerHTML = filtered.map(im => {
-      const u = fdsUrl(im.Code_IM);
-      const fdsBtn = u ? `<a href="${u}" target="_blank" style="font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;margin-left:6px">📄 FDS</a>` : '';
-      return `<div class="materiel-card" style="border-left-color:#27AE60">
-        <strong>${im.Libelle}</strong>${fdsBtn}<br>
-        <span class="chantier-tag">${im.Code_IM}</span>
-        ${im.Categorie ? `<small style="color:var(--grey)"> · ${im.Categorie}</small>` : ''}
-      </div>`;
-    }).join('');
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur : ' + e.message + '</p>'; }
-}
-
-// ── Recherche unifiée (admin) ─────────────────────────────
-async function rechercheAuto() {
-  const cat  = document.getElementById('rech-cat')?.value || '';
-  const q    = document.getElementById('rech-input')?.value.trim() || '';
-  const div  = document.getElementById('rech-resultats');
-  if (!div) return;
-  if (!q && !cat) { div.innerHTML = '<p class="empty-msg">Sélectionne une catégorie ou tape ta recherche.</p>'; return; }
-
-  let html = '';
-  const immosMatch = immosFilt(cat, q).slice(0, 8);
-  const empMatch   = q ? S.employes.filter(e => e.Code?.toUpperCase().includes(q.toUpperCase()) || e.Nom?.toUpperCase().includes(q.toUpperCase())).slice(0, 4) : [];
-
-  if (immosMatch.length) {
-    html += `<h3 style="color:var(--blue);font-size:12px;margin:6px 0 4px;text-transform:uppercase;letter-spacing:.5px">Immos (${immosMatch.length})</h3>`;
-    html += immosMatch.map(im => {
-      const u = fdsUrl(im.Code_IM);
-      const fdsBtn = u ? `<a href="${u}" target="_blank" style="font-size:11px;padding:2px 8px;background:#E3F2FD;color:#0D47A1;border-radius:8px;text-decoration:none;margin-left:6px">📄 FDS</a>` : '';
-      return `<div class="materiel-card" style="border-left-color:#27AE60;cursor:pointer" onclick="voirDetailImmo('${im.Code_IM}')">
-        <strong>${im.Libelle}</strong>${fdsBtn}
-        <button onclick="event.stopPropagation();ouvrirPhotos('${im.Code_IM}')" style="font-size:11px;padding:2px 8px;background:#FFF8F0;color:var(--orange);border:1px solid var(--orange);border-radius:8px;cursor:pointer;margin-left:4px">🖼️</button><br>
-        <span class="chantier-tag">${im.Code_IM}</span>
-        ${im.Categorie ? `<small style="color:var(--grey)"> · ${im.Categorie}</small>` : ''}
-        ${im.N_Serie ? `<br><small style="color:var(--grey)">N° série : ${im.N_Serie}</small>` : ''}
-      </div>`;
-    }).join('');
-  }
-
-  if (empMatch.length) {
-    html += `<h3 style="color:var(--blue);font-size:12px;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px">Employés (${empMatch.length})</h3>`;
-    html += empMatch.map(e => `<div class="suggestion-item" onclick="voirDetailEmploye('${e.Code}','${e.Nom.replace(/'/g,"\\'")}')"><strong>${e.Nom}</strong> <span class="chantier-tag">${e.Code}</span></div>`).join('');
-  }
-
-  if (!html) html = `<p class="empty-msg">Aucun résultat pour "${q || cat}".</p>`;
-  div.innerHTML = html;
-}
-
-function scannerPourRecherche() {
-  showScreen('screen-scan-recherche');
-  startScanner('scanner-recherche', code => {
-    stopScanner(); vib(150);
-    document.getElementById('rech-input').value = code;
-    showScreen('screen-rechercher');
-    if (code.startsWith('IM')) voirDetailImmo(code);
-    else rechercheAuto();
-  });
-}
-
-async function voirDetailImmo(codeIM) {
-  const div = document.getElementById('rech-resultats');
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    const r = await fetch(CONFIG.proxy + '?immo=' + encodeURIComponent(codeIM));
-    const hist = await r.json();
-    // Une Panne/Suivi_Panne n'est jamais un changement de possession : on l'ignore pour la localisation
-    const dernier = hist.find(m => m.type_mouvement !== 'Panne' && m.type_mouvement !== 'Suivi_Panne') || null;
-    const estDepot = !dernier || dernier.type_mouvement === 'Retour' || dernier.type_mouvement === 'Réparation' || dernier.code_chantier === 'DEPOT';
-    // Panne active actuelle + prestataire éventuel
-    const lastPanne = hist.find(m => m.type_mouvement === 'Panne');
-    const lastRep   = hist.find(m => m.type_mouvement === 'Réparation');
-    const panneActive = lastPanne && (!lastRep || new Date(lastPanne.horodatage) > new Date(lastRep.horodatage));
-    let presta = null;
-    if (panneActive) {
-      for (const m of hist) {
-        if (new Date(m.horodatage) < new Date(lastPanne.horodatage)) break;
-        const match = (m.note || '').match(/##PRESTA:([^#]+)##/);
-        if (match) { presta = match[1]; break; }
-      }
-    }
-    let locStyle, locTxt;
-    if (presta) {
-      locStyle = 'background:#F3E5F5;color:#6A1B9A';
-      locTxt = `🔧 Chez le prestataire : ${presta}`;
-    } else if (estDepot) {
-      locStyle = 'background:#E8F5E9;color:#1B5E20';
-      locTxt = '🏭 Au dépôt';
-    } else {
-      locStyle = 'background:#FFF3E0;color:#E65100';
-      locTxt = `👤 Avec ${dernier.nom_employe} depuis ${fmt(dernier.horodatage)}`;
-    }
-    const panneTag = panneActive && !presta ? '<br><span style="font-size:11px;font-weight:700;color:#E65100">📢 Panne en cours — déclarée le ' + fmt(lastPanne.horodatage) + '</span>' : '';
-    const u = fdsUrl(codeIM);
-    let html = `<div class="materiel-card" style="border-left-color:var(--orange)">
-      <strong style="font-size:16px;color:var(--blue)">${lib(codeIM)}</strong><br>
-      <span class="chantier-tag">${codeIM}</span>
-      ${cat(codeIM) ? `<small style="color:var(--grey)"> · ${cat(codeIM)}</small>` : ''}<br>
-      <div class="localisation-badge" style="${locStyle};margin:8px 0">${locTxt}${panneTag}</div>
-      <div id="fiche-act-immo-${codeIM}" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"></div>
-    </div>
-    <h3 style="color:var(--blue);font-size:13px;margin:8px 0 4px">Historique (${hist.length})</h3>`;
-    if (!hist.length) html += '<p class="empty-msg">Aucun mouvement.</p>';
-    else html += hist.map(m => {
-      const donneur = m.type_mouvement === 'Transfert' && m.code_chantier?.includes('|') ? ' <small style="color:var(--grey)">de ' + m.code_chantier.split('|')[1] + '</small>' : '';
-      return `<div style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
-        ${m.type_mouvement === 'Retour' ? '📥' : '🔄'} <strong>${m.type_mouvement}</strong>${donneur}
-        ${ebadge(m.etat)}<br>
-        <small style="color:var(--grey)">👷 ${m.nom_employe} — ${fmtDT(m.horodatage)}</small>
-        ${m.note ? `<br><small style="color:var(--orange)">📝 ${m.note}</small>` : ''}
-      </div>`;
-    }).join('');
-    div.innerHTML = html;
-    // ── Boutons admin : panne, vol, HS ─────────────────────────────────────
-    const actDiv2 = document.getElementById('fiche-act-immo-' + codeIM);
-    if (actDiv2) {
-      const uFds2 = fdsUrl(codeIM);
-      if (uFds2) { const aF = document.createElement('a'); aF.href=uFds2; aF.target='_blank'; aF.style.cssText='padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;display:inline-block'; aF.textContent='📄 FDS'; actDiv2.appendChild(aF); }
-      const bPh3 = document.createElement('button'); bPh3.style.cssText='padding:7px 14px;background:#FFF8F0;color:var(--orange);border:2px solid var(--orange);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bPh3.textContent='🖼️ Photos'; (function(_c){bPh3.onclick=function(){ouvrirPhotos(_c);};})(codeIM); actDiv2.appendChild(bPh3);
-      const isAdm2 = S.employe && CONFIG.admins.includes(S.employe.code);
-      if (isAdm2) {
-        const lastP2 = hist.find(function(m){return m.type_mouvement==='Panne';});
-        const lastR2 = hist.find(function(m){return m.type_mouvement==='Réparation';});
-        const enP2   = lastP2 && (!lastR2 || new Date(lastP2.horodatage) > new Date(lastR2.horodatage));
-        const bPan = document.createElement('button'); bPan.style.cssText='padding:7px 14px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer';
-        bPan.textContent = enP2 ? '✅ Résoudre panne' : '📢 Signaler panne';
-        (function(_c,_ep){bPan.onclick=function(){if(_ep)ouvrirEcranResolution(_c);else ouvrirEcranPanne(_c);};})(codeIM,!!enP2); actDiv2.appendChild(bPan);
-        const bVol2 = document.createElement('button'); bVol2.style.cssText='padding:7px 14px;background:#4A148C;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bVol2.textContent='🚨 Volé/Disparu'; (function(_c){bVol2.onclick=function(){ouvrirEcranVol(_c);};})(codeIM); actDiv2.appendChild(bVol2);
-        const bHS2 = document.createElement('button'); bHS2.style.cssText='padding:7px 14px;background:#424242;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bHS2.textContent='⚫ HS définitif'; (function(_c){bHS2.onclick=function(){ouvrirEcranHS(_c);};})(codeIM); actDiv2.appendChild(bHS2);
-      }
-    }
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur.</p>'; }
-}
-
-async function voirDetailEmploye(code, nom) {
-  const div = document.getElementById('rech-resultats');
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    const r = await fetch(CONFIG.proxy + '?employe=' + encodeURIComponent(code));
-    const d = await r.json();
-    const actuel = d.actuel || [], hist = d.historique || [];
-    let html = `<div class="materiel-card" style="border-left-color:var(--blue)">
-      <strong style="font-size:16px;color:var(--blue)">${nom}</strong> <span class="chantier-tag">${code}</span><br>
-      <small style="color:var(--grey)">${actuel.length} immo(s) en possession · ${hist.length} mouvements au total</small>
-    </div>
-    <h3 style="color:var(--blue);font-size:13px;margin:8px 0 4px">En sa possession (${actuel.length})</h3>`;
-    if (!actuel.length) html += '<p class="empty-msg">Aucun matériel.</p>';
-    else html += actuel.map(m => `<div class="materiel-card"><strong>${lib(m.code_im)}</strong> <span class="chantier-tag" onclick="voirDetailImmo('${m.code_im}')" style="cursor:pointer">${m.code_im}</span> ${ebadge(m.etat)}<br><small style="color:var(--grey)">${fmt(m.horodatage)}</small></div>`).join('');
-    div.innerHTML = html;
-    // Attacher handlers (boutons admin : FDS, photos, panne, vol)
-    const actDiv2 = document.getElementById('fiche-act-immo-' + codeIM);
-    if (actDiv2) {
-      const u = fdsUrl(codeIM);
-      if (u) { const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.style.cssText = 'padding:7px 14px;background:#E3F2FD;color:#0D47A1;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none'; a.textContent = '📄 FDS'; actDiv2.appendChild(a); }
-      const bPh = document.createElement('button'); bPh.style.cssText = 'padding:7px 14px;background:#FFF8F0;color:var(--orange);border:2px solid var(--orange);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bPh.textContent = '🖼️ Photos'; (function(_c){ bPh.onclick = function(){ ouvrirPhotos(_c); }; })(codeIM); actDiv2.appendChild(bPh);
-      const isAdminLocal2 = S.employe && CONFIG.admins.includes(S.employe.code);
-      if (isAdminLocal2) {
-        // Panne
-        const estEnPannePWA = hist.length > 0 && hist.some(function(m, i) { if(m.type_mouvement !== 'Panne') return false; for(let j = 0; j < i; j++){ if(hist[j].type_mouvement === 'Réparation' && new Date(hist[j].horodatage) > new Date(m.horodatage)) return false; } return true; });
-        const bPa = document.createElement('button'); bPa.style.cssText = 'padding:7px 14px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bPa.textContent = estEnPannePWA ? '✅ Panne résolue' : '📢 Signaler panne'; (function(_c, _ep){ bPa.onclick = function(){ if(_ep) resoudrePannePWA(_c); else signalerPannePWA(_c); }; })(codeIM, estEnPannePWA); actDiv2.appendChild(bPa);
-        // Vol / Disparu
-        const bVol = document.createElement('button'); bVol.style.cssText = 'padding:7px 14px;background:#4A148C;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bVol.textContent = '🚨 Volé / Disparu'; (function(_c){ bVol.onclick = function(){ declarerVolPWA(_c); }; })(codeIM); actDiv2.appendChild(bVol);
-        // HS définitif / Perdu
-        const bHS = document.createElement('button'); bHS.style.cssText = 'padding:7px 14px;background:#424242;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'; bHS.textContent = '⚫ HS définitif'; (function(_c){ bHS.onclick = function(){ marquerImmoHSPWA(_c); }; })(codeIM); actDiv2.appendChild(bHS);
-      }
-    }
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur.</p>'; }
-}
-
-// ── Photos ────────────────────────────────────────────────
-function ouvrirPhotos(codeIM) {
-  S.photoImmo = codeIM;
-  document.getElementById('photos-immo-titre').textContent = lib(codeIM) + ' (' + codeIM + ')';
-  const isAdmin = S.employe && CONFIG.admins.includes(S.employe.code);
-  document.getElementById('upload-zone')?.classList.toggle('hidden', !isAdmin);
-  showScreen('screen-photos');
-  chargerPhotos(codeIM);
-}
-
-async function chargerPhotos(codeIM) {
-  const div = document.getElementById('galerie-photos');
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    const r = await fetch(CONFIG.proxy + '?photos=' + encodeURIComponent(codeIM));
-    const photos = await r.json();
-    if (!photos.length) { div.innerHTML = '<p class="empty-msg">Aucune photo.</p>'; return; }
-    const isAdmin = S.employe && CONFIG.admins.includes(S.employe.code);
-    div.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%">' + photos.map(p => `
-      <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
-        <img src="${p.url}" style="width:100%;height:160px;object-fit:cover;cursor:pointer;display:block" loading="lazy" onclick="agrandirPhoto(this.src)">
-        <p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">${fmt(p.created)}</p>
-        ${isAdmin ? `<button onclick="supprimerPhoto('${p.name}')" style="width:100%;padding:6px;background:#FDECEA;border:none;color:var(--red);font-size:12px;cursor:pointer">🗑️ Supprimer</button>` : ''}
-      </div>`).join('') + '</div>';
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur.</p>'; }
-}
-
-async function uploadPhoto(input) {
-  if (!input.files?.[0]) return;
-  const prog = document.getElementById('upload-progress');
-  if (prog) prog.textContent = '⏳ Compression...';
-  previewPhoto(input, '__dummy', '__dummy');
-  const reader = new FileReader();
-  reader.onload = async e => {
-    const img = new Image();
-    img.onload = async () => {
-      const canvas = document.createElement('canvas');
-      const ratio  = Math.min(1200 / img.width, 1200 / img.height, 1);
-      canvas.width  = Math.round(img.width  * ratio);
-      canvas.height = Math.round(img.height * ratio);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      const b64 = canvas.toDataURL('image/jpeg', 0.75);
-      const now = new Date();
-      const fn  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.jpg`;
-      if (prog) prog.textContent = '⬆️ Upload en cours...';
+  // Résolution du vrai nom d'un employé depuis son code (évite les doublons "CONI" vs "COUTAREL Nicolas")
+  let _nomParCode = null;
+  async function getNomResolver() {
+    if (!_nomParCode) {
+      _nomParCode = {};
       try {
-        const r = await fetch(CONFIG.proxy + '?action=upload_photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code_im: S.photoImmo, data: b64, filename: fn }) });
-        const d = await r.json();
-        if (d.success) { if (prog) prog.textContent = '✅ Ajoutée !'; input.value = ''; setTimeout(() => { if (prog) prog.textContent = ''; chargerPhotos(S.photoImmo); }, 1000); }
-        else if (prog) prog.textContent = '❌ Échec.';
-      } catch (e) { if (prog) prog.textContent = '❌ Erreur réseau.'; }
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(input.files[0]);
-}
+        const emp = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
+        emp.forEach(i => {
+          const f = i.fields || {};
+          const c = f.Title || f.Code || f.Code_Employe || '';
+          // Le nom réel est stocké dans field_1 (colonne interne SharePoint)
+          const n = f.field_1 || f.Nom || f.Nom_Employe || f.Name || '';
+          if (c && n) _nomParCode[c] = n;
+        });
+      } catch (e) { /* si Employes inaccessible, fallback sur les noms bruts */ }
+    }
+    return (code, fallback) => (code && _nomParCode[code]) || fallback || code || '';
+  }
 
-function agrandirPhoto(url) {
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
-  ov.onclick = () => document.body.removeChild(ov);
-  const img = document.createElement('img');
-  img.src = url; img.style.cssText = 'max-width:95vw;max-height:90vh;border-radius:8px;object-fit:contain';
-  ov.appendChild(img); document.body.appendChild(ov);
-}
+  // ── Debugs ──────────────────────────────────────────────────────────────────
+  if (p.get('debug_immos')    === '1') { const r = await fetch(GL + '/Immos/items?$expand=fields&$top=2', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
+  if (p.get('debug_resa')     === '1') { const r = await fetch(GL + '/Reservations/items?$expand=fields&$top=2', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
+  if (p.get('debug_transferts')=== '1') { const r = await fetch(GL + '/Transferts_En_Attente/items?$expand=fields&$top=5', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
+  if (p.get('debug_employes') === '1') { const r = await fetch(GL + '/Employes/items?$expand=fields&$top=3', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
+  if (p.get('debug_mouvements')=== '1') { const r = await fetch(GL + '/Mouvements/items?$expand=fields&$top=3&$orderby=fields/Created desc', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
 
-async function supprimerPhoto(filename) {
-  if (!confirm('Supprimer cette photo ?')) return;
-  await fetch(CONFIG.proxy + '?action=delete_photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code_im: S.photoImmo, filename }) });
-  chargerPhotos(S.photoImmo);
-}
+  // ── Métadonnées achat (valeur + date) ──────────────────────────────────────
+  if (p.get('immo_metadata') === '1') {
+    const items = await paginate(GL + '/Immos/items?$expand=fields&$top=200', 6);
+    const meta = {};
+    items.forEach(i => {
+      const f = i.fields || {};
+      const code = f.Title || f.Code_IM || '';
+      // Site : source de vérité = colonne Site de la liste Immos. Défaut 'Reunion' (transition sans régression).
+      let site = (f.Site || '').trim();
+      if (site) { const s = site.toLowerCase(); site = s.startsWith('may') ? 'Mayotte' : 'Reunion'; } else { site = 'Reunion'; }
+      if (code) meta[code] = {
+        valeur_achat: parseFloat(f.Valeur_Achat) || 0,
+        date_achat:   f.Date_Achat || '',
+        site:         site
+      };
+    });
+    return json(meta);
+  }
 
-// ── Force attribution ─────────────────────────────────────
-let forceImmoCode = null;
+  // ── FDS map ─────────────────────────────────────────────────────────────────
+  if (p.get('fds_map') === '1') {
+    const items = await paginate(GL + '/Immos/items?$expand=fields&$top=200', 6);
+    const map = {};
+    items.forEach(i => { const f = i.fields || {}; const c = f.Code_IM || f.Title || ''; const u = f.FDS_URL || ''; if (c && u) map[c] = u; });
+    return json(map);
+  }
 
-function rechercherImmoPourForce() {
-  const cat  = document.getElementById('force-cat')?.value || '';
-  const q    = document.getElementById('force-immo-search')?.value || '';
-  const div  = document.getElementById('force-suggestions');
-  const info = document.getElementById('force-immo-info');
-  const res  = immosFilt(cat, q).slice(0, 8);
-  if (res.length === 1) { forceImmoCode = res[0].Code_IM; if (info) info.textContent = '✅ ' + res[0].Libelle + ' (' + res[0].Code_IM + ')'; if (div) div.innerHTML = ''; return; }
-  forceImmoCode = null;
-  if (info) info.textContent = res.length > 1 ? res.length + ' résultats — affinez la recherche' : '';
-  if (!div) return;
-  div.innerHTML = (!q && !cat) ? '' : res.length === 0 ? '<p class="empty-msg">Aucune immo.</p>' :
-    res.map(im => `<div class="suggestion-item" onclick="selForceImmo('${im.Code_IM}','${(im.Libelle||'').replace(/'/g,"\\'")}')"><strong>${im.Libelle}</strong> <span class="chantier-tag">${im.Code_IM}</span></div>`).join('');
-}
-
-function selForceImmo(code, libelle) {
-  forceImmoCode = code;
-  const fi = document.getElementById('force-immo-search');
-  const inf = document.getElementById('force-immo-info');
-  const div = document.getElementById('force-suggestions');
-  if (fi) fi.value = libelle;
-  if (inf) inf.textContent = '✅ ' + libelle + ' (' + code + ')';
-  if (div) div.innerHTML = '';
-}
-
-function scannerPourForce() {
-  showScreen('screen-scan-force');
-  startScanner('scanner-force', code => {
-    if (!code.startsWith('IM')) { toast('Ce n\'est pas une immo', 'error'); return; }
-    stopScanner(); vib(150);
-    selForceImmo(code, lib(code));
-    showScreen('screen-force-attribution');
-  });
-}
-
-async function validerForceAttribution() {
-  if (!forceImmoCode) { toast('Sélectionne une immo', 'error'); return; }
-  const sel = document.getElementById('force-receveur');
-  if (!sel?.value) { toast('Sélectionne un employé', 'error'); return; }
-  const codeRec = sel.value;
-  const nomRec  = sel.options[sel.selectedIndex]?.textContent.split(' (')[0] || codeRec;
-  const etat    = document.getElementById('force-etat')?.value || 'Bon état';
-  const note    = document.getElementById('force-note')?.value.trim() || '';
-  if (!confirm(`Attribuer ${lib(forceImmoCode)} à ${nomRec} sans validation ?`)) return;
-  try {
-    const m = { code_im: forceImmoCode, code_employe: codeRec, nom_employe: nomRec, type_mouvement: 'Transfert', code_chantier: S.employe.code + '|' + S.employe.nom, etat, note: (note ? note + ' — ' : '') + '[Attribution forcée par ' + S.employe.nom + ']', horodatage: new Date().toISOString() };
-    const r = await fetch(CONFIG.proxy, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) });
+  // ── Photos map ───────────────────────────────────────────────────────────────
+  if (p.get('photos_map') === '1') {
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos:/children?$select=name', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+    if (r.status === 404) return json({});
     const d = await r.json();
-    if (d.success !== false) { showRecap('⚡ Attribution forcée', { ...m, nom_employe: nomRec }, null); forceImmoCode = null; rafraichirBadges(); }
-    else toast('Erreur lors de l\'attribution', 'error');
-  } catch (e) { toast('Erreur réseau', 'error'); }
-}
+    const map = {};
+    (d.value || []).forEach(f => { map[f.name] = true; });
+    return json(map);
+  }
 
-// ── Réservations ──────────────────────────────────────────
-function initReservationScreen(pourQuelquunDautre) {
-  S.resaImmoCode = null; S.resaImmoLibelle = null;
-  const elInfo = document.getElementById('resa-immo-info');
-  if (elInfo) elInfo.textContent = '';
-  const elSearch = document.getElementById('resa-immo-search');
-  if (elSearch) elSearch.value = '';
-  const elSugg = document.getElementById('resa-immo-suggestions');
-  if (elSugg) elSugg.innerHTML = '';
-  document.getElementById('resa-date-debut').value = '';
-  document.getElementById('resa-date-fin').value = '';
-  document.getElementById('resa-chantier').value = '';
-  document.getElementById('resa-note').value = '';
-  const isAdmin = S.employe && CONFIG.admins.includes(S.employe.code);
-  const sectionPourQui = document.getElementById('resa-pour-qui-section');
-  if (sectionPourQui) sectionPourQui.classList.toggle('hidden', !isAdmin);
-  buildCatSelect('resa-categorie', rechercherImmoResa);
-  showScreen('screen-reserver');
-}
+  // ── FDS proxy ────────────────────────────────────────────────────────────────
+  if (p.get('fds')) {
+    const code = p.get('fds');
+    const ir = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + code + "'&$top=1", { headers: H });
+    const id = await ir.json();
+    const u = id.value && id.value[0] && id.value[0].fields ? id.value[0].fields.FDS_URL || '' : '';
+    if (u && u.includes('sharepoint.com')) {
+      const sid = 'u!' + btoa(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const sr = await fetch('https://graph.microsoft.com/v1.0/shares/' + encodeURIComponent(sid) + '/driveItem/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+      if (sr.ok) { const buf = await sr.arrayBuffer(); return new Response(buf, { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Cache-Control': 'max-age=3600' } }); }
+    }
+    return new Response('FDS non trouvee', { status: 404, headers: cors });
+  }
 
-function rechercherImmoResa() {
-  const cat  = document.getElementById('resa-categorie')?.value || '';
-  const q    = document.getElementById('resa-immo-search')?.value || '';
-  const div  = document.getElementById('resa-immo-suggestions');
-  if (!div) return;
-  if (!q && !cat) { div.innerHTML = ''; return; }
-  const res = immosFilt(cat, q, true).slice(0, 8); // true = filtrage geographique
-  const montrerDrapeau = S.employe && voitDeuxSites(S.employe.code);
-  div.innerHTML = res.length === 0 ? '<p class="empty-msg">Aucune immo disponible sur votre perimetre.</p>' :
-    res.map(im => { const flag = montrerDrapeau ? ' ' + badgeSite(siteImmoDe(im.Code_IM)) : ''; return `<div class="suggestion-item" onclick="selImmoResa('${im.Code_IM}','${(im.Libelle||'').replace(/'/g,"\\'")}')"><strong>${im.Libelle}</strong> <span class="chantier-tag">${im.Code_IM}</span>${flag}${im.Categorie ? `<small style="color:var(--grey)"> · ${im.Categorie}</small>` : ''}</div>`; }).join('');
-}
+  // ── Photo proxy ──────────────────────────────────────────────────────────────
+  if (p.get('photo')) {
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos/' + p.get('photo') + ':/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+    if (!r.ok) return new Response('Photo non trouvee', { status: 404, headers: cors });
+    return new Response(await r.arrayBuffer(), { status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=3600' } });
+  }
 
-function selImmoResa(code, libelle) {
-  S.resaImmoCode = code; S.resaImmoLibelle = libelle;
-  const el = document.getElementById('resa-immo-info');
-  const montrerDrapeau = S.employe && voitDeuxSites(S.employe.code);
-  if (el) el.innerHTML = '✅ ' + libelle + ' (' + code + ')' + (montrerDrapeau ? ' ' + badgeSite(siteImmoDe(code)) : '');
-  const inp = document.getElementById('resa-immo-search');
-  if (inp) inp.value = libelle;
-  const div = document.getElementById('resa-immo-suggestions');
-  if (div) div.innerHTML = '';
-  // Avertissement si reservation hors de son ile de rattachement
-  if (S.employe && avertirCroisement(S.employe.code, code)) {
-    const siteImmo = siteImmoDe(code);
-    const nomSite = siteImmo === 'Mayotte' ? 'Mayotte' : 'La Reunion';
-    setTimeout(function() {
-      if (!confirm('\u26a0\ufe0f Attention : ce materiel se trouve a ' + nomSite + ' !\n\nEtes-vous certain de vouloir continuer la reservation ?')) {
-        S.resaImmoCode = null; S.resaImmoLibelle = null;
-        if (el) el.textContent = '';
-        if (inp) inp.value = '';
+  // ── Photos liste ─────────────────────────────────────────────────────────────
+  if (p.get('photos')) {
+    const code = p.get('photos');
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos/' + encodeURIComponent(code) + ':/children?$select=name,id,createdDateTime,size', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+    if (r.status === 404) return json([]);
+    const d = await r.json();
+    const photos = (d.value || []).filter(f => f.name.match(/\.(jpg|jpeg|png|webp)$/i)).map(f => ({
+      name: f.name, url: 'https://immo-proxy.ral-85d.workers.dev/?photo=' + encodeURIComponent(code + '/' + f.name), created: f.createdDateTime, size: f.size
+    }));
+    return json(photos);
+  }
+
+  // ── Maintenance ───────────────────────────────────────────────────────────────
+  if (p.get('maintenance') === '1') {
+    const items = await paginate(GL + '/Immos/items?$expand=fields&$top=200', 6);
+    const now = new Date(), j30 = new Date(now.getTime() + 30 * 86400000), j7 = new Date(now.getTime() + 7 * 86400000);
+    const all = items.map(i => { const f = i.fields || {}; return { code_im: f.Title || '', libelle: f.Libelle || '', categorie: f.Categorie || '', date_garantie_fin: f.Date_Garantie_Fin || '', periodicite_mois: f.Periodicite_Maintenance_Mois || 0, prochaine_maintenance: f.Prochaine_Maintenance || '', prestataire_sav: f.Prestataire_SAV || '', cout_maintenance: f.Cout_Maintenance || 0, valeur_achat: parseFloat(f.Valeur_Achat) || 0, date_achat: f.Date_Achat || '' }; });
+    return json({ all, maintenances_urgentes: all.filter(i => i.prochaine_maintenance && new Date(i.prochaine_maintenance) <= j7), maintenances_bientot: all.filter(i => i.prochaine_maintenance && new Date(i.prochaine_maintenance) > j7 && new Date(i.prochaine_maintenance) <= j30), garanties_bientot: all.filter(i => i.date_garantie_fin && new Date(i.date_garantie_fin) > now && new Date(i.date_garantie_fin) <= j30), garanties_expirees: all.filter(i => i.date_garantie_fin && new Date(i.date_garantie_fin) <= now) });
+  }
+
+  // ── Réservations liste ────────────────────────────────────────────────────────
+  if (p.get('reservations') === '1') {
+    const items = await paginate(GL + '/Reservations/items?$expand=fields&$orderby=fields/Created%20desc&$top=200', 5);
+    const now = new Date();
+    return json(items.map(item => {
+      const f = item.fields || {};
+      const fin = f.Date_Fin ? new Date(f.Date_Fin) : null;
+      let statut = f.Statut || 'Demandee';
+      if (statut !== 'Rendue' && statut !== 'Annulee' && fin && fin < now) statut = 'En retard';
+      const noteRaw = f.Note || '';
+      const initMatch = noteRaw.match(/##INIT:([^#]+)##/);
+      const codeInitial = initMatch ? initMatch[1] : '';
+      const noteClean = noteRaw.replace(/##INIT:[^#]+##/g, '').trim();
+      return { id: item.id, code_im: f.Code_IM || '', code_im_initial: codeInitial, code_employe: f.Title || '', nom_employe: f.Nom_Employe || '', code_chantier: f.Code_Chantier || '', nom_chantier: f.Nom_Chantier || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut, note: noteClean, created: f.Created || '' };
+    }));
+  }
+
+  // ── Réservations par employé ──────────────────────────────────────────────────
+  if (p.get('mes_reservations')) {
+    const code = p.get('mes_reservations');
+    const r = await fetch(GL + "/Reservations/items?$expand=fields&$filter=fields/Title eq '" + code + "'&$orderby=fields/Created%20desc&$top=100", { headers: H });
+    if (!r.ok) return json([]);
+    const d = await r.json();
+    const now = new Date();
+    return json((d.value || []).map(item => {
+      const f = item.fields || {};
+      const fin = f.Date_Fin ? new Date(f.Date_Fin) : null;
+      let statut = f.Statut || 'Demandee';
+      if (statut !== 'Rendue' && statut !== 'Annulee' && fin && fin < now) statut = 'En retard';
+      const noteRaw = f.Note || '';
+      const initMatch = noteRaw.match(/##INIT:([^#]+)##/);
+      return { id: item.id, code_im: f.Code_IM || '', code_im_initial: initMatch ? initMatch[1] : '', code_employe: f.Title || '', nom_employe: f.Nom_Employe || '', code_chantier: f.Code_Chantier || '', nom_chantier: f.Nom_Chantier || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut, note: noteRaw.replace(/##INIT:[^#]+##/g, '').trim() };
+    }));
+  }
+
+  // ── Liste des employés (avec rôle/statut) ─────────────────────────────────────
+  if (p.get('employes') === '1') {
+    const items = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
+    const mapped = items.map(i => {
+      const f = i.fields || {};
+      return {
+        code: f.Title || f.Code || f.Code_Employe || '',
+        nom: f.field_1 || f.Nom || f.Nom_Employe || f.Name || '',
+        poste: f.Poste || '',
+        // Code_CT réutilisé comme champ "Droits"
+        role: f.Code_CT || f.Droits || '',
+        // Site de rattachement (Reunion/Mayotte). Défaut Reunion si vide.
+        site: (function(){ var s=(f.Site||'').trim().toLowerCase(); return s.startsWith('may')?'Mayotte':(s?'Reunion':''); })(),
+        // Actif : la colonne SharePoint "Actif" vaut "Oui"/"Non". Défaut actif si vide.
+        actif: (function(){ var a=(f.Actif||'').trim().toLowerCase(); return a==='non'||a==='no'||a==='false'?false:true; })(),
+        itemId: i.id // nécessaire pour les mises à jour PATCH
+      };
+    });
+    // Déduplication par code (la liste SharePoint peut contenir des doublons).
+    // On garde en priorité l'occurrence qui a un rôle renseigné.
+    const byCode = {};
+    mapped.forEach(e => {
+      if (!e.code) return;
+      const ex = byCode[e.code];
+      if (!ex) { byCode[e.code] = e; return; }
+      // Préférer celle avec un rôle défini, sinon avec un site défini
+      const score = (x) => (x.role ? 2 : 0) + (x.site ? 1 : 0);
+      if (score(e) > score(ex)) byCode[e.code] = e;
+    });
+    return json(Object.values(byCode));
+  }
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────────
+  if (p.get('dashboard') === '1') {
+    const [movR, pendR] = await Promise.all([
+      fetch(GL + '/Mouvements/items?$expand=fields&$top=5000', { headers: H }),
+      fetch(GL + '/Transferts_En_Attente/items?$expand=fields&$top=200', { headers: H }) // Pas de filtre OData, filtre JS côté client
+    ]);
+    const movData  = await movR.json();
+    const pendData = await pendR.json();
+    // Résolveur de noms (résout les doublons type "CONI" vs "COUTAREL Nicolas")
+    const vraiNom = await getNomResolver();
+
+    const allMovRaw = (movData.value || []).map(i => { const code = i.fields.Code_Employe || ''; return { code_im: i.fields.Title || '', code_employe: code, nom_employe: vraiNom(code, i.fields.Commentaire || ''), type_mouvement: i.fields.Type_Mouvement || '', code_chantier: i.fields.Code_Chantier || '', etat: i.fields.Etat || '', note: i.fields.Note || '', horodatage: i.fields.Horodatage || i.fields.Created || '' }; });
+    const allMov = allMovRaw.sort((a, b) => new Date(b.horodatage) - new Date(a.horodatage));
+
+    // Filtrer les transferts en attente côté JS (évite les problèmes OData)
+    const pending = (pendData.value || [])
+      .filter(i => { const s = (i.fields || {}).Statut || ''; return s !== 'Validé' && s !== 'Valide' && s !== 'Refused'; })
+      .map(i => ({ id: i.id, code_im: i.fields.Title || '', donneur_code: i.fields.Code_Employe_Donneur || '', donneur_nom: i.fields.Nom_Donneur || '', receveur_code: i.fields.Code_Employe_Receveur || '', receveur_nom: i.fields.Nom_Receveur || '', etat: i.fields.Etat || '', note: i.fields.Note || '', statut: i.fields.Statut || 'En attente', horodatage: i.fields.Created || '' }));
+
+    // ── Inventaire courant : dernier mouvement de POSSESSION par immo ──────────
+    // Important : une déclaration de panne (Panne / Suivi_Panne) n'est PAS un
+    // changement de possession. L'immo reste avec son dernier détenteur réel
+    // jusqu'à un vrai Transfert, Retour, ou Réparation (résolution = retour dépôt).
+    const inv = {};
+    allMov.forEach(m => {
+      if (inv[m.code_im]) return; // déjà déterminé par un mouvement plus récent
+      if (m.type_mouvement === 'Panne' || m.type_mouvement === 'Suivi_Panne') return; // ignoré pour la possession
+      const isGest = GESTIONNAIRES.includes(m.code_employe);
+      // Une Réparation = la panne est résolue = l'immo revient au dépôt, quel que soit l'admin qui a traité
+      const isRetour = m.type_mouvement === 'Retour' || m.type_mouvement === 'Réparation' || m.code_chantier === 'DEPOT' || isGest;
+      inv[m.code_im] = { code_im: m.code_im, statut: isRetour ? 'Au depot' : 'En circulation', detenteur_code: isRetour ? 'DEPOT' : m.code_employe, detenteur_nom: isRetour ? 'Depot' : m.nom_employe, etat: m.etat || 'Inconnu', note: m.note || '', since: m.horodatage, dernier_mouvement: m.type_mouvement };
+    });
+
+    // ── Détection des pannes actives + prestataire éventuel (localisation spéciale) ──
+    const lastPanneByCode = {}; const lastRepByCode = {};
+    allMov.forEach(m => {
+      if (m.type_mouvement === 'Panne' && !lastPanneByCode[m.code_im]) lastPanneByCode[m.code_im] = m;
+      if (m.type_mouvement === 'Réparation' && !lastRepByCode[m.code_im]) lastRepByCode[m.code_im] = m;
+    });
+    Object.keys(lastPanneByCode).forEach(code => {
+      const lp = lastPanneByCode[code]; const lr = lastRepByCode[code];
+      const panneActive = !lr || new Date(lp.horodatage) > new Date(lr.horodatage);
+      if (!panneActive || !inv[code]) return;
+      // Chercher le prestataire le plus récent renseigné depuis la déclaration de panne
+      let presta = null; let prestaSince = lp.horodatage;
+      for (const m of allMov) {
+        if (m.code_im !== code) continue;
+        if (new Date(m.horodatage) < new Date(lp.horodatage)) break; // avant la panne : on arrête
+        const match = (m.note || '').match(/##PRESTA:([^#]+)##/);
+        if (match) { presta = match[1]; prestaSince = m.horodatage; break; }
       }
-    }, 150);
-  }
-}
-
-function scannerPourResa() {
-  showScreen('screen-scan-resa');
-  startScanner('scanner-resa', code => {
-    if (!code.startsWith('IM')) { toast('Ce n\'est pas une immo', 'error'); return; }
-    // Contrôle géographique : l'immo doit être sur un site autorisé
-    if (S.employe && !immoVisiblePour(S.employe.code, code)) {
-      stopScanner(); vib(300);
-      const siteImmo = siteImmoDe(code);
-      const nomSite = siteImmo === 'Mayotte' ? 'Mayotte' : 'La Réunion';
-      showScreen('screen-reserver', true);
-      toast('⛔ ' + lib(code) + ' est à ' + nomSite + ' — hors de votre périmètre', 'error', 3500);
-      return;
-    }
-    stopScanner(); vib(200);
-    showScreen('screen-reserver', true);
-    selImmoResa(code, lib(code));
-    toast('📦 ' + lib(code) + ' sélectionné', 'success', 2000);
-  });
-}
-
-async function soumettreReservation() {
-  if (!S.resaImmoCode) { toast('Sélectionne une immo', 'error'); return; }
-  const debut = document.getElementById('resa-date-debut').value;
-  const fin   = document.getElementById('resa-date-fin').value;
-  if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
-  if (new Date(fin) <= new Date(debut)) { toast('La date de retour doit être après le départ', 'error'); return; }
-  // Vérifier conflits
-  try {
-    const r = await fetch(CONFIG.proxy + '?reservations=1');
-    const resas = await r.json();
-    const conflits = resas.filter(r => r.code_im === S.resaImmoCode && r.statut !== 'Annulee' && r.statut !== 'Rendue' && !(new Date(fin) < new Date(r.date_debut) || new Date(debut) > new Date(r.date_fin)));
-    if (conflits.length > 0) {
-      const msg = conflits.map(c => `${c.nom_employe} (${fmt(c.date_debut)} → ${fmt(c.date_fin)})`).join(' | ');
-      if (!confirm(`Cette immo est déjà réservée : ${msg}. Envoyer quand même ?`)) return;
-    }
-  } catch (e) {}
-
-  const selPQ = document.getElementById('resa-pour-qui');
-  const pourQCode = selPQ?.value || '';
-  const pourQNom  = pourQCode ? (selPQ?.options[selPQ.selectedIndex]?.textContent.split(' (')[0] || pourQCode) : '';
-  const codeEmp = pourQCode || S.employe.code;
-  const nomEmp  = pourQNom  || S.employe.nom;
-
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=reserver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      code_im: S.resaImmoCode, code_employe: codeEmp, nom_employe: nomEmp,
-      code_chantier: document.getElementById('resa-chantier').value,
-      nom_chantier:  document.getElementById('resa-chantier').value,
-      date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), // 07h00 départ / 15h00 retour max
-      note: document.getElementById('resa-note').value,
-    }) });
-    const d = await r.json();
-    if (d.success) {
-      vib(300); toast('✅ Demande de réservation envoyée !', 'success', 3500);
-      document.getElementById('recap').innerHTML = `<strong>✅ Demande envoyée !</strong><br><strong>Immo :</strong> ${S.resaImmoLibelle}<br>${pourQNom ? `<strong>Pour :</strong> ${pourQNom}<br>` : ''}<strong>Du :</strong> ${fmt(debut)}<br><strong>Au :</strong> ${fmt(fin)}<br><em style="color:var(--grey)">En attente de confirmation logistique</em>`;
-      document.getElementById('alerte-degradation')?.classList.add('hidden');
-      showScreen('screen-confirmation');
-      majBadgeResas();
-    } else toast('Erreur lors de la réservation', 'error');
-  } catch (e) { toast('Erreur réseau', 'error'); }
-}
-
-async function afficherMesReservations() {
-  if (!S.employe) { showScreen('screen-activation'); return; }
-  if (CONFIG.admins.includes(S.employe.code)) {
-    await afficherReservationsAdmin();
-    return;
-  }
-  if (!S.employe) { showScreen('screen-activation'); return; }
-  const div = document.getElementById('mes-resa-liste');
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    const r = await fetch(CONFIG.proxy + '?mes_reservations=' + S.employe.code);
-    const resas = await r.json();
-    if (!resas.length) { div.innerHTML = '<p class="empty-msg">Aucune réservation.</p>'; return; }
-    const actives  = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee');
-    const terminees= resas.filter(r => r.statut === 'Rendue' || r.statut === 'Annulee');
-    const retards  = actives.filter(r => r.statut === 'En retard');
-    let html = '';
-    if (retards.length) html += `<div style="background:#FFEBEE;border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid var(--red)"><strong style="color:var(--red)">⚠️ ${retards.length} retard(s) — retourne le matériel au dépôt</strong></div>`;
-    const carte = r => {
-      const c = SCOL[r.statut] || '#999';
-      const canEdit = r.statut === 'Demandee' || r.statut === 'Confirmee' || r.statut === 'En cours' || r.statut === 'En retard';
-      return `<div class="materiel-card" style="border-left-color:${c}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <strong style="color:var(--blue)">${lib(r.code_im) || '—'}</strong>
-          ${rsLabel(r.statut)}
-        </div>
-        ${r.code_im ? `<span class="chantier-tag">${r.code_im}</span><br>` : ''}
-        <div style="font-size:13px;margin-top:4px">📅 ${fmt(r.date_debut)} → ${fmt(r.date_fin)}</div>
-        ${r.nom_chantier ? `<div style="font-size:12px;color:var(--grey)">🏗️ ${r.nom_chantier}</div>` : ''}
-        ${r.note ? `<div style="font-size:12px;color:var(--grey)">📝 ${r.note}</div>` : ''}
-        ${r.statut === 'Contre-proposition' ? `<div style="background:#EDE7F6;border-radius:8px;padding:8px;margin-top:6px;font-size:12px;color:#4527A0"><strong>✏️ Proposition de la logistique :</strong> voir les nouvelles dates ci-dessus<br><div style="display:flex;gap:8px;margin-top:6px"><button onclick="accepterContreProp('${r.id}')" style="flex:1;padding:7px;background:#27AE60;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">✅ Accepter</button><button onclick="annulerResa('${r.id}')" style="flex:1;padding:7px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">❌ Refuser</button></div></div>` : ''}
-        ${canEdit && r.statut !== 'Contre-proposition' ? `<div style="display:flex;gap:8px;margin-top:8px">
-          <button onclick="ouvrirModifResa('${r.id}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>
-          <button onclick="annulerResa('${r.id}')" style="flex:1;padding:8px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">❌ Annuler</button>
-        </div>` : ''}
-      </div>`;
-    };
-    if (actives.length) html += `<h3 style="color:var(--blue);font-size:14px;margin:8px 0 6px">En cours (${actives.length})</h3>` + actives.map(carte).join('');
-    if (terminees.length) html += `<h3 style="color:var(--grey);font-size:13px;margin:12px 0 6px">Terminées (${terminees.length})</h3>` + terminees.map(carte).join('');
-    div.innerHTML = html;
-  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur : ' + e.message + '</p>'; }
-}
-
-async function accepterContreProp(id) {
-  if (!confirm('Accepter la proposition de la logistique ?')) return;
-  try {
-    await fetch(CONFIG.proxy + '?action=statut_resa', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, statut: 'Confirmee' }),
-    });
-    toast('✅ Proposition acceptée — réservation confirmée', 'success', 3000);
-    afficherMesReservations();
-    majBadgeResas();
-  } catch (e) { toast('Erreur', 'error'); }
-}
-
-async function annulerResa(id) {
-  if (!confirm('Annuler cette réservation ?')) return;
-  await fetch(CONFIG.proxy + '?action=statut_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, statut: 'Annulee' }) });
-  toast('Réservation annulée', 'success');
-  afficherMesReservations(); majBadgeResas();
-}
-
-let resaEnCoursId = null;
-async function ouvrirModifResa(id) {
-  resaEnCoursId = id;
-  try {
-    const r = await fetch(CONFIG.proxy + '?mes_reservations=' + S.employe.code);
-    const resas = await r.json();
-    const resa = resas.find(r => r.id === id);
-    if (!resa) { toast('Réservation introuvable', 'error'); return; }
-    // Bloc changement d'immo réservé aux admins — masqué pour l'utilisateur standard
-    const blocImmo = document.getElementById('modif-immo-bloc');
-    if (blocImmo) blocImmo.classList.add('hidden');
-    document.getElementById('modif-resa-info').textContent = lib(resa.code_im) + ' (' + resa.code_im + ')';
-    if (resa.date_debut) document.getElementById('modif-date-debut').value = resa.date_debut.slice(0, 10);
-    if (resa.date_fin)   document.getElementById('modif-date-fin').value   = resa.date_fin.slice(0, 10);
-    document.getElementById('modif-chantier').value = resa.nom_chantier || '';
-    document.getElementById('modif-note').value     = resa.note || '';
-    showScreen('screen-modifier-resa');
-  } catch (e) { toast('Erreur', 'error'); }
-}
-
-async function validerModifResa() {
-  if (!resaEnCoursId) return;
-  const debut = document.getElementById('modif-date-debut').value;
-  const fin   = document.getElementById('modif-date-fin').value;
-  if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
-  try {
-    await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: resaEnCoursId, date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), nom_chantier: document.getElementById('modif-chantier').value, note: document.getElementById('modif-note').value }) });
-    toast('Réservation modifiée', 'success');
-    resaEnCoursId = null;
-    showScreen('screen-mes-reservations');
-  } catch (e) { toast('Erreur', 'error'); }
-}
-
-// ── Scanner pour déclarer une panne (admin) ─────────────────────────────
-function scannerPourPanne() {
-  showScreen('screen-scan-immo', true);
-  document.getElementById('titre-mouvement').textContent = '📢 Scanner pour déclarer une panne';
-  document.getElementById('immo-result')?.classList.add('hidden');
-  startScanner('scanner-immo', function(code) {
-    if (!code.startsWith('IM')) { return; }
-    stopScanner(); vib(200);
-    showScreen('screen-accueil');
-    signalerPannePWA(code);
-  });
-}
-
-// ── Résoudre une panne depuis la PWA (admin) ─────────────────────────────
-async function resoudrePannePWA(codeIM) {
-  const libIM = lib(codeIM);
-  const note = prompt('Résolution panne ' + libIM + ' — Décrivez la réparation (obligatoire) :');
-  if (!note || note.trim().length < 10) { toast('Note obligatoire (10 car. min.)', 'error'); return; }
-  const prest = prompt('Prestataire SAV (optionnel) :') || '';
-  const cout  = prompt('Coût réel de réparation en € (optionnel) :') || '';
-  if (!confirm('Confirmer le retour de ' + codeIM + ' dans le parc ?')) return;
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=resoudre_panne', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code_im: codeIM, etat_resolution: 'Bon état', prestataire: prest, cout_reel: cout, note, par_code: S.employe.code, par_nom: S.employe.nom }),
-    });
-    const d = await r.json();
-    if (d.success !== false) {
-      vib(300);
-      document.getElementById('recap').innerHTML = '<strong>✅ Panne résolue !</strong><br><strong>Immo :</strong> ' + libIM + '<br><strong>Note :</strong> ' + note + '<br>' + (prest ? '<strong>Prestataire :</strong> ' + prest + '<br>' : '') + (cout ? '<strong>Coût :</strong> ' + cout + '€<br>' : '') + '<em style="color:var(--grey)">Immo de retour dans le parc.</em>';
-      document.getElementById('alerte-degradation')?.classList.add('hidden');
-      showScreen('screen-confirmation');
-    } else { toast('Erreur lors de la résolution', 'error'); }
-  } catch (e) { toast('Erreur réseau', 'error'); }
-}
-
-// ── Déclarer vol / disparition depuis PWA (admin) ─────────────────────────
-async function declarerVolPWA(codeIM) {
-  const libIM = lib(codeIM);
-  const type = confirm('Cliquez OK pour "Volé", Annuler pour "Disparu"') ? 'Volé' : 'Disparu';
-  const motif = prompt('Motif obligatoire pour [' + type + '] ' + codeIM + ' (min 10 car.) :');
-  if (!motif || motif.trim().length < 10) { toast('Motif obligatoire', 'error'); return; }
-  if (!confirm('1ère CONFIRMATION : ' + codeIM + ' sera déclaré [' + type + '] et retiré du parc.')) return;
-  if (!confirm('CONFIRMATION FINALE IRRÉVERSIBLE : Confirmer [' + type + '] pour ' + codeIM + ' ?')) return;
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=declarer_vol', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code_im: codeIM, type_vol: type, motif, par_code: S.employe.code, par_nom: S.employe.nom }),
-    });
-    const d = await r.json();
-    if (d.success !== false) {
-      vib(300); toast('✅ ' + codeIM + ' déclaré ' + type, 'success', 4000);
-      showScreen('screen-accueil');
-    } else { toast('Erreur', 'error'); }
-  } catch (e) { toast('Erreur réseau', 'error'); }
-}
-
-// ── Déclarer une panne depuis la PWA ────────────────────────────────────
-async function signalerPannePWA(codeIM) {
-  const libIM = lib(codeIM);
-  const motif = prompt('Signaler une panne sur ' + libIM + ' (' + codeIM + ')\nDécrivez brièvement le problème (obligatoire, 5 car. min.) :');
-  if (!motif || motif.trim().length < 5) {
-    toast('Motif obligatoire pour signaler une panne', 'error');
-    return;
-  }
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=declarer_panne', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code_im: codeIM,
-        code_employe: S.employe.code,
-        nom_employe: S.employe.nom,
-        motif: motif.trim() + ' [signalé par ' + S.employe.nom + ']',
-      }),
-    });
-    const d = await r.json();
-    if (d.success !== false) {
-      vib(300);
-      toast('📢 Panne signalée — la logistique est notifiée', 'success', 4000);
-      // Afficher un écran de confirmation
-      document.getElementById('recap').innerHTML =
-        '<strong>📢 Panne signalée</strong><br>' +
-        '<strong>Immo :</strong> ' + libIM + ' (' + codeIM + ')<br>' +
-        '<strong>Signalé par :</strong> ' + S.employe.nom + '<br>' +
-        '<strong>Motif :</strong> ' + motif + '<br>' +
-        '<em style="color:var(--grey)">La logistique va être contactée pour intervention.</em>';
-      document.getElementById('alerte-degradation')?.classList.add('hidden');
-      showScreen('screen-confirmation');
-      rafraichirBadges();
-    } else {
-      toast('Erreur lors du signalement', 'error');
-    }
-  } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
-}
-
-// ══════════════════════════════════════════════════════════
-// VUE RÉSERVATIONS POUR CONI / ADMIN
-// ══════════════════════════════════════════════════════════
-
-async function afficherReservationsAdmin() {
-  const div = document.getElementById('mes-resa-liste');
-  // Changer le titre
-  const h2 = document.querySelector('#screen-mes-reservations h2');
-  if (h2) h2.textContent = '📋 Réservations en cours';
-  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
-  try {
-    const r = await fetch(CONFIG.proxy + '?reservations=1');
-    const resas = await r.json();
-    const actives = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee');
-    actives.sort((a, b) => {
-      const aImm = isImminenteSansReponse(a) ? 0 : 1;
-      const bImm = isImminenteSansReponse(b) ? 0 : 1;
-      if (aImm !== bImm) return aImm - bImm; // imminentes en premier, avant même "En retard"
-      const order = { 'En retard': 0, 'Demandee': 1, 'Contre-proposition': 2, 'Confirmee': 3, 'En cours': 4 };
-      return (order[a.statut] || 9) - (order[b.statut] || 9);
-    });
-    if (!actives.length) { div.innerHTML = '<p class="empty-msg">Aucune réservation en cours.</p>'; return; }
-    // Compteurs par statut
-    const counts = {};
-    actives.forEach(r => { counts[r.statut] = (counts[r.statut] || 0) + 1; });
-    let html = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
-    Object.keys(counts).forEach(s => {
-      const c = STATUT_COLORS[s] || { bg: '#F5F5F5', color: '#999', label: s };
-      html += `<span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${c.bg};color:${c.color}">${c.label} · ${counts[s]}</span>`;
-    });
-    html += '</div>';
-    html += actives.map(r => {
-      const l = lib(r.code_im) || '—';
-      const s = STATUT_COLORS[r.statut] || { bg: '#F5F5F5', color: '#999', label: r.statut };
-      const dDebut = r.date_debut ? fmtDate(r.date_debut) : '—';
-      const dFin   = r.date_fin   ? fmtDate(r.date_fin)   : '—';
-      const isImm  = isImminenteSansReponse(r);
-      return `<div class="materiel-card" style="border-left:4px solid ${isImm ? 'var(--red)' : s.color};${isImm ? 'background:#FFF5F5' : ''}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-          <div><strong style="color:var(--blue)">${r.nom_employe}</strong> <small style="color:var(--grey)">${r.code_employe}</small></div>
-          <span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${s.bg};color:${s.color}">${s.label}</span>
-        </div>
-        ${isImm ? '<div style="background:var(--red);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:800;margin-bottom:6px;text-align:center">⏰ DÉPART IMMINENT — RÉPONSE REQUISE</div>' : ''}
-        <strong>${l}</strong> <span style="font-size:11px;color:#999;font-family:monospace">${r.code_im}</span>
-        <div style="font-size:13px;margin-top:4px">📅 ${dDebut} → ${dFin}</div>
-        ${r.nom_chantier ? `<div style="font-size:12px;color:var(--grey)">🏗️ ${r.nom_chantier}</div>` : ''}
-        ${r.note ? `<div style="font-size:12px;color:var(--orange)">📝 ${r.note}</div>` : ''}
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-          ${r.statut === 'Demandee' ? `<button onclick="actionResaPWA('${r.id}','Confirmee','${r.nom_employe.replace(/'/g,"\\'")}','${r.code_im}')" style="flex:1;padding:8px;background:#E8F5E9;color:#1B5E20;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✅ Confirmer</button>` : ''}
-          <button onclick="proposerModifPWA('${r.id}','${r.code_im}','${r.nom_employe.replace(/'/g,"\\'")}','${r.date_debut ? r.date_debut.slice(0,10) : ''}','${r.date_fin ? r.date_fin.slice(0,10) : ''}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>
-          <button onclick="actionResaPWA('${r.id}','Annulee','${r.nom_employe.replace(/'/g,"\\'")}','${r.code_im}')" style="flex:1;padding:8px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">❌ Annuler</button>
-        </div>
-      </div>`;
-    }).join('');
-    div.innerHTML = html;
-  } catch (e) {
-    div.innerHTML = `<p class="empty-msg">Erreur : ${e.message}</p>`;
-  }
-}
-
-async function actionResaPWA(id, statut, nomEmp, codeIM) {
-  const action = statut === 'Confirmee' ? 'Confirmer' : 'Annuler';
-  if (!confirm(`${action} la réservation de ${nomEmp} pour ${lib(codeIM)} ?`)) return;
-  try {
-    await fetch(CONFIG.proxy + '?action=statut_resa', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, statut }),
-    });
-    toast(action === 'Confirmer' ? '✅ Réservation confirmée' : '❌ Réservation annulée', 'success');
-    afficherReservationsAdmin();
-  } catch (e) { toast('Erreur', 'error'); }
-}
-
-function proposerModifPWA(id, codeIM, nomEmp, dateDebut, dateFin) {
-  S.resaEnCoursId = id;
-  S.resaImmoActuelle = codeIM;
-  document.getElementById('modif-resa-info').textContent = `Demande de ${nomEmp}`;
-  // Afficher le bloc de changement d'immo (admin uniquement)
-  const bloc = document.getElementById('modif-immo-bloc');
-  if (bloc) bloc.classList.remove('hidden');
-  const actuelle = document.getElementById('modif-immo-actuelle');
-  if (actuelle) actuelle.innerHTML = 'Demandé : <strong>' + lib(codeIM) + '</strong> (' + codeIM + ')';
-  const codeInput = document.getElementById('modif-immo-code');
-  if (codeInput) codeInput.value = '';
-  const lblInit = document.getElementById('modif-immo-label');
-  if (lblInit) lblInit.textContent = '';
-  if (dateDebut) document.getElementById('modif-date-debut').value = dateDebut;
-  if (dateFin)   document.getElementById('modif-date-fin').value   = dateFin;
-  document.getElementById('modif-chantier').value = '';
-  document.getElementById('modif-note').value = '';
-  showScreen('screen-modifier-resa');
-}
-
-// Scanner une immo pour la contre-proposition
-function scannerModifImmo() {
-  showScreen('screen-scan-immo', true);
-  document.getElementById('titre-mouvement').textContent = '📷 Scanner l\'immo proposée';
-  startScanner('scanner-immo', function(code) {
-    if (!code.startsWith('IM')) return;
-    stopScanner(); vib(200);
-    const inp = document.getElementById('modif-immo-code');
-    if (inp) inp.value = code;
-    const lbl = document.getElementById('modif-immo-label');
-    if (lbl) lbl.textContent = '✅ ' + lib(code);
-    showScreen('screen-modifier-resa');
-  });
-}
-
-// Remplacer validerModifResa pour supporter la contre-proposition admin
-const _origValiderModif = validerModifResa;
-validerModifResa = async function() {
-  if (!S.resaEnCoursId) return;
-  const debut = document.getElementById('modif-date-debut').value;
-  const fin   = document.getElementById('modif-date-fin').value;
-  const note  = document.getElementById('modif-note').value;
-  if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
-  const isAdmin = S.employe && CONFIG.admins.includes(S.employe.code);
-  // Immo alternative (admin uniquement)
-  let immoAlt = '';
-  const codeInput = document.getElementById('modif-immo-code');
-  if (isAdmin && codeInput) {
-    const saisie = (codeInput.value || '').trim().toUpperCase();
-    if (saisie && saisie !== (S.resaImmoActuelle || '').toUpperCase()) {
-      if (!lib(saisie) || lib(saisie) === saisie) { toast('Code IM inconnu : ' + saisie, 'error'); return; }
-      immoAlt = saisie;
-    }
-  }
-  const noteComplete = isAdmin
-    ? (note ? `[Modification par ${S.employe.nom} : ${note}]` : `[Modifiée par ${S.employe.nom}]`)
-    : note;
-  const statut = isAdmin ? 'Contre-proposition' : undefined;
-  try {
-    const body = { id: S.resaEnCoursId, date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), nom_chantier: document.getElementById('modif-chantier').value, note: noteComplete };
-    if (statut) body.statut = statut;
-    if (immoAlt) body.code_im_alt = immoAlt;
-    await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    toast(isAdmin ? '✏️ Contre-proposition envoyée' : '✅ Réservation modifiée', 'success');
-    S.resaEnCoursId = null;
-    S.resaImmoActuelle = null;
-    afficherReservationsAdmin();
-    showScreen('screen-reservations-admin');
-  } catch (e) { toast('Erreur', 'error'); }
-};
-
-// Couleurs pour les statuts (utilisé dans afficherReservationsAdmin)
-const STATUT_COLORS = {
-  'Demandee':           { bg: '#FFF8E1', color: '#E65100', label: '⏳ En attente' },
-  'Confirmee':          { bg: '#E8F5E9', color: '#1B5E20', label: '✅ Confirmée' },
-  'En cours':           { bg: '#E3F2FD', color: '#0D47A1', label: '🔄 En cours' },
-  'Rendue':             { bg: '#F5F5F5', color: '#757575', label: '📦 Rendue' },
-  'En retard':          { bg: '#FFEBEE', color: '#B71C1C', label: '⚠️ En retard' },
-  'Annulee':            { bg: '#F5F5F5', color: '#9E9E9E', label: '❌ Annulée' },
-  'Contre-proposition': { bg: '#EDE7F6', color: '#4527A0', label: '✏️ Contre-proposition' },
-};
-
-// ══════════════════════════════════════════════════════════
-// ÉCRANS PANNE / RÉSOLUTION / RETRAIT — sans prompt/confirm
-// ══════════════════════════════════════════════════════════
-
-// Immo en cours de traitement (état partagé entre les écrans)
-const PANNE_STATE = { codeIM: null, libelle: null, typeRetrait: null };
-
-// ── Ouvrir écran signalement panne ───────────────────────
-function ouvrirEcranPanne(codeIM) {
-  if (!codeIM) return;
-  PANNE_STATE.codeIM = codeIM;
-  PANNE_STATE.libelle = lib(codeIM);
-  const el = document.getElementById('panne-immo-titre');
-  if (el) el.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
-  const ta = document.getElementById('panne-motif');
-  if (ta) ta.value = '';
-  showScreen('screen-signaler-panne', true);
-}
-
-// Appelée aussi depuis le bouton "Mon matériel"
-function signalerPannePWA(codeIM) { ouvrirEcranPanne(codeIM); }
-
-async function soumettrePanne() {
-  const motif = (document.getElementById('panne-motif') || {}).value || '';
-  if (!motif || motif.trim().length < 5) {
-    toast('Décrivez la panne (5 caractères minimum)', 'error'); return;
-  }
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=declarer_panne', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code_im: PANNE_STATE.codeIM,
-        code_employe: S.employe.code,
-        nom_employe: S.employe.nom,
-        motif: motif.trim() + ' [signalé par ' + S.employe.nom + ']',
-      }),
-    });
-    const d = await r.json();
-    if (d.success !== false) {
-      vib(300);
-      document.getElementById('recap').innerHTML =
-        '<strong>📢 Panne signalée</strong><br>' +
-        '<strong>Immo :</strong> ' + PANNE_STATE.libelle + ' (' + PANNE_STATE.codeIM + ')<br>' +
-        '<strong>Signalé par :</strong> ' + S.employe.nom + '<br>' +
-        '<strong>Motif :</strong> ' + motif + '<br>' +
-        '<em style="color:var(--grey)">La logistique sera notifiée. L\'immo est suspendue des réservations.</em>';
-      document.getElementById('alerte-degradation')?.classList.add('hidden');
-      showScreen('screen-confirmation', true);
-      rafraichirBadges();
-    } else { toast('Erreur lors du signalement', 'error'); }
-  } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
-}
-
-// ── Ouvrir écran résolution panne ────────────────────────
-function ouvrirEcranResolution(codeIM) {
-  if (!codeIM) return;
-  PANNE_STATE.codeIM = codeIM;
-  PANNE_STATE.libelle = lib(codeIM);
-  const el = document.getElementById('resolution-immo-titre');
-  if (el) el.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
-  ['resolution-etat', 'resolution-prest', 'resolution-cout', 'resolution-note'].forEach(function(id) {
-    const el2 = document.getElementById(id);
-    if (el2) el2.value = id === 'resolution-etat' ? 'Bon état' : '';
-  });
-  showScreen('screen-resoudre-panne', true);
-}
-
-function resoudrePannePWA(codeIM) { ouvrirEcranResolution(codeIM); }
-
-async function soumettreResolution() {
-  const etat  = (document.getElementById('resolution-etat') || {}).value || 'Bon état';
-  const prest = (document.getElementById('resolution-prest') || {}).value || '';
-  const coutRaw = (document.getElementById('resolution-cout') || {}).value || '';
-  const cout  = coutRaw.replace(',', '.'); // normaliser virgule → point
-  const note  = (document.getElementById('resolution-note') || {}).value || '';
-  if (!note || note.trim().length < 10) {
-    toast('La note de résolution est obligatoire (10 car. min.)', 'error'); return;
-  }
-  try {
-    const r = await fetch(CONFIG.proxy + '?action=resoudre_panne', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code_im: PANNE_STATE.codeIM, etat_resolution: etat,
-        prestataire: prest, cout_reel: cout, note,
-        par_code: S.employe.code, par_nom: S.employe.nom,
-      }),
-    });
-    const d = await r.json();
-    if (d.success !== false) {
-      vib(300);
-      const recapEl = document.getElementById('recap');
-      const immoLabel = PANNE_STATE.libelle || PANNE_STATE.codeIM || 'Immo';
-      if (recapEl) {
-        recapEl.innerHTML =
-          '<strong>✅ Panne résolue !</strong><br>' +
-          '<strong>Immo :</strong> ' + immoLabel + '<br>' +
-          '<strong>État :</strong> ' + etat + '<br>' +
-          (prest ? '<strong>Prestataire :</strong> ' + prest + '<br>' : '') +
-          (cout  ? '<strong>Coût :</strong> ' + parseFloat(cout).toFixed(2) + '€<br>' : '') +
-          '<strong>Note :</strong> ' + note + '<br>' +
-          '<em style="color:var(--grey)">Immo de retour dans le parc.</em>';
-        document.getElementById('alerte-degradation')?.classList.add('hidden');
-        showScreen('screen-confirmation', true);
+      if (presta) {
+        inv[code].statut = 'Chez prestataire';
+        inv[code].detenteur_code = 'PRESTA';
+        inv[code].detenteur_nom = 'Prestataire : ' + presta;
+        inv[code].since = prestaSince;
       } else {
-        // Fallback si screen-confirmation non accessible
-        toast('✅ Panne résolue — ' + immoLabel + ' de retour dans le parc !', 'success', 5000);
-        showScreen('screen-accueil');
+        inv[code].en_panne = true; // le détenteur affiché reste le dernier réel, juste signalé
       }
-      rafraichirBadges();
-    } else { toast('Erreur lors de la résolution', 'error'); }
-  } catch (e) { toast('Erreur réseau', 'error'); }
-}
+    });
 
-// ── Ouvrir écran retrait parc (vol, disparu, HS, perdu) ──
-function ouvrirEcranVol(codeIM) {
-  PANNE_STATE.codeIM = codeIM; PANNE_STATE.libelle = lib(codeIM);
-  PANNE_STATE.typeRetrait = null; // sera choisi par l'utilisateur
-  const titreEl = document.getElementById('retrait-titre');
-  if (titreEl) titreEl.textContent = '🚨 Vol ou disparition';
-  const immoEl = document.getElementById('retrait-immo-titre');
-  if (immoEl) immoEl.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
-  // Ajouter un select type dans le formulaire
-  const motifEl = document.getElementById('retrait-motif');
-  if (motifEl) motifEl.placeholder = 'Décrivez les circonstances du vol ou de la disparition... (10 car. min.)';
-  // Choix type
-  const warn = document.getElementById('retrait-warning');
-  if (warn) warn.innerHTML = '<select id="retrait-type" class="select-input" style="margin-bottom:8px"><option value="Volé">🚨 Volé</option><option value="Disparu">🔍 Disparu</option></select><br>⚠️ Action irréversible — l\'immo sera retirée définitivement du parc';
-  _reinitRetraitEcran();
-  showScreen('screen-retrait-parc', true);
-}
+    const inventory      = Object.values(inv);
+    const enCirc         = inventory.filter(i => i.statut === 'En circulation');
+    const auDepot        = inventory.filter(i => i.statut === 'Au depot');
+    const chezPrestataire= inventory.filter(i => i.statut === 'Chez prestataire');
+    const horsService    = inventory.filter(i => i.etat === 'Hors service');
+    const now         = Date.now();
+    const alertes     = pending.filter(t => (now - new Date(t.horodatage).getTime()) > 86400000);
 
-function ouvrirEcranHS(codeIM) {
-  PANNE_STATE.codeIM = codeIM; PANNE_STATE.libelle = lib(codeIM);
-  PANNE_STATE.typeRetrait = 'Hors service définitif';
-  const titreEl = document.getElementById('retrait-titre');
-  if (titreEl) titreEl.textContent = '⚫ HS définitif';
-  const immoEl = document.getElementById('retrait-immo-titre');
-  if (immoEl) immoEl.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
-  const warn = document.getElementById('retrait-warning');
-  if (warn) warn.innerHTML = '⚠️ Marquer comme Hors Service Définitif — immo retirée du parc';
-  const motifEl = document.getElementById('retrait-motif');
-  if (motifEl) motifEl.placeholder = 'Décrivez pourquoi cette immo est mise hors service définitivement... (10 car. min.)';
-  _reinitRetraitEcran();
-  showScreen('screen-retrait-parc', true);
-}
+    const etats = ['Neuf', 'Bon état', 'Usé', 'Abîmé', 'Hors service'];
+    const parEtat = {};
+    etats.forEach(e => { parEtat[e] = inventory.filter(i => i.etat === e).length; });
+    parEtat['Inconnu'] = inventory.filter(i => !etats.includes(i.etat)).length;
 
-function _reinitRetraitEcran() {
-  const m = document.getElementById('retrait-motif'); if (m) m.value = '';
-  const c1 = document.getElementById('retrait-confirm1'); if (c1) c1.classList.remove('hidden');
-  const c2 = document.getElementById('retrait-confirm2'); if (c2) c2.classList.add('hidden');
-}
+    const detMap = {};
+    enCirc.forEach(i => { if (!detMap[i.detenteur_code]) detMap[i.detenteur_code] = { nom: i.detenteur_nom, count: 0 }; detMap[i.detenteur_code].count++; });
+    const durMap = {};
+    enCirc.forEach(i => { const d = i.since ? (now - new Date(i.since).getTime()) / 3600000 : 0; if (!durMap[i.detenteur_code]) durMap[i.detenteur_code] = { nom: i.detenteur_nom, h: 0, n: 0 }; durMap[i.detenteur_code].h += d; durMap[i.detenteur_code].n++; });
+    const moyenneJ = enCirc.length ? Math.round(enCirc.reduce((a, i) => a + (i.since ? (now - new Date(i.since).getTime()) / 86400000 : 0), 0) / enCirc.length * 10) / 10 : 0;
 
-function retraitConfirm1() {
-  const motif = (document.getElementById('retrait-motif') || {}).value || '';
-  if (!motif || motif.trim().length < 10) {
-    toast('Motif obligatoire (10 car. min.)', 'error'); return;
+    return json({ inventory, en_circulation: enCirc, au_depot: auDepot, chez_prestataire: chezPrestataire, pending, hors_service: horsService, all_movements: allMov,
+      top_detenteurs: Object.values(detMap).sort((a, b) => b.count - a.count).slice(0, 10),
+      classement_duree: Object.keys(durMap).map(code => ({ code, nom: durMap[code].nom, count: durMap[code].n, moyenneJours: Math.round(durMap[code].h / durMap[code].n / 24 * 10) / 10, totalJours: Math.round(durMap[code].h / 24 * 10) / 10 })).sort((a, b) => b.moyenneJours - a.moyenneJours).slice(0, 10),
+      stats: { total_mouvementes: inventory.length, total_mouvements: allMov.length, en_circulation: enCirc.length, au_depot: auDepot.length, chez_prestataire: chezPrestataire.length, transferts_en_attente: pending.length, par_etat: parEtat, alertes_delai: alertes.length, hors_service: horsService.length, moyenne_jours_hors_depot: moyenneJ }
+    });
   }
-  document.getElementById('retrait-confirm1').classList.add('hidden');
-  document.getElementById('retrait-confirm2').classList.remove('hidden');
+
+  // ── GET simples ───────────────────────────────────────────────────────────────
+  if (request.method === 'GET') {
+    const immo      = p.get('immo');
+    const employe   = p.get('employe');
+    const transferts= p.get('transferts');
+
+    if (transferts) {
+      const r = await fetch(GL + "/Transferts_En_Attente/items?$expand=fields&$filter=fields/Code_Employe_Receveur eq '" + transferts + "'&$top=50", { headers: H });
+      const d = await r.json();
+      return json((d.value || []).filter(i => { const s = (i.fields || {}).Statut || ''; return s !== 'Validé' && s !== 'Valide'; }).map(i => ({ id: i.id, code_im: i.fields.Title || '', code_employe_donneur: i.fields.Code_Employe_Donneur || '', nom_donneur: i.fields.Nom_Donneur || '', etat: i.fields.Etat || '', note: i.fields.Note || '', horodatage: i.fields.Created || '' })));
+    }
+
+    if (immo) {
+      const all = await paginate(GL + '/Mouvements/items?$expand=fields&$orderby=fields/Created%20desc&$top=2000', 3);
+      const q = immo.toUpperCase();
+      const resolveNom = await getNomResolver();
+      return json(all.map(i => { const code = i.fields.Code_Employe || ''; return { code_im: i.fields.Title || '', code_employe: code, nom_employe: resolveNom(code, i.fields.Commentaire || ''), type_mouvement: i.fields.Type_Mouvement || '', code_chantier: i.fields.Code_Chantier || '', etat: i.fields.Etat || '', note: i.fields.Note || '', horodatage: i.fields.Horodatage || i.fields.Created || '' }; }).filter(m => m.code_im.toUpperCase().includes(q)));
+    }
+
+    if (employe) {
+      const all = await paginate(GL + '/Mouvements/items?$expand=fields&$orderby=fields/Created%20desc&$top=2000', 3);
+      const resolveNom = await getNomResolver();
+      const movs = all.map(i => { const code = i.fields.Code_Employe || ''; return { code_im: i.fields.Title || '', code_employe: code, nom_employe: resolveNom(code, i.fields.Commentaire || ''), type_mouvement: i.fields.Type_Mouvement || '', code_chantier: i.fields.Code_Chantier || '', etat: i.fields.Etat || '', note: i.fields.Note || '', horodatage: i.fields.Horodatage || i.fields.Created || '' }; });
+      const seen = {}, actuel = [];
+      // Une Panne/Suivi_Panne n'est pas un changement de possession : on l'ignore pour déterminer le détenteur actuel
+      movs.forEach(m => {
+        if (m.type_mouvement === 'Panne' || m.type_mouvement === 'Suivi_Panne') return;
+        if (!seen[m.code_im]) { seen[m.code_im] = true; if (m.code_employe === employe && m.type_mouvement !== 'Retour' && m.type_mouvement !== 'Réparation' && m.code_chantier !== 'DEPOT' && !GESTIONNAIRES.includes(m.code_employe)) actuel.push(m); }
+      });
+      return json({ actuel, historique: movs.filter(m => m.code_employe === employe) });
+    }
+
+    const all = await paginate(GL + '/Mouvements/items?$expand=fields&$orderby=fields/Created%20desc&$top=2000', 3);
+    const resolveNomAll = await getNomResolver();
+    return json(all.map(i => { const code = i.fields.Code_Employe || ''; return { code_im: i.fields.Title || '', code_employe: code, nom_employe: resolveNomAll(code, i.fields.Commentaire || ''), type_mouvement: i.fields.Type_Mouvement || '', code_chantier: i.fields.Code_Chantier || '', etat: i.fields.Etat || '', note: i.fields.Note || '', horodatage: i.fields.Horodatage || i.fields.Created || '' }; }));
+  }
+
+  // ── POST ──────────────────────────────────────────────────────────────────────
+  if (request.method === 'POST') {
+    const action = p.get('action');
+    const body   = await request.json();
+
+    if (action === 'upload_photo') {
+      try {
+        const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos/' + encodeURIComponent(body.code_im) + '/' + encodeURIComponent(body.filename || (Date.now() + '.jpg')) + ':/content', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'image/jpeg' }, body: bytes.buffer });
+        return json({ success: r.ok, url: r.ok ? 'https://immo-proxy.ral-85d.workers.dev/?photo=' + encodeURIComponent(body.code_im + '/' + body.filename) : null });
+      } catch (e) { return json({ success: false, error: e.message }); }
+    }
+
+    if (action === 'delete_photo') {
+      const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos/' + encodeURIComponent(body.code_im) + '/' + encodeURIComponent(body.filename), { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + td.access_token } });
+      return json({ success: r.ok });
+    }
+
+    // ── Mettre à jour le rôle/droits d'un employé ──
+    if (action === 'maj_droits') {
+      let itemId = body.item_id;
+      if (!itemId) {
+        // Retrouver l'item par code (essai Title puis Code)
+        const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + body.code + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+        if (!itemId) {
+          const cur2 = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Code eq '" + body.code + "'&$top=1", { headers: H });
+          const curData2 = await cur2.json();
+          itemId = curData2.value && curData2.value[0] ? curData2.value[0].id : null;
+        }
+      }
+      if (!itemId) return json({ success: false, error: 'employe_introuvable', code: body.code });
+      // Écrire dans Code_CT (réutilisé comme "Droits") — tenter les deux noms de colonnes possibles
+      let ok = false;
+      try {
+        const r = await fetch(GL + '/Employes/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Code_CT: body.role }) });
+        ok = r.ok;
+        if (!ok) { const r2 = await fetch(GL + '/Employes/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Droits: body.role }) }); ok = r2.ok; }
+      } catch (e) { ok = false; }
+      return json({ success: ok, item_id: itemId });
+    }
+
+    // ── Mettre à jour le site de rattachement d'un employé ──
+    if (action === 'maj_site_employe') {
+      let itemId = body.item_id;
+      if (!itemId) {
+        const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + body.code + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+      }
+      if (!itemId) return json({ success: false, error: 'employe_introuvable', code: body.code });
+      const site = (body.site === 'Mayotte') ? 'Mayotte' : 'Reunion';
+      let ok = false;
+      try {
+        const r = await fetch(GL + '/Employes/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Site: site }) });
+        ok = r.ok;
+      } catch (e) { ok = false; }
+      return json({ success: ok, item_id: itemId, site: site });
+    }
+
+    // ── SEED : appliquer en masse les rôles + sites aux employés (one-shot) ──
+    // Sécurité : nécessite body.confirm === 'ESPACE-SOLEIL' pour s'exécuter.
+    // ── Nettoyage des doublons d'employés (garde 1 ligne par code) ──
+    if (action === 'dedupe_employes') {
+      if (body.confirm !== 'ESPACE-SOLEIL') return json({ success: false, error: 'confirmation_requise' });
+      const emp = await paginate(GL + '/Employes/items?$expand=fields&$top=300', 6);
+      // Grouper par code (Title)
+      const groupes = {};
+      emp.forEach(i => { const f = i.fields || {}; const c = f.Title || f.Code || ''; if (c) (groupes[c] = groupes[c] || []).push(i); });
+      // Pour chaque groupe, garder l'item le plus complet (rôle+site), supprimer les autres
+      const aSupprimer = [];
+      for (const code in groupes) {
+        const items = groupes[code];
+        if (items.length <= 1) continue;
+        const score = (it) => { const f = it.fields || {}; return (f.Code_CT ? 2 : 0) + (f.Site ? 1 : 0); };
+        items.sort((a, b) => score(b) - score(a) || (parseInt(a.id, 10) - parseInt(b.id, 10)));
+        // items[0] est gardé, le reste supprimé
+        for (let k = 1; k < items.length; k++) aSupprimer.push(items[k].id);
+      }
+      // Supprimer par lots de 20 via $batch
+      const relBase = '/sites/' + SITE_ID + '/lists/Employes/items/';
+      let supprimes = 0; const erreurs = [];
+      for (let i = 0; i < aSupprimer.length; i += 20) {
+        const chunk = aSupprimer.slice(i, i + 20);
+        const requests = chunk.map((id, idx) => ({ id: String(idx), method: 'DELETE', url: relBase + id }));
+        try {
+          const rb = await fetch('https://graph.microsoft.com/v1.0/$batch', { method: 'POST', headers: H, body: JSON.stringify({ requests }) });
+          const rbData = await rb.json();
+          (rbData.responses || []).forEach(resp => { if (resp.status >= 200 && resp.status < 300) supprimes++; else erreurs.push(resp.status); });
+        } catch (e) { erreurs.push('batch_exception'); }
+      }
+      return json({ success: true, doublons_trouves: aSupprimer.length, supprimes, erreurs });
+    }
+
+    // ── Basculer Actif / Inactif d'un employé ──
+    if (action === 'maj_actif') {
+      let itemId = body.item_id;
+      if (!itemId) {
+        const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + body.code + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+      }
+      if (!itemId) return json({ success: false, error: 'employe_introuvable', code: body.code });
+      const val = body.actif ? 'Oui' : 'Non';
+      let ok = false;
+      try {
+        const r = await fetch(GL + '/Employes/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Actif: val }) });
+        ok = r.ok;
+      } catch (e) { ok = false; }
+      return json({ success: ok, item_id: itemId, actif: val });
+    }
+
+    // ── SEED : appliquer les sites aux immos (one-shot) ──
+    if (action === 'seed_immo_sites') {
+      if (body.confirm !== 'ESPACE-SOLEIL') return json({ success: false, error: 'confirmation_requise' });
+      const SITES = {"IM000018":"Reunion","IM000021":"Reunion","IM000178":"Reunion","IM000179":"Reunion","IM000180":"Reunion","IM000182":"Reunion","IM000204":"Reunion","IM000210":"Reunion","IM000809":"Reunion","IM000810":"Reunion","IM000928":"Reunion","IM000929":"Reunion","IM000931":"Reunion","IM001153":"Reunion","IM001154":"Reunion","IM001155":"Reunion","IM001156":"Reunion","IM001157":"Reunion","IM001158":"Reunion","IM001159":"Reunion","IM001025":"Reunion","IM000009":"Reunion","IM000037":"Reunion","IM000047":"Reunion","IM000064":"Reunion","IM000076":"Reunion","IM000078":"Reunion","IM000080":"Reunion","IM000087":"Reunion","IM000102":"Reunion","IM000148":"Reunion","IM000174":"Reunion","IM000226":"Mayotte","IM000227":"Reunion","IM000228":"Reunion","IM000229":"Reunion","IM000230":"Reunion","IM000232":"Reunion","IM000234":"Reunion","IM000237":"Reunion","IM000238":"Reunion","IM000240":"Reunion","IM000241":"Reunion","IM000242":"Reunion","IM000247":"Reunion","IM000250":"Reunion","IM000251":"Reunion","IM000252":"Mayotte","IM000253":"Reunion","IM000265":"Reunion","IM000281":"Reunion","IM000319":"Mayotte","IM000322":"Reunion","IM000323":"Reunion","IM000331":"Reunion","IM000350":"Mayotte","IM000351":"Reunion","IM000352":"Reunion","IM000353":"Reunion","IM000362":"Reunion","IM000363":"Reunion","IM000364":"Reunion","IM000365":"Reunion","IM000367":"Reunion","IM000400":"Reunion","IM000401":"Reunion","IM000403":"Mayotte","IM000404":"Reunion","IM000405":"Reunion","IM000407":"Reunion","IM000408":"Reunion","IM000409":"Reunion","IM000410":"Reunion","IM000411":"Reunion","IM000415":"Reunion","IM000416":"Mayotte","IM000445":"Mayotte","IM000446":"Reunion","IM000455":"Reunion","IM000459":"Mayotte","IM000460":"Mayotte","IM000462":"Reunion","IM000464":"Reunion","IM000465":"Reunion","IM000466":"Reunion","IM000467":"Reunion","IM000468":"Reunion","IM000482":"Reunion","IM000486":"Reunion","IM000487":"Reunion","IM000502":"Reunion","IM000503":"Reunion","IM000507":"Reunion","IM000515":"Reunion","IM000516":"Reunion","IM000517":"Reunion","IM000518":"Reunion","IM000519":"Reunion","IM000527":"Reunion","IM000528":"Reunion","IM000531":"Reunion","IM000532":"Reunion","IM000533":"Reunion","IM000534":"Reunion","IM000535":"Reunion","IM000536":"Reunion","IM000541":"Reunion","IM000542":"Reunion","IM000543":"Reunion","IM000556":"Reunion","IM000557":"Reunion","IM000560":"Reunion","IM000561":"Reunion","IM000562":"Reunion","IM000563":"Reunion","IM000564":"Reunion","IM000565":"Reunion","IM000567":"Mayotte","IM000568":"Mayotte","IM000569":"Mayotte","IM000582":"Reunion","IM000583":"Reunion","IM000584":"Reunion","IM000585":"Reunion","IM000591":"Reunion","IM000600":"Reunion","IM000603":"Reunion","IM000614":"Mayotte","IM000615":"Mayotte","IM000616":"Mayotte","IM000637":"Reunion","IM000640":"Reunion","IM000642":"Reunion","IM000652":"Reunion","IM000660":"Mayotte","IM000661":"Mayotte","IM000676":"Reunion","IM000687":"Reunion","IM000688":"Reunion","IM000699":"Mayotte","IM000700":"Mayotte","IM000701":"Mayotte","IM000702":"Mayotte","IM000703":"Mayotte","IM000704":"Mayotte","IM000705":"Mayotte","IM000706":"Mayotte","IM000718":"Reunion","IM000720":"Reunion","IM000725":"Mayotte","IM000758":"Reunion","IM000766":"Mayotte","IM000775":"Mayotte","IM000776":"Mayotte","IM000777":"Mayotte","IM000781":"Reunion","IM000782":"Mayotte","IM000783":"Mayotte","IM000784":"Mayotte","IM000785":"Mayotte","IM000786":"Mayotte","IM000787":"Mayotte","IM000788":"Mayotte","IM000815":"Reunion","IM000832":"Reunion","IM000835":"Reunion","IM000857":"Reunion","IM000869":"Reunion","IM000890":"Reunion","IM000894":"Reunion","IM000895":"Reunion","IM000905":"Reunion","IM000909":"Reunion","IM000917":"Reunion","IM000918":"Reunion","IM000919":"Reunion","IM000932":"Reunion","IM000933":"Reunion","IM000934":"Reunion","IM000935":"Reunion","IM000936":"Reunion","IM000937":"Reunion","IM000938":"Reunion","IM000939":"Reunion","IM000942":"Reunion","IM000943":"Reunion","IM000944":"Reunion","IM000945":"Reunion","IM000946":"Reunion","IM000950":"Reunion","IM000951":"Reunion","IM000952":"Reunion","IM000953":"Reunion","IM000954":"Reunion","IM000955":"Reunion","IM000956":"Reunion","IM000957":"Reunion","IM001029":"Reunion","IM001030":"Reunion","IM001031":"Reunion","IM001041":"Reunion","IM001042":"Reunion","IM001043":"Reunion","IM001044":"Reunion","IM001056":"Reunion","IM001057":"Reunion","IM001062":"Reunion","IM001088":"Reunion","IM001089":"Reunion","IM001090":"Reunion","IM001091":"Reunion","IM001092":"Reunion","IM001104":"Reunion","IM001105":"Reunion","IM001106":"Reunion","IM001107":"Reunion","IM001108":"Reunion","IM001109":"Reunion","IM001110":"Reunion","IM001111":"Reunion","IM001112":"Reunion","IM001113":"Reunion","IM001114":"Reunion","IM001115":"Reunion","IM001117":"Reunion","IM001119":"Reunion","IM001120":"Reunion","IM001121":"Reunion","IM001122":"Reunion","IM001123":"Mayotte","IM001124":"Mayotte","IM001125":"Mayotte","IM001133":"Reunion","IM001151":"Reunion","IM001161":"Reunion","IM001162":"Reunion","IM000046":"Reunion","IM000058":"Reunion","IM000105":"Reunion","IM000137":"Reunion","IM000146":"Reunion","IM000156":"Reunion","IM000162":"Reunion","IM000194":"Reunion","IM000222":"Reunion","IM000243":"Reunion","IM000245":"Reunion","IM000254":"Reunion","IM000255":"Reunion","IM000269":"Reunion","IM000293":"Mayotte","IM000318":"Reunion","IM000337":"Mayotte","IM000349":"Reunion","IM000357":"Reunion","IM000372":"Mayotte","IM000387":"Reunion","IM000427":"Reunion","IM000431":"Reunion","IM000432":"Reunion","IM000434":"Reunion","IM000436":"Reunion","IM000437":"Reunion","IM000438":"Reunion","IM000440":"Reunion","IM000442":"Reunion","IM000443":"Reunion","IM000456":"Reunion","IM000470":"Reunion","IM000476":"Reunion","IM000485":"Reunion","IM000499":"Reunion","IM000520":"Reunion","IM000523":"Reunion","IM000524":"Reunion","IM000529":"Mayotte","IM000537":"Reunion","IM000538":"Reunion","IM000539":"Reunion","IM000544":"Reunion","IM000551":"Reunion","IM000552":"Reunion","IM000553":"Reunion","IM000554":"Reunion","IM000555":"Reunion","IM000570":"Reunion","IM000608":"Reunion","IM000609":"Reunion","IM000610":"Reunion","IM000636":"Reunion","IM000638":"Reunion","IM000639":"Reunion","IM000647":"Reunion","IM000648":"Reunion","IM000669":"Reunion","IM000670":"Reunion","IM000684":"Reunion","IM000696":"Reunion","IM000722":"Mayotte","IM000727":"Mayotte","IM000728":"Mayotte","IM000737":"Reunion","IM000738":"Reunion","IM000739":"Reunion","IM000742":"Reunion","IM000743":"Reunion","IM000744":"Reunion","IM000745":"Reunion","IM000746":"Reunion","IM000748":"Reunion","IM000749":"Reunion","IM000759":"Reunion","IM000773":"Reunion","IM000778":"Mayotte","IM000779":"Mayotte","IM000780":"Mayotte","IM000801":"Reunion","IM000802":"Reunion","IM000803":"Reunion","IM000804":"Reunion","IM000833":"Reunion","IM000837":"Reunion","IM000864":"Reunion","IM000865":"Reunion","IM000866":"Reunion","IM000867":"Reunion","IM000877":"Mayotte","IM000891":"Reunion","IM000892":"Reunion","IM000893":"Reunion","IM000912":"Reunion","IM000914":"Reunion","IM000915":"Reunion","IM000926":"Reunion","IM000941":"Reunion","IM001026":"Reunion","IM001058":"Reunion","IM001059":"Reunion","IM001152":"Reunion","IM000024":"Reunion","IM000025":"Reunion","IM000029":"Reunion","IM000054":"Reunion","IM000055":"Reunion","IM000060":"Mayotte","IM000062":"Reunion","IM000063":"Reunion","IM000071":"Reunion","IM000113":"Reunion","IM000118":"Reunion","IM000135":"Reunion","IM000139":"Reunion","IM000140":"Reunion","IM000145":"Reunion","IM000166":"Reunion","IM000167":"Reunion","IM000168":"Reunion","IM000186":"Reunion","IM000189":"Reunion","IM000198":"Reunion","IM000203":"Reunion","IM000206":"Reunion","IM000207":"Reunion","IM000208":"Reunion","IM000211":"Reunion","IM000212":"Reunion","IM000213":"Reunion","IM000214":"Reunion","IM000216":"Reunion","IM000217":"Reunion","IM000220":"Reunion","IM000221":"Reunion","IM000257":"Reunion","IM000258":"Reunion","IM000263":"Reunion","IM000264":"Reunion","IM000266":"Reunion","IM000268":"Reunion","IM000270":"Reunion","IM000271":"Reunion","IM000274":"Reunion","IM000275":"Reunion","IM000276":"Reunion","IM000277":"Reunion","IM000278":"Reunion","IM000279":"Reunion","IM000280":"Reunion","IM000282":"Mayotte","IM000283":"Reunion","IM000284":"Reunion","IM000285":"Mayotte","IM000286":"Reunion","IM000289":"Reunion","IM000290":"Reunion","IM000291":"Reunion","IM000292":"Reunion","IM000294":"Reunion","IM000303":"Reunion","IM000304":"Reunion","IM000305":"Reunion","IM000306":"Reunion","IM000308":"Reunion","IM000309":"Reunion","IM000310":"Reunion","IM000311":"Reunion","IM000312":"Mayotte","IM000313":"Reunion","IM000314":"Reunion","IM000320":"Mayotte","IM000321":"Mayotte","IM000325":"Reunion","IM000326":"Reunion","IM000327":"Reunion","IM000328":"Reunion","IM000329":"Reunion","IM000330":"Reunion","IM000334":"Reunion","IM000348":"Reunion","IM000354":"Reunion","IM000355":"Reunion","IM000358":"Reunion","IM000360":"Reunion","IM000366":"Mayotte","IM000373":"Mayotte","IM000374":"Mayotte","IM000375":"Mayotte","IM000377":"Mayotte","IM000391":"Mayotte","IM000392":"Mayotte","IM000393":"Reunion","IM000394":"Mayotte","IM000395":"Mayotte","IM000396":"Mayotte","IM000397":"Mayotte","IM000399":"Reunion","IM000402":"Reunion","IM000417":"Mayotte","IM000418":"Mayotte","IM000419":"Mayotte","IM000420":"Mayotte","IM000421":"Reunion","IM000422":"Reunion","IM000424":"Reunion","IM000425":"Reunion","IM000426":"Reunion","IM000428":"Reunion","IM000429":"Reunion","IM000430":"Reunion","IM000433":"Reunion","IM000435":"Reunion","IM000448":"Reunion","IM000452":"Reunion","IM000457":"Mayotte","IM000458":"Mayotte","IM000469":"Reunion","IM000471":"Reunion","IM000472":"Reunion","IM000474":"Reunion","IM000475":"Mayotte","IM000479":"Reunion","IM000480":"Reunion","IM000481":"Reunion","IM000483":"Reunion","IM000488":"Reunion","IM000489":"Reunion","IM000492":"Reunion","IM000497":"Reunion","IM000498":"Reunion","IM000501":"Reunion","IM000508":"Reunion","IM000509":"Reunion","IM000510":"Reunion","IM000511":"Reunion","IM000512":"Reunion","IM000513":"Reunion","IM000514":"Reunion","IM000521":"Reunion","IM000522":"Reunion","IM000530":"Mayotte","IM000540":"Reunion","IM000545":"Reunion","IM000546":"Reunion","IM000558":"Reunion","IM000559":"Reunion","IM000566":"Mayotte","IM000571":"Mayotte","IM000572":"Mayotte","IM000573":"Mayotte","IM000574":"Mayotte","IM000575":"Reunion","IM000576":"Reunion","IM000586":"Reunion","IM000587":"Reunion","IM000588":"Reunion","IM000594":"Reunion","IM000595":"Reunion","IM000596":"Reunion","IM000597":"Reunion","IM000598":"Reunion","IM000599":"Reunion","IM000604":"Reunion","IM000611":"Mayotte","IM000612":"Mayotte","IM000613":"Mayotte","IM000617":"Mayotte","IM000632":"Reunion","IM000633":"Reunion","IM000634":"Reunion","IM000635":"Reunion","IM000644":"Mayotte","IM000645":"Mayotte","IM000646":"Reunion","IM000649":"Reunion","IM000650":"Reunion","IM000651":"Reunion","IM000662":"Reunion","IM000663":"Reunion","IM000664":"Reunion","IM000665":"Reunion","IM000672":"Reunion","IM000673":"Reunion","IM000674":"Reunion","IM000675":"Reunion","IM000677":"Reunion","IM000678":"Reunion","IM000697":"Reunion","IM000707":"Reunion","IM000708":"Mayotte","IM000710":"Mayotte","IM000711":"Mayotte","IM000712":"Mayotte","IM000713":"Mayotte","IM000714":"Mayotte","IM000715":"Mayotte","IM000716":"Mayotte","IM000717":"Reunion","IM000719":"Reunion","IM000723":"Mayotte","IM000724":"Mayotte","IM000726":"Reunion","IM000729":"Mayotte","IM000730":"Mayotte","IM000731":"Mayotte","IM000732":"Mayotte","IM000733":"Mayotte","IM000736":"Reunion","IM000740":"Reunion","IM000741":"Reunion","IM000750":"Reunion","IM000751":"Reunion","IM000752":"Reunion","IM000753":"Reunion","IM000754":"Reunion","IM000755":"Reunion","IM000756":"Reunion","IM000757":"Reunion","IM000760":"Reunion","IM000761":"Reunion","IM000767":"Reunion","IM000768":"Reunion","IM000769":"Reunion","IM000770":"Reunion","IM000772":"Reunion","IM000774":"Mayotte","IM000789":"Mayotte","IM000790":"Mayotte","IM000791":"Mayotte","IM000792":"Mayotte","IM000793":"Mayotte","IM000794":"Mayotte","IM000795":"Mayotte","IM000796":"Mayotte","IM000797":"Mayotte","IM000798":"Mayotte","IM000805":"Reunion","IM000806":"Mayotte","IM000811":"Reunion","IM000812":"Reunion","IM000813":"Reunion","IM000814":"Reunion","IM000816":"Reunion","IM000819":"Reunion","IM000820":"Reunion","IM000823":"Reunion","IM000825":"Reunion","IM000830":"Reunion","IM000834":"Reunion","IM000838":"Reunion","IM000839":"Reunion","IM000840":"Reunion","IM000843":"Reunion","IM000844":"Reunion","IM000848":"Reunion","IM000849":"Mayotte","IM000850":"Reunion","IM000851":"Reunion","IM000852":"Reunion","IM000853":"Reunion","IM000854":"Reunion","IM000855":"Reunion","IM000856":"Reunion","IM000862":"Reunion","IM000863":"Reunion","IM000868":"Reunion","IM000872":"Reunion","IM000873":"Reunion","IM000874":"Reunion","IM000875":"Mayotte","IM000876":"Mayotte","IM000878":"Reunion","IM000879":"Reunion","IM000880":"Reunion","IM000881":"Reunion","IM000882":"Reunion","IM000885":"Reunion","IM000886":"Reunion","IM000887":"Reunion","IM000888":"Reunion","IM000896":"Reunion","IM000907":"Reunion","IM000908":"Reunion","IM000920":"Reunion","IM000921":"Reunion","IM000922":"Reunion","IM000923":"Reunion","IM000924":"Reunion","IM000925":"Reunion","IM000927":"Reunion","IM000947":"Reunion","IM000948":"Reunion","IM000964":"Reunion","IM000965":"Reunion","IM000966":"Reunion","IM000967":"Reunion","IM000968":"Reunion","IM000969":"Reunion","IM000970":"Reunion","IM000971":"Reunion","IM000972":"Reunion","IM000973":"Reunion","IM000974":"Reunion","IM000975":"Reunion","IM000976":"Reunion","IM000977":"Reunion","IM000978":"Reunion","IM000979":"Reunion","IM000980":"Reunion","IM000981":"Reunion","IM000982":"Reunion","IM000983":"Reunion","IM000984":"Reunion","IM000985":"Reunion","IM000986":"Reunion","IM000987":"Reunion","IM000988":"Reunion","IM000989":"Reunion","IM000990":"Reunion","IM000991":"Reunion","IM000992":"Reunion","IM000993":"Reunion","IM000994":"Reunion","IM000995":"Reunion","IM000996":"Reunion","IM000997":"Reunion","IM000998":"Reunion","IM000999":"Reunion","IM001000":"Reunion","IM001001":"Reunion","IM001002":"Reunion","IM001003":"Reunion","IM001004":"Reunion","IM001005":"Reunion","IM001006":"Reunion","IM001007":"Reunion","IM001008":"Reunion","IM001009":"Reunion","IM001010":"Reunion","IM001011":"Reunion","IM001012":"Reunion","IM001013":"Reunion","IM001014":"Reunion","IM001015":"Reunion","IM001016":"Reunion","IM001017":"Reunion","IM001018":"Reunion","IM001019":"Reunion","IM001020":"Reunion","IM001021":"Reunion","IM001022":"Reunion","IM001023":"Reunion","IM001024":"Reunion","IM001027":"Reunion","IM001028":"Reunion","IM001035":"Reunion","IM001036":"Reunion","IM001037":"Reunion","IM001038":"Reunion","IM001039":"Reunion","IM001048":"Reunion","IM001049":"Reunion","IM001050":"Reunion","IM001051":"Reunion","IM001052":"Reunion","IM001053":"Reunion","IM001054":"Reunion","IM001055":"Reunion","IM001060":"Reunion","IM001061":"Reunion","IM001063":"Mayotte","IM001065":"Reunion","IM001066":"Reunion","IM001067":"Reunion","IM001068":"Reunion","IM001069":"Reunion","IM001070":"Reunion","IM001071":"Reunion","IM001072":"Reunion","IM001073":"Reunion","IM001074":"Reunion","IM001075":"Reunion","IM001076":"Reunion","IM001077":"Reunion","IM001078":"Reunion","IM001079":"Reunion","IM001080":"Reunion","IM001081":"Reunion","IM001082":"Reunion","IM001083":"Reunion","IM001084":"Reunion","IM001085":"Reunion","IM001086":"Reunion","IM001087":"Reunion","IM001093":"Reunion","IM001094":"Reunion","IM001095":"Reunion","IM001096":"Reunion","IM001097":"Reunion","IM001098":"Reunion","IM001099":"Reunion","IM001100":"Reunion","IM001101":"Reunion","IM001102":"Reunion","IM001103":"Reunion","IM001118":"Reunion","IM001131":"Reunion","IM001132":"Reunion","IM001137":"Mayotte","IM001138":"Mayotte","IM001139":"Reunion","IM001140":"Reunion","IM001142":"Reunion","IM001144":"Reunion","IM001147":"Reunion","IM001148":"Reunion","IM001149":"Reunion","IM001150":"Reunion","IM000041":"Reunion","IM000042":"Reunion","IM000091":"Reunion","IM000092":"Reunion","IM000094":"Reunion","IM000095":"Reunion","IM000096":"Reunion","IM000097":"Reunion","IM000098":"Reunion","IM000099":"Reunion","IM000100":"Reunion","IM000101":"Reunion","IM000120":"Reunion","IM000121":"Reunion","IM000122":"Reunion","IM000123":"Reunion","IM000124":"Reunion","IM000125":"Reunion","IM000127":"Reunion","IM000129":"Reunion","IM000130":"Reunion","IM000185":"Reunion","IM000187":"Reunion","IM000188":"Reunion","IM000287":"Reunion","IM000299":"Reunion","IM000300":"Reunion","IM000301":"Reunion","IM000339":"Mayotte","IM000340":"Mayotte","IM000341":"Mayotte","IM000342":"Mayotte","IM000378":"Mayotte","IM000379":"Mayotte","IM000380":"Mayotte","IM000381":"Mayotte","IM000382":"Mayotte","IM000383":"Mayotte","IM000384":"Mayotte","IM000385":"Mayotte","IM000386":"Mayotte","IM000618":"Mayotte","IM000619":"Mayotte","IM000620":"Mayotte","IM000621":"Mayotte","IM000622":"Mayotte","IM000623":"Mayotte","IM000624":"Mayotte","IM000625":"Mayotte","IM000626":"Mayotte","IM000627":"Mayotte","IM000628":"Mayotte","IM000629":"Mayotte","IM000630":"Mayotte","IM000631":"Mayotte","IM000653":"Reunion","IM000654":"Reunion","IM000108":"Reunion","IM000119":"Reunion","IM000133":"Reunion","IM000136":"Reunion","IM000138":"Reunion","IM000143":"Reunion","IM000169":"Reunion","IM000171":"Reunion","IM000176":"Reunion","IM000183":"Reunion","IM000262":"Reunion","IM000361":"Reunion","IM000376":"Mayotte","IM000389":"Reunion","IM000423":"Reunion","IM000451":"Reunion","IM000453":"Mayotte","IM000454":"Mayotte","IM000473":"Reunion","IM000493":"Reunion","IM000671":"Reunion","IM000679":"Reunion","IM000680":"Reunion","IM000681":"Reunion","IM000682":"Reunion","IM000695":"Reunion","IM000721":"Mayotte","IM000735":"Reunion","IM000765":"Reunion","IM000799":"Reunion","IM000800":"Reunion","IM000836":"Reunion","IM000845":"Reunion","IM000883":"Reunion","IM000884":"Reunion","IM000906":"Reunion","IM000940":"Reunion","IM000958":"Reunion","IM000959":"Reunion","IM000960":"Reunion","IM000961":"Reunion","IM000962":"Reunion","IM000963":"Reunion","IM001116":"Reunion","IM001129":"Reunion","IM001130":"Reunion","IM001141":"Reunion","IM001164":"Reunion","IM001166":"Reunion","IM001168":"Reunion","IM001169":"Reunion","IM000526":"Reunion","IM000589":"Reunion","IM000592":"Reunion","IM000747":"Reunion","IM000870":"Reunion","IM000019":"Reunion","IM000020":"Reunion","IM000106":"Reunion","IM000109":"Reunion","IM000177":"Reunion","IM000184":"Reunion","IM000272":"Reunion","IM000273":"Reunion","IM000343":"Reunion","IM000344":"Reunion","IM000345":"Reunion","IM000346":"Reunion","IM000347":"Reunion","IM000390":"Reunion","IM000412":"Reunion","IM000413":"Reunion","IM000414":"Reunion","IM000449":"Reunion","IM000450":"Reunion","IM000477":"Reunion","IM000478":"Reunion","IM000495":"Reunion","IM000496":"Reunion","IM000525":"Reunion","IM000547":"Reunion","IM000548":"Reunion","IM000550":"Reunion","IM000577":"Reunion","IM000578":"Reunion","IM000579":"Reunion","IM000580":"Reunion","IM000581":"Reunion","IM000605":"Reunion","IM000606":"Reunion","IM000607":"Reunion","IM000643":"Reunion","IM000655":"Reunion","IM000656":"Reunion","IM000657":"Reunion","IM000658":"Reunion","IM000659":"Reunion","IM000666":"Reunion","IM000667":"Reunion","IM000668":"Reunion","IM000685":"Reunion","IM000686":"Reunion","IM000689":"Reunion","IM000690":"Reunion","IM000691":"Reunion","IM000692":"Reunion","IM000693":"Reunion","IM000694":"Reunion","IM000734":"Reunion","IM000763":"Reunion","IM000764":"Reunion","IM000771":"Mayotte","IM000807":"Reunion","IM000808":"Reunion","IM000826":"Reunion","IM000827":"Reunion","IM000828":"Reunion","IM000829":"Reunion","IM000831":"Reunion","IM000871":"Reunion","IM000889":"Reunion","IM000897":"Reunion","IM000898":"Reunion","IM000899":"Reunion","IM000900":"Reunion","IM000901":"Reunion","IM000902":"Reunion","IM000903":"Reunion","IM000904":"Reunion","IM000930":"Reunion","IM000949":"Reunion","IM001032":"Reunion","IM001033":"Reunion","IM001034":"Reunion","IM001040":"Reunion","IM001045":"Reunion","IM001046":"Reunion","IM001128":"Reunion","IM001145":"Reunion","IM001146":"Reunion","IM001165":"Reunion","IM000032":"Reunion","IM000107":"Reunion","IM000114":"Reunion","IM000202":"Reunion","IM000267":"Reunion","IM000302":"Reunion","IM000388":"Reunion","IM000444":"Reunion","IM000447":"Reunion","IM000491":"Reunion","IM000504":"Reunion","IM000505":"Reunion","IM000506":"Reunion","IM000549":"Reunion","IM000593":"Reunion","IM000683":"Reunion","IM000709":"Reunion","IM000817":"Reunion","IM000818":"Reunion","IM000824":"Reunion","IM000858":"Reunion","IM000859":"Reunion","IM000860":"Reunion","IM000861":"Reunion","IM000910":"Reunion","IM000911":"Reunion","IM001127":"Reunion","IM001134":"Reunion","IM001135":"Reunion","IM001136":"Reunion","IM001163":"Reunion","IM001167":"Reunion","IM000111":"Reunion","IM000142":"Reunion","IM000181":"Reunion","IM000246":"Reunion","IM000368":"Reunion","IM000369":"Reunion","IM000461":"Reunion","IM000601":"Reunion","IM000602":"Reunion","IM000821":"Reunion","IM001143":"Reunion","IM000004":"Reunion","IM000005":"Reunion","IM000008":"Reunion","IM000016":"Reunion","IM000110":"Reunion","IM000141":"Reunion","IM000201":"Reunion","IM000205":"Reunion","IM000248":"Reunion","IM000249":"Reunion","IM000261":"Reunion","IM000336":"Reunion","IM000356":"Reunion","IM000359":"Reunion","IM000370":"Reunion","IM000490":"Reunion","IM000494":"Reunion","IM000590":"Reunion","IM000641":"Reunion","IM000762":"Reunion","IM000822":"Reunion","IM000842":"Reunion","IM001047":"Reunion","IM001064":"Reunion","IM001126":"Reunion","IM001160":"Reunion"};
+      const items = await paginate(GL + '/Immos/items?$expand=fields&$top=500', 10);
+      const idsByCode = {};
+      items.forEach(i => { const f = i.fields || {}; const c = f.Title || f.Code_IM || ''; if (c) (idsByCode[c] = idsByCode[c] || []).push(i.id); });
+      const ops = [];
+      const introuvables = [];
+      for (const code in SITES) {
+        const ids = idsByCode[code];
+        if (!ids || !ids.length) { introuvables.push(code); continue; }
+        ids.forEach(id => ops.push({ code: code, id: id, site: SITES[code] }));
+      }
+      const relBase = '/sites/' + SITE_ID + '/lists/Immos/items/';
+      const report = { ok: 0, erreurs: [] };
+      for (let i = 0; i < ops.length; i += 20) {
+        const chunk = ops.slice(i, i + 20);
+        const requests = chunk.map((op, idx) => ({ id: String(idx), method: 'PATCH', url: relBase + op.id + '/fields', headers: { 'Content-Type': 'application/json' }, body: { Site: op.site } }));
+        try {
+          const rb = await fetch('https://graph.microsoft.com/v1.0/$batch', { method: 'POST', headers: H, body: JSON.stringify({ requests }) });
+          const rbData = await rb.json();
+          (rbData.responses || []).forEach(resp => { if (resp.status >= 200 && resp.status < 300) report.ok++; else report.erreurs.push(resp.status); });
+        } catch (e) { report.erreurs.push('batch_exception'); }
+      }
+      return json({ success: true, total: Object.keys(SITES).length, operations: ops.length, appliques: report.ok, introuvables: introuvables.length, erreurs: report.erreurs.slice(0, 20) });
+    }
+
+    if (action === 'seed_roles_sites') {
+      if (body.confirm !== 'ESPACE-SOLEIL') return json({ success: false, error: 'confirmation_requise' });
+      const SEED = {"CANI":["CT_Specialise","Reunion"],"PALO":["Ouvrier","Reunion"],"BOMA":["RA","Reunion"],"BAKA":["Admin","Reunion"],"ROJO":["RA","Reunion"],"GRWI":["Ouvrier","Reunion"],"BADA":["Ouvrier","Reunion"],"LAHU":["CT","Reunion"],"POGU":["Ouvrier","Reunion"],"NAJE":["Ouvrier","Reunion"],"MEJO":["CT","Reunion"],"PACH":["Ouvrier","Reunion"],"IADA":["Ouvrier","Reunion"],"BLFA":["Ouvrier","Reunion"],"LAJC":["Ouvrier","Reunion"],"FLDA":["Ouvrier","Reunion"],"REST":["Ouvrier","Reunion"],"RIJB":["CT","Reunion"],"PIBE":["Ouvrier_Specialise","Reunion"],"SEJU":["Ouvrier_Specialise","Reunion"],"PACA":["RA","Reunion"],"LEMI":["Ouvrier","Reunion"],"JADI":["Ouvrier","Reunion"],"LEWI":["Ouvrier","Reunion"],"AIWI":["Admin","Reunion"],"SAMA":["Ouvrier","Reunion"],"BIFL":["Ouvrier","Reunion"],"ROCH":["Ouvrier","Reunion"],"TUJM":["Ouvrier","Reunion"],"SCST":["CT","Reunion"],"MAMA":["Ouvrier","Reunion"],"MASA":["Ouvrier","Reunion"],"LEDI":["Ouvrier","Reunion"],"ROJY":["Ouvrier","Reunion"],"SIDE":["Ouvrier","Reunion"],"BENO":["Ouvrier","Reunion"],"AUAR":["Admin","Reunion"],"GASE":["Ouvrier","Reunion"],"SOBE":["Ouvrier","Reunion"],"PAYV":["Ouvrier","Reunion"],"CALU":["Ouvrier","Reunion"],"LAJD":["Ouvrier","Reunion"],"GOLU":["CT","Reunion"],"NAXA":["RA","Reunion"],"NALU":["Ouvrier","Reunion"],"COSY":["Ouvrier","Reunion"],"ORFA":["Ouvrier","Reunion"],"DUDE":["Ouvrier","Reunion"],"ANFL":["Ouvrier","Reunion"],"VILO":["Ouvrier","Reunion"],"ATMA":["Ouvrier","Reunion"],"MILU":["Ouvrier","Reunion"],"JEDA":["RA","Reunion"],"DEFR":["Ouvrier","Reunion"],"ZEYO":["Ouvrier","Reunion"],"VIMT":["Ouvrier","Reunion"],"RAJE":["Ouvrier","Reunion"],"IATH":["Ouvrier","Reunion"],"TASE":["Ouvrier","Reunion"],"LEPR":["Ouvrier","Reunion"],"DOYO":["RA","Reunion"],"BUAN":["Ouvrier","Reunion"],"MASE":["Ouvrier","Reunion"],"DUJU":["Ouvrier","Reunion"],"LAME":["Ouvrier","Reunion"],"ABLU":["Ouvrier","Reunion"],"COTA":["Ouvrier","Reunion"],"MIJE":["Ouvrier","Reunion"],"MOIB":["Ouvrier","Reunion"],"GAAN":["Ouvrier","Reunion"],"CONI":["Admin","Reunion"],"ELSL":["Ouvrier","Reunion"],"PARO":["Ouvrier","Reunion"],"ICPH":["Ouvrier","Reunion"],"FRLU":["Ouvrier","Reunion"],"DACH":["CT","Mayotte"],"FAZI":["Ouvrier","Mayotte"],"TOHO":["CT","Mayotte"],"CHMO":["Ouvrier","Mayotte"],"MIAN":["Ouvrier","Mayotte"],"ATAB":["Ouvrier","Mayotte"],"SOMO":["Ouvrier","Mayotte"],"SAAL":["Ouvrier","Mayotte"],"BOFA":["Ouvrier","Mayotte"],"MKSA":["Ouvrier","Mayotte"],"ELSA":["Ouvrier","Mayotte"],"MOEL":["Ouvrier","Mayotte"],"ABNA":["Ouvrier","Mayotte"],"AHAB":["Ouvrier","Mayotte"],"NAIR":["Ouvrier","Mayotte"],"SAEL":["Logistique_Mayotte","Mayotte"],"MOAS":["Ouvrier","Mayotte"],"MACH":["Ouvrier","Mayotte"],"SAAB":["Ouvrier","Mayotte"],"TOAO":["Ouvrier","Mayotte"],"YOAN":["Ouvrier","Mayotte"],"ALMH":["Ouvrier","Mayotte"]};
+      // Charger tous les employés une fois. Gérer les DOUBLONS : un code peut avoir plusieurs itemId.
+      const emp = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
+      const idsByCode = {};
+      emp.forEach(i => { const f = i.fields || {}; const c = f.Title || f.Code || ''; if (c) { (idsByCode[c] = idsByCode[c] || []).push(i.id); } });
+
+      // Construire la liste des opérations PATCH (une par occurrence de chaque code)
+      const relBase = '/sites/' + SITE_ID + '/lists/Employes/items/';
+      const ops = [];
+      const introuvables = [];
+      for (const code in SEED) {
+        const ids = idsByCode[code];
+        if (!ids || !ids.length) { introuvables.push(code); continue; }
+        const [role, site] = SEED[code];
+        ids.forEach(id => ops.push({ code: code, id: id, role: role, site: site }));
+      }
+
+      // Envoyer par lots de 20 via l'API $batch de Graph (1 sous-requête Cloudflare par lot)
+      const report = { ok: [], erreurs: [] };
+      for (let i = 0; i < ops.length; i += 20) {
+        const chunk = ops.slice(i, i + 20);
+        const requests = chunk.map((op, idx) => ({
+          id: String(idx),
+          method: 'PATCH',
+          url: relBase + op.id + '/fields',
+          headers: { 'Content-Type': 'application/json' },
+          body: { Code_CT: op.role, Site: op.site }
+        }));
+        try {
+          const rb = await fetch('https://graph.microsoft.com/v1.0/$batch', { method: 'POST', headers: H, body: JSON.stringify({ requests }) });
+          const rbData = await rb.json();
+          (rbData.responses || []).forEach(resp => {
+            const op = chunk[parseInt(resp.id, 10)];
+            if (resp.status >= 200 && resp.status < 300) report.ok.push(op.code);
+            else report.erreurs.push(op.code + ':' + resp.status);
+          });
+        } catch (e) {
+          chunk.forEach(op => report.erreurs.push(op.code + ':batch_exception'));
+        }
+      }
+      return json({ success: true, total_seed: Object.keys(SEED).length, total_operations: ops.length, appliques: report.ok.length, introuvables: introuvables, erreurs: report.erreurs });
+    }
+
+    if (action === 'reserver') {
+      const r = await fetch(GL + '/Reservations/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_employe || '', Nom_Employe: body.nom_employe || '', Code_Chantier: body.code_chantier || '', Nom_Chantier: body.nom_chantier || '', Date_Debut: body.date_debut, Date_Fin: body.date_fin, Statut: 'Demandee', Note: body.note || '', Code_IM: body.code_im || '' } }) });
+      return json({ success: r.ok, status: r.status, detail: await r.text() });
+    }
+
+    if (action === 'statut_resa') {
+      const r = await fetch(GL + '/Reservations/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Statut: body.statut }) });
+      return json({ success: r.ok });
+    }
+
+    if (action === 'modifier_resa') {
+      const fields = {};
+      if (body.date_debut)                 fields.Date_Debut   = body.date_debut;
+      if (body.date_fin)                   fields.Date_Fin     = body.date_fin;
+      if (body.nom_chantier !== undefined) fields.Nom_Chantier = body.nom_chantier;
+      if (body.statut !== undefined)       fields.Statut       = body.statut;
+      // Si on change l'immo (contre-proposition), on conserve la trace de l'immo initialement demandée.
+      let noteFinale = body.note;
+      if (body.code_im_alt) {
+        // Lire la résa actuelle pour connaître l'immo demandée avant modification
+        const cur = await fetch(GL + '/Reservations/items/' + body.id + '?$expand=fields', { headers: H });
+        const curData = await cur.json();
+        const curFields = curData.fields || {};
+        const immoActuelle = curFields.Code_IM || '';
+        const noteActuelle = curFields.Note || '';
+        // Ne mémoriser l'immo initiale que si elle n'a pas déjà été enregistrée
+        let codeInitial = immoActuelle;
+        const dejaInit = noteActuelle.match(/##INIT:([^#]+)##/);
+        if (dejaInit) codeInitial = dejaInit[1]; // garder la toute première demande
+        fields.Code_IM = body.code_im_alt;
+        // Reconstituer la note : marqueur INIT + note métier fournie
+        const noteBase = (body.note !== undefined ? body.note : noteActuelle).replace(/##INIT:[^#]+##/g, '').trim();
+        noteFinale = '##INIT:' + codeInitial + '## ' + noteBase;
+      }
+      if (noteFinale !== undefined) fields.Note = noteFinale;
+      const r = await fetch(GL + '/Reservations/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+      return json({ success: r.ok });
+    }
+
+    if (action === 'transfert') {
+      const r = await fetch(GL + '/Transferts_En_Attente/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe_Donneur: body.code_employe_donneur, Nom_Donneur: body.nom_donneur, Code_Employe_Receveur: body.code_employe_receveur, Nom_Receveur: body.nom_receveur, Statut: 'En attente', Etat: body.etat || '', Note: body.note || '' } }) });
+      return json({ success: r.ok, status: r.status });
+    }
+
+    // ── Marquer statut immo (HS définitive / Perdu / En panne) ──
+    if (action === 'marquer_statut_immo') {
+      const fields = { Etat: body.etat };
+      if (body.actif !== undefined) fields.Actif = body.actif;
+      // Stocker le motif dans Note si dispo, sinon dans Commentaire
+      if (body.motif) fields.Note = body.motif;
+      const r = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + body.code_im + "'&$top=1", { headers: H });
+      const rd = await r.json();
+      const itemId = rd.value && rd.value[0] ? rd.value[0].id : null;
+      if (!itemId) return json({ success: false, error: 'Immo non trouvée' });
+      const rp = await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+      // Créer aussi un mouvement pour la traçabilité
+      await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: body.par_code || 'ADMIN', Type_Mouvement: body.type_mouv || 'Archivage', Commentaire: body.par_nom || 'Admin', Etat: body.etat, Note: body.motif || '', Horodatage: new Date().toISOString() } }) });
+      return json({ success: rp.ok });
+    }
+
+    // ── Mettre à jour le suivi d'une panne (prestataire, coût, note) ──
+    if (action === 'maj_panne') {
+      // Créer un mouvement de suivi — marqueur ##PRESTA:Nom## non-ambigu pour la localisation
+      const note = '[SUIVI ' + new Date().toLocaleDateString('fr-FR') + ']' +
+        (body.prestataire ? ' ##PRESTA:' + body.prestataire + '## Prestataire: ' + body.prestataire : '') +
+        (body.cout_estime ? ' Cout estime: ' + body.cout_estime + 'EUR' : '') +
+        ' ' + (body.note_suivi || '');
+      const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+        Title: body.code_im, Code_Employe: body.par_code || 'CONI', Type_Mouvement: 'Suivi_Panne',
+        Commentaire: body.par_nom || body.par_code || 'CONI', Etat: 'En panne', Note: note, Horodatage: new Date().toISOString()
+      } }) });
+      return json({ success: r.ok });
+    }
+
+    // ── Déclarer une panne ──
+    if (action === 'declarer_panne') {
+      // Mettre à jour l'immo
+      const ri = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + body.code_im + "'&$top=1", { headers: H });
+      const rid = await ri.json();
+      const itemId = rid.value && rid.value[0] ? rid.value[0].id : null;
+      if (itemId) await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Etat: 'En panne' }) });
+      // Créer un mouvement de type Panne
+      const rp = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: body.code_employe || '', Type_Mouvement: 'Panne', Commentaire: body.nom_employe || '', Etat: 'En panne', Note: body.motif || '', Horodatage: new Date().toISOString() } }) });
+      return json({ success: rp.ok });
+    }
+
+    // ── Résoudre une panne ──
+    if (action === 'resoudre_panne') {
+      const ri = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + body.code_im + "'&$top=1", { headers: H });
+      const rid = await ri.json();
+      const itemId = rid.value && rid.value[0] ? rid.value[0].id : null;
+      if (itemId) await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Etat: body.etat_resolution || 'Bon état', Actif: true }) });
+      const coutNum = parseFloat((body.cout_reel || '').toString().replace(',', '.')) || 0;
+      const noteRep = 'RESOLUTION ' + new Date().toLocaleDateString('fr-FR') +
+        (body.prestataire ? ' | Prestataire: ' + body.prestataire : '') +
+        (coutNum > 0 ? ' | ##COUT:' + coutNum + '## ' + coutNum + 'EUR' : '') +
+        ' | ' + (body.note || '');
+      await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+        Title: body.code_im, Code_Employe: body.par_code || 'CONI', Type_Mouvement: 'Réparation',
+        Commentaire: body.par_nom || body.par_code || 'CONI', Etat: body.etat_resolution || 'Bon état',
+        Note: noteRep, Horodatage: new Date().toISOString()
+      } }) });
+      return json({ success: true });
+    }
+
+    // ── Déclarer vol ou disparition ──
+    if (action === 'declarer_vol') {
+      const etatVol = body.type_vol || 'Volé';
+      const ri = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + body.code_im + "'&$top=1", { headers: H });
+      const rid = await ri.json();
+      const itemId = rid.value && rid.value[0] ? rid.value[0].id : null;
+      if (itemId) await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Etat: etatVol, Actif: false }) });
+      await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+        Title: body.code_im, Code_Employe: body.par_code || 'ADMIN', Type_Mouvement: 'Archivage',
+        Commentaire: body.par_nom || 'Admin', Etat: etatVol,
+        Note: body.motif + ' [' + etatVol + ' déclaré par ' + (body.par_nom || 'Admin') + ']',
+        Horodatage: new Date().toISOString()
+      } }) });
+      return json({ success: true });
+    }
+
+    // ── Annuler un transfert en attente ──
+    if (action === 'annuler_transfert') {
+      const r = await fetch(GL + '/Transferts_En_Attente/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Statut: 'Annulé' }) });
+      return json({ success: r.ok });
+    }
+
+    // ── Modifier le receveur d'un transfert en attente ──
+    if (action === 'maj_transfert') {
+      const fields = {};
+      if (body.code_employe_receveur) fields.Code_Employe_Receveur = body.code_employe_receveur;
+      if (body.nom_receveur)          fields.Nom_Receveur = body.nom_receveur;
+      if (body.note !== undefined)    fields.Note = body.note;
+      const r = await fetch(GL + '/Transferts_En_Attente/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+      return json({ success: r.ok });
+    }
+
+    if (action === 'valider') {
+      const item = await fetch(GL + '/Transferts_En_Attente/items/' + body.id + '?$expand=fields', { headers: H });
+      const idata = await item.json();
+      const f = idata.fields || {};
+      await fetch(GL + '/Transferts_En_Attente/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Statut: 'Validé' }) });
+      const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: f.Title || body.code_im || '', Code_Employe: f.Code_Employe_Receveur || body.code_employe || '', Type_Mouvement: 'Transfert', Code_Chantier: (f.Code_Employe_Donneur || '') + '|' + (f.Nom_Donneur || ''), Commentaire: f.Nom_Receveur || body.nom_employe || '', Etat: body.etat_reception || f.Etat || '', Note: body.note_reception || '', Horodatage: new Date().toISOString() } }) });
+      return json({ success: r.ok });
+    }
+
+    // Mouvement direct
+    const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: body.code_employe, Type_Mouvement: body.type_mouvement, Code_Chantier: body.code_chantier, Commentaire: body.nom_employe, Etat: body.etat || '', Note: body.note || '', Horodatage: body.horodatage } }) });
+    return json({ success: r.ok, status: r.status });
+  }
+
+  return new Response('Not found', { status: 404, headers: cors });
 }
-
-async function retraitConfirm2() {
-  const motif = (document.getElementById('retrait-motif') || {}).value || '';
-  const typeRetrait = PANNE_STATE.typeRetrait || (document.getElementById('retrait-type') || {}).value || 'Volé';
-  const actionEndpoint = (typeRetrait === 'Volé' || typeRetrait === 'Disparu') ? 'declarer_vol' : 'marquer_statut_immo';
-  const payload = actionEndpoint === 'declarer_vol'
-    ? { code_im: PANNE_STATE.codeIM, type_vol: typeRetrait, motif, par_code: S.employe.code, par_nom: S.employe.nom }
-    : { code_im: PANNE_STATE.codeIM, etat: typeRetrait, actif: false, motif, type_mouv: 'Archivage', par_code: S.employe.code, par_nom: S.employe.nom };
-  try {
-    await fetch(CONFIG.proxy + '?action=' + actionEndpoint, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    vib(300);
-    document.getElementById('recap').innerHTML =
-      '<strong>' + (typeRetrait === 'Volé' ? '🚨' : typeRetrait === 'Disparu' ? '🔍' : '⚫') + ' ' + PANNE_STATE.libelle + ' — ' + typeRetrait + '</strong><br>' +
-      '<strong>Motif :</strong> ' + motif + '<br>' +
-      '<em style="color:var(--grey)">Immo retirée définitivement du parc. Statistiques conservées.</em>';
-    document.getElementById('alerte-degradation')?.classList.add('hidden');
-    showScreen('screen-confirmation', true);
-    rafraichirBadges();
-  } catch (e) { toast('Erreur réseau', 'error'); }
-}
-
-// Alias pour les anciens appels
-function marquerImmoHSPWA(codeIM) { ouvrirEcranHS(codeIM); }
-function declarerVolPWA(codeIM)    { ouvrirEcranVol(codeIM); }
-
-// ── Écran Sortie définitive (Volé / Disparu / HS) ────────────────────────
-function ouvrirEcranSortie(codeIM) {
-  PANNE_STATE.codeIM = codeIM;
-  PANNE_STATE.libelle = lib(codeIM);
-  const titreEl = document.getElementById('retrait-titre');
-  if (titreEl) titreEl.textContent = '⛔ Sortie définitive du parc';
-  const immoEl = document.getElementById('retrait-immo-titre');
-  if (immoEl) immoEl.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
-  const warn = document.getElementById('retrait-warning');
-  if (warn) warn.innerHTML =
-    '<select id="retrait-type" class="select-input" style="margin-bottom:8px">' +
-    '<option value="Hors service définitif">⚫ Hors service définitif</option>' +
-    '<option value="Perdu">❌ Perdu</option>' +
-    '<option value="Volé">🚨 Volé</option>' +
-    '<option value="Disparu">🔍 Disparu / introuvable</option>' +
-    '</select>' +
-    '<div style="background:#FFEBEE;border-radius:8px;padding:8px;font-size:12px;color:var(--red);font-weight:700;text-align:center">⚠️ Action définitive et irréversible</div>';
-  const motifEl = document.getElementById('retrait-motif');
-  if (motifEl) motifEl.placeholder = 'Décrivez en détail la raison... (10 car. min.)';
-  _reinitRetraitEcran();
-  PANNE_STATE.typeRetrait = null; // sera lu depuis le select au moment de valider
-  showScreen('screen-retrait-parc', true);
-}
-
-// Remplacer retraitConfirm2 pour lire le select type
-const _origRetraitConfirm2 = retraitConfirm2;
-retraitConfirm2 = async function() {
-  const motif = (document.getElementById('retrait-motif') || {}).value || '';
-  const typeFromSelect = (document.getElementById('retrait-type') || {}).value || '';
-  const typeRetrait = PANNE_STATE.typeRetrait || typeFromSelect || 'Perdu';
-  const actionEndpoint = (typeRetrait === 'Volé' || typeRetrait === 'Disparu') ? 'declarer_vol' : 'marquer_statut_immo';
-  const payload = actionEndpoint === 'declarer_vol'
-    ? { code_im: PANNE_STATE.codeIM, type_vol: typeRetrait, motif, par_code: S.employe.code, par_nom: S.employe.nom }
-    : { code_im: PANNE_STATE.codeIM, etat: typeRetrait, actif: false, motif, type_mouv: 'Archivage', par_code: S.employe.code, par_nom: S.employe.nom };
-  try {
-    await fetch(CONFIG.proxy + '?action=' + actionEndpoint, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    vib(300);
-    document.getElementById('recap').innerHTML =
-      '<strong>⛔ ' + PANNE_STATE.libelle + ' — ' + typeRetrait + '</strong><br>' +
-      '<strong>Motif :</strong> ' + motif + '<br>' +
-      '<em style="color:var(--grey)">Immo retirée du parc. Toutes les statistiques sont conservées.</em>';
-    document.getElementById('alerte-degradation')?.classList.add('hidden');
-    showScreen('screen-confirmation', true);
-    rafraichirBadges();
-  } catch (e) { toast('Erreur réseau', 'error'); }
-};
-
-// Alias de compatibilité
-function ouvrirEcranVol(codeIM) { ouvrirEcranSortie(codeIM); }
-function ouvrirEcranHS(codeIM)  { ouvrirEcranSortie(codeIM); }
