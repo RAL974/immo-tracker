@@ -458,9 +458,9 @@ async function loadEmployes(force){
     var r=await fetch(W+'?employes=1');
     var data=await r.json();
     if(Array.isArray(data)&&data.length){
-      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',itemId:e.itemId||null};});
+      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,itemId:e.itemId||null};});
       employesByCode={};
-      employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site};});
+      employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site,actif:e.Actif};});
       return;
     }
   }catch(e){/* fallback ci-dessous */}
@@ -1292,7 +1292,7 @@ function renderUsers(){
   // Enrichir chaque employé avec rôle + tri (stocké en global pour le filtrage sans re-rendu complet)
   USERS_CACHE=employesList.map(function(e){
     var r=roleUtilisateur(e.Code,e.Poste,e.Droits);
-    return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0,droits:droitsBrut(e.Code,e.Poste,e.Droits),itemId:e.itemId||null,explicite:estRoleStandard(e.Droits),site:normSiteD(e.Site||'')};
+    return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0,droits:droitsBrut(e.Code,e.Poste,e.Droits),itemId:e.itemId||null,explicite:estRoleStandard(e.Droits),site:normSiteD(e.Site||''),actif:e.Actif!==false};
   });
 
   // Compteurs par rôle
@@ -1308,7 +1308,11 @@ function renderUsers(){
   // Barre d'info sur la future gestion des droits
   html+='<div style="background:#E8F5E9;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:#1B5E20"><strong>✅ Gestion des droits & sites active.</strong> Le <strong>rôle</strong> détermine qui peut réserver et sur quel périmètre. Le <strong>site</strong> définit le rattachement : un CT ne voit que le matériel de son île ; Admin, gestionnaires, RA, CT et ouvriers spécialisés accèdent aux deux.</div>';
   if(ADMIN_SESSION.code&&ADMINS_CODES.includes(ADMIN_SESSION.code)){
-    html+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="flex:1;min-width:200px;color:#8D6E00">⚙️ <strong>Initialisation en masse</strong> — applique en une fois les rôles et sites de référence à tous les employés (une seule fois, au démarrage).</span><button onclick="lancerSeedRolesSites()" style="padding:8px 16px;background:#F57F17;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap">⚙️ Initialiser rôles & sites</button></div>';
+    html+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="flex:1;min-width:200px;color:#8D6E00">⚙️ <strong>Outils de maintenance</strong> — actions ponctuelles réservées aux administrateurs.</span>'+
+      '<button onclick="lancerSeedRolesSites()" style="padding:8px 14px;background:#F57F17;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Rôles & sites employés</button>'+
+      '<button onclick="lancerSeedImmoSites()" style="padding:8px 14px;background:#0277BD;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Sites des immos</button>'+
+      '<button onclick="lancerDedupeEmployes()" style="padding:8px 14px;background:#C62828;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">🧹 Nettoyer doublons</button>'+
+      '</div>';
   }
 
   // Filtres — rendus UNE fois ; le filtrage ne régénère que le tbody (garde le focus de l\'input)
@@ -1319,7 +1323,7 @@ function renderUsers(){
     '<select id="users-site" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px"><option value="">Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>'+
     '</div>';
 
-  html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
+  html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Actif</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
 
   div.innerHTML=html;
   filterUsers(); // premier rendu du tableau
@@ -1341,21 +1345,25 @@ function filterUsers(){
     var labels={'Admin':'Administrateur','Logistique':'Gestionnaire dépôt RUN','Logistique_Mayotte':'Logistique Mayotte','RA':'Responsable d’affaires','CT_Specialise':'CT spécialisé','CT':'Conducteur travaux','Ouvrier_Specialise':'Ouvrier spécialisé','Ouvrier':'Ouvrier'};
     var opts=roles.map(function(r){return'<option value="'+r+'"'+(u.droits===r?' selected':'')+'>'+labels[r]+'</option>';}).join('');
     var siteOpts='<option value="Reunion"'+(u.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(u.site==='Mayotte'?' selected':'')+'>Mayotte</option>';
-    return '<tr>'+
+    return '<tr'+(u.actif?'':' style="opacity:.5;background:#FAFAFA"')+'>'+
       '<td><span class="link-emp" data-emp="'+u.code+'" data-nom="'+u.nom.replace(/"/g,'')+'"><b style="font-size:13px">'+u.nom+'</b></span></td>'+
       '<td style="font-family:monospace;font-size:12px;color:var(--grey)">'+u.code+'</td>'+
       '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span>'+(u.explicite?'':' <span style="font-size:9px;color:#bbb" title="Rôle déduit automatiquement">(auto)</span>')+'</td>'+
       '<td>'+badgeSiteD(u.site)+'<select class="site-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid #eee;border-radius:5px">'+siteOpts+'</select></td>'+
+      '<td style="text-align:center"><button class="actif-toggle" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" data-actif="'+(u.actif?'1':'0')+'" style="border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;background:'+(u.actif?'#E8F5E9':'#FFEBEE')+';color:'+(u.actif?'#1B5E20':'#B71C1C')+'">'+(u.actif?'✓ Actif':'✕ Inactif')+'</button></td>'+
       '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
       '<td><select class="role-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">'+opts+'</select></td>'+
     '</tr>';
-  }).join('')||'<tr><td colspan="6" class="es">Aucun utilisateur trouvé.</td></tr>';
+  }).join('')||'<tr><td colspan="7" class="es">Aucun utilisateur trouvé.</td></tr>';
   // Attacher les handlers
   tbody.querySelectorAll('.role-edit-sel').forEach(function(sel){
     sel.onchange=function(){majDroitsUtilisateur(this.getAttribute('data-code'),this.value,this.getAttribute('data-item'));};
   });
   tbody.querySelectorAll('.site-edit-sel').forEach(function(sel){
     sel.onchange=function(){majSiteUtilisateur(this.getAttribute('data-code'),this.value,this.getAttribute('data-item'));};
+  });
+  tbody.querySelectorAll('.actif-toggle').forEach(function(btn){
+    btn.onclick=function(){majActifUtilisateur(this.getAttribute('data-code'),this.getAttribute('data-actif')!=='1',this.getAttribute('data-item'));};
   });
 }
 
@@ -1377,6 +1385,55 @@ async function lancerSeedRolesSites(){
       alert('Échec : '+(res.error||'inconnu'));
     }
   }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// Applique les sites de référence aux immos
+async function lancerSeedImmoSites(){
+  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('🌍 Appliquer les sites (Réunion/Mayotte) à toutes les immos ?\n\nÀ faire une fois au démarrage. Continuer ?'))return;
+  try{
+    var r=await fetch(W+'?action=seed_immo_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
+    var res=await r.json();
+    if(res.success){
+      var msg='✅ Sites appliqués !\n\n'+res.appliques+' / '+res.operations+' immos mises à jour.';
+      if(res.introuvables)msg+='\n\n⚠️ Introuvables : '+res.introuvables;
+      if(res.erreurs&&res.erreurs.length)msg+='\n\n❌ Erreurs : '+res.erreurs.join(', ');
+      alert(msg);
+      refreshAll();
+    }else{alert('Échec : '+(res.error||'inconnu'));}
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// Supprime les doublons d'employés dans SharePoint
+async function lancerDedupeEmployes(){
+  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('🧹 Supprimer les lignes en double dans la liste Employés ?\n\nUne seule ligne par employé sera conservée (la plus complète). Cette action est définitive.\n\nContinuer ?'))return;
+  try{
+    var r=await fetch(W+'?action=dedupe_employes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
+    var res=await r.json();
+    if(res.success){
+      var msg='✅ Nettoyage terminé !\n\n'+res.supprimes+' doublon(s) supprimé(s) sur '+res.doublons_trouves+' trouvé(s).';
+      if(res.erreurs&&res.erreurs.length)msg+='\n\n⚠️ '+res.erreurs.length+' erreur(s).';
+      alert(msg);
+      loadEmployes(true).then(function(){renderUsers();});
+    }else{alert('Échec : '+(res.error||'inconnu'));}
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+async function majActifUtilisateur(code,actif,itemId){
+  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier ce statut.');filterUsers();return;}
+  if(!confirm((actif?'Réactiver':'Désactiver')+' '+nomEmploye(code)+' ?'+(actif?'':'\n\nUn employé inactif ne pourra plus réserver ni recevoir de matériel.')))return;
+  try{
+    var body={code:code,actif:actif};if(itemId)body.item_id=itemId;
+    var r=await fetch(W+'?action=maj_actif',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var res=await r.json();
+    if(res.success){
+      var u=USERS_CACHE.find(function(x){return x.code===code;});if(u)u.actif=actif;
+      if(employesByCode[code])employesByCode[code].actif=actif;
+      var el=employesList.find(function(x){return x.Code===code;});if(el)el.Actif=actif;
+      filterUsers();
+    }else{alert('Échec de la mise à jour'+(res.error==='employe_introuvable'?' : employé introuvable.':'.'));filterUsers();}
+  }catch(e){alert('Erreur réseau : '+e.message);filterUsers();}
 }
 
 async function majSiteUtilisateur(code,site,itemId){
@@ -1644,7 +1701,9 @@ async function chargerFicheImmo(codeIM){
       html+='</div>';
     }
     html+=locHtml;
-    if(immoInfo.N_Serie)html+='<p style="font-size:13px;color:var(--grey);margin-bottom:10px">N° série : <strong>'+immoInfo.N_Serie+'</strong></p>';
+    if(immoInfo.N_Serie)html+='<p style="font-size:13px;color:var(--grey);margin-bottom:6px">N° série : <strong>'+immoInfo.N_Serie+'</strong></p>';
+    if(immoInfo.Categorie)html+='<p style="font-size:13px;color:var(--grey);margin-bottom:6px">Catégorie : <strong>'+immoInfo.Categorie+'</strong></p>';
+    if(immoInfo.Compte)html+='<p style="font-size:12px;color:#9E9E9E;margin-bottom:10px">Compte comptable : <strong>'+immoInfo.Compte+'</strong> <span style="font-size:10px">(encadrement)</span></p>';
     // Boutons
     html+='<div class="fiche-actions" id="fiche-act-immo-'+codeIM+'"></div>';
     // Historique
