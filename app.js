@@ -7,15 +7,107 @@ const CONFIG = {
   // Admins / logistique
   admins:  ['CONI', 'AIWI', 'NAXA', 'BAKA'],
   // Responsables d'affaires + CTs + admins : tous autorisés à réserver
-  autorises: ['CONI', 'AIWI', 'NAXA', 'BAKA', 'ROJO', 'LAHU', 'AUAR', 'BOMA', 'ADWI',
+  autorises: ['CONI', 'AIWI', 'NAXA', 'BAKA', 'ROJO', 'LAHU', 'AUAR', 'BOMA',
               'RIJB', 'MEJO', 'GOLU', 'SCST', 'CANI', 'DACH', 'TOHO'],
   etats:   { 'Neuf': 5, 'Bon état': 4, 'Usé': 3, 'Abîmé': 2, 'Hors service': 1 },
 };
 
-// Peut-on faire une réservation ?
+// ══════════════════════════════════════════════════════════
+// MODÈLE RÔLES × SITES (source unique de vérité — cohérent avec le dashboard)
+// ══════════════════════════════════════════════════════════
+// Rôles (valeurs stockées dans Code_CT via le dashboard) :
+//   Admin, Logistique, Logistique_Mayotte, RA, CT_Specialise, CT, Ouvrier_Specialise, Ouvrier
+// Sites : Reunion, Mayotte
+
+// Normalise une valeur de rôle brute → clé standard (ou '' si non standard/ancienne valeur)
+function normRole(v) {
+  var r = (v || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  var map = {
+    'admin': 'Admin',
+    'logistique': 'Logistique',
+    'logistique_mayotte': 'Logistique_Mayotte',
+    'ra': 'RA',
+    'responsable_affaires': 'RA', 'responsable_d_affaires': 'RA',
+    'ct_specialise': 'CT_Specialise', 'ct_spécialisé': 'CT_Specialise',
+    'ct': 'CT', 'conducteur': 'CT',
+    'ouvrier_specialise': 'Ouvrier_Specialise', 'ouvrier_spécialisé': 'Ouvrier_Specialise', 'os': 'Ouvrier_Specialise',
+    'ouvrier': 'Ouvrier'
+  };
+  return map[r] || '';
+}
+
+// Normalise un site → 'Reunion' | 'Mayotte' (défaut Reunion)
+function normSite(v) {
+  var s = (v || '').trim().toLowerCase();
+  return s.indexOf('may') === 0 ? 'Mayotte' : 'Reunion';
+}
+
+// Rôles autorisés à réserver du matériel
+var ROLES_RESERVE = ['Admin', 'Logistique', 'Logistique_Mayotte', 'RA', 'CT_Specialise', 'CT', 'Ouvrier_Specialise'];
+// Rôles bi-site (voient les deux îles + drapeaux d'emplacement)
+var ROLES_BISITE = ['Admin', 'Logistique', 'RA', 'CT_Specialise', 'Ouvrier_Specialise'];
+
+// Peut-on réserver du matériel ?
 function peutReserver(code) {
   if (!code) return false;
+  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
+  if (role) return ROLES_RESERVE.indexOf(role) !== -1;
+  // Fallback rétrocompatibilité (tant que le rôle n'est pas défini proprement)
   return CONFIG.autorises.includes(code);
+}
+
+// Voit-il les deux sites (et donc les drapeaux d'emplacement) ?
+function voitDeuxSites(code) {
+  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
+  return ROLES_BISITE.indexOf(role) !== -1;
+}
+
+// Quels sites cette personne peut-elle voir/réserver ?
+function sitesAutorises(code) {
+  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
+  var site = normSite(S.siteByCode && S.siteByCode[code]);
+  if (ROLES_BISITE.indexOf(role) !== -1) return ['Reunion', 'Mayotte']; // bi-site
+  if (role === 'Logistique_Mayotte') return ['Mayotte'];               // logistique Mayotte
+  if (role === 'CT') return [site];                                     // CT mono-site (son île)
+  if (role === 'Ouvrier') return [];                                    // ne réserve pas
+  // Fallback : si code dans autorises sans rôle défini → voit son site (défaut Reunion)
+  if (CONFIG.autorises.includes(code)) return [site];
+  return [];
+}
+
+// Une immo est-elle réservable par cette personne (selon le site) ?
+function immoVisiblePour(code, codeIM) {
+  var sites = sitesAutorises(code);
+  if (!sites.length) return false;
+  var siteImmo = siteImmoDe(codeIM);
+  return sites.indexOf(siteImmo) !== -1;
+}
+
+// Site d'une immo (depuis la meta chargée, défaut Reunion)
+function siteImmoDe(codeIM) {
+  return normSite(S.siteImmoByCode && S.siteImmoByCode[codeIM]);
+}
+
+// Faut-il avertir (réservation hors de son île de rattachement) ?
+function avertirCroisement(code, codeIM) {
+  if (!voitDeuxSites(code)) return false; // seuls les bi-site peuvent croiser
+  var siteEmploye = normSite(S.siteByCode && S.siteByCode[code]);
+  var siteImmo = siteImmoDe(codeIM);
+  return siteImmo !== siteEmploye;
+}
+
+// ── Drapeaux SVG (rendu identique partout) ────────────────────────────────
+var FLAG_REUNION = '<svg viewBox="0 0 60 40" width="18" height="12" style="border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.12)"><rect width="60" height="40" fill="#2A6BE0"/><g fill="#FFDD00"><path d="M30 21 L-31.8 15.8 L-30.8 9.0 Z"/><path d="M30 21 L-28.3 -0.0 L-25.6 -6.4 Z"/><path d="M30 21 L-20.9 -14.4 L-16.6 -19.8 Z"/><path d="M30 21 L-10.0 -26.4 L-4.5 -30.5 Z"/><path d="M30 21 L3.6 -35.1 L10.0 -37.7 Z"/><path d="M30 21 L19.0 -40.0 L25.9 -40.9 Z"/><path d="M30 21 L35.2 -40.8 L42.0 -39.8 Z"/><path d="M30 21 L51.0 -37.3 L57.4 -34.6 Z"/><path d="M30 21 L65.4 -29.9 L70.8 -25.6 Z"/><path d="M30 21 L77.4 -19.0 L81.5 -13.5 Z"/><path d="M30 21 L86.1 -5.4 L88.7 1.0 Z"/></g><path d="M30 21 L2 40 L58 40 Z" fill="#F42A2A"/></svg>';
+var FLAG_MAYOTTE = '<svg viewBox="0 0 60 40" width="18" height="12" style="border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.12)"><rect width="60" height="40" fill="#fff"/><path d="M19 8 H41 V21 Q41 31 30 35 Q19 31 19 21 Z" fill="#C1121F" stroke="#8a0d16" stroke-width="0.6"/><path d="M20.2 9.2 H39.8 V20.5 H20.2 Z" fill="#1E4F9E"/><path d="M27 15.5 a4 4 0 1 0 4.5 -3.2 a5 5 0 1 1 -4.5 3.2 Z" fill="#fff"/><g fill="#FFD100" stroke="#E8A200" stroke-width="0.3"><g transform="translate(26,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g><g transform="translate(34,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g></g></svg>';
+function drapeauSite(site) {
+  return normSite(site) === 'Mayotte' ? FLAG_MAYOTTE : FLAG_REUNION;
+}
+function badgeSite(site) {
+  var s = normSite(site);
+  var bg = s === 'Mayotte' ? '#E0F2F1' : '#E3F2FD';
+  var fg = s === 'Mayotte' ? '#00695C' : '#0D47A1';
+  var lbl = s === 'Mayotte' ? 'MAYOTTE' : 'RÉUNION';
+  return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:' + bg + ';color:' + fg + ';vertical-align:middle">' + drapeauSite(s) + ' ' + lbl + '</span>';
 }
 
 // Une demande "Demandee" est imminente si le depart est dans moins de 24h (ou deja depasse sans reponse)
@@ -37,6 +129,9 @@ function isImminenteSansReponse(r) {
 // ── État global ───────────────────────────────────────────
 const S = {
   employe:             null,
+  droitsByCode:        {},
+  siteByCode:          {},
+  siteImmoByCode:      {},
   typeMouvement:       null,
   codeIM:              null,
   codeReceveur:        null,
@@ -115,11 +210,15 @@ function buildCatSelect(id, fn) {
   if (fn) sel.onchange = fn;
 }
 
-function immosFilt(cat, q) {
+function immosFilt(cat, q, filtrerSite) {
   const qu = (q || '').trim().toUpperCase();
+  // Sites autorisés pour la personne connectée (uniquement si filtrerSite demandé, ex: réservation)
+  const sitesOK = filtrerSite && S.employe ? sitesAutorises(S.employe.code) : null;
   const res = [];
   for (const k in S.immos) {
     const im = S.immos[k];
+    // Filtrage géographique : ne montrer que les immos des sites autorisés
+    if (sitesOK && sitesOK.indexOf(siteImmoDe(k)) === -1) continue;
     const mc = !cat || (im.Categorie || 'Sans catégorie') === cat;
     const num = k.replace('IM', '').replace(/^0+/, '');
     const mq = !qu || k.toUpperCase().includes(qu) || (im.Libelle || '').toUpperCase().includes(qu) || num === qu;
@@ -184,12 +283,37 @@ async function chargerImmos() {
     arr.forEach(i => { S.immos[i.Code_IM] = i; });
     ['resa-categorie', 'rech-cat', 'force-cat', 'stock-cat'].forEach(id => buildCatSelect(id));
   } catch (e) {}
+  // Charger les sites réels des immos (colonne Site SharePoint via le Worker)
+  try {
+    const rm = await fetch(CONFIG.proxy + '?immo_metadata=1');
+    const meta = await rm.json();
+    S.siteImmoByCode = {};
+    for (const code in meta) { S.siteImmoByCode[code] = meta[code].site || 'Reunion'; }
+  } catch (e) { S.siteImmoByCode = {}; }
 }
 
 async function chargerEmployes() {
   try {
-    const r = await fetch('employes.json');
-    S.employes = await r.json();
+    // 1. Priorité : endpoint Worker (contient le champ Droits, à jour en temps réel)
+    let arr = null;
+    try {
+      const rw = await fetch(CONFIG.proxy + '?employes=1');
+      const data = await rw.json();
+      if (Array.isArray(data) && data.length) {
+        arr = data.map(e => ({ Code: e.code, Nom: e.nom, Poste: e.poste || '', Droits: e.role || '', Site: e.site || '' }));
+      }
+    } catch (e) { /* fallback ci-dessous */ }
+    // 2. Fallback : fichier statique
+    if (!arr) {
+      const r = await fetch('employes.json');
+      const raw = await r.json();
+      arr = raw.map(e => ({ Code: e.Code, Nom: e.Nom, Poste: e.Poste || '', Droits: '', Site: '' }));
+    }
+    S.employes = arr;
+    // Index code → droits + site (pour peutReserver / filtrage géographique)
+    S.droitsByCode = {};
+    S.siteByCode = {};
+    arr.forEach(e => { S.droitsByCode[e.Code] = e.Droits || ''; S.siteByCode[e.Code] = e.Site || ''; });
     const selIds = ['select-receveur', 'force-receveur', 'resa-pour-qui'];
     selIds.forEach(selId => {
       const sel = document.getElementById(selId);
@@ -971,27 +1095,49 @@ function rechercherImmoResa() {
   const div  = document.getElementById('resa-immo-suggestions');
   if (!div) return;
   if (!q && !cat) { div.innerHTML = ''; return; }
-  const res = immosFilt(cat, q).slice(0, 8);
-  div.innerHTML = res.length === 0 ? '<p class="empty-msg">Aucune immo.</p>' :
-    res.map(im => `<div class="suggestion-item" onclick="selImmoResa('${im.Code_IM}','${(im.Libelle||'').replace(/'/g,"\\'")}')"><strong>${im.Libelle}</strong> <span class="chantier-tag">${im.Code_IM}</span>${im.Categorie ? `<small style="color:var(--grey)"> · ${im.Categorie}</small>` : ''}</div>`).join('');
+  const res = immosFilt(cat, q, true).slice(0, 8); // true = filtrage geographique
+  const montrerDrapeau = S.employe && voitDeuxSites(S.employe.code);
+  div.innerHTML = res.length === 0 ? '<p class="empty-msg">Aucune immo disponible sur votre perimetre.</p>' :
+    res.map(im => { const flag = montrerDrapeau ? ' ' + badgeSite(siteImmoDe(im.Code_IM)) : ''; return `<div class="suggestion-item" onclick="selImmoResa('${im.Code_IM}','${(im.Libelle||'').replace(/'/g,"\\'")}')"><strong>${im.Libelle}</strong> <span class="chantier-tag">${im.Code_IM}</span>${flag}${im.Categorie ? `<small style="color:var(--grey)"> · ${im.Categorie}</small>` : ''}</div>`; }).join('');
 }
 
 function selImmoResa(code, libelle) {
   S.resaImmoCode = code; S.resaImmoLibelle = libelle;
   const el = document.getElementById('resa-immo-info');
-  if (el) el.textContent = '✅ ' + libelle + ' (' + code + ')';
+  const montrerDrapeau = S.employe && voitDeuxSites(S.employe.code);
+  if (el) el.innerHTML = '✅ ' + libelle + ' (' + code + ')' + (montrerDrapeau ? ' ' + badgeSite(siteImmoDe(code)) : '');
   const inp = document.getElementById('resa-immo-search');
   if (inp) inp.value = libelle;
   const div = document.getElementById('resa-immo-suggestions');
   if (div) div.innerHTML = '';
+  // Avertissement si reservation hors de son ile de rattachement
+  if (S.employe && avertirCroisement(S.employe.code, code)) {
+    const siteImmo = siteImmoDe(code);
+    const nomSite = siteImmo === 'Mayotte' ? 'Mayotte' : 'La Reunion';
+    setTimeout(function() {
+      if (!confirm('\u26a0\ufe0f Attention : ce materiel se trouve a ' + nomSite + ' !\n\nEtes-vous certain de vouloir continuer la reservation ?')) {
+        S.resaImmoCode = null; S.resaImmoLibelle = null;
+        if (el) el.textContent = '';
+        if (inp) inp.value = '';
+      }
+    }, 150);
+  }
 }
 
 function scannerPourResa() {
   showScreen('screen-scan-resa');
   startScanner('scanner-resa', code => {
     if (!code.startsWith('IM')) { toast('Ce n\'est pas une immo', 'error'); return; }
+    // Contrôle géographique : l'immo doit être sur un site autorisé
+    if (S.employe && !immoVisiblePour(S.employe.code, code)) {
+      stopScanner(); vib(300);
+      const siteImmo = siteImmoDe(code);
+      const nomSite = siteImmo === 'Mayotte' ? 'Mayotte' : 'La Réunion';
+      showScreen('screen-reserver', true);
+      toast('⛔ ' + lib(code) + ' est à ' + nomSite + ' — hors de votre périmètre', 'error', 3500);
+      return;
+    }
     stopScanner(); vib(200);
-    // Passer skipInit=true pour ne pas effacer les données
     showScreen('screen-reserver', true);
     selImmoResa(code, lib(code));
     toast('📦 ' + lib(code) + ' sélectionné', 'success', 2000);
