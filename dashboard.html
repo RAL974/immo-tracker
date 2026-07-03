@@ -309,6 +309,7 @@ tr:hover td{background:#FAFBFC;}
       <div class="filters">
         <input type="text" id="circ-q" placeholder="Immo, employé..." oninput="renderCirc()">
         <select id="circ-etat" onchange="renderCirc()"><option value="">Tous états</option><option>Neuf</option><option>Bon état</option><option>Usé</option><option>Abîmé</option><option>Hors service</option></select>
+        <select id="circ-site" onchange="setSiteFilter('circulation',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
       </div>
       <div class="card"><div class="card-head"><h3>Matériel en circulation</h3><span class="card-cnt" id="cnt-circ"></span></div><div class="det-grid" id="dg-circ" style="padding:12px"></div></div>
     </div>
@@ -319,6 +320,7 @@ tr:hover td{background:#FAFBFC;}
         <input type="text" id="depot-q" placeholder="Code, libellé..." oninput="renderDepot()">
         <select id="depot-cat" onchange="renderDepot()"><option value="">Toutes catégories</option></select>
         <select id="depot-etat" onchange="renderDepot()"><option value="">Tous états</option><option>Neuf</option><option>Bon état</option><option>Usé</option><option>Abîmé</option><option>Hors service</option><option>Inconnu</option></select>
+        <select id="depot-site" onchange="setSiteFilter('depot',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
         <select id="depot-nb" onchange="renderDepot()" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
           <option value="50">50 max</option><option value="100">100 max</option><option value="200">200 max</option><option value="0">Tous</option>
         </select>
@@ -332,7 +334,7 @@ tr:hover td{background:#FAFBFC;}
           <button onclick="sortDepot('cat')" class="filter-btn" style="padding:4px 10px;font-size:12px">Catégorie</button>
           <button onclick="sortDepot('since')" class="filter-btn" style="padding:4px 10px;font-size:12px">Durée au dépôt</button>
         </div>
-        <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Site</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
     </div>
 
     <!-- Historique -->
@@ -344,6 +346,9 @@ tr:hover td{background:#FAFBFC;}
             <option value="">Tous types</option>
             <option value="Transfert">🔄 Transferts</option>
             <option value="Retour">📥 Retours dépôt</option>
+          </select>
+          <select id="hist-site" onchange="setSiteFilter('historique',this.value)" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+            <option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option>
           </select>
           <select id="hist-nb" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
             <option value="50">50 derniers</option>
@@ -362,6 +367,7 @@ tr:hover td{background:#FAFBFC;}
       <div class="card">
         <div class="card-head"><h3>Transferts en attente de validation</h3><span class="card-cnt" id="cnt-transf"></span></div>
         <p style="padding:8px 18px;font-size:13px;color:var(--grey);border-bottom:1px solid #f0f0f0">Valider ici la réception d'un matériel depuis le dashboard, sans scanner.</p>
+        <div style="padding:8px 18px"><select id="transf-site" onchange="setSiteFilter('transferts',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Donneur</th><th>Receveur</th><th>État déclaré</th><th>Attente</th><th>Note</th><th>Action</th></tr></thead><tbody id="tb-transf"></tbody></table></div>
       </div>
     </div>
@@ -379,6 +385,7 @@ tr:hover td{background:#FAFBFC;}
           <option value="Rendue">Rendue</option>
           <option value="Annulee">Annulée</option>
         </select>
+        <select id="resa-site" onchange="setSiteFilter('reservations',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
       </div>
       <div id="resa-stats"></div>
       <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>Calendrier — 6 semaines</h3></div><div class="gantt-wrap" id="resa-gantt" style="padding:14px"></div></div>
@@ -400,6 +407,7 @@ tr:hover td{background:#FAFBFC;}
             <option value="a_fds">Avec FDS</option>
             <option value="avec_photos">Avec photos</option>
           </select>
+          <select id="docs-site" onchange="renderDocs()"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
         </div>
         <div class="card"><div class="card-head"><h3>Suivi des documents</h3><span class="card-cnt" id="cnt-docs"></span></div>
           <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
@@ -717,6 +725,8 @@ async function loadAll(){
     document.getElementById('last-upd').textContent='Actualisé '+fmtDT(new Date().toISOString());
     // Charger réservations en arrière-plan
     loadReservations();
+    // Charger les métadonnées immo (sites) en arrière-plan pour badges & filtres partout
+    loadImmoMeta().then(function(){ if(activeTab&&activeTab!=='vue-generale')renderTab(activeTab); });
   }catch(e){document.getElementById('loading-screen').innerHTML='<p style="color:var(--red)">Erreur : '+e.message+'</p>';}
 }
 
@@ -868,7 +878,8 @@ function renderCirc(){
   var q=(document.getElementById('circ-q')||{}).value||'';
   var fe=(document.getElementById('circ-etat')||{}).value||'';
   var qu=q.trim().toUpperCase();
-  var data=(d.en_circulation||[]).filter(function(i){return(!qu||(i.code_im.includes(qu)||i.detenteur_nom.toUpperCase().includes(qu)||(getLib(i.code_im)).toUpperCase().includes(qu)))&&(!fe||i.etat===fe);});
+  var fs=SITE_FILTERS.circulation||'';
+  var data=(d.en_circulation||[]).filter(function(i){return(!qu||(i.code_im.includes(qu)||i.detenteur_nom.toUpperCase().includes(qu)||(getLib(i.code_im)).toUpperCase().includes(qu)))&&(!fe||i.etat===fe)&&(!fs||siteImmoDash(i.code_im)===fs);});
   var grp={};
   data.forEach(function(i){if(!grp[i.detenteur_code])grp[i.detenteur_code]={nom:i.detenteur_nom,code:i.detenteur_code,list:[]};grp[i.detenteur_code].list.push(i);});
   document.getElementById('cnt-circ').textContent=data.length+' immos';
@@ -877,7 +888,7 @@ function renderCirc(){
   if(!sorted.length){div.innerHTML='<p class="es">Aucun résultat.</p>';return;}
   div.innerHTML=sorted.map(function(g){
     return '<div class="det-card"><div class="det-nom"><span class="link-emp" data-emp="'+g.code+'" data-nom="'+g.nom.replace(/"/g,'')+'">'+g.nom+'</span><span><span class="det-cnt">'+g.list.length+'</span> <span style="font-size:10px;color:var(--grey)">'+g.code+'</span></span></div>'+
-      g.list.map(function(i){return'<div class="det-item"><span><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span> <span style="font-size:11px;color:#555">'+getLib(i.code_im)+'</span>'+(i.en_panne?' <span style="font-size:10px;font-weight:700;color:#E65100">📢 EN PANNE</span>':'')+'</span><span>'+ebadge(i.etat)+'</span></div>';}).join('')+'</div>';
+      g.list.map(function(i){return'<div class="det-item"><span><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+' <span style="font-size:11px;color:#555">'+getLib(i.code_im)+'</span>'+(i.en_panne?' <span style="font-size:10px;font-weight:700;color:#E65100">📢 EN PANNE</span>':'')+'</span><span>'+ebadge(i.etat)+'</span></div>';}).join('')+'</div>';
   }).join('');
 }
 
@@ -894,7 +905,8 @@ function renderDepot(){
   var fc=(document.getElementById('depot-cat')||{}).value||'';
   var fe=(document.getElementById('depot-etat')||{}).value||'';
   var qu=q.trim().toUpperCase();
-  var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe);});
+  var fs=SITE_FILTERS.depot||'';
+  var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe)&&(!fs||siteImmoDash(i.code_im)===fs);});
   // Tri configurable
   data.sort(function(a,b){
     var dir=depotSortDir;
@@ -907,7 +919,6 @@ function renderDepot(){
   var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
   var affiche=nb===0?data:data.slice(0,nb);
   var cntEl=document.getElementById('cnt-depot');if(cntEl)cntEl.textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
-  document.getElementById('tb-depot').innerHTML=affiche.length===0?'<tr><td colspan="5" class="es">Aucun résultat.</td></tr>':
   document.getElementById('tb-depot').innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
     affiche.map(function(i){
       var l=getLib(i.code_im);var c=getCat(i.code_im);
@@ -917,6 +928,7 @@ function renderDepot(){
       return'<tr>'+
         '<td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td>'+
         '<td style="font-size:12px">'+l+'</td>'+
+        '<td>'+badgeSiteD(siteImmoDash(i.code_im))+'</td>'+
         '<td style="font-size:11px;color:var(--grey)">'+c+'</td>'+
         '<td>'+ebadge(i.etat)+'</td>'+
         '<td style="font-size:12px;font-weight:600;color:var(--blue)">'+va+'</td>'+
@@ -933,10 +945,12 @@ function filterHist(){
 function searchHist(){filterHist();}
 function autoLoadHist_internal(all,q,type,nb){
   var qu=q.trim().toUpperCase();
+  var fs=SITE_FILTERS.historique||'';
   var res=all.filter(function(m){
     var matchQ=!qu||(m.code_im.toUpperCase().includes(qu)||m.code_employe.toUpperCase().includes(qu)||m.nom_employe.toUpperCase().includes(qu));
     var matchT=!type||m.type_mouvement===type;
-    return matchQ&&matchT;
+    var matchS=!fs||siteImmoDash(m.code_im)===fs;
+    return matchQ&&matchT&&matchS;
   });
   var affiche=nb===0?res:res.slice(0,nb);
   document.getElementById('cnt-hist').textContent=affiche.length+(res.length>affiche.length?' / '+res.length:'')+' mouvements';
@@ -947,7 +961,7 @@ function autoLoadHist_internal(all,q,type,nb){
       var donneur='—';var donneurCode='';
       if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
       return '<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
-        '<td><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span></td>'+
+        '<td><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span>'+drapImmoDash(m.code_im)+'</td>'+
         '<td style="font-size:12px">'+l+'</td>'+
         '<td>'+icon+' '+m.type_mouvement+'</td>'+
         '<td><span class="link-emp" data-emp="'+m.code_employe+'" data-nom="'+m.nom_employe.replace(/"/g,'')+'"><b style="font-size:12px">'+m.nom_employe+'</b></span></td>'+
@@ -960,7 +974,8 @@ function autoLoadHist_internal(all,q,type,nb){
 // ── Rendu — Transferts ───────────────────────────────────
 function renderTransferts(){
   if(!d){document.getElementById('tb-transf').innerHTML='<tr><td colspan="8" class="es">Chargement...</td></tr>';return;}
-  var data=d.pending||[];
+  var fs=SITE_FILTERS.transferts||'';
+  var data=(d.pending||[]).filter(function(t){return !fs||siteImmoDash(t.code_im)===fs;});
   document.getElementById('cnt-transf').textContent=data.length+' en attente';
   var now=Date.now();
   if(!data.length){document.getElementById('tb-transf').innerHTML='<tr><td colspan="8" class="es">Aucun transfert en attente.</td></tr>';return;}
@@ -970,7 +985,7 @@ function renderTransferts(){
     var ret=h>24;
     var l=getLib(t.code_im);
     html+='<tr class="'+(ret?'urgent-row':'warn-row')+'">';
-    html+='<td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+t.code_im+'</span></td>';
+    html+='<td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+t.code_im+'</span>'+drapImmoDash(t.code_im)+'</td>';
     html+='<td style="font-size:12px">'+l+'</td>';
     html+='<td><span class="link-emp" data-emp="'+t.donneur_code+'" data-nom="'+t.donneur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.donneur_nom+'</b></span></td>';
     html+='<td><span class="link-emp" data-emp="'+t.receveur_code+'" data-nom="'+t.receveur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.receveur_nom+'</b></span></td>';
@@ -1025,8 +1040,9 @@ async function validerTransfertDash(btn,tid,cim,rec,recNom,etat){
 function renderResa(){
   var q=(document.getElementById('resa-q')||{}).value||'';
   var sf=(document.getElementById('resa-statut')||{}).value||'';
+  var fs=SITE_FILTERS.reservations||'';
   var qu=q.trim().toUpperCase();
-  var data=reservations.filter(function(r){return(!qu||(r.code_im.includes(qu)||r.nom_employe.toUpperCase().includes(qu)||(r.nom_chantier||'').toUpperCase().includes(qu)||(getLib(r.code_im)).toUpperCase().includes(qu)))&&(!sf||r.statut===sf);});
+  var data=reservations.filter(function(r){return(!qu||(r.code_im.includes(qu)||r.nom_employe.toUpperCase().includes(qu)||(r.nom_chantier||'').toUpperCase().includes(qu)||(getLib(r.code_im)).toUpperCase().includes(qu)))&&(!sf||r.statut===sf)&&(!fs||siteImmoDash(r.code_im)===fs);});
   var order={'En retard':0,'Demandee':1,'Confirmee':2,'En cours':3,'Rendue':4,'Annulee':5};
   data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9);});
   // Sous-totaux
@@ -1086,7 +1102,7 @@ function renderResa(){
       var isImm=isImminenteSansReponse(r);
       var tr='<tr class="'+(isImm||isU?'urgent-row':isD?'warn-row':'')+'">';
       tr+='<td>'+rsLabel(r.statut)+(isImm?' <span style="display:block;margin-top:2px;font-size:10px;font-weight:800;color:var(--red)">⏰ DÉPART IMMINENT</span>':'')+'</td>';
-      tr+='<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+r.code_im+'</span>'+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:9px;color:var(--orange);white-space:nowrap">✏️ initial : <span class="link-im" data-cim="'+r.code_im_initial+'" data-lib="'+getLib(r.code_im_initial).replace(/"/g,'')+'">'+r.code_im_initial+'</span></span>':'')+'</td>';
+      tr+='<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+r.code_im+'</span>'+drapImmoDash(r.code_im)+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:9px;color:var(--orange);white-space:nowrap">✏️ initial : <span class="link-im" data-cim="'+r.code_im_initial+'" data-lib="'+getLib(r.code_im_initial).replace(/"/g,'')+'">'+r.code_im_initial+'</span></span>':'')+'</td>';
       tr+='<td style="font-size:12px">'+l+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:10px;color:var(--grey)">au lieu de : '+getLib(r.code_im_initial)+'</span>':'')+'</td>';
       tr+='<td><span class="link-emp" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'"><b style="font-size:12px">'+r.nom_employe+'</b></span></td>';
       tr+='<td style="font-size:12px">'+(r.nom_chantier||'—')+'</td>';
@@ -1109,10 +1125,12 @@ function majStatutResa(id,statut,sel){
 function renderDocs(){
   var q=(document.getElementById('docs-q')||{}).value||'';
   var f=(document.getElementById('docs-filter')||{}).value||'';
+  var fs=(document.getElementById('docs-site')||{}).value||'';
   var qu=q.trim().toUpperCase();
   var invMap={};(d.inventory||[]).forEach(function(i){invMap[i.code_im]=i;});
   var rows=Object.keys(im).map(function(code){var immo=im[code];var inv=invMap[code];return{code_im:code,libelle:immo.Libelle||'',categorie:immo.Categorie||'',hasFds:!!getFdsUrl(code),hasPhotos:!!photosMap[code],statut:inv?inv.statut:'Au depot'};});
   if(qu)rows=rows.filter(function(r){return r.code_im.includes(qu)||r.libelle.toUpperCase().includes(qu)||r.categorie.toUpperCase().includes(qu);});
+  if(fs)rows=rows.filter(function(r){return siteImmoDash(r.code_im)===fs;});
   if(f==='manque_fds')rows=rows.filter(function(r){return!r.hasFds;});
   if(f==='a_fds')rows=rows.filter(function(r){return r.hasFds;});
   if(f==='avec_photos')rows=rows.filter(function(r){return r.hasPhotos;});
@@ -1122,7 +1140,7 @@ function renderDocs(){
   document.getElementById('nb-docs').textContent=sansFds+' sans FDS';
   document.getElementById('cnt-docs').textContent=rows.length+' immos';
   document.getElementById('tb-docs').innerHTML=rows.length===0?'<tr><td colspan="6" class="es">Aucune.</td></tr>':
-    rows.map(function(r){var u=getFdsUrl(r.code_im);return'<tr style="'+(r.hasFds?'background:#F0FFF4':'')+'">'+'<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+r.libelle.replace(/"/g,'')+'">'+r.code_im+'</span></td>'+
+    rows.map(function(r){var u=getFdsUrl(r.code_im);return'<tr style="'+(r.hasFds?'background:#F0FFF4':'')+'">'+'<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+r.libelle.replace(/"/g,'')+'">'+r.code_im+'</span>'+drapImmoDash(r.code_im)+'</td>'+
       '<td style="font-size:12px">'+r.libelle+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+r.categorie+'</td>'+
       '<td><span class="badge '+(r.statut==='En circulation'?'bb':'bn')+'">'+r.statut+'</span></td>'+
@@ -1133,16 +1151,19 @@ function renderDocs(){
 // ── Rendu — Maintenance ──────────────────────────────────
 function renderMaint(){
   if(!maintenance){document.getElementById('maint-content').innerHTML='<p class="es">Renseignez les dates dans la liste Immos SharePoint.</p>';return;}
-  var mu=maintenance.maintenances_urgentes||[],mb=maintenance.maintenances_bientot||[],gb=maintenance.garanties_bientot||[],ge=maintenance.garanties_expirees||[];
+  var fs=SITE_FILTERS.maintenance||'';
+  var siteOK=function(code){return !fs||siteImmoDash(code)===fs;};
+  var mu=(maintenance.maintenances_urgentes||[]).filter(function(i){return siteOK(i.code_im);}),mb=(maintenance.maintenances_bientot||[]).filter(function(i){return siteOK(i.code_im);}),gb=(maintenance.garanties_bientot||[]).filter(function(i){return siteOK(i.code_im);}),ge=(maintenance.garanties_expirees||[]).filter(function(i){return siteOK(i.code_im);});
   function tbl(titre,items,col){
     if(!items.length)return'';
     var h='<div class="card" style="margin-bottom:12px;border-top:3px solid '+col+'"><div class="card-head"><h3>'+titre+' ('+items.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>Date prévue</th><th>Prestataire</th><th>Coût</th></tr></thead><tbody>';
-    h+=items.map(function(i){return'<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+i.libelle.replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+i.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+i.categorie+'</td><td>'+fmtD(i.prochaine_maintenance||i.date_garantie_fin)+'</td><td style="font-size:12px">'+(i.prestataire_sav||'—')+'</td><td style="font-size:12px">'+(i.cout_maintenance?i.cout_maintenance+'€':'—')+'</td></tr>';}).join('');
+    h+=items.map(function(i){return'<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+i.libelle.replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+'</td><td style="font-size:12px">'+i.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+i.categorie+'</td><td>'+fmtD(i.prochaine_maintenance||i.date_garantie_fin)+'</td><td style="font-size:12px">'+(i.prestataire_sav||'—')+'</td><td style="font-size:12px">'+(i.cout_maintenance?i.cout_maintenance+'€':'—')+'</td></tr>';}).join('');
     return h+'</tbody></table></div></div>';
   }
+  var filtreHtml='<div style="margin-bottom:12px"><select onchange="setSiteFilter(\'maintenance\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select></div>';
   var html=tbl('🔴 Maintenance urgente (≤7j)',mu,'var(--red)')+tbl('🟠 Maintenance dans 30j',mb,'var(--orange)')+tbl('⚠️ Garanties expirant dans 30j',gb,'var(--yellow)')+tbl('❌ Garanties expirées',ge,'var(--grey)');
-  if(!html)html='<div class="es" style="padding:40px">Aucune alerte maintenance.</div>';
-  document.getElementById('maint-content').innerHTML=html;
+  if(!html)html='<div class="es" style="padding:40px">Aucune alerte maintenance'+(fs?' sur '+fs:'')+'.</div>';
+  document.getElementById('maint-content').innerHTML=filtreHtml+html;
 }
 
 // ── Rendu — Alertes ──────────────────────────────────────
@@ -1156,7 +1177,9 @@ function renderAlertes(){
   // Supprimer le spinner de chargement si présent
   var sp=pane.querySelector('.loading-placeholder');if(sp)pane.removeChild(sp);
   var now=Date.now();
-  var hsAll=d.hors_service||[];var ret=d.alertes_delai||[];
+  var fs=SITE_FILTERS.alertes||'';
+  var siteOK=function(code){return !fs||siteImmoDash(code)===fs;};
+  var hsAll=(d.hors_service||[]).filter(function(i){return siteOK(i.code_im);});var ret=(d.alertes_delai||[]).filter(function(t){return siteOK(t.code_im);});
   // Pannes en cours (mouvement type Panne sans Réparation ultérieure)
   // Detection pannes actives : aucune Reparation apres la derniere Panne
   var immoLastPanne={};var immoLastRep={};
@@ -1168,6 +1191,7 @@ function renderAlertes(){
   });
   var pannesActives=[];
   Object.keys(immoLastPanne).forEach(function(code){
+    if(!siteOK(code))return;
     var lastP=immoLastPanne[code];var lastR=immoLastRep[code];
     var estActive=!lastR||(new Date(lastP.horodatage)>new Date(lastR.horodatage));
     if(estActive){var j=Math.floor((now-new Date(lastP.horodatage).getTime())/86400000);pannesActives.push({code_im:code,note:lastP.note||'',since:lastP.horodatage,detenteur:lastP.nom_employe||'—',detenteur_code:lastP.code_employe||'',dureeJ:j});}
@@ -1192,11 +1216,11 @@ function renderAlertes(){
       return row.outerHTML;
     }).join('')+'</tbody></table></div></div>';
   // Immos chez le prestataire (panne avec prestataire renseigné)
-  var chezPresta=d.chez_prestataire||[];
+  var chezPresta=(d.chez_prestataire||[]).filter(function(i){return siteOK(i.code_im);});
   if(chezPresta.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid #9C27B0"><div class="card-head"><h3>🔧 Chez le prestataire ('+chezPresta.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Prestataire</th><th>Depuis</th><th>Action</th></tr></thead><tbody>'+
     chezPresta.map(function(i){
       var presta=i.detenteur_nom.replace('Prestataire : ','');
-      return '<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td>'+
+      return '<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+'</td>'+
         '<td style="font-size:12px">'+getLib(i.code_im)+'</td>'+
         '<td style="font-size:12px;font-weight:700;color:#9C27B0">🔧 '+presta+'</td>'+
         '<td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td>'+
@@ -1204,13 +1228,13 @@ function renderAlertes(){
     }).join('')+'</tbody></table></div></div>';
 
   // Réservations imminentes sans réponse (départ <=24h, statut Demandee)
-  var resaImminentes=(reservations||[]).filter(isImminenteSansReponse).sort(function(a,b){return new Date(a.date_debut)-new Date(b.date_debut);});
+  var resaImminentes=(reservations||[]).filter(isImminenteSansReponse).filter(function(r){return siteOK(r.code_im);}).sort(function(a,b){return new Date(a.date_debut)-new Date(b.date_debut);});
   if(resaImminentes.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>⏰ Réservations imminentes sans réponse ('+resaImminentes.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Demandeur</th><th>Code IM</th><th>Libellé</th><th>Départ demandé</th><th>Action</th></tr></thead><tbody>'+
     resaImminentes.map(function(r){
       var diffH=Math.round((new Date(r.date_debut).getTime()-Date.now())/3600000);
       var diffTxt=diffH<0?'Dépassé depuis '+Math.abs(diffH)+'h':'Dans '+diffH+'h';
       return '<tr class="urgent-row"><td><span class="link-emp" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'">'+r.nom_employe+'</span></td>'+
-        '<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+getLib(r.code_im).replace(/"/g,'')+'">'+r.code_im+'</span></td>'+
+        '<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+getLib(r.code_im).replace(/"/g,'')+'">'+r.code_im+'</span>'+drapImmoDash(r.code_im)+'</td>'+
         '<td style="font-size:12px">'+getLib(r.code_im)+'</td>'+
         '<td><b style="color:var(--red)">'+fmtDT(r.date_debut)+'</b><br><span style="font-size:10px;color:var(--grey)">'+diffTxt+'</span></td>'+
         '<td><button onclick="goTab(\'reservations\')" style="padding:4px 10px;background:var(--orange);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">📅 Traiter</button></td></tr>';
@@ -1219,10 +1243,12 @@ function renderAlertes(){
   // Exclure de "Hors service actuel" les immos déjà affichées dans "Pannes en cours" (même panne, déjà actionnable plus haut)
   var pannesActivesCodes={};pannesActives.forEach(function(p){pannesActivesCodes[p.code_im]=true;});
   var hs=hsAll.filter(function(i){return !pannesActivesCodes[i.code_im];});
-  if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service actuel ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span></td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
-  if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span></td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
-  if(!html)html='<div class="es" style="padding:40px">Aucune alerte active. Tout est OK ✅</div>';
-  div.innerHTML=html;
+  if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service actuel ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+'</td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+  if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span>'+drapImmoDash(t.code_im)+'</td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
+  // Filtre site en tête
+  var filtreHtml='<div style="margin-bottom:12px"><select onchange="setSiteFilter(\'alertes\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select></div>';
+  if(!html)html='<div class="es" style="padding:40px">Aucune alerte active'+(fs?' sur '+fs:'')+'. Tout est OK ✅</div>';
+  div.innerHTML=filtreHtml+html;
   // Attacher handlers des boutons Suivi et Résoudre
   div.querySelectorAll('.btn-res-p').forEach(function(btn){
     btn.onclick=function(){resoudrePanneComplet(this.dataset.cim);};
@@ -1240,6 +1266,22 @@ var FLAG_MAYOTTE_D='<svg viewBox="0 0 60 40" width="18" height="12" style="borde
 function normSiteD(v){var s=(v||'').trim().toLowerCase();return s.indexOf('may')===0?'Mayotte':'Reunion';}
 function drapeauSiteD(site){return normSiteD(site)==='Mayotte'?FLAG_MAYOTTE_D:FLAG_REUNION_D;}
 function badgeSiteD(site){var s=normSiteD(site);var bg=s==='Mayotte'?'#E0F2F1':'#E3F2FD';var fg=s==='Mayotte'?'#00695C':'#0D47A1';var lbl=s==='Mayotte'?'MAYOTTE':'RÉUNION';return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:'+bg+';color:'+fg+';vertical-align:middle">'+drapeauSiteD(s)+' '+lbl+'</span>';}
+// Site d'une immo (depuis immoMeta chargé, défaut Reunion)
+function siteImmoDash(codeIM){return normSiteD(immoMeta[codeIM]&&immoMeta[codeIM].site);}
+// Petit badge drapeau seul (sans texte) pour les tableaux denses
+function drapImmoDash(codeIM){return '<span title="'+siteImmoDash(codeIM)+'" style="display:inline-flex;vertical-align:middle;margin-left:4px">'+drapeauSiteD(siteImmoDash(codeIM))+'</span>';}
+// État des filtres site par onglet (Réunion/Mayotte/'' = tous)
+var SITE_FILTERS={circulation:'',depot:'',historique:'',transferts:'',reservations:'',maintenance:'',alertes:''};
+function setSiteFilter(tab,val){SITE_FILTERS[tab]=val;renderTab(tab);}
+// Génère le HTML d'un sélecteur de filtre site pour un onglet
+function siteFilterSelect(tab){
+  var v=SITE_FILTERS[tab]||'';
+  return '<select onchange="setSiteFilter(\''+tab+'\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px">'+
+    '<option value=""'+(v===''?' selected':'')+'>🌍 Tous les sites</option>'+
+    '<option value="Reunion"'+(v==='Reunion'?' selected':'')+'>Réunion</option>'+
+    '<option value="Mayotte"'+(v==='Mayotte'?' selected':'')+'>Mayotte</option>'+
+  '</select>';
+}
 
 function roleUtilisateur(code,poste,droits){
   // 1. Rôle explicite depuis SharePoint (champ Droits/Code_CT) — prioritaire
