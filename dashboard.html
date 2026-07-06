@@ -1245,11 +1245,12 @@ function renderTransferts(){
     var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);
     var ret=h>24;
     var l=getLib(t.code_im);
+    var estRetour=(t.receveur_code==='DEPOT');
     html+='<tr class="'+(ret?'urgent-row':'warn-row')+'">';
     html+='<td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+t.code_im+'</span>'+drapImmoDash(t.code_im)+'</td>';
     html+='<td style="font-size:12px">'+l+'</td>';
     html+='<td><span class="link-emp" data-emp="'+t.donneur_code+'" data-nom="'+t.donneur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.donneur_nom+'</b></span></td>';
-    html+='<td><span class="link-emp" data-emp="'+t.receveur_code+'" data-nom="'+t.receveur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.receveur_nom+'</b></span></td>';
+    html+='<td>'+(estRetour?'<span class="badge" style="background:#E3F2FD;color:#0D47A1;font-weight:700">📥 Retour dépôt</span>':'<span class="link-emp" data-emp="'+t.receveur_code+'" data-nom="'+t.receveur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.receveur_nom+'</b></span>')+'</td>';
     html+='<td>'+ebadge(t.etat||'Inconnu')+'</td>';
     html+='<td><span class="badge '+(ret?'bret':'batt')+'">'+h+'h</span></td>';
     html+='<td style="font-size:11px;color:var(--grey)">'+(t.note||'—')+'</td>';
@@ -1287,10 +1288,14 @@ function renderTransferts(){
 
 async function validerTransfertDash(btn,tid,cim,rec,recNom,etat){
   var lib=getLib(cim);
-  if(!confirm('Valider : '+lib+' → '+recNom+' ('+etat+') ?'))return;
+  var estRetour=(rec==='DEPOT');
+  if(!confirm(estRetour?('Valider le retour au dépôt de '+lib+' ('+etat+') ?'):('Valider : '+lib+' → '+recNom+' ('+etat+') ?')))return;
+  // Pour un retour, on trace le garant qui valide ; pour un transfert, on garde le receveur
+  var codeVal=estRetour?ADMIN_SESSION.code:rec;
+  var nomVal=estRetour?ADMIN_SESSION.nom:recNom;
   btn.textContent='...';btn.disabled=true;
   try{
-    var r=await fetch(W+'?action=valider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_im:cim,code_employe:rec,nom_employe:recNom,etat_reception:etat,note_reception:'Validé depuis le tableau de bord',etat_donneur:''})});
+    var r=await fetch(W+'?action=valider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_im:cim,code_employe:codeVal,nom_employe:nomVal,etat_reception:etat,note_reception:'Validé depuis le tableau de bord',etat_donneur:''})});
     var dat=await r.json();
     if(dat.success!==false){var row=btn.closest('tr');if(row)row.style.opacity='.4';btn.textContent='✅ Validé';setTimeout(function(){refreshAll();},1800);}
     else{btn.textContent='✅ Valider';btn.disabled=false;alert('Erreur lors de la validation.');}
@@ -1598,13 +1603,14 @@ function renderUsers(){
     return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0,droits:droitsBrut(e.Code,e.Poste,e.Droits),itemId:e.itemId||null,explicite:estRoleStandard(e.Droits),site:normSiteD(e.Site||''),actif:e.Actif!==false,hasPwd:!!e.HasPwd};
   });
 
-  // Compteurs par rôle
+  // Compteurs par rôle (cartes cliquables → filtrent la liste)
   var parRole={};USERS_CACHE.forEach(function(u){parRole[u.role]=(parRole[u.role]||0)+1;});
 
   var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
   [['Administrateur','#1A3A6B','👑'],['Gestionnaire dépôt RUN','#1A3A6B','📦'],['Logistique Mayotte','#00695C','📦'],['Responsable d’affaires','#5E35B1','💼'],['CT spécialisé','#D84315','✈️'],['Conducteur de travaux','#E87722','🏗️'],['Ouvrier spécialisé','#8E24AA','⚡'],['Ouvrier','#27AE60','👷'],['Encadrement','#1A3A6B','📋']].forEach(function(rc){
     var n=parRole[rc[0]]||0;if(n===0)return;
-    html+='<div class="card" style="padding:14px;text-align:center;border-top:3px solid '+rc[1]+'"><div style="font-size:28px">'+rc[2]+'</div><div style="font-size:24px;font-weight:800;color:'+rc[1]+'">'+n+'</div><div style="font-size:12px;color:var(--grey)">'+rc[0]+'</div></div>';
+    // La valeur du filtre = le libellé du rôle (les options du select utilisent ces libellés)
+    html+='<div class="card role-card" data-role="'+rc[0].replace(/"/g,'')+'" style="padding:14px;text-align:center;border-top:3px solid '+rc[1]+';cursor:pointer;transition:transform .1s,box-shadow .1s" title="Cliquer pour voir '+rc[0]+'"><div style="font-size:28px">'+rc[2]+'</div><div style="font-size:24px;font-weight:800;color:'+rc[1]+'">'+n+'</div><div style="font-size:12px;color:var(--grey)">'+rc[0]+'</div></div>';
   });
   html+='</div>';
 
@@ -1637,6 +1643,21 @@ function renderUsers(){
   html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Actif</th><th>Mot de passe</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
 
   div.innerHTML=html;
+  // Rendre les cartes de rôle cliquables : applique le filtre + scroll vers la liste
+  div.querySelectorAll('.role-card').forEach(function(card){
+    card.onmouseenter=function(){this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,.12)';};
+    card.onmouseleave=function(){this.style.transform='';this.style.boxShadow='';};
+    card.onclick=function(){
+      var role=this.getAttribute('data-role');
+      var sel=document.getElementById('users-role');
+      if(sel){
+        // Si déjà filtré sur ce rôle, on désactive le filtre (bascule)
+        if(sel.value===role){sel.value='';}else{sel.value=role;}
+        filterUsers();
+        var t=document.getElementById('users-title');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});
+      }
+    };
+  });
   filterUsers(); // premier rendu du tableau
 }
 
