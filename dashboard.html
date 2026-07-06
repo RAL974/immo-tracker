@@ -19,8 +19,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #pin-box p{color:var(--grey);font-size:13px;margin-bottom:20px;}
 #pin-input{width:100%;padding:14px;border:2px solid #ddd;border-radius:10px;font-size:22px;letter-spacing:8px;text-align:center;font-weight:700;}
 #pin-input:focus{outline:none;border-color:var(--orange);}
-#pin-btn,#pin-btn2{width:100%;margin-top:12px;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
-#pin-btn:hover,#pin-btn2:hover{background:#0d2a52;}
+#pin-btn,#pin-btn2,#pin-btn3{width:100%;margin-top:12px;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
+#pin-btn:hover,#pin-btn2:hover,#pin-btn3:hover{background:#0d2a52;}
 #pin-error{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
 
 /* ── Header ── */
@@ -218,8 +218,17 @@ tr:hover td{background:#FAFBFC;}
     <div id="pin-step2" style="display:none">
       <p style="font-size:14px;color:var(--blue);font-weight:700;margin-bottom:8px">Qui êtes-vous ?</p>
       <select id="pin-identite" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:12px"></select>
-      <button id="pin-btn2" onclick="confirmerIdentite()">Continuer →</button>
+      <button id="pin-btn2" onclick="etapeMotDePasse()">Continuer →</button>
       <p style="font-size:11px;color:var(--grey);margin-top:8px">Vos actions (validations, résolutions de panne, sorties) seront tracées à votre nom.</p>
+    </div>
+    <div id="pin-step3" style="display:none">
+      <p id="pwd-qui" style="font-size:14px;color:var(--blue);font-weight:700;margin-bottom:4px"></p>
+      <p id="pwd-consigne" style="font-size:12px;color:var(--grey);margin-bottom:10px"></p>
+      <input type="password" id="pwd-input" placeholder="Mot de passe" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:8px" onkeydown="if(event.key==='Enter')validerMotDePasse()">
+      <input type="password" id="pwd-input2" placeholder="Confirmez le mot de passe" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:8px;display:none" onkeydown="if(event.key==='Enter')validerMotDePasse()">
+      <button id="pin-btn3" onclick="validerMotDePasse()">Se connecter →</button>
+      <p id="pwd-error" style="color:var(--red);font-size:12px;margin-top:8px"></p>
+      <p style="font-size:11px;color:var(--grey);margin-top:6px"><a href="#" onclick="retourIdentite();return false;" style="color:var(--blue)">← Changer d'identité</a></p>
     </div>
   </div>
 </div>
@@ -466,7 +475,7 @@ async function loadEmployes(force){
     var r=await fetch(W+'?employes=1');
     var data=await r.json();
     if(Array.isArray(data)&&data.length){
-      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,itemId:e.itemId||null};});
+      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,HasPwd:!!e.has_password,itemId:e.itemId||null};});
       employesByCode={};
       employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site,actif:e.Actif};});
       return;
@@ -510,6 +519,11 @@ var TZ='Indian/Reunion';
 var PIN='ES974';
 var ADMIN_SESSION={code:null,nom:null}; // identité de l'admin connecté (traçabilité des actions)
 var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
+// Super-administrateurs PERMANENTS : gardent tous les droits quel que soit leur rôle SharePoint.
+// Ne peuvent être rétrogradés depuis l'interface — seule une modification du code le permettrait.
+var SUPER_ADMIN_CODES=['AIWI'];
+function estAdmin(code){return ADMINS_CODES.includes(code)||SUPER_ADMIN_CODES.includes(code);}
+function estSuperAdmin(code){return SUPER_ADMIN_CODES.includes(code);}
 var CT_CODES=['ROJO','LAHU','AUAR','BOMA','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
 var USERS_CACHE=null;
 var d=null, im={}, fdsMap={}, photosMap={}, reservations=[], maintenance=null;
@@ -575,16 +589,87 @@ async function peuplerSelecteurIdentite(){
   else if(uniques.length)sel.value=uniques[0].Code;
 }
 
-function confirmerIdentite(){
+// Étape 2 → 3 : l'identité est choisie, on passe au mot de passe
+var LOGIN_CODE=null, LOGIN_NEEDS_SETUP=false;
+async function etapeMotDePasse(){
   var sel=document.getElementById('pin-identite');
   var code=sel.value;
   if(!code)return;
+  LOGIN_CODE=code;
+  var btn=document.getElementById('pin-btn2');
+  btn.disabled=true;btn.textContent='Vérification…';
+  // Demander au Worker si un mot de passe est déjà défini
+  try{
+    var r=await fetch(W+'?action=verify_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,password:'__probe__'})});
+    var res=await r.json();
+    LOGIN_NEEDS_SETUP=!!res.needs_setup;
+  }catch(e){LOGIN_NEEDS_SETUP=false;}
+  btn.disabled=false;btn.textContent='Continuer →';
+  // Afficher l'étape mot de passe
+  document.getElementById('pin-step2').style.display='none';
+  document.getElementById('pin-step3').style.display='block';
+  document.getElementById('pwd-qui').textContent=nomEmploye(code)+' ('+code+')';
+  document.getElementById('pwd-error').textContent='';
+  document.getElementById('pwd-input').value='';
+  document.getElementById('pwd-input2').value='';
+  if(LOGIN_NEEDS_SETUP){
+    document.getElementById('pwd-consigne').textContent='Première connexion : créez votre mot de passe personnel (min. 4 caractères).';
+    document.getElementById('pwd-input').placeholder='Nouveau mot de passe';
+    document.getElementById('pwd-input2').style.display='block';
+    document.getElementById('pin-btn3').textContent='Créer et se connecter →';
+  }else{
+    document.getElementById('pwd-consigne').textContent='Saisissez votre mot de passe personnel.';
+    document.getElementById('pwd-input').placeholder='Mot de passe';
+    document.getElementById('pwd-input2').style.display='none';
+    document.getElementById('pin-btn3').textContent='Se connecter →';
+  }
+  setTimeout(function(){document.getElementById('pwd-input').focus();},100);
+}
+
+// Retour à la sélection d'identité
+function retourIdentite(){
+  document.getElementById('pin-step3').style.display='none';
+  document.getElementById('pin-step2').style.display='block';
+}
+
+// Valider le mot de passe (création ou vérification)
+async function validerMotDePasse(){
+  var pwd=document.getElementById('pwd-input').value;
+  var err=document.getElementById('pwd-error');
+  var btn=document.getElementById('pin-btn3');
+  if(!pwd){err.textContent='Veuillez saisir un mot de passe.';return;}
+  if(LOGIN_NEEDS_SETUP){
+    var pwd2=document.getElementById('pwd-input2').value;
+    if(pwd.length<4){err.textContent='Le mot de passe doit contenir au moins 4 caractères.';return;}
+    if(pwd!==pwd2){err.textContent='Les deux mots de passe ne correspondent pas.';return;}
+    btn.disabled=true;btn.textContent='Création…';
+    try{
+      var r=await fetch(W+'?action=set_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:LOGIN_CODE,password:pwd})});
+      var res=await r.json();
+      if(res.success){finaliserConnexion(LOGIN_CODE);}
+      else{err.textContent='Échec de la création. Réessayez.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
+    }catch(e){err.textContent='Erreur réseau.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
+  }else{
+    btn.disabled=true;btn.textContent='Vérification…';
+    try{
+      var r=await fetch(W+'?action=verify_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:LOGIN_CODE,password:pwd})});
+      var res=await r.json();
+      if(res.success){finaliserConnexion(LOGIN_CODE);}
+      else if(res.needs_setup){LOGIN_NEEDS_SETUP=true;etapeMotDePasse();}
+      else{err.textContent='Mot de passe incorrect.';btn.disabled=false;btn.textContent='Se connecter →';document.getElementById('pwd-input').value='';}
+    }catch(e){err.textContent='Erreur réseau.';btn.disabled=false;btn.textContent='Se connecter →';}
+  }
+}
+
+// Connexion finalisée : ouvrir la session
+function finaliserConnexion(code){
   ADMIN_SESSION={code:code,nom:nomEmploye(code)};
   sessionStorage.setItem('auth','1');
   sessionStorage.setItem('admin_code',code);
   sessionStorage.setItem('admin_nom',ADMIN_SESSION.nom);
   localStorage.setItem('admin_identite',code);
   document.getElementById('pin-overlay').style.display='none';
+  document.getElementById('pin-step3').style.display='none';
   afficherIdentiteConnectee();
   loadAll();
 }
@@ -596,18 +681,19 @@ function afficherIdentiteConnectee(){
   if(el)el.textContent='👤 '+ADMIN_SESSION.nom;
 }
 
-// Permet de changer d'identité sans ressaisir le PIN
+// Permet de changer d'identité (redemande le mot de passe de la nouvelle identité)
 function changerIdentite(){
   document.getElementById('pin-overlay').style.display='flex';
   document.getElementById('pin-step1').style.display='none';
   document.getElementById('pin-step2').style.display='block';
+  document.getElementById('pin-step3').style.display='none';
   peuplerSelecteurIdentite();
 }
 
 document.getElementById('pin-input').addEventListener('keydown',function(e){if(e.key==='Enter')checkPin();});
-// Reprise de session existante
-if(sessionStorage.getItem('auth')==='1'){
-  ADMIN_SESSION={code:sessionStorage.getItem('admin_code')||'CONI',nom:sessionStorage.getItem('admin_nom')||'CONI'};
+// Reprise de session existante (sessionStorage = effacé à la fermeture de l'onglet)
+if(sessionStorage.getItem('auth')==='1'&&sessionStorage.getItem('admin_code')){
+  ADMIN_SESSION={code:sessionStorage.getItem('admin_code'),nom:sessionStorage.getItem('admin_nom')||sessionStorage.getItem('admin_code')};
   document.getElementById('pin-overlay').style.display='none';
   loadEmployes().then(function(){
     if(!ADMIN_SESSION.nom||ADMIN_SESSION.nom===ADMIN_SESSION.code)ADMIN_SESSION.nom=nomEmploye(ADMIN_SESSION.code);
@@ -1295,7 +1381,7 @@ function roleUtilisateur(code,poste,droits){
   if(dr==='ouvrier_specialise'||dr==='ouvrier_spécialisé'||dr==='os')return{label:'Ouvrier spécialisé',color:'#8E24AA',rank:3};
   if(dr==='ouvrier')return{label:'Ouvrier',color:'#27AE60',rank:4};
   // 2. Sinon dérivation automatique (rétrocompatibilité)
-  if(ADMINS_CODES.includes(code))return{label:'Administrateur',color:'#1A3A6B',rank:0};
+  if(estAdmin(code))return{label:'Administrateur',color:'#1A3A6B',rank:0};
   if(CT_CODES.includes(code))return{label:'Conducteur de travaux',color:'#E87722',rank:2};
   var p=(poste||'').toLowerCase();
   if(p.includes('encadr'))return{label:'Encadrement',color:'#1A3A6B',rank:0};
@@ -1313,7 +1399,7 @@ function droitsBrut(code,poste,droits){
   // Ne considérer que les valeurs de rôle STANDARD comme un rôle explicite défini
   if(dr&&ROLES_STANDARD[dr])return ROLES_STANDARD[dr];
   // Sinon dérivation (les anciennes valeurs "CT Mayotte" etc. sont ignorées comme rôle)
-  if(ADMINS_CODES.includes(code))return'Admin';
+  if(estAdmin(code))return'Admin';
   if(CT_CODES.includes(code))return'CT';
   var p=(poste||'').toLowerCase();
   if(p.includes('encadr'))return'Admin';
@@ -1334,7 +1420,7 @@ function renderUsers(){
   // Enrichir chaque employé avec rôle + tri (stocké en global pour le filtrage sans re-rendu complet)
   USERS_CACHE=employesList.map(function(e){
     var r=roleUtilisateur(e.Code,e.Poste,e.Droits);
-    return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0,droits:droitsBrut(e.Code,e.Poste,e.Droits),itemId:e.itemId||null,explicite:estRoleStandard(e.Droits),site:normSiteD(e.Site||''),actif:e.Actif!==false};
+    return{code:e.Code,nom:e.Nom,poste:e.Poste||'—',role:r.label,color:r.color,rank:r.rank,nb:possede[e.Code]||0,droits:droitsBrut(e.Code,e.Poste,e.Droits),itemId:e.itemId||null,explicite:estRoleStandard(e.Droits),site:normSiteD(e.Site||''),actif:e.Actif!==false,hasPwd:!!e.HasPwd};
   });
 
   // Compteurs par rôle
@@ -1349,7 +1435,7 @@ function renderUsers(){
 
   // Barre d'info sur la future gestion des droits
   html+='<div style="background:#E8F5E9;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:#1B5E20"><strong>✅ Gestion des droits & sites active.</strong> Le <strong>rôle</strong> détermine qui peut réserver et sur quel périmètre. Le <strong>site</strong> définit le rattachement : un CT ne voit que le matériel de son île ; Admin, gestionnaires, RA, CT et ouvriers spécialisés accèdent aux deux.</div>';
-  if(ADMIN_SESSION.code&&ADMINS_CODES.includes(ADMIN_SESSION.code)){
+  if(ADMIN_SESSION.code&&estAdmin(ADMIN_SESSION.code)){
     html+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="flex:1;min-width:200px;color:#8D6E00">⚙️ <strong>Outils de maintenance</strong> — actions ponctuelles réservées aux administrateurs.</span>'+
       '<button onclick="lancerSeedRolesSites()" style="padding:8px 14px;background:#F57F17;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Rôles & sites employés</button>'+
       '<button onclick="lancerSeedImmoSites()" style="padding:8px 14px;background:#0277BD;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Sites des immos</button>'+
@@ -1365,7 +1451,7 @@ function renderUsers(){
     '<select id="users-site" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px"><option value="">Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>'+
     '</div>';
 
-  html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Actif</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
+  html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Actif</th><th>Mot de passe</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
 
   div.innerHTML=html;
   filterUsers(); // premier rendu du tableau
@@ -1393,10 +1479,11 @@ function filterUsers(){
       '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span>'+(u.explicite?'':' <span style="font-size:9px;color:#bbb" title="Rôle déduit automatiquement">(auto)</span>')+'</td>'+
       '<td>'+badgeSiteD(u.site)+'<select class="site-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid #eee;border-radius:5px">'+siteOpts+'</select></td>'+
       '<td style="text-align:center"><button class="actif-toggle" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" data-actif="'+(u.actif?'1':'0')+'" style="border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;background:'+(u.actif?'#E8F5E9':'#FFEBEE')+';color:'+(u.actif?'#1B5E20':'#B71C1C')+'">'+(u.actif?'✓ Actif':'✕ Inactif')+'</button></td>'+
+      '<td style="text-align:center">'+(u.hasPwd?'<span title="Mot de passe défini" style="color:#1B5E20;font-size:13px">🔒 Défini</span><br><button class="pwd-reset" data-code="'+u.code+'" style="margin-top:3px;border:none;background:#FFF3E0;color:#E65100;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">Réinitialiser</button>':'<span title="Aucun mot de passe" style="color:#B71C1C;font-size:12px">🔓 Non défini</span>')+'</td>'+
       '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
       '<td><select class="role-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">'+opts+'</select></td>'+
     '</tr>';
-  }).join('')||'<tr><td colspan="7" class="es">Aucun utilisateur trouvé.</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="es">Aucun utilisateur trouvé.</td></tr>';
   // Attacher les handlers
   tbody.querySelectorAll('.role-edit-sel').forEach(function(sel){
     sel.onchange=function(){majDroitsUtilisateur(this.getAttribute('data-code'),this.value,this.getAttribute('data-item'));};
@@ -1407,12 +1494,15 @@ function filterUsers(){
   tbody.querySelectorAll('.actif-toggle').forEach(function(btn){
     btn.onclick=function(){majActifUtilisateur(this.getAttribute('data-code'),this.getAttribute('data-actif')!=='1',this.getAttribute('data-item'));};
   });
+  tbody.querySelectorAll('.pwd-reset').forEach(function(btn){
+    btn.onclick=function(){resetPasswordUtilisateur(this.getAttribute('data-code'));};
+  });
 }
 
 // Enregistre le site de rattachement d'un utilisateur
 // Initialisation en masse des rôles + sites (one-shot)
 async function lancerSeedRolesSites(){
-  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   if(!confirm('⚙️ Appliquer les rôles et sites de référence à TOUS les employés ?\n\nCela écrase les valeurs actuelles des colonnes Rôle (Code_CT) et Site avec le mapping validé. À faire une seule fois au démarrage.\n\nContinuer ?'))return;
   try{
     var r=await fetch(W+'?action=seed_roles_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
@@ -1431,7 +1521,7 @@ async function lancerSeedRolesSites(){
 
 // Applique les sites de référence aux immos
 async function lancerSeedImmoSites(){
-  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   if(!confirm('🌍 Appliquer les sites (Réunion/Mayotte) à toutes les immos ?\n\nÀ faire une fois au démarrage. Continuer ?'))return;
   try{
     var r=await fetch(W+'?action=seed_immo_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
@@ -1448,7 +1538,7 @@ async function lancerSeedImmoSites(){
 
 // Supprime les doublons d'employés dans SharePoint
 async function lancerDedupeEmployes(){
-  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   if(!confirm('🧹 Supprimer les lignes en double dans la liste Employés ?\n\nUne seule ligne par employé sera conservée (la plus complète). Cette action est définitive.\n\nContinuer ?'))return;
   try{
     var r=await fetch(W+'?action=dedupe_employes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
@@ -1462,8 +1552,23 @@ async function lancerDedupeEmployes(){
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
 
+async function resetPasswordUtilisateur(code){
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('Réinitialiser le mot de passe de '+nomEmploye(code)+' ?\n\nIl devra en créer un nouveau à sa prochaine connexion.'))return;
+  try{
+    var r=await fetch(W+'?action=reset_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,confirm:'ESPACE-SOLEIL'})});
+    var res=await r.json();
+    if(res.success){
+      var u=USERS_CACHE.find(function(x){return x.code===code;});if(u)u.hasPwd=false;
+      var el=employesList.find(function(x){return x.Code===code;});if(el)el.HasPwd=false;
+      filterUsers();
+      alert('✅ Mot de passe réinitialisé. '+nomEmploye(code)+' en créera un nouveau à sa prochaine connexion.');
+    }else{alert('Échec : '+(res.error||'inconnu'));}
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
 async function majActifUtilisateur(code,actif,itemId){
-  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier ce statut.');filterUsers();return;}
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier ce statut.');filterUsers();return;}
   if(!confirm((actif?'Réactiver':'Désactiver')+' '+nomEmploye(code)+' ?'+(actif?'':'\n\nUn employé inactif ne pourra plus réserver ni recevoir de matériel.')))return;
   try{
     var body={code:code,actif:actif};if(itemId)body.item_id=itemId;
@@ -1479,7 +1584,7 @@ async function majActifUtilisateur(code,actif,itemId){
 }
 
 async function majSiteUtilisateur(code,site,itemId){
-  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier le site.');filterUsers();return;}
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier le site.');filterUsers();return;}
   try{
     var body={code:code,site:site};if(itemId)body.item_id=itemId;
     var r=await fetch(W+'?action=maj_site_employe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -1495,8 +1600,12 @@ async function majSiteUtilisateur(code,site,itemId){
 
 // Enregistre le nouveau rôle d'un utilisateur
 async function majDroitsUtilisateur(code,role,itemId){
-  if(!ADMIN_SESSION.code||!ADMINS_CODES.includes(ADMIN_SESSION.code)){
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){
     alert('Seul un administrateur peut modifier les droits.');filterUsers();return;
+  }
+  // Le super-administrateur ne peut pas être rétrogradé depuis l'interface
+  if(estSuperAdmin(code)&&role!=='Admin'){
+    alert(nomEmploye(code)+' est administrateur permanent de la solution et ne peut pas être rétrogradé ici.');filterUsers();return;
   }
   if(!confirm('Attribuer le rôle « '+role.replace('_',' ')+' » à '+nomEmploye(code)+' ?')){filterUsers();return;}
   try{
