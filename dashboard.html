@@ -297,6 +297,19 @@ tr:hover td{background:#FAFBFC;}
   </div>
 </div>
 
+<!-- Modal ajout immo / employé -->
+<div id="add-overlay" onclick="if(event.target===this)fermerAjout()" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:650;display:none;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:min(520px,100%);max-height:90vh;overflow-y:auto">
+    <h3 id="add-titre" style="color:var(--blue);margin-bottom:16px;font-size:16px">Ajouter</h3>
+    <div id="add-form"></div>
+    <div class="fact-btns" style="display:flex;gap:8px;margin-top:16px">
+      <button id="add-confirm-btn" style="background:var(--green);color:#fff;flex:1;padding:12px;border:none;border-radius:10px;font-weight:700;cursor:pointer">✅ Enregistrer</button>
+      <button style="background:#eee;color:#444;padding:12px 18px;border:none;border-radius:10px;cursor:pointer" onclick="fermerAjout()">Annuler</button>
+    </div>
+    <p id="add-msg" style="margin-top:10px;font-size:13px"></p>
+  </div>
+</div>
+
 <!-- Main content -->
 <div id="main" style="padding-top:var(--header)">
   <div id="loading-screen"><div class="spinner"></div><p>Chargement du tableau de bord...</p></div>
@@ -1035,6 +1048,141 @@ function renderDepot(){
   });
 }
 
+// ══════════════ AJOUT IMMO / EMPLOYÉ ══════════════
+var addFieldStyle='width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-top:4px';
+var addLabelStyle='font-size:12px;font-weight:700;color:var(--blue)';
+
+function fermerAjout(){document.getElementById('add-overlay').style.display='none';}
+
+// ── Formulaire AJOUT IMMO ──
+async function ouvrirAjoutImmo(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter une immobilisation';
+  document.getElementById('add-msg').textContent='';
+  var catOpts=['Electroportatif','Mesure & test','Matériel de chantier','Coffrets & armoires','Matériel & installations','Échelle / Escabeau','Véhicules','Informatique & bureautique','Mobilier','Logiciels & licences','Sans catégorie'].map(function(c){return'<option>'+c+'</option>';}).join('');
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Code immobilisation *</label><div style="display:flex;gap:8px;align-items:center"><input id="ai-code" style="'+addFieldStyle+'" placeholder="Chargement du prochain n°..."><span id="ai-code-check" style="font-size:18px"></span></div><p style="font-size:11px;color:var(--grey);margin-top:2px">Prochain n° disponible proposé automatiquement. Modifiable, mais un doublon est bloqué.</p></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Libellé *</label><input id="ai-libelle" style="'+addFieldStyle+'" placeholder="Ex: Perceuse HILTI TE-4-A22"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Catégorie</label><select id="ai-categorie" style="'+addFieldStyle+'">'+catOpts+'</select></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">N° de série</label><input id="ai-nserie" style="'+addFieldStyle+'" placeholder="Optionnel"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Achat HT (€)</label><input id="ai-valeur" type="number" step="0.01" style="'+addFieldStyle+'" placeholder="0.00"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">État</label><select id="ai-etat" style="'+addFieldStyle+'"><option>Neuf</option><option selected>Bon</option><option>Usé</option><option>Abîmé</option><option>Hors service</option></select></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date d\'achat</label><input id="ai-date-achat" type="date" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date mise en service</label><input id="ai-date-service" type="date" style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte d\'immobilisation</label><input id="ai-compte-immo" style="'+addFieldStyle+'" placeholder="Ex: 21541"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="ai-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte d\'amortissement</label><input id="ai-compte-amort" style="'+addFieldStyle+'" placeholder="Ex: 28154"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte de dotation</label><input id="ai-compte-dot" style="'+addFieldStyle+'" placeholder="Ex: 68112"></div></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=enregistrerImmo;
+  // Charger le prochain code IM
+  try{
+    var r=await fetch(W+'?next_code_im=1');var res=await r.json();
+    document.getElementById('ai-code').value=res.next_code||'';
+  }catch(e){document.getElementById('ai-code').placeholder='Saisir le code manuellement';}
+  // Vérif doublon en direct
+  document.getElementById('ai-code').oninput=verifCodeImmoDispo;
+}
+
+var _verifTimer=null;
+function verifCodeImmoDispo(){
+  var code=(document.getElementById('ai-code').value||'').trim().toUpperCase();
+  var chk=document.getElementById('ai-code-check');
+  chk.textContent='';
+  if(!/^IM\d{6}$/.test(code)){chk.textContent='⚠️';chk.title='Format attendu : IMxxxxxx';return;}
+  clearTimeout(_verifTimer);
+  _verifTimer=setTimeout(async function(){
+    // Vérifier via la liste immoMeta locale d'abord (rapide)
+    if(immoMeta[code]||im[code]){chk.textContent='❌';chk.title='Ce code existe déjà';}
+    else{chk.textContent='✅';chk.title='Disponible';}
+  },300);
+}
+
+async function enregistrerImmo(){
+  var code=(document.getElementById('ai-code').value||'').trim().toUpperCase();
+  var libelle=(document.getElementById('ai-libelle').value||'').trim();
+  var msg=document.getElementById('add-msg');
+  var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!/^IM\d{6}$/.test(code)){msg.textContent='Code invalide (format IMxxxxxx).';return;}
+  if(!libelle){msg.textContent='Le libellé est obligatoire.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={
+    code_im:code,libelle:libelle,
+    categorie:document.getElementById('ai-categorie').value,
+    n_serie:document.getElementById('ai-nserie').value.trim(),
+    etat:document.getElementById('ai-etat').value,
+    valeur_achat:document.getElementById('ai-valeur').value,
+    date_achat:document.getElementById('ai-date-achat').value?document.getElementById('ai-date-achat').value+'T00:00:00Z':'',
+    date_mise_service:document.getElementById('ai-date-service').value?document.getElementById('ai-date-service').value+'T00:00:00Z':'',
+    compte_immobilisation:document.getElementById('ai-compte-immo').value.trim(),
+    compte_amortissement:document.getElementById('ai-compte-amort').value.trim(),
+    compte_dotation:document.getElementById('ai-compte-dot').value.trim(),
+    site:document.getElementById('ai-site').value
+  };
+  try{
+    var r=await fetch(W+'?action=ajouter_immo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Immo '+code+' ajoutée !';
+      // Mettre à jour les caches locaux
+      im[code]={Libelle:libelle,Categorie:payload.categorie,Compte:payload.compte_immobilisation};
+      immoMeta[code]={site:payload.site,valeur_achat:Number(payload.valeur_achat)||0,date_achat:payload.date_achat};
+      setTimeout(function(){fermerAjout();loadAll();},1200);
+    }else{
+      btn.disabled=false;btn.textContent='✅ Enregistrer';
+      msg.textContent='❌ '+(res.message||res.error||'Échec');
+    }
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+// ── Formulaire AJOUT EMPLOYÉ ──
+function ouvrirAjoutEmploye(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter un employé';
+  document.getElementById('add-msg').textContent='';
+  var roles=['Ouvrier','Ouvrier_Specialise','CT','CT_Specialise','RA','Logistique','Logistique_Mayotte','Admin'];
+  var roleOpts=roles.map(function(r){return'<option value="'+r+'">'+r.replace('_',' ')+'</option>';}).join('');
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Code employé *</label><div style="display:flex;gap:8px;align-items:center"><input id="ae-code" style="'+addFieldStyle+'" placeholder="Ex: ROJY" maxlength="6"><span id="ae-code-check" style="font-size:18px"></span></div><p style="font-size:11px;color:var(--grey);margin-top:2px">Code unique (souvent 4 lettres). Un doublon est bloqué.</p></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Nom complet *</label><input id="ae-nom" style="'+addFieldStyle+'" placeholder="Ex: ROIX Johnny"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Poste</label><input id="ae-poste" style="'+addFieldStyle+'" placeholder="Ex: Conducteur de travaux"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Rôle / Droits</label><select id="ae-role" style="'+addFieldStyle+'">'+roleOpts+'</select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="ae-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=enregistrerEmploye;
+  document.getElementById('ae-code').oninput=function(){
+    var code=(this.value||'').trim().toUpperCase();var chk=document.getElementById('ae-code-check');
+    if(code.length<2){chk.textContent='';return;}
+    chk.textContent=employesByCode[code]?'❌':'✅';
+    chk.title=employesByCode[code]?'Ce code existe déjà':'Disponible';
+  };
+}
+
+async function enregistrerEmploye(){
+  var code=(document.getElementById('ae-code').value||'').trim().toUpperCase();
+  var nom=(document.getElementById('ae-nom').value||'').trim();
+  var msg=document.getElementById('add-msg');
+  var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(code.length<2){msg.textContent='Code employé requis.';return;}
+  if(!nom){msg.textContent='Le nom complet est obligatoire.';return;}
+  if(employesByCode[code]){msg.textContent='❌ Le code '+code+' existe déjà.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={code:code,nom:nom,poste:document.getElementById('ae-poste').value.trim(),role:document.getElementById('ae-role').value,site:document.getElementById('ae-site').value};
+  try{
+    var r=await fetch(W+'?action=ajouter_employe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Employé '+code+' ajouté !';
+      setTimeout(function(){fermerAjout();loadEmployes().then(function(){filterUsers();});},1200);
+    }else{
+      btn.disabled=false;btn.textContent='✅ Enregistrer';
+      msg.textContent='❌ '+(res.message||res.error||'Échec');
+    }
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
 // Modifie l'emplacement (site) d'une immo — admins et Gestionnaire Dépôt RUN
 async function majSiteImmo(codeIM,site){
   if(!peutEditerEmplacement(ADMIN_SESSION.code)){alert('Réservé aux administrateurs et au gestionnaire de dépôt.');renderDepot();return;}
@@ -1463,11 +1611,19 @@ function renderUsers(){
   // Barre d'info sur la future gestion des droits
   html+='<div style="background:#E8F5E9;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:#1B5E20"><strong>✅ Gestion des droits & sites active.</strong> Le <strong>rôle</strong> détermine qui peut réserver et sur quel périmètre. Le <strong>site</strong> définit le rattachement : un CT ne voit que le matériel de son île ; Admin, gestionnaires, RA, CT et ouvriers spécialisés accèdent aux deux.</div>';
   if(ADMIN_SESSION.code&&estAdmin(ADMIN_SESSION.code)){
-    html+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="flex:1;min-width:200px;color:#8D6E00">⚙️ <strong>Outils de maintenance</strong> — actions ponctuelles réservées aux administrateurs.</span>'+
+    // Boutons d'ajout (mis en avant)
+    html+='<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">'+
+      '<button onclick="ouvrirAjoutImmo()" style="padding:11px 18px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px">➕ Ajouter une immobilisation</button>'+
+      '<button onclick="ouvrirAjoutEmploye()" style="padding:11px 18px;background:#00695C;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px">➕ Ajouter un employé</button>'+
+    '</div>';
+    // Outils de maintenance (repliés — usage ponctuel)
+    html+='<details style="margin-bottom:16px"><summary style="cursor:pointer;font-size:13px;color:#8D6E00;background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:10px 16px;font-weight:700">⚙️ Outils de maintenance avancés (réimport, doublons…)</summary>'+
+      '<div style="background:#FFFDF5;border:1px solid #FFE082;border-top:none;border-radius:0 0 10px 10px;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<span style="flex:1;min-width:200px;color:#8D6E00;font-size:12px">Actions ponctuelles : à utiliser seulement après un réimport de données.</span>'+
       '<button onclick="lancerSeedRolesSites()" style="padding:8px 14px;background:#F57F17;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Rôles & sites employés</button>'+
       '<button onclick="lancerSeedImmoSites()" style="padding:8px 14px;background:#0277BD;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Sites des immos</button>'+
       '<button onclick="lancerDedupeEmployes()" style="padding:8px 14px;background:#C62828;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">🧹 Nettoyer doublons</button>'+
-      '</div>';
+      '</div></details>';
   }
 
   // Filtres — rendus UNE fois ; le filtrage ne régénère que le tbody (garde le focus de l\'input)
