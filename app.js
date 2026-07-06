@@ -49,6 +49,28 @@ var ROLES_BISITE = ['Admin', 'Logistique', 'RA', 'CT_Specialise', 'Ouvrier_Speci
 // Super-administrateurs PERMANENTS : tous droits quel que soit le rôle SharePoint
 var SUPER_ADMIN_CODES = ['AIWI'];
 
+// ── Filtrage par compte comptable selon le rôle ───────────────────────────
+// Les rôles terrain ne voient pas les immos "administratives" (logiciels, mobilier,
+// véhicules, informatique, cautions...). Seuls Admin et Logistique (Gestionnaire Dépôt RUN) voient tout.
+// Exception : les étiqueteuses (compte 2183 mal affecté) restent visibles pour tous.
+var COMPTES_MASQUES = ['205', '2154', '2181', '2182', '2183', '2184', '2718', '2752'];
+var ETIQUETEUSES_VISIBLES = ['IM000272','IM000495','IM000496','IM000605','IM000606','IM000607','IM000643','IM000685','IM000686','IM000771','IM000889','IM000897','IM000898','IM000899','IM000900','IM000901','IM000902','IM000903','IM000904'];
+var ROLES_VOIENT_TOUT = ['Admin', 'Logistique']; // + super-admin
+
+// Une catégorie/immo est-elle visible pour cette personne selon le compte comptable ?
+function comptesVisiblePour(code, codeIM) {
+  // Admin, Logistique et super-admin voient tout
+  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return true;
+  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
+  if (ROLES_VOIENT_TOUT.indexOf(role) !== -1) return true;
+  // Les autres : masquer les comptes administratifs, sauf étiqueteuses
+  var immo = S.immos && S.immos[codeIM];
+  var compte = immo && immo.Compte ? String(immo.Compte).trim() : '';
+  if (COMPTES_MASQUES.indexOf(compte) === -1) return true; // compte non masqué → visible
+  if (ETIQUETEUSES_VISIBLES.indexOf(codeIM) !== -1) return true; // étiqueteuse → visible
+  return false; // compte masqué → invisible pour ce rôle
+}
+
 // Peut-on réserver du matériel ?
 function peutReserver(code) {
   if (!code) return false;
@@ -80,12 +102,14 @@ function sitesAutorises(code) {
   return [];
 }
 
-// Une immo est-elle réservable par cette personne (selon le site) ?
+// Une immo est-elle réservable/visible par cette personne (site + compte comptable) ?
 function immoVisiblePour(code, codeIM) {
   var sites = sitesAutorises(code);
   if (!sites.length) return false;
   var siteImmo = siteImmoDe(codeIM);
-  return sites.indexOf(siteImmo) !== -1;
+  if (sites.indexOf(siteImmo) === -1) return false;
+  // Filtrage par compte comptable selon le rôle
+  return comptesVisiblePour(code, codeIM);
 }
 
 // Site d'une immo (depuis la meta chargée, défaut Reunion)
@@ -201,9 +225,13 @@ const SLAB = { 'Demandee': '⏳ En attente', 'Confirmee': '✅ Confirmée', 'En 
 function rsLabel(s) { const c = SCOL[s] || '#999'; const l = SLAB[s] || s; return `<span style="padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:${c}22;color:${c}">${l}</span>`; }
 
 // ── Catégories ────────────────────────────────────────────
-function getCats() {
+function getCats(filtrerRole) {
   const c = {};
-  for (const k in S.immos) { c[S.immos[k].Categorie || 'Sans catégorie'] = true; }
+  for (const k in S.immos) {
+    // Si filtrage par rôle demandé, exclure les catégories dont toutes les immos sont masquées
+    if (filtrerRole && S.employe && !comptesVisiblePour(S.employe.code, k)) continue;
+    c[S.immos[k].Categorie || 'Sans catégorie'] = true;
+  }
   return Object.keys(c).sort();
 }
 
@@ -211,7 +239,9 @@ function buildCatSelect(id, fn) {
   const sel = document.getElementById(id);
   if (!sel) return;
   const v = sel.value;
-  sel.innerHTML = '<option value="">Toutes catégories</option>' + getCats().map(c => `<option value="${c}">${c}</option>`).join('');
+  // Le sélecteur de réservation (resa-categorie) filtre selon le rôle ; les autres montrent tout
+  const filtrerRole = (id === 'resa-categorie');
+  sel.innerHTML = '<option value="">Toutes catégories</option>' + getCats(filtrerRole).map(c => `<option value="${c}">${c}</option>`).join('');
   sel.value = v;
   if (fn) sel.onchange = fn;
 }
@@ -225,6 +255,8 @@ function immosFilt(cat, q, filtrerSite) {
     const im = S.immos[k];
     // Filtrage géographique : ne montrer que les immos des sites autorisés
     if (sitesOK && sitesOK.indexOf(siteImmoDe(k)) === -1) continue;
+    // Filtrage par compte comptable selon le rôle (masque logiciels, mobilier, cautions… pour les rôles terrain)
+    if (filtrerSite && S.employe && !comptesVisiblePour(S.employe.code, k)) continue;
     const mc = !cat || (im.Categorie || 'Sans catégorie') === cat;
     const num = k.replace('IM', '').replace(/^0+/, '');
     const mq = !qu || k.toUpperCase().includes(qu) || (im.Libelle || '').toUpperCase().includes(qu) || num === qu;
