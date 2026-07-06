@@ -380,7 +380,7 @@ tr:hover td{background:#FAFBFC;}
           </select>
           <button class="filter-btn" onclick="filterHist()">Filtrer</button>
         </div>
-        <div class="tbl-wrap"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libellé</th><th>Type</th><th>Employé</th><th>Donneur</th><th>État</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libellé</th><th>Type</th><th>Employé</th><th>Donneur / Validé par</th><th>État</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
       </div>
     </div>
 
@@ -1219,14 +1219,16 @@ function autoLoadHist_internal(all,q,type,nb){
     affiche.map(function(m){
       var l=getLib(m.code_im);
       var icon=m.type_mouvement==='Retour'?'📥':'🔄';
-      var donneur='—';var donneurCode='';
+      var donneur='—';var donneurCode='';var estValidation=false;
       if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
+      else if(m.type_mouvement==='Retour'&&m.code_chantier&&m.code_chantier.indexOf('DEPOT|')===0){var vp=m.code_chantier.split('|');donneurCode=vp[1]||'';donneur=vp[2]||'—';estValidation=true;}
+      var donneurCell=donneur==='—'?'—':(estValidation?'<span title="Retour validé par ce garant">✅ <span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span></span>':'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>');
       return '<tr><td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
         '<td><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span>'+drapImmoDash(m.code_im)+'</td>'+
         '<td style="font-size:12px">'+l+'</td>'+
         '<td>'+icon+' '+m.type_mouvement+'</td>'+
         '<td><span class="link-emp" data-emp="'+m.code_employe+'" data-nom="'+m.nom_employe.replace(/"/g,'')+'"><b style="font-size:12px">'+m.nom_employe+'</b></span></td>'+
-        '<td style="font-size:12px;color:var(--grey)">'+(donneurCode?'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>':donneur)+'</td>'+
+        '<td style="font-size:12px;color:var(--grey)">'+donneurCell+'</td>'+
         '<td>'+ebadge(m.etat||'')+'</td>'+
         '<td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
     }).join('');
@@ -2064,14 +2066,17 @@ async function chargerFicheImmo(codeIM){
     // Historique
     html+='<h3 style="color:var(--blue);font-size:14px;margin-bottom:10px">Historique ('+hist.length+')</h3>';
     if(!hist.length)html+='<p style="color:var(--grey);font-size:13px">Aucun mouvement.</p>';
-    else html+='<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Employé</th><th>Donneur</th><th>État</th><th>Note</th></tr></thead><tbody>'+
+    else html+='<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Employé</th><th>Donneur / Validé par</th><th>État</th><th>Note</th></tr></thead><tbody>'+
       hist.map(function(m){
-        var donneur='—';var donneurCode='';if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
+        var donneur='—';var donneurCode='';var estValidation=false;
+        if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
+        else if(m.type_mouvement==='Retour'&&m.code_chantier&&m.code_chantier.indexOf('DEPOT|')===0){var vp=m.code_chantier.split('|');donneurCode=vp[1]||'';donneur=vp[2]||'—';estValidation=true;}
+        var donneurCell=donneur==='—'?'—':(estValidation?'✅ <span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>':'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>');
         return '<tr style="border-bottom:1px solid #f0f0f0">'+
           '<td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
           '<td>'+(m.type_mouvement==='Retour'?'📥':'🔄')+' '+m.type_mouvement+'</td>'+
           '<td><span class="link-emp" data-emp="'+m.code_employe+'" data-nom="'+m.nom_employe.replace(/"/g,'')+'">'+m.nom_employe+'</span></td>'+
-          '<td style="color:var(--grey);font-size:12px">'+(donneurCode?'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>':donneur)+'</td>'+
+          '<td style="color:var(--grey);font-size:12px">'+donneurCell+'</td>'+
           '<td>'+ebadge(m.etat||'')+'</td>'+
           '<td style="font-size:11px;color:var(--grey)">'+(m.note||'—')+'</td></tr>';
       }).join('')+'</tbody></table></div>';
