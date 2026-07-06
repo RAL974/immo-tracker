@@ -524,6 +524,12 @@ var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
 var SUPER_ADMIN_CODES=['AIWI'];
 function estAdmin(code){return ADMINS_CODES.includes(code)||SUPER_ADMIN_CODES.includes(code);}
 function estSuperAdmin(code){return SUPER_ADMIN_CODES.includes(code);}
+// Peut modifier l'emplacement d'une immo : admins + Gestionnaire Dépôt RUN (Logistique)
+function peutEditerEmplacement(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='logistique';
+}
 var CT_CODES=['ROJO','LAHU','AUAR','BOMA','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
 var USERS_CACHE=null;
 var d=null, im={}, fdsMap={}, photosMap={}, reservations=[], maintenance=null;
@@ -1014,7 +1020,7 @@ function renderDepot(){
       return'<tr>'+
         '<td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td>'+
         '<td style="font-size:12px">'+l+'</td>'+
-        '<td>'+badgeSiteD(siteImmoDash(i.code_im))+'</td>'+
+        '<td>'+badgeSiteD(siteImmoDash(i.code_im))+(peutEditerEmplacement(ADMIN_SESSION.code)?'<select class="immo-site-sel" data-cim="'+i.code_im+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid #eee;border-radius:5px"><option value="Reunion"'+(siteImmoDash(i.code_im)==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(siteImmoDash(i.code_im)==='Mayotte'?' selected':'')+'>Mayotte</option></select>':'')+'</td>'+
         '<td style="font-size:11px;color:var(--grey)">'+c+'</td>'+
         '<td>'+ebadge(i.etat)+'</td>'+
         '<td style="font-size:12px;font-weight:600;color:var(--blue)">'+va+'</td>'+
@@ -1022,6 +1028,27 @@ function renderDepot(){
         '<td style="font-size:11px;color:var(--grey)">'+fmtD(i.since)+'</td>'+
       '</tr>';
     }).join('');
+  // Attacher les handlers de changement d'emplacement (admins/logistique)
+  var tbd=document.getElementById('tb-depot');
+  if(tbd)tbd.querySelectorAll('.immo-site-sel').forEach(function(sel){
+    sel.onchange=function(){majSiteImmo(this.getAttribute('data-cim'),this.value);};
+  });
+}
+
+// Modifie l'emplacement (site) d'une immo — admins et Gestionnaire Dépôt RUN
+async function majSiteImmo(codeIM,site){
+  if(!peutEditerEmplacement(ADMIN_SESSION.code)){alert('Réservé aux administrateurs et au gestionnaire de dépôt.');renderDepot();return;}
+  if(!confirm('Déplacer '+codeIM+' ('+getLib(codeIM)+') vers '+(site==='Mayotte'?'Mayotte':'La Réunion')+' ?'))return renderDepot();
+  try{
+    var r=await fetch(W+'?action=maj_site_immo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:codeIM,site:site})});
+    var res=await r.json();
+    if(res.success){
+      // Mettre à jour immoMeta localement pour refléter le changement sans recharger
+      if(!immoMeta[codeIM])immoMeta[codeIM]={};
+      immoMeta[codeIM].site=site;
+      renderDepot();
+    }else{alert('Échec : '+(res.error==='immo_introuvable'?'immo introuvable dans SharePoint.':(res.error||'inconnu')));renderDepot();}
+  }catch(e){alert('Erreur réseau : '+e.message);renderDepot();}
 }
 
 // ── Rendu — Historique ───────────────────────────────────
