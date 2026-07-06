@@ -649,17 +649,41 @@ async function uploadPhotoSiPresente(codeIM, b64) {
   } catch (e) {}
 }
 
+// Rôles garants du dépôt : valident les retours terrain et constatent l'état du matériel
+var ROLES_GARANTS = ['Admin', 'Logistique', 'Logistique_Mayotte'];
+function estGarant(code) {
+  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return true;
+  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
+  return ROLES_GARANTS.indexOf(role) !== -1;
+}
+
 // ── Confirmer état ────────────────────────────────────────
 async function confirmerAvecEtat() {
   const etat = document.getElementById('select-etat').value;
   const note = document.getElementById('note-texte').value.trim();
 
   if (S.typeMouvement === 'Retour') {
-    const noteTrace = (note ? note + ' — ' : '') + '[retour enregistré par ' + S.employe.nom + ']';
-    const mouv = { code_im: S.codeIM, code_employe: S.employe.code, nom_employe: S.employe.nom, type_mouvement: 'Retour', code_chantier: 'DEPOT', etat, note: noteTrace, horodatage: new Date().toISOString() };
-    showRecap('📥 Retour enregistré', mouv, null);
-    enregistrerMouvement(mouv);
-    uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
+    // Un garant (Admin, Gestionnaire Dépôt RUN, Logistique Mayotte) valide directement.
+    // Un rôle terrain crée un retour EN ATTENTE de validation par un garant.
+    if (estGarant(S.employe.code)) {
+      const noteTrace = (note ? note + ' — ' : '') + '[retour validé par ' + S.employe.nom + ']';
+      const mouv = { code_im: S.codeIM, code_employe: S.employe.code, nom_employe: S.employe.nom, type_mouvement: 'Retour', code_chantier: 'DEPOT', etat, note: noteTrace, horodatage: new Date().toISOString() };
+      showRecap('📥 Retour enregistré', mouv, null);
+      enregistrerMouvement(mouv);
+      uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
+    } else {
+      // Retour en attente : stocké comme un "transfert vers le dépôt" à valider
+      const noteTrace = (note ? note + ' — ' : '') + '[retour déclaré par ' + S.employe.nom + ']';
+      const payload = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: 'DEPOT', nom_receveur: 'Dépôt', etat, note: noteTrace };
+      showRecap('📥 Retour déclaré', { code_im: S.codeIM, nom_employe: 'Dépôt', type_mouvement: 'Retour', etat, note }, 'En attente de validation par un gestionnaire de dépôt.');
+      try {
+        const r = await fetch(CONFIG.proxy + '?action=transfert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const d = await r.json();
+        if (!d.success) toast('Erreur lors de la déclaration du retour', 'error');
+        else toast('✅ Retour déclaré — en attente de validation dépôt', 'success', 3500);
+      } catch (e) { toast('Erreur réseau', 'error'); }
+      uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
+    }
     return;
   }
 
