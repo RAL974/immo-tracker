@@ -916,7 +916,7 @@ async function voirDetailImmo(codeIM) {
     const hist = await r.json();
     // Une Panne/Suivi_Panne n'est jamais un changement de possession : on l'ignore pour la localisation
     const dernier = hist.find(m => m.type_mouvement !== 'Panne' && m.type_mouvement !== 'Suivi_Panne') || null;
-    const estDepot = !dernier || dernier.type_mouvement === 'Retour' || dernier.type_mouvement === 'Réparation' || dernier.code_chantier === 'DEPOT';
+    const estDepot = !dernier || dernier.type_mouvement === 'Retour' || dernier.type_mouvement === 'Réparation' || (dernier.code_chantier || '').indexOf('DEPOT') === 0;
     // Panne active actuelle + prestataire éventuel
     const lastPanne = hist.find(m => m.type_mouvement === 'Panne');
     const lastRep   = hist.find(m => m.type_mouvement === 'Réparation');
