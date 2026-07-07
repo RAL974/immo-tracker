@@ -356,7 +356,6 @@ tr:hover td{background:#FAFBFC;}
           <button onclick="sortDepot('cat')" class="filter-btn" style="padding:4px 10px;font-size:12px">Catégorie</button>
           <button onclick="sortDepot('since')" class="filter-btn" style="padding:4px 10px;font-size:12px">Durée au dépôt</button>
         </div>
-        <div id="depot-admin-toggle" style="margin-bottom:8px"></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Site</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
     </div>
 
@@ -1023,8 +1022,7 @@ function renderDepot(){
   var fe=(document.getElementById('depot-etat')||{}).value||'';
   var qu=q.trim().toUpperCase();
   var fs=SITE_FILTERS.depot||'';
-  var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe)&&(!fs||siteImmoDash(i.code_im)===fs)&&(SHOW_ADMIN.depot||estImmoActivite(i.code_im));});
-  var nbAdmin=(d.au_depot||[]).filter(function(i){return !estImmoActivite(i.code_im);}).length;
+  var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe)&&(!fs||siteImmoDash(i.code_im)===fs);});
   // Tri configurable
   data.sort(function(a,b){
     var dir=depotSortDir;
@@ -1037,11 +1035,6 @@ function renderDepot(){
   var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
   var affiche=nb===0?data:data.slice(0,nb);
   var cntEl=document.getElementById('cnt-depot');if(cntEl)cntEl.textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
-  // Bouton bascule immos administratives
-  var toggleEl=document.getElementById('depot-admin-toggle');
-  if(toggleEl){
-    toggleEl.innerHTML=nbAdmin>0?'<button onclick="toggleAdminImmos(\'depot\')" style="padding:5px 12px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:'+(SHOW_ADMIN.depot?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.depot?'➖ Masquer':'➕ Afficher')+' les '+nbAdmin+' immos administratives (mobilier, informatique, véhicules…)</button>':'';
-  }
   tbEl.innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
     affiche.map(function(i){
       var l=getLib(i.code_im);var c=getCat(i.code_im);
@@ -1604,7 +1597,13 @@ function pctAmort(codeIM){var a=calcAmort(codeIM);if(!a.amortissable||a.valeur<=
 // Les comptes administratifs (logiciels, mobilier, véhicules, informatique, cautions…) ne relèvent pas de l'activité terrain.
 var COMPTES_ADMIN_DASH=['205','2154','2181','2182','2183','2184','2718','2752'];
 var ETIQUETEUSES_DASH=['IM000272','IM000495','IM000496','IM000605','IM000606','IM000607','IM000643','IM000685','IM000686','IM000771','IM000889','IM000897','IM000898','IM000899','IM000900','IM000901','IM000902','IM000903','IM000904'];
-function compteImmoDash(codeIM){var m=immoMeta[codeIM]||{};return (m.compte||(im[codeIM]&&im[codeIM].Compte)||'').toString().trim();}
+function compteImmoDash(codeIM){
+  // Source fiable d'abord : immos.json (toujours renseigné). SharePoint (immoMeta) en secours.
+  var c=(im[codeIM]&&im[codeIM].Compte)||'';
+  if(c)return String(c).trim();
+  var m=immoMeta[codeIM]||{};
+  return (m.compte||'').toString().trim();
+}
 // true = immo liée à l'activité (celle que voient les CT) ; false = immo administrative
 function estImmoActivite(codeIM){
   var compte=compteImmoDash(codeIM);
@@ -2094,10 +2093,10 @@ function renderAnalyse(){
   html+='</div></div></div>';
 
   // ── Top immos mouvementées ────────────────────────────────────────────────
-  var immoFreq={};all.forEach(function(m){if(SHOW_ADMIN.analyses||estImmoActivite(m.code_im))immoFreq[m.code_im]=(immoFreq[m.code_im]||0)+1;});
+  // Stats d'utilisation : on ne compte QUE les immos d'activité (celles que voient les CT), avec au moins un mouvement
+  var immoFreq={};all.forEach(function(m){if(estImmoActivite(m.code_im))immoFreq[m.code_im]=(immoFreq[m.code_im]||0)+1;});
   var topImmo=Object.keys(immoFreq).sort(function(a,b){return immoFreq[b]-immoFreq[a];}).slice(0,10);
-  var nbAdminMvt=Object.keys(immoFreq).length;
-  html+='<div class="card"><div class="card-head"><h3>🔥 Top immos mouvementées</h3></div><div style="padding:8px 12px 0"><button onclick="toggleAdminImmos(\'analyses\')" style="padding:4px 10px;border:1px solid #ddd;border-radius:8px;font-size:11px;background:'+(SHOW_ADMIN.analyses?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.analyses?'Activité seule':'Inclure administratives')+'</button></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Mvts</th></tr></thead><tbody>';
+  html+='<div class="card"><div class="card-head"><h3>🔥 Top immos mouvementées</h3></div><div style="padding:6px 12px 0;font-size:11px;color:var(--grey)">Immos d\'activité uniquement (hors mobilier, informatique, véhicules, financières…)</div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Mvts</th></tr></thead><tbody>';
   topImmo.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
     html+='<tr><td>'+m+'</td><td><span class="link-im" data-cim="'+code+'" data-lib="'+getLib(code).replace(/"/g,'')+'">'+code+'</span></td><td style="font-size:12px">'+getLib(code)+'</td><td><b>'+immoFreq[code]+'</b></td></tr>';
   });
@@ -2124,7 +2123,7 @@ function renderAnalyse(){
   html+='</tbody></table></div></div>';
 
   // ── Top pires machines — pannes ───────────────────────────────────────────
-  var immoP={};all.filter(function(m){return m.type_mouvement==='Panne';}).forEach(function(m){immoP[m.code_im]=(immoP[m.code_im]||0)+1;});
+  var immoP={};all.filter(function(m){return m.type_mouvement==='Panne'&&estImmoActivite(m.code_im);}).forEach(function(m){immoP[m.code_im]=(immoP[m.code_im]||0)+1;});
   var topP=Object.keys(immoP).sort(function(a,b){return immoP[b]-immoP[a];}).slice(0,8);
   html+='<div class="card" style="border-top:3px solid var(--red)"><div class="card-head"><h3>⚠️ Pires machines — pannes (nb)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Pannes</th></tr></thead><tbody>';
   if(!topP.length)html+='<tr><td colspan="4" class="es">Aucune panne enregistrée.</td></tr>';
@@ -2135,7 +2134,7 @@ function renderAnalyse(){
 
   // ── Top coûts maintenance ─────────────────────────────────────────────────
   // Statistiques réparations depuis les mouvements réels
-  var reparations=all.filter(function(m){return m.type_mouvement==='Réparation';});
+  var reparations=all.filter(function(m){return m.type_mouvement==='Réparation'&&estImmoActivite(m.code_im);});
   var costByImmo={};reparations.forEach(function(m){
     var note=m.note||'';
     // Multi-pattern : chercher le coût dans la note (format "Coût réel : X€" ou "COUT:X" ou premier nombre suivi de €)
