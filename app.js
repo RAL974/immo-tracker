@@ -31,7 +31,8 @@ function normRole(v) {
     'ct_specialise': 'CT_Specialise', 'ct_spécialisé': 'CT_Specialise',
     'ct': 'CT', 'conducteur': 'CT',
     'ouvrier_specialise': 'Ouvrier_Specialise', 'ouvrier_spécialisé': 'Ouvrier_Specialise', 'os': 'Ouvrier_Specialise',
-    'ouvrier': 'Ouvrier'
+    'ouvrier': 'Ouvrier',
+    'encadrement': 'Encadrement'
   };
   return map[r] || '';
 }
@@ -42,62 +43,86 @@ function normSite(v) {
   return s.indexOf('may') === 0 ? 'Mayotte' : 'Reunion';
 }
 
-// Rôles autorisés à réserver du matériel
-var ROLES_RESERVE = ['Admin', 'Logistique', 'Logistique_Mayotte', 'RA', 'CT_Specialise', 'CT', 'Ouvrier_Specialise'];
-// Rôles bi-site (voient les deux îles + drapeaux d'emplacement)
-var ROLES_BISITE = ['Admin', 'Logistique', 'RA', 'CT_Specialise', 'Ouvrier_Specialise'];
 // Super-administrateurs PERMANENTS : tous droits quel que soit le rôle SharePoint
 var SUPER_ADMIN_CODES = ['AIWI'];
 
-// ── Filtrage par compte comptable selon le rôle ───────────────────────────
-// Les rôles terrain ne voient pas les immos "administratives" (logiciels, mobilier,
-// véhicules, informatique, cautions...). Seuls Admin et Logistique (Gestionnaire Dépôt RUN) voient tout.
-// Exception : les étiqueteuses (compte 2183 mal affecté) restent visibles pour tous.
+// ══════════════════════════════════════════════════════════════════════════
+//  TABLE CENTRALE DES DROITS PAR RÔLE (source unique de vérité)
+//  Chaque rôle déclare ses capacités. Pour modifier un droit → une seule ligne.
+//    reserver   : peut réserver / recevoir du matériel
+//    bisite     : voit et agit sur les deux îles (sinon limité à son site)
+//    garant     : peut valider un retour dépôt (atteste de l'état)
+//    voitTout   : voit toutes les catégories, y compris comptes administratifs
+//    admin      : gère la solution (rôles, ajouts, mots de passe…)
+//    comptesExtra : comptes normalement masqués mais visibles pour ce rôle (exceptions)
+// ══════════════════════════════════════════════════════════════════════════
+var ROLE_CAPS = {
+  'Admin':              { reserver:true, bisite:true,  garant:true,  voitTout:true, admin:true },
+  'Logistique':         { reserver:true, bisite:true,  garant:true,  voitTout:true },            // Gestionnaire Dépôt RUN
+  'Logistique_Mayotte': { reserver:true, bisite:false, garant:true,  voitTout:false, comptesExtra:['2182'] }, // mono-Mayotte, voit AUSSI les véhicules (entretien sur place)
+  'RA':                 { reserver:true, bisite:true },
+  'CT_Specialise':      { reserver:true, bisite:true },
+  'CT':                 { reserver:true, bisite:false },
+  'Ouvrier_Specialise': { reserver:true, bisite:true },
+  'Ouvrier':            {},                                                                        // aucun droit particulier
+  'Encadrement':        { bisite:true,  voitTout:true }                                            // view-only : voit tout (2 îles) pour export, ne réserve pas
+};
+
+// Comptes comptables "administratifs" masqués aux rôles terrain (logiciels, mobilier, véhicules, informatique, cautions…)
 var COMPTES_MASQUES = ['205', '2154', '2181', '2182', '2183', '2184', '2718', '2752'];
+// Exception : étiqueteuses (compte 2183 mal affecté par l'ancienne DAF) visibles pour tous
 var ETIQUETEUSES_VISIBLES = ['IM000272','IM000495','IM000496','IM000605','IM000606','IM000607','IM000643','IM000685','IM000686','IM000771','IM000889','IM000897','IM000898','IM000899','IM000900','IM000901','IM000902','IM000903','IM000904'];
-var ROLES_VOIENT_TOUT = ['Admin', 'Logistique']; // + super-admin
+
+// Renvoie les capacités d'une personne (super-admin = toutes)
+function caps(code) {
+  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return { reserver:true, bisite:true, garant:true, voitTout:true, admin:true };
+  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
+  return ROLE_CAPS[role] || {};
+}
 
 // Une catégorie/immo est-elle visible pour cette personne selon le compte comptable ?
 function comptesVisiblePour(code, codeIM) {
-  // Admin, Logistique et super-admin voient tout
-  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return true;
-  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
-  if (ROLES_VOIENT_TOUT.indexOf(role) !== -1) return true;
-  // Les autres : masquer les comptes administratifs, sauf étiqueteuses
+  var c = caps(code);
+  if (c.voitTout) return true;
   var immo = S.immos && S.immos[codeIM];
   var compte = immo && immo.Compte ? String(immo.Compte).trim() : '';
-  if (COMPTES_MASQUES.indexOf(compte) === -1) return true; // compte non masqué → visible
-  if (ETIQUETEUSES_VISIBLES.indexOf(codeIM) !== -1) return true; // étiqueteuse → visible
-  return false; // compte masqué → invisible pour ce rôle
+  if (COMPTES_MASQUES.indexOf(compte) === -1) return true;             // compte non masqué → visible
+  if (ETIQUETEUSES_VISIBLES.indexOf(codeIM) !== -1) return true;        // étiqueteuse → visible
+  if (c.comptesExtra && c.comptesExtra.indexOf(compte) !== -1) return true; // exception (ex: véhicules pour Logistique Mayotte)
+  return false;                                                          // compte masqué → invisible pour ce rôle
 }
 
 // Peut-on réserver du matériel ?
 function peutReserver(code) {
   if (!code) return false;
-  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return true; // super-admin permanent
-  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
-  if (role) return ROLES_RESERVE.indexOf(role) !== -1;
+  if (caps(code).reserver) return true;
   // Fallback rétrocompatibilité (tant que le rôle n'est pas défini proprement)
+  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
+  if (role) return false;
   return CONFIG.autorises.includes(code);
 }
 
 // Voit-il les deux sites (et donc les drapeaux d'emplacement) ?
 function voitDeuxSites(code) {
-  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return true; // super-admin permanent
-  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
-  return ROLES_BISITE.indexOf(role) !== -1;
+  return !!caps(code).bisite;
+}
+
+// Est-il garant du dépôt (peut valider un retour) ?
+function estGarant(code) {
+  return !!caps(code).garant;
 }
 
 // Quels sites cette personne peut-elle voir/réserver ?
 function sitesAutorises(code) {
-  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return ['Reunion', 'Mayotte']; // super-admin permanent
+  var c = caps(code);
+  if (c.bisite) return ['Reunion', 'Mayotte'];
   var role = normRole(S.droitsByCode && S.droitsByCode[code]);
   var site = normSite(S.siteByCode && S.siteByCode[code]);
-  if (ROLES_BISITE.indexOf(role) !== -1) return ['Reunion', 'Mayotte']; // bi-site
-  if (role === 'Logistique_Mayotte') return ['Mayotte'];               // logistique Mayotte
-  if (role === 'CT') return [site];                                     // CT mono-site (son île)
-  if (role === 'Ouvrier') return [];                                    // ne réserve pas
-  // Fallback : si code dans autorises sans rôle défini → voit son site (défaut Reunion)
+  if (role === 'Logistique_Mayotte') return ['Mayotte'];  // mono-Mayotte
+  if (role === 'CT') return [site];                         // CT mono-site (son île)
+  if (role === 'Ouvrier') return [];                        // ne réserve pas
+  if (ROLE_CAPS[role]) return [site];                       // autre rôle mono-site défini → son site
+  // Fallback : code autorisé sans rôle défini → voit son site (défaut Reunion)
   if (CONFIG.autorises.includes(code)) return [site];
   return [];
 }
@@ -108,7 +133,6 @@ function immoVisiblePour(code, codeIM) {
   if (!sites.length) return false;
   var siteImmo = siteImmoDe(codeIM);
   if (sites.indexOf(siteImmo) === -1) return false;
-  // Filtrage par compte comptable selon le rôle
   return comptesVisiblePour(code, codeIM);
 }
 
@@ -647,14 +671,6 @@ async function uploadPhotoSiPresente(codeIM, b64) {
   try {
     await fetch(CONFIG.proxy + '?action=upload_photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code_im: codeIM, data: b64, filename: fn }) });
   } catch (e) {}
-}
-
-// Rôles garants du dépôt : valident les retours terrain et constatent l'état du matériel
-var ROLES_GARANTS = ['Admin', 'Logistique', 'Logistique_Mayotte'];
-function estGarant(code) {
-  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return true;
-  var role = normRole(S.droitsByCode && S.droitsByCode[code]);
-  return ROLES_GARANTS.indexOf(role) !== -1;
 }
 
 // ── Confirmer état ────────────────────────────────────────
