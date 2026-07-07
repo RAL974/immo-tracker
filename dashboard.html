@@ -356,6 +356,7 @@ tr:hover td{background:#FAFBFC;}
           <button onclick="sortDepot('cat')" class="filter-btn" style="padding:4px 10px;font-size:12px">Catégorie</button>
           <button onclick="sortDepot('since')" class="filter-btn" style="padding:4px 10px;font-size:12px">Durée au dépôt</button>
         </div>
+        <div id="depot-admin-toggle" style="margin-bottom:8px"></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Site</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
     </div>
 
@@ -1022,7 +1023,8 @@ function renderDepot(){
   var fe=(document.getElementById('depot-etat')||{}).value||'';
   var qu=q.trim().toUpperCase();
   var fs=SITE_FILTERS.depot||'';
-  var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe)&&(!fs||siteImmoDash(i.code_im)===fs);});
+  var data=(d.au_depot||[]).filter(function(i){var l=getLib(i.code_im);var c=getCat(i.code_im);return(!qu||(i.code_im.includes(qu)||l.toUpperCase().includes(qu)))&&(!fc||(c||'Sans catégorie')===fc)&&(!fe||i.etat===fe)&&(!fs||siteImmoDash(i.code_im)===fs)&&(SHOW_ADMIN.depot||estImmoActivite(i.code_im));});
+  var nbAdmin=(d.au_depot||[]).filter(function(i){return !estImmoActivite(i.code_im);}).length;
   // Tri configurable
   data.sort(function(a,b){
     var dir=depotSortDir;
@@ -1035,6 +1037,11 @@ function renderDepot(){
   var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
   var affiche=nb===0?data:data.slice(0,nb);
   var cntEl=document.getElementById('cnt-depot');if(cntEl)cntEl.textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
+  // Bouton bascule immos administratives
+  var toggleEl=document.getElementById('depot-admin-toggle');
+  if(toggleEl){
+    toggleEl.innerHTML=nbAdmin>0?'<button onclick="toggleAdminImmos(\'depot\')" style="padding:5px 12px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:'+(SHOW_ADMIN.depot?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.depot?'➖ Masquer':'➕ Afficher')+' les '+nbAdmin+' immos administratives (mobilier, informatique, véhicules…)</button>':'';
+  }
   tbEl.innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
     affiche.map(function(i){
       var l=getLib(i.code_im);var c=getCat(i.code_im);
@@ -1593,6 +1600,22 @@ function calcAmort(codeIM){
 function eur(n){return (Math.round(n)).toLocaleString('fr-FR')+' €';}
 function pctAmort(codeIM){var a=calcAmort(codeIM);if(!a.amortissable||a.valeur<=0)return 0;return Math.min(100,Math.round(a.cumul/a.valeur*100));}
 
+// ── Immos "activité" (terrain) vs "administratives" ──────────────────────
+// Les comptes administratifs (logiciels, mobilier, véhicules, informatique, cautions…) ne relèvent pas de l'activité terrain.
+var COMPTES_ADMIN_DASH=['205','2154','2181','2182','2183','2184','2718','2752'];
+var ETIQUETEUSES_DASH=['IM000272','IM000495','IM000496','IM000605','IM000606','IM000607','IM000643','IM000685','IM000686','IM000771','IM000889','IM000897','IM000898','IM000899','IM000900','IM000901','IM000902','IM000903','IM000904'];
+function compteImmoDash(codeIM){var m=immoMeta[codeIM]||{};return (m.compte||(im[codeIM]&&im[codeIM].Compte)||'').toString().trim();}
+// true = immo liée à l'activité (celle que voient les CT) ; false = immo administrative
+function estImmoActivite(codeIM){
+  var compte=compteImmoDash(codeIM);
+  if(COMPTES_ADMIN_DASH.indexOf(compte)===-1)return true;      // compte non administratif
+  if(ETIQUETEUSES_DASH.indexOf(codeIM)!==-1)return true;        // étiqueteuse (exception)
+  return false;
+}
+// Bascule d'affichage des immos administratives, par onglet (défaut : masquées)
+var SHOW_ADMIN={depot:false,analyses:false};
+function toggleAdminImmos(tab){SHOW_ADMIN[tab]=!SHOW_ADMIN[tab];renderTab(tab);}
+
 // Modifier la durée d'amortissement d'une immo (admins)
 async function modifierDureeAmort(codeIM){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
@@ -1961,9 +1984,10 @@ function renderAnalyse(){
   html+='</div></div></div>';
 
   // ── Top immos mouvementées ────────────────────────────────────────────────
-  var immoFreq={};all.forEach(function(m){immoFreq[m.code_im]=(immoFreq[m.code_im]||0)+1;});
+  var immoFreq={};all.forEach(function(m){if(SHOW_ADMIN.analyses||estImmoActivite(m.code_im))immoFreq[m.code_im]=(immoFreq[m.code_im]||0)+1;});
   var topImmo=Object.keys(immoFreq).sort(function(a,b){return immoFreq[b]-immoFreq[a];}).slice(0,10);
-  html+='<div class="card"><div class="card-head"><h3>🔥 Top immos mouvementées</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Mvts</th></tr></thead><tbody>';
+  var nbAdminMvt=Object.keys(immoFreq).length;
+  html+='<div class="card"><div class="card-head"><h3>🔥 Top immos mouvementées</h3></div><div style="padding:8px 12px 0"><button onclick="toggleAdminImmos(\'analyses\')" style="padding:4px 10px;border:1px solid #ddd;border-radius:8px;font-size:11px;background:'+(SHOW_ADMIN.analyses?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.analyses?'Activité seule':'Inclure administratives')+'</button></div><div class="tbl-wrap"><table><thead><tr><th>Rang</th><th>Code IM</th><th>Libellé</th><th>Mvts</th></tr></thead><tbody>';
   topImmo.forEach(function(code,i){var m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
     html+='<tr><td>'+m+'</td><td><span class="link-im" data-cim="'+code+'" data-lib="'+getLib(code).replace(/"/g,'')+'">'+code+'</span></td><td style="font-size:12px">'+getLib(code)+'</td><td><b>'+immoFreq[code]+'</b></td></tr>';
   });
