@@ -820,7 +820,17 @@ async function loadAll(){
   try{
     var r=await fetch(W+'?dashboard=1');
     d=await r.json();
-    try{var ir=await fetch('immos.json');var il=await ir.json();il.forEach(function(i){im[i.Code_IM]=i;});}catch(e){}
+    try{
+      var ir=await fetch('immos.json?v='+Date.now());
+      if(!ir.ok)throw new Error('HTTP '+ir.status+' (fichier introuvable sur le serveur)');
+      var il=await ir.json();
+      if(!Array.isArray(il))throw new Error('format inattendu : immos.json doit être un tableau [ ] (1023 immos), pas un objet { }');
+      il.forEach(function(i){im[i.Code_IM]=i;});
+      if(!Object.keys(im).length)throw new Error('aucune immo chargée');
+    }catch(e){
+      alert('⚠️ Problème de chargement du catalogue immos.json :\n\n'+e.message+'\n\nLes libellés et catégories ne s\'afficheront pas correctement. Vérifiez que immos.json est bien déployé (tableau de 1023 immos) à la racine du dépôt GitHub.');
+      console.error('immos.json:',e);
+    }
     // Enrichir inventaire
     var invSet={};(d.inventory||[]).forEach(function(i){invSet[i.code_im]=true;});
     Object.keys(im).forEach(function(code){
