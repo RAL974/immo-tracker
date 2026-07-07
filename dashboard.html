@@ -1616,6 +1616,59 @@ function estImmoActivite(codeIM){
 var SHOW_ADMIN={depot:false,analyses:false};
 function toggleAdminImmos(tab){SHOW_ADMIN[tab]=!SHOW_ADMIN[tab];renderTab(tab);}
 
+// ══════════════ EXPORT COMPTABLE (rapprochement EBP / expert-comptable) ══════════════
+// Formate un nombre en décimal français (virgule), sans séparateur de milliers (pour Excel)
+function nbFr(n){return (Math.round((n||0)*100)/100).toString().replace('.',',');}
+// Échappe une valeur pour CSV point-virgule
+function csvCell(v){v=(v==null?'':String(v));if(/[";\n]/.test(v))return '"'+v.replace(/"/g,'""')+'"';return v;}
+function dateFr(iso){if(!iso)return '';var d=new Date(iso);if(isNaN(d.getTime()))return '';return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();}
+
+function exporterComptable(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  var entetes=['Code IM','Libellé','Catégorie','N° série','Compte immobilisation','Compte amortissement','Compte dotation','Site','Date achat','Date mise en service','Valeur achat HT (€)','Durée amort. (ans)','Annuité (€)','Amort. cumulé (€)','Valeur nette comptable (€)','% amorti','État','Actif'];
+  var lignes=[entetes.map(csvCell).join(';')];
+  var codes=Object.keys(im).sort();
+  var totAchat=0,totVNC=0,totCumul=0;
+  codes.forEach(function(code){
+    var info=im[code]||{};var mt=immoMeta[code]||{};
+    var a=calcAmort(code);
+    var actif='Oui'; // la base opérationnelle ne contient que les immos actives du parc
+    totAchat+=a.valeur;totVNC+=a.vnc;totCumul+=a.cumul;
+    lignes.push([
+      code,
+      info.Libelle||'',
+      info.Categorie||getCat(code)||'',
+      mt.n_serie||info.N_Serie||'',
+      mt.compte||info.Compte||'',
+      mt.compte_amort||'',
+      mt.compte_dot||'',
+      siteImmoDash(code)==='Mayotte'?'Mayotte':'Réunion',
+      dateFr(mt.date_achat),
+      dateFr(mt.date_mise_service),
+      nbFr(a.valeur),
+      a.amortissable?a.duree:'',
+      a.amortissable?nbFr(a.annuite):'',
+      nbFr(a.cumul),
+      nbFr(a.vnc),
+      a.amortissable?(Math.min(100,Math.round(a.cumul/a.valeur*100))+'%'):'n/a',
+      mt.etat||info.Etat||'',
+      actif
+    ].map(csvCell).join(';'));
+  });
+  // Ligne de totaux
+  lignes.push('');
+  lignes.push(['TOTAUX','','','','','','','','','',nbFr(totAchat),'','',nbFr(totCumul),nbFr(totVNC),(totAchat>0?Math.round(totCumul/totAchat*100)+'%':''),'',''].map(csvCell).join(';'));
+
+  var csv='\uFEFF'+lignes.join('\r\n'); // BOM UTF-8 pour Excel
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');
+  var dt=new Date();var stamp=dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2)+'-'+('0'+dt.getDate()).slice(-2);
+  a2.href=url;a2.download='Export_Immos_Amortissement_'+stamp+'.csv';
+  document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+  URL.revokeObjectURL(url);
+}
+
 // Modifier la durée d'amortissement d'une immo (admins)
 async function modifierDureeAmort(codeIM){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
@@ -1954,7 +2007,7 @@ function renderAnalyse(){
   var totAchat=vAchat.Reunion+vAchat.Mayotte, totVNC=vVNC.Reunion+vVNC.Mayotte;
   var totCumul=totAchat-totVNC;
   var pctGlobal=totAchat>0?Math.round(totCumul/totAchat*100):0;
-  html+='<div class="card" style="grid-column:1/-1"><div class="card-head"><h3>💰 Valeur du parc & amortissement</h3></div><div style="padding:14px">';
+  html+='<div class="card" style="grid-column:1/-1"><div class="card-head"><h3>💰 Valeur du parc & amortissement</h3>'+(estAdmin(ADMIN_SESSION.code)?'<button onclick="exporterComptable()" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export comptable (CSV)</button>':'')+'</div><div style="padding:14px">';
   html+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">';
   html+='<div><div style="font-size:11px;color:var(--grey)">Valeur d\'achat totale</div><div style="font-size:24px;font-weight:800;color:var(--blue)">'+eur(totAchat)+'</div></div>';
   html+='<div><div style="font-size:11px;color:var(--grey)">Valeur nette comptable (VNC)</div><div style="font-size:24px;font-weight:800;color:var(--green)">'+eur(totVNC)+'</div></div>';
