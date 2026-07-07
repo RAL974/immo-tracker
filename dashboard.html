@@ -1454,21 +1454,98 @@ function renderDocs(){
 }
 
 // ── Rendu — Maintenance ──────────────────────────────────
+var GARANTIE_ANS=2;          // durée de garantie type (modifiable)
+var SEUIL_DORMANT_MOIS=6;    // seuil immo dormante (modifiable via le sélecteur)
+function setSeuilDormant(v){SEUIL_DORMANT_MOIS=parseInt(v,10)||6;renderMaint();}
+
 function renderMaint(){
-  if(!maintenance){document.getElementById('maint-content').innerHTML='<p class="es">Renseignez les dates dans la liste Immos SharePoint.</p>';return;}
+  var cont=document.getElementById('maint-content');
+  if(!cont)return;
+  if(!d){cont.innerHTML='<p class="es">Chargement…</p>';return;}
   var fs=SITE_FILTERS.maintenance||'';
   var siteOK=function(code){return !fs||siteImmoDash(code)===fs;};
-  var mu=(maintenance.maintenances_urgentes||[]).filter(function(i){return siteOK(i.code_im);}),mb=(maintenance.maintenances_bientot||[]).filter(function(i){return siteOK(i.code_im);}),gb=(maintenance.garanties_bientot||[]).filter(function(i){return siteOK(i.code_im);}),ge=(maintenance.garanties_expirees||[]).filter(function(i){return siteOK(i.code_im);});
-  function tbl(titre,items,col){
-    if(!items.length)return'';
-    var h='<div class="card" style="margin-bottom:12px;border-top:3px solid '+col+'"><div class="card-head"><h3>'+titre+' ('+items.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>Date prévue</th><th>Prestataire</th><th>Coût</th></tr></thead><tbody>';
-    h+=items.map(function(i){return'<tr><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+i.libelle.replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+'</td><td style="font-size:12px">'+i.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+i.categorie+'</td><td>'+fmtD(i.prochaine_maintenance||i.date_garantie_fin)+'</td><td style="font-size:12px">'+(i.prestataire_sav||'—')+'</td><td style="font-size:12px">'+(i.cout_maintenance?i.cout_maintenance+'€':'—')+'</td></tr>';}).join('');
-    return h+'</tbody></table></div></div>';
-  }
-  var filtreHtml='<div style="margin-bottom:12px"><select onchange="setSiteFilter(\'maintenance\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select></div>';
-  var html=tbl('🔴 Maintenance urgente (≤7j)',mu,'var(--red)')+tbl('🟠 Maintenance dans 30j',mb,'var(--orange)')+tbl('⚠️ Garanties expirant dans 30j',gb,'var(--yellow)')+tbl('❌ Garanties expirées',ge,'var(--grey)');
-  if(!html)html='<div class="es" style="padding:40px">Aucune alerte maintenance'+(fs?' sur '+fs:'')+'.</div>';
-  document.getElementById('maint-content').innerHTML=filtreHtml+html;
+  var now=Date.now();
+  var all=d.all_movements||[];
+  var voitCompta=peutVoirCompta(ADMIN_SESSION.code);
+  var eurCell=function(v){return voitCompta?eur(v):'—';};
+
+  // Compteur de pannes par immo
+  var pannes={};all.forEach(function(m){if(m.type_mouvement==='Panne')pannes[m.code_im]=(pannes[m.code_im]||0)+1;});
+
+  // ── 1. Garanties encore en cours, expirant bientôt (date mise en service + GARANTIE_ANS) ──
+  var garanties=[];
+  Object.keys(im).forEach(function(code){
+    if(!siteOK(code)||!estImmoActivite(code))return;
+    var mt=immoMeta[code]||{};var dref=mt.date_mise_service||mt.date_achat;
+    if(!dref)return;
+    var fin=new Date(dref);if(isNaN(fin.getTime()))return;
+    fin.setFullYear(fin.getFullYear()+GARANTIE_ANS);
+    var jours=Math.round((fin.getTime()-now)/86400000);
+    if(jours>0&&jours<=180)garanties.push({code:code,fin:fin.toISOString(),jours:jours,valeur:mt.valeur_achat||0});
+  });
+  garanties.sort(function(a,b){return a.jours-b.jours;});
+
+  // ── 2. Immos à entretenir (état dégradé ou pannes récurrentes) ──
+  var aEntretenir=[];
+  (d.inventory||[]).forEach(function(i){
+    if(!siteOK(i.code_im)||!estImmoActivite(i.code_im))return;
+    var etat=(i.etat||'').toLowerCase();var nbP=pannes[i.code_im]||0;
+    var degrade=etat.indexOf('abîm')>=0||etat.indexOf('abim')>=0||etat.indexOf('usé')>=0||etat.indexOf('use')>=0||etat.indexOf('hors')>=0;
+    if(degrade||nbP>=2)aEntretenir.push({code:i.code_im,etat:i.etat||'—',pannes:nbP,statut:i.statut,valeur:(immoMeta[i.code_im]||{}).valeur_achat||0});
+  });
+  aEntretenir.sort(function(a,b){return b.pannes-a.pannes||b.valeur-a.valeur;});
+
+  // ── 3. Immos dormantes : au dépôt depuis longtemps, AVEC au moins un mouvement (règle métier) ──
+  var seuilJ=SEUIL_DORMANT_MOIS*30;
+  var dormantes=[];
+  (d.au_depot||[]).forEach(function(i){
+    if(!siteOK(i.code_im)||!estImmoActivite(i.code_im))return;
+    if(!i.since)return; // jamais sorti (aucun mouvement) → PAS dormant
+    var jours=Math.round((now-new Date(i.since).getTime())/86400000);
+    if(jours>=seuilJ){var mt=immoMeta[i.code_im]||{};dormantes.push({code:i.code_im,jours:jours,since:i.since,vnc:calcAmort(i.code_im).vnc,valeur:mt.valeur_achat||0});}
+  });
+  dormantes.sort(function(a,b){return b.jours-a.jours;});
+
+  // ── Rendu ──
+  var filtreHtml='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center">'+
+    '<select onchange="setSiteFilter(\'maintenance\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
+    '<label style="font-size:12px;color:var(--grey)">Seuil dormance : <select onchange="setSeuilDormant(this.value)" style="padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:12px"><option value="3"'+(SEUIL_DORMANT_MOIS===3?' selected':'')+'>3 mois</option><option value="6"'+(SEUIL_DORMANT_MOIS===6?' selected':'')+'>6 mois</option><option value="12"'+(SEUIL_DORMANT_MOIS===12?' selected':'')+'>12 mois</option></select></label></div>';
+
+  // Bandeau résumé
+  var vncDormant=dormantes.reduce(function(s,x){return s+x.vnc;},0);
+  var resume='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">'+
+    '<div style="flex:1;min-width:150px;background:#FFF8E1;border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:#F9A825">'+garanties.length+'</div><div style="font-size:12px;color:var(--grey)">garantie(s) expirant &lt; 6 mois</div></div>'+
+    '<div style="flex:1;min-width:150px;background:#FFEBEE;border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--red)">'+aEntretenir.length+'</div><div style="font-size:12px;color:var(--grey)">immo(s) à entretenir</div></div>'+
+    '<div style="flex:1;min-width:150px;background:#E8F5E9;border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--green)">'+dormantes.length+'</div><div style="font-size:12px;color:var(--grey)">dormante(s)'+(voitCompta&&vncDormant>0?' · VNC '+eur(vncDormant):'')+'</div></div>'+
+  '</div>';
+
+  var html=resume;
+
+  // 1. Garanties
+  html+='<div class="card" style="margin-bottom:12px;border-top:3px solid #F9A825"><div class="card-head"><h3>🛡️ Garanties à surveiller ('+garanties.length+')</h3></div>';
+  if(!garanties.length)html+='<div class="es" style="padding:20px">Aucune garantie n\'expire dans les 6 prochains mois.</div>';
+  else{html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Fin garantie</th><th>Dans</th><th>Valeur</th></tr></thead><tbody>';
+    html+=garanties.map(function(g){return'<tr><td><span class="link-im" data-cim="'+g.code+'" data-lib="'+getLib(g.code).replace(/"/g,'')+'">'+g.code+'</span>'+drapImmoDash(g.code)+'</td><td style="font-size:12px">'+getLib(g.code)+'</td><td>'+fmtD(g.fin)+'</td><td><b style="color:'+(g.jours<=30?'var(--red)':'#F9A825')+'">'+g.jours+' j</b></td><td style="font-size:12px">'+eurCell(g.valeur)+'</td></tr>';}).join('');
+    html+='</tbody></table></div>';}
+  html+='<div style="padding:8px 12px;font-size:11px;color:var(--grey)">Garantie estimée à '+GARANTIE_ANS+' ans depuis la mise en service. Vérifiez le bon de garantie du fournisseur avant toute démarche.</div></div>';
+
+  // 2. À entretenir
+  html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔧 Immos à entretenir ('+aEntretenir.length+')</h3></div>';
+  if(!aEntretenir.length)html+='<div class="es" style="padding:20px">Aucune immo en état dégradé ni à pannes récurrentes'+(fs?' sur '+fs:'')+'.</div>';
+  else{html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>État</th><th>Pannes</th><th>Statut</th><th>Valeur</th></tr></thead><tbody>';
+    html+=aEntretenir.slice(0,50).map(function(e){return'<tr><td><span class="link-im" data-cim="'+e.code+'" data-lib="'+getLib(e.code).replace(/"/g,'')+'">'+e.code+'</span>'+drapImmoDash(e.code)+'</td><td style="font-size:12px">'+getLib(e.code)+'</td><td>'+ebadge(e.etat)+'</td><td>'+(e.pannes>0?'<b style="color:var(--red)">'+e.pannes+'</b>':'—')+'</td><td style="font-size:11px;color:var(--grey)">'+(e.statut==='Au depot'?'Au dépôt':'En circulation')+'</td><td style="font-size:12px">'+eurCell(e.valeur)+'</td></tr>';}).join('');
+    html+='</tbody></table></div>';}
+  html+='</div>';
+
+  // 3. Dormantes
+  html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--green)"><div class="card-head"><h3>💤 Immos dormantes — candidates à cession ('+dormantes.length+')</h3></div>';
+  if(!dormantes.length)html+='<div class="es" style="padding:20px">Aucune immo au dépôt depuis plus de '+SEUIL_DORMANT_MOIS+' mois (parmi celles ayant déjà bougé).</div>';
+  else{html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Au dépôt depuis</th><th>Durée</th><th>Valeur achat</th><th>VNC</th></tr></thead><tbody>';
+    html+=dormantes.slice(0,100).map(function(x){var mois=Math.floor(x.jours/30);return'<tr><td><span class="link-im" data-cim="'+x.code+'" data-lib="'+getLib(x.code).replace(/"/g,'')+'">'+x.code+'</span>'+drapImmoDash(x.code)+'</td><td style="font-size:12px">'+getLib(x.code)+'</td><td style="font-size:12px">'+fmtD(x.since)+'</td><td><b>'+mois+' mois</b></td><td style="font-size:12px">'+eurCell(x.valeur)+'</td><td style="font-size:12px;color:var(--green)"><b>'+eurCell(x.vnc)+'</b></td></tr>';}).join('');
+    html+='</tbody></table></div>';}
+  html+='<div style="padding:8px 12px;font-size:11px;color:var(--grey)">Immos au dépôt depuis plus de '+SEUIL_DORMANT_MOIS+' mois. Les immos jamais sorties ne sont pas comptées.</div></div>';
+
+  cont.innerHTML=filtreHtml+html;
 }
 
 // ── Rendu — Alertes ──────────────────────────────────────
