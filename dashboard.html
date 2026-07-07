@@ -549,6 +549,12 @@ function estGarant(code){
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='admin'||role==='logistique'||role==='logistique_mayotte';
 }
+// Peut voir les données comptables (dates, comptes) sur les fiches : Admin, Gestionnaire Dépôt RUN (Logistique), Encadrement
+function peutVoirCompta(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='logistique'||role==='encadrement';
+}
 // Peut modifier l'emplacement d'une immo : admins + Gestionnaire Dépôt RUN (Logistique)
 function peutEditerEmplacement(code){
   if(estAdmin(code))return true;
@@ -2310,6 +2316,21 @@ async function chargerFicheImmo(codeIM){
       var coutRep2=0;(d.all_movements||[]).filter(function(m){return m.code_im===codeIM&&m.type_mouvement==='Réparation';}).forEach(function(m){var n=m.note||'';var cm=n.match(/Coût réel\s*:\s*([\d.,]+)/i);if(cm){var c=parseFloat(cm[1].replace(',','.'));if(!isNaN(c))coutRep2+=c;}});
       if(coutRep2>0&&mt2.valeur_achat>0){var ratio2=Math.round(coutRep2/mt2.valeur_achat*100);var ratioColor=ratio2>=100?'var(--red)':ratio2>=50?'var(--orange)':'var(--green)';html+='<div style="background:#FFF3E0;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Coût réparations :</span> <strong style="color:'+ratioColor+'">'+coutRep2.toFixed(0)+'€ ('+ratio2+'% valeur achat)</strong></div>';}
       html+='</div>';
+    }
+    // Données comptables (date mise en service + comptes) — réservé Admin / Gestionnaire Dépôt RUN / Encadrement
+    if(peutVoirCompta(ADMIN_SESSION.code)){
+      var dmes=mt2.date_mise_service?fmtD(mt2.date_mise_service):'—';
+      var cImmo=mt2.compte||'—',cAmort=mt2.compte_amort||'—',cDot=mt2.compte_dot||'—';
+      html+='<div style="background:#E8EAF6;border-radius:10px;padding:12px 14px;margin-bottom:12px">'+
+        '<div style="font-size:13px;font-weight:700;color:#283593;margin-bottom:8px">🧾 Données comptables</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;font-size:12px">'+
+          '<div><span style="color:var(--grey)">Date d\'achat</span><br><strong>'+(mt2.date_achat?fmtD(mt2.date_achat):'—')+'</strong></div>'+
+          '<div><span style="color:var(--grey)">Date mise en service</span><br><strong>'+dmes+'</strong></div>'+
+          '<div><span style="color:var(--grey)">Compte immobilisation</span><br><strong>'+cImmo+'</strong></div>'+
+          '<div><span style="color:var(--grey)">Compte amortissement</span><br><strong>'+cAmort+'</strong></div>'+
+          '<div><span style="color:var(--grey)">Compte dotation</span><br><strong>'+cDot+'</strong></div>'+
+          '<div><span style="color:var(--grey)">N° série</span><br><strong>'+(mt2.n_serie||(im[codeIM]&&im[codeIM].N_Serie)||'—')+'</strong></div>'+
+        '</div></div>';
     }
     // Amortissement linéaire & valeur nette comptable
     if(mt2.valeur_achat>0){
