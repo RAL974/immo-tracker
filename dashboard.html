@@ -1670,6 +1670,61 @@ function exporterComptable(){
 }
 
 // Modifier la durée d'amortissement d'une immo (admins)
+// ══════════════ MIGRATION : enrichir les immos depuis l'export EBP ══════════════
+async function enrichirImmosEBP(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('Enrichir les immobilisations dans SharePoint à partir des données comptables EBP ?\n\n'+
+    'Cela met à jour, pour chaque immo : libellé, date d\'achat, date de mise en service, valeur d\'achat HT, comptes (immobilisation, amortissement, dotation), site et statut actif.\n\n'+
+    'Les données du fichier EBP font foi et remplaceront les valeurs actuelles.'))return;
+  var statut=document.getElementById('ebp-statut');
+  var setStatut=function(txt){if(statut)statut.innerHTML=txt;};
+  setStatut('⏳ Chargement du fichier EBP…');
+  var full;
+  try{
+    var r=await fetch('immos_full.json?t='+Date.now());
+    full=await r.json();
+  }catch(e){setStatut('❌ Impossible de charger immos_full.json : '+e.message);return;}
+  if(!Object.keys(immoMeta).length){setStatut('⏳ Chargement des immos SharePoint…');try{await loadImmoMeta();}catch(e){}}
+
+  var patches=[];var absents=[];
+  Object.keys(full).forEach(function(code){
+    var mt=immoMeta[code];
+    if(!mt||!mt.id){absents.push(code);return;}
+    var e=full[code];
+    var fields={
+      Libelle:e.libelle||'',
+      Date_Achat:e.date_achat||null,
+      Date_Mise_Service:e.date_mise_service||null,
+      Valeur_Achat:e.valeur_achat||0,
+      Compte_Immobilisation:e.compte_immo||'',
+      Compte_Amortissement:e.compte_amort||'',
+      Compte_Dotation:e.compte_dot||'',
+      Site:e.site==='Mayotte'?'Mayotte':'Reunion',
+      Actif:e.actif?'Oui':'Non'
+    };
+    patches.push({id:mt.id,fields:fields});
+  });
+
+  if(!patches.length){setStatut('❌ Aucune immo à mettre à jour (correspondance des codes impossible).');return;}
+
+  var total=patches.length,okTotal=0,koTotal=0,lot=20;
+  for(var i=0;i<patches.length;i+=lot){
+    var tranche=patches.slice(i,i+lot);
+    setStatut('⏳ Mise à jour '+Math.min(i+lot,total)+' / '+total+' immos…');
+    try{
+      var rr=await fetch(W+'?action=bulk_patch_immos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({patches:tranche})});
+      var res=await rr.json();
+      okTotal+=res.ok||0;koTotal+=res.ko||0;
+    }catch(e){koTotal+=tranche.length;}
+  }
+  var msg='✅ Enrichissement terminé : '+okTotal+' immos mises à jour';
+  if(koTotal)msg+=', '+koTotal+' en échec';
+  if(absents.length)msg+='. '+absents.length+' code(s) EBP absents de SharePoint (immos sorties non importées).';
+  setStatut(msg+' — rechargement…');
+  try{await loadImmoMeta();}catch(e){}
+  setTimeout(function(){setStatut(msg);renderTab(activeTab);},1500);
+}
+
 async function modifierDureeAmort(codeIM){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   var actuelle=dureeAmort(codeIM);
@@ -1783,6 +1838,8 @@ function renderUsers(){
       '<button onclick="lancerSeedRolesSites()" style="padding:8px 14px;background:#F57F17;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Rôles & sites employés</button>'+
       '<button onclick="lancerSeedImmoSites()" style="padding:8px 14px;background:#0277BD;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Sites des immos</button>'+
       '<button onclick="lancerDedupeEmployes()" style="padding:8px 14px;background:#C62828;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">🧹 Nettoyer doublons</button>'+
+      '<button onclick="enrichirImmosEBP()" style="padding:8px 14px;background:#6A1B9A;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">📥 Enrichir immos (EBP)</button>'+
+      '<div id="ebp-statut" style="flex-basis:100%;font-size:12px;color:var(--grey);margin-top:6px"></div>'+
       '</div></details>';
   }
 
