@@ -535,8 +535,19 @@ var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
 // Super-administrateurs PERMANENTS : gardent tous les droits quel que soit leur rôle SharePoint.
 // Ne peuvent être rétrogradés depuis l'interface — seule une modification du code le permettrait.
 var SUPER_ADMIN_CODES=['AIWI'];
-function estAdmin(code){return ADMINS_CODES.includes(code)||SUPER_ADMIN_CODES.includes(code);}
+function estAdmin(code){
+  if(ADMINS_CODES.includes(code)||SUPER_ADMIN_CODES.includes(code))return true;
+  // (B) le RÔLE Admin donne aussi les pouvoirs admin, pas seulement les codes en dur
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='admin';
+}
 function estSuperAdmin(code){return SUPER_ADMIN_CODES.includes(code);}
+// (C) Garants du dépôt : seuls habilités à valider un retour (attester de l'état)
+function estGarant(code){
+  if(estSuperAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='admin'||role==='logistique'||role==='logistique_mayotte';
+}
 // Peut modifier l'emplacement d'une immo : admins + Gestionnaire Dépôt RUN (Logistique)
 function peutEditerEmplacement(code){
   if(estAdmin(code))return true;
@@ -580,11 +591,12 @@ async function peuplerSelecteurIdentite(){
   sel.innerHTML='<option value="">⏳ Chargement…</option>';
   sel.disabled=true;
   try{ await loadEmployes(); }catch(e){}
-  // Candidats : rôles de niveau gestion (peuvent agir depuis le dashboard)
+  // Candidats : rôles de niveau gestion (peuvent agir depuis le dashboard). Les employés INACTIFS sont exclus.
   var candidats=employesList.filter(function(e){
+    if(e.Actif===false)return false; // employé sorti de l'entreprise → pas de connexion
     if(ADMINS_CODES.includes(e.Code))return true;
     var role=(e.Droits||e.role||'').toLowerCase().replace(/[\s-]+/g,'_');
-    if(role==='admin'||role==='logistique'||role==='logistique_mayotte'||role==='ra')return true;
+    if(role==='admin'||role==='logistique'||role==='logistique_mayotte'||role==='ra'||role==='encadrement')return true;
     var poste=(e.Poste||'').toLowerCase();
     return poste.includes('encadr')||poste.includes('atelier');
   });
@@ -751,21 +763,18 @@ function closeMobileMenu(){
 }
 
 function goTab(name){
-  // Autoriser la navigation même si d est en cours de chargement
-  if(!d&&name!=='vue-generale'){
-    // Afficher un message de chargement
-    document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
-    var pane=document.getElementById('pane-'+name);
-    if(pane){pane.classList.add('active');pane.innerHTML='<p style="text-align:center;padding:40px;color:var(--grey)">Chargement en cours...</p>';}
-    document.querySelectorAll('.nav-item').forEach(function(i){i.classList.toggle('active',i.dataset.tab===name);});
-    document.querySelectorAll('.bnav-item').forEach(function(i){i.classList.toggle('active',i.dataset&&i.dataset.tab===name);});
-    return;
-  }
   activeTab=name;
   document.querySelectorAll('.nav-item').forEach(function(i){i.classList.toggle('active',i.dataset.tab===name);});
+  document.querySelectorAll('.bnav-item').forEach(function(i){i.classList.toggle('active',i.dataset&&i.dataset.tab===name);});
   document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
   var pane=document.getElementById('pane-'+name);
   if(pane)pane.classList.add('active');
+  if(!d&&name!=='vue-generale'){
+    // Données pas encore chargées : indicateur NON destructif (ne pas écraser la structure du panneau,
+    // sinon tb-depot & co. disparaissent et le rendu ultérieur plante). Le rendu se fera quand d sera prêt.
+    if(typeof toast==='function')toast('Chargement des données…','info',1500);
+    return;
+  }
   renderTab(name);
 }
 
@@ -819,10 +828,10 @@ async function loadAll(){
     });
     d.stats.au_depot=d.au_depot.length;
     d.stats.total_mouvementes=d.inventory.length;
-    // Catégories pour select dépôt
+    // Catégories pour select dépôt (on repart de zéro pour éviter les doublons si loadAll est rappelé)
     var cats={};Object.keys(im).forEach(function(k){cats[im[k].Categorie||'Sans catégorie']=true;});
     var catSel=document.getElementById('depot-cat');
-    if(catSel)Object.keys(cats).sort().forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);});
+    if(catSel){catSel.innerHTML='<option value="">Toutes catégories</option>';Object.keys(cats).sort().forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);});}
     updateBadges();
     renderVueGenerale();
     document.getElementById('loading-screen').style.display='none';
@@ -1006,6 +1015,8 @@ function sortDepot(key){
 }
 function renderDepot(){
   if(!d)return;
+  var tbEl=document.getElementById('tb-depot');
+  if(!tbEl)return; // panneau pas encore prêt (évite le crash si appelé trop tôt)
   var q=(document.getElementById('depot-q')||{}).value||'';
   var fc=(document.getElementById('depot-cat')||{}).value||'';
   var fe=(document.getElementById('depot-etat')||{}).value||'';
@@ -1024,7 +1035,7 @@ function renderDepot(){
   var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
   var affiche=nb===0?data:data.slice(0,nb);
   var cntEl=document.getElementById('cnt-depot');if(cntEl)cntEl.textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
-  document.getElementById('tb-depot').innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
+  tbEl.innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
     affiche.map(function(i){
       var l=getLib(i.code_im);var c=getCat(i.code_im);
       var mt=immoMeta[i.code_im]||{};
@@ -1072,7 +1083,8 @@ async function ouvrirAjoutImmo(){
     '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte d\'immobilisation</label><input id="ai-compte-immo" style="'+addFieldStyle+'" placeholder="Ex: 21541"></div>'+
     '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="ai-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div></div>'+
     '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte d\'amortissement</label><input id="ai-compte-amort" style="'+addFieldStyle+'" placeholder="Ex: 28154"></div>'+
-    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte de dotation</label><input id="ai-compte-dot" style="'+addFieldStyle+'" placeholder="Ex: 68112"></div></div>';
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte de dotation</label><input id="ai-compte-dot" style="'+addFieldStyle+'" placeholder="Ex: 68112"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Durée d\'amortissement (ans)</label><input id="ai-duree" type="number" min="0" step="1" style="'+addFieldStyle+'" placeholder="Vide = durée par défaut de la catégorie"></div>';
   document.getElementById('add-overlay').style.display='flex';
   document.getElementById('add-confirm-btn').onclick=enregistrerImmo;
   // Charger le prochain code IM
@@ -1118,6 +1130,7 @@ async function enregistrerImmo(){
     compte_immobilisation:document.getElementById('ai-compte-immo').value.trim(),
     compte_amortissement:document.getElementById('ai-compte-amort').value.trim(),
     compte_dotation:document.getElementById('ai-compte-dot').value.trim(),
+    duree_amort:document.getElementById('ai-duree').value.trim(),
     site:document.getElementById('ai-site').value
   };
   try{
@@ -1141,8 +1154,8 @@ function ouvrirAjoutEmploye(){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   document.getElementById('add-titre').textContent='➕ Ajouter un employé';
   document.getElementById('add-msg').textContent='';
-  var roles=['Ouvrier','Ouvrier_Specialise','CT','CT_Specialise','RA','Logistique','Logistique_Mayotte','Admin'];
-  var roleOpts=roles.map(function(r){return'<option value="'+r+'">'+r.replace('_',' ')+'</option>';}).join('');
+  var roles=['Ouvrier','Ouvrier_Specialise','CT','CT_Specialise','RA','Logistique','Logistique_Mayotte','Admin','Encadrement'];
+  var roleOpts=roles.map(function(r){return'<option value="'+r+'">'+(r==='Encadrement'?'Encadrement (view-only)':r.replace('_',' '))+'</option>';}).join('');
   document.getElementById('add-form').innerHTML=
     '<div class="frow"><label style="'+addLabelStyle+'">Code employé *</label><div style="display:flex;gap:8px;align-items:center"><input id="ae-code" style="'+addFieldStyle+'" placeholder="Ex: ROJY" maxlength="6"><span id="ae-code-check" style="font-size:18px"></span></div><p style="font-size:11px;color:var(--grey);margin-top:2px">Code unique (souvent 4 lettres). Un doublon est bloqué.</p></div>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Nom complet *</label><input id="ae-nom" style="'+addFieldStyle+'" placeholder="Ex: ROIX Johnny"></div>'+
@@ -1257,12 +1270,16 @@ function renderTransferts(){
     html+='<td><span class="badge '+(ret?'bret':'batt')+'">'+h+'h</span></td>';
     html+='<td style="font-size:11px;color:var(--grey)">'+(t.note||'—')+'</td>';
     html+='<td style="white-space:nowrap;min-width:200px">';
+    if(estGarant(ADMIN_SESSION.code)){
     html+='<select class="sel-etat-t" style="font-size:11px;padding:2px 6px;border:1px solid #ddd;border-radius:6px;margin-right:4px;margin-bottom:4px">';
     html+='<option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option>';
     html+='</select><br>';
     html+='<button class="btn-val-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">✅ Valider</button>';
     html+='<button class="btn-ann-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" style="padding:4px 8px;background:#FFEBEE;color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">❌ Annuler</button>';
     html+='<button class="btn-mod-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:#E3F2FD;color:var(--blue);border:1px solid var(--blue);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">✏️ Modifier</button>';
+    }else{
+      html+='<span style="font-size:11px;color:var(--grey);font-style:italic">🔒 Validation réservée aux garants du dépôt</span>';
+    }
     html+='</td></tr>';
   });
   document.getElementById('tb-transf').innerHTML=html;
@@ -1538,6 +1555,64 @@ function badgeSiteD(site){var s=normSiteD(site);var bg=s==='Mayotte'?'#E0F2F1':'
 function siteImmoDash(codeIM){return normSiteD(immoMeta[codeIM]&&immoMeta[codeIM].site);}
 // Petit badge drapeau seul (sans texte) pour les tableaux denses
 function drapImmoDash(codeIM){return '<span title="'+siteImmoDash(codeIM)+'" style="display:inline-flex;vertical-align:middle;margin-left:4px">'+drapeauSiteD(siteImmoDash(codeIM))+'</span>';}
+
+// ══════════════ AMORTISSEMENT LINÉAIRE & VALEUR NETTE COMPTABLE ══════════════
+// Durées d'amortissement par défaut selon le compte comptable (années). Modifiable par immo via colonne Duree_Amortissement.
+var DUREES_CATEGORIE={'21541':5,'21542':5,'21543':7,'21544':7,'2154':7,'2181':7,'2182':5,'2183':3,'2184':10,'205':1,'2718':0,'2752':0};
+var DUREE_DEFAUT=5; // défaut si compte inconnu
+
+// Durée d'amortissement retenue pour une immo (priorité : saisie immo > catégorie > défaut)
+function dureeAmort(codeIM){
+  var m=immoMeta[codeIM]||{};
+  if(m.duree_amort&&m.duree_amort>0)return m.duree_amort;
+  var compte=(m.compte||(im[codeIM]&&im[codeIM].Compte)||'').toString().trim();
+  if(compte&&DUREES_CATEGORIE[compte]!==undefined)return DUREES_CATEGORIE[compte];
+  return DUREE_DEFAUT;
+}
+
+// Calcul d'amortissement linéaire. Renvoie {valeur, duree, annuite, cumul, vnc, ans, amortissable}
+function calcAmort(codeIM){
+  var m=immoMeta[codeIM]||{};
+  var valeur=m.valeur_achat||0;
+  var duree=dureeAmort(codeIM);
+  // Date de référence : mise en service si dispo, sinon date d'achat
+  var dateRef=m.date_mise_service||m.date_achat||'';
+  var res={valeur:valeur,duree:duree,annuite:0,cumul:0,vnc:valeur,ans:0,amortissable:(duree>0&&valeur>0)};
+  if(!res.amortissable){res.vnc=valeur;return res;} // durée 0 (ex: immos financières) → non amortissable
+  var d=new Date(dateRef);
+  if(isNaN(d.getTime())){res.vnc=valeur;return res;}
+  var now=new Date();
+  var ans=(now-d)/(365.25*24*3600*1000);
+  if(ans<0)ans=0;
+  res.ans=ans;
+  res.annuite=valeur/duree;
+  res.cumul=Math.min(valeur,res.annuite*ans);
+  res.vnc=Math.max(0,valeur-res.cumul);
+  return res;
+}
+function eur(n){return (Math.round(n)).toLocaleString('fr-FR')+' €';}
+function pctAmort(codeIM){var a=calcAmort(codeIM);if(!a.amortissable||a.valeur<=0)return 0;return Math.min(100,Math.round(a.cumul/a.valeur*100));}
+
+// Modifier la durée d'amortissement d'une immo (admins)
+async function modifierDureeAmort(codeIM){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  var actuelle=dureeAmort(codeIM);
+  var saisie=prompt('Durée d\'amortissement de '+codeIM+' (en années) :\n\n'+
+    'Laisser vide = durée par défaut de la catégorie.\n'+
+    '0 = non amortissable.',actuelle);
+  if(saisie===null)return; // annulé
+  var duree=saisie.trim()===''?0:parseInt(saisie,10);
+  if(isNaN(duree)||duree<0){alert('Valeur invalide.');return;}
+  try{
+    var r=await fetch(W+'?action=maj_duree_amort',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:codeIM,duree:duree})});
+    var res=await r.json();
+    if(res.success){
+      if(!immoMeta[codeIM])immoMeta[codeIM]={};
+      immoMeta[codeIM].duree_amort=duree;
+      chargerFicheImmo(codeIM); // recharge la fiche pour rafraîchir la VNC
+    }else{alert('Échec : '+(res.error||'inconnu'));}
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
 // État des filtres site par onglet (Réunion/Mayotte/'' = tous)
 var SITE_FILTERS={circulation:'',depot:'',historique:'',transferts:'',reservations:'',maintenance:'',alertes:''};
 function setSiteFilter(tab,val){SITE_FILTERS[tab]=val;renderTab(tab);}
@@ -1562,6 +1637,7 @@ function roleUtilisateur(code,poste,droits){
   if(dr==='ct'||dr==='conducteur')return{label:'Conducteur de travaux',color:'#E87722',rank:2};
   if(dr==='ouvrier_specialise'||dr==='ouvrier_spécialisé'||dr==='os')return{label:'Ouvrier spécialisé',color:'#8E24AA',rank:3};
   if(dr==='ouvrier')return{label:'Ouvrier',color:'#27AE60',rank:4};
+  if(dr==='encadrement')return{label:'Encadrement',color:'#1A3A6B',rank:0};
   // 2. Sinon dérivation automatique (rétrocompatibilité)
   if(estAdmin(code))return{label:'Administrateur',color:'#1A3A6B',rank:0};
   if(CT_CODES.includes(code))return{label:'Conducteur de travaux',color:'#E87722',rank:2};
@@ -1572,7 +1648,7 @@ function roleUtilisateur(code,poste,droits){
 }
 // Valeur brute du champ Droits (pour pré-sélectionner le menu déroulant d'édition)
 // Valeurs de rôle "propres" gérées par le dashboard (distinctes des anciennes valeurs Code_CT organisationnelles type "CT Mayotte")
-var ROLES_STANDARD={'admin':'Admin','logistique':'Logistique','logistique_mayotte':'Logistique_Mayotte','ra':'RA','responsable_affaires':'RA','responsable_d_affaires':'RA','ct_specialise':'CT_Specialise','ct_spécialisé':'CT_Specialise','ct':'CT','conducteur':'CT','ouvrier_specialise':'Ouvrier_Specialise','ouvrier_spécialisé':'Ouvrier_Specialise','os':'Ouvrier_Specialise','ouvrier':'Ouvrier'};
+var ROLES_STANDARD={'admin':'Admin','logistique':'Logistique','logistique_mayotte':'Logistique_Mayotte','ra':'RA','responsable_affaires':'RA','responsable_d_affaires':'RA','ct_specialise':'CT_Specialise','ct_spécialisé':'CT_Specialise','ct':'CT','conducteur':'CT','ouvrier_specialise':'Ouvrier_Specialise','ouvrier_spécialisé':'Ouvrier_Specialise','os':'Ouvrier_Specialise','ouvrier':'Ouvrier','encadrement':'Encadrement'};
 function estRoleStandard(droits){
   return ROLES_STANDARD.hasOwnProperty((droits||'').trim().toLowerCase().replace(/[\s-]+/g,'_'));
 }
@@ -1675,8 +1751,8 @@ function filterUsers(){
   var titleEl=document.getElementById('users-title');
   if(titleEl)titleEl.textContent='👥 Tous les utilisateurs ('+filtered.length+')';
   tbody.innerHTML=filtered.map(function(u){
-    var roles=['Admin','Logistique','Logistique_Mayotte','RA','CT_Specialise','CT','Ouvrier_Specialise','Ouvrier'];
-    var labels={'Admin':'Administrateur','Logistique':'Gestionnaire dépôt RUN','Logistique_Mayotte':'Logistique Mayotte','RA':'Responsable d’affaires','CT_Specialise':'CT spécialisé','CT':'Conducteur travaux','Ouvrier_Specialise':'Ouvrier spécialisé','Ouvrier':'Ouvrier'};
+    var roles=['Admin','Logistique','Logistique_Mayotte','RA','CT_Specialise','CT','Ouvrier_Specialise','Ouvrier','Encadrement'];
+    var labels={'Admin':'Administrateur','Logistique':'Gestionnaire dépôt RUN','Logistique_Mayotte':'Logistique Mayotte','RA':'Responsable d’affaires','CT_Specialise':'CT spécialisé','CT':'Conducteur travaux','Ouvrier_Specialise':'Ouvrier spécialisé','Ouvrier':'Ouvrier','Encadrement':'Encadrement (view-only)'};
     var opts=roles.map(function(r){return'<option value="'+r+'"'+(u.droits===r?' selected':'')+'>'+labels[r]+'</option>';}).join('');
     var siteOpts='<option value="Reunion"'+(u.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(u.site==='Mayotte'?' selected':'')+'>Mayotte</option>';
     return '<tr'+(u.actif?'':' style="opacity:.5;background:#FAFAFA"')+'>'+
@@ -1775,7 +1851,7 @@ async function resetPasswordUtilisateur(code){
 
 async function majActifUtilisateur(code,actif,itemId){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier ce statut.');filterUsers();return;}
-  if(!confirm((actif?'Réactiver':'Désactiver')+' '+nomEmploye(code)+' ?'+(actif?'':'\n\nUn employé inactif ne pourra plus réserver ni recevoir de matériel.')))return;
+  if(!confirm((actif?'Réactiver ':'Sortir ')+nomEmploye(code)+(actif?' ?':' de l\'entreprise ?')+(actif?'':'\n\nIl passera en INACTIF : plus de connexion, ni réservation, ni réception de matériel.\nTout son historique de mouvements est conservé.')))return;
   try{
     var body={code:code,actif:actif};if(itemId)body.item_id=itemId;
     var r=await fetch(W+'?action=maj_actif',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -1841,6 +1917,37 @@ function renderAnalyse(){
   var sp=pane?pane.querySelector('.loading-placeholder'):null;if(sp&&pane)pane.removeChild(sp);
   var all=d.all_movements||[];var inv=d.inventory||[];var now=Date.now();
   var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">';
+
+  // ── Valeur du parc & amortissement (VNC) ─────────────────────────────────
+  var vAchat={Reunion:0,Mayotte:0},vVNC={Reunion:0,Mayotte:0},nbAmort={Reunion:0,Mayotte:0};
+  Object.keys(im).forEach(function(code){
+    var mt=immoMeta[code];if(!mt||!mt.valeur_achat)return;
+    var s=siteImmoDash(code);
+    vAchat[s]+=mt.valeur_achat;
+    var a=calcAmort(code);
+    vVNC[s]+=a.vnc;
+    if(a.amortissable)nbAmort[s]++;
+  });
+  var totAchat=vAchat.Reunion+vAchat.Mayotte, totVNC=vVNC.Reunion+vVNC.Mayotte;
+  var totCumul=totAchat-totVNC;
+  var pctGlobal=totAchat>0?Math.round(totCumul/totAchat*100):0;
+  html+='<div class="card" style="grid-column:1/-1"><div class="card-head"><h3>💰 Valeur du parc & amortissement</h3></div><div style="padding:14px">';
+  html+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">';
+  html+='<div><div style="font-size:11px;color:var(--grey)">Valeur d\'achat totale</div><div style="font-size:24px;font-weight:800;color:var(--blue)">'+eur(totAchat)+'</div></div>';
+  html+='<div><div style="font-size:11px;color:var(--grey)">Valeur nette comptable (VNC)</div><div style="font-size:24px;font-weight:800;color:var(--green)">'+eur(totVNC)+'</div></div>';
+  html+='<div><div style="font-size:11px;color:var(--grey)">Amortissements cumulés</div><div style="font-size:24px;font-weight:800;color:var(--grey)">'+eur(totCumul)+'</div></div>';
+  html+='<div><div style="font-size:11px;color:var(--grey)">Amorti globalement</div><div style="font-size:24px;font-weight:800;color:var(--orange)">'+pctGlobal+'%</div></div>';
+  html+='</div>';
+  html+='<div style="height:10px;background:#E0E0E0;border-radius:5px;overflow:hidden;margin-bottom:12px"><div style="height:100%;width:'+pctGlobal+'%;background:linear-gradient(90deg,var(--green),var(--orange))"></div></div>';
+  // Détail par site
+  html+='<table style="width:100%;font-size:13px"><thead><tr style="color:var(--grey);text-align:left"><th style="padding:4px">Site</th><th style="padding:4px">Immos amort.</th><th style="padding:4px">Valeur achat</th><th style="padding:4px">VNC</th><th style="padding:4px">Amorti</th></tr></thead><tbody>';
+  ['Reunion','Mayotte'].forEach(function(s){
+    var pctS=vAchat[s]>0?Math.round((vAchat[s]-vVNC[s])/vAchat[s]*100):0;
+    html+='<tr><td style="padding:4px">'+drapeauSiteD(s)+' '+(s==='Reunion'?'La Réunion':'Mayotte')+'</td><td style="padding:4px">'+nbAmort[s]+'</td><td style="padding:4px">'+eur(vAchat[s])+'</td><td style="padding:4px;font-weight:700;color:var(--green)">'+eur(vVNC[s])+'</td><td style="padding:4px">'+pctS+'%</td></tr>';
+  });
+  html+='</tbody></table>';
+  html+='<p style="font-size:11px;color:var(--grey);margin-top:8px">Amortissement linéaire, calculé depuis la date de mise en service (ou d\'achat), selon la durée propre à chaque immo ou celle de sa catégorie.</p>';
+  html+='</div></div>';
 
   // ── Synthèse globale ─────────────────────────────────────────────────────
   var nbRetours=all.filter(function(m){return m.type_mouvement==='Retour';}).length;
@@ -2056,6 +2163,29 @@ async function chargerFicheImmo(codeIM){
       var coutRep2=0;(d.all_movements||[]).filter(function(m){return m.code_im===codeIM&&m.type_mouvement==='Réparation';}).forEach(function(m){var n=m.note||'';var cm=n.match(/Coût réel\s*:\s*([\d.,]+)/i);if(cm){var c=parseFloat(cm[1].replace(',','.'));if(!isNaN(c))coutRep2+=c;}});
       if(coutRep2>0&&mt2.valeur_achat>0){var ratio2=Math.round(coutRep2/mt2.valeur_achat*100);var ratioColor=ratio2>=100?'var(--red)':ratio2>=50?'var(--orange)':'var(--green)';html+='<div style="background:#FFF3E0;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Coût réparations :</span> <strong style="color:'+ratioColor+'">'+coutRep2.toFixed(0)+'€ ('+ratio2+'% valeur achat)</strong></div>';}
       html+='</div>';
+    }
+    // Amortissement linéaire & valeur nette comptable
+    if(mt2.valeur_achat>0){
+      var am=calcAmort(codeIM);
+      if(am.amortissable){
+        var pct=Math.min(100,Math.round(am.cumul/am.valeur*100));
+        var vncColor=pct>=100?'var(--grey)':pct>=70?'var(--orange)':'var(--green)';
+        html+='<div style="background:#F3E5F5;border-radius:10px;padding:12px 14px;margin-bottom:12px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'+
+            '<div style="font-size:13px;font-weight:700;color:#6A1B9A">📉 Amortissement linéaire</div>'+
+            '<div style="font-size:11px;color:var(--grey)">Durée : <strong>'+am.duree+' ans</strong>'+(estAdmin(ADMIN_SESSION.code)?' <a href="#" onclick="modifierDureeAmort(\''+codeIM+'\');return false;" style="color:var(--blue);font-size:11px">modifier</a>':'')+'</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">'+
+            '<div><span style="font-size:11px;color:var(--grey)">Valeur nette comptable</span><br><strong style="font-size:18px;color:'+vncColor+'">'+eur(am.vnc)+'</strong></div>'+
+            '<div><span style="font-size:11px;color:var(--grey)">Amorti</span><br><strong style="font-size:15px;color:'+vncColor+'">'+pct+'%</strong></div>'+
+            '<div><span style="font-size:11px;color:var(--grey)">Annuité</span><br><strong style="font-size:15px">'+eur(am.annuite)+'/an</strong></div>'+
+            '<div><span style="font-size:11px;color:var(--grey)">Cumul amorti</span><br><strong style="font-size:15px;color:var(--grey)">'+eur(am.cumul)+'</strong></div>'+
+          '</div>'+
+          '<div style="margin-top:8px;height:8px;background:#E0E0E0;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+vncColor+'"></div></div>'+
+        '</div>';
+      }else{
+        html+='<div style="background:#F5F5F5;border-radius:8px;padding:8px 14px;font-size:12px;color:var(--grey);margin-bottom:12px">Immobilisation non amortissable'+(estAdmin(ADMIN_SESSION.code)?' — <a href="#" onclick="modifierDureeAmort(\''+codeIM+'\');return false;" style="color:var(--blue)">définir une durée</a>':'')+'</div>';
+      }
     }
     html+=locHtml;
     if(immoInfo.N_Serie)html+='<p style="font-size:13px;color:var(--grey);margin-bottom:6px">N° série : <strong>'+immoInfo.N_Serie+'</strong></p>';
