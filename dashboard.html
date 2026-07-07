@@ -1102,9 +1102,9 @@ async function ouvrirAjoutImmo(){
     '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date mise en service</label><input id="ai-date-service" type="date" style="'+addFieldStyle+'"></div></div>'+
     '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte d\'immobilisation</label><input id="ai-compte-immo" style="'+addFieldStyle+'" placeholder="Ex: 21541"></div>'+
     '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="ai-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div></div>'+
-    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte d\'amortissement</label><input id="ai-compte-amort" style="'+addFieldStyle+'" placeholder="Ex: 28154"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte d\'amortissement</label><input id="ai-compte-amort" style="'+addFieldStyle+'" placeholder="Ex: 281543"></div>'+
     '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Compte de dotation</label><input id="ai-compte-dot" style="'+addFieldStyle+'" placeholder="Ex: 68112"></div></div>'+
-    '<div class="frow"><label style="'+addLabelStyle+'">Durée d\'amortissement (ans)</label><input id="ai-duree" type="number" min="0" step="1" style="'+addFieldStyle+'" placeholder="Vide = durée par défaut de la catégorie"></div>';
+    '<div style="font-size:11px;color:var(--grey);margin:-4px 0 8px">La durée d\'amortissement est déduite automatiquement du compte d\'amortissement.</div>';
   document.getElementById('add-overlay').style.display='flex';
   document.getElementById('add-confirm-btn').onclick=enregistrerImmo;
   // Charger le prochain code IM
@@ -1150,7 +1150,6 @@ async function enregistrerImmo(){
     compte_immobilisation:document.getElementById('ai-compte-immo').value.trim(),
     compte_amortissement:document.getElementById('ai-compte-amort').value.trim(),
     compte_dotation:document.getElementById('ai-compte-dot').value.trim(),
-    duree_amort:document.getElementById('ai-duree').value.trim(),
     site:document.getElementById('ai-site').value
   };
   try{
@@ -1655,17 +1654,19 @@ function drapImmoDash(codeIM){return '<span title="'+siteImmoDash(codeIM)+'" sty
 
 // ══════════════ AMORTISSEMENT LINÉAIRE & VALEUR NETTE COMPTABLE ══════════════
 // Durées d'amortissement par défaut selon le compte comptable (années). Modifiable par immo via colonne Duree_Amortissement.
-var DUREES_CATEGORIE={'21541':5,'21542':5,'21543':7,'21544':7,'2154':7,'2181':7,'2182':5,'2183':3,'2184':10,'205':1,'2718':0,'2752':0};
-var DUREE_DEFAUT=5; // défaut si compte inconnu
+// Durées d'amortissement en MOIS selon le COMPTE D'AMORTISSEMENT (automatique, non modifiable).
+// 0 = non amortissable (cautions 28718/28752).
+var DUREES_AMORT_MOIS={'2805':12,'28154':120,'281541':36,'281542':48,'281543':60,'281544':48,'28181':60,'28182':12,'28183':36,'28184':60,'28315':36,'28718':0,'28752':0};
+var DUREE_DEFAUT_MOIS=60; // 5 ans par défaut si compte d'amortissement inconnu
 
-// Durée d'amortissement retenue pour une immo (priorité : saisie immo > catégorie > défaut)
-function dureeAmort(codeIM){
-  var m=immoMeta[codeIM]||{};
-  if(m.duree_amort&&m.duree_amort>0)return m.duree_amort;
-  var compte=(m.compte||(im[codeIM]&&im[codeIM].Compte)||'').toString().trim();
-  if(compte&&DUREES_CATEGORIE[compte]!==undefined)return DUREES_CATEGORIE[compte];
-  return DUREE_DEFAUT;
+// Durée d'amortissement en MOIS, déduite du compte d'amortissement de l'immo
+function dureeAmortMois(codeIM){
+  var ca=((immoMeta[codeIM]||{}).compte_amort||'').toString().trim();
+  if(ca&&DUREES_AMORT_MOIS[ca]!==undefined)return DUREES_AMORT_MOIS[ca];
+  return DUREE_DEFAUT_MOIS;
 }
+// Durée en ANNÉES (0 = non amortissable) — utilisée par le calcul
+function dureeAmort(codeIM){return dureeAmortMois(codeIM)/12;}
 
 // Calcul d'amortissement linéaire. Renvoie {valeur, duree, annuite, cumul, vnc, ans, amortissable}
 function calcAmort(codeIM){
@@ -1821,25 +1822,6 @@ async function enrichirImmosEBP(){
   setTimeout(function(){setStatut(msg);renderTab(activeTab);},1500);
 }
 
-async function modifierDureeAmort(codeIM){
-  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  var actuelle=dureeAmort(codeIM);
-  var saisie=prompt('Durée d\'amortissement de '+codeIM+' (en années) :\n\n'+
-    'Laisser vide = durée par défaut de la catégorie.\n'+
-    '0 = non amortissable.',actuelle);
-  if(saisie===null)return; // annulé
-  var duree=saisie.trim()===''?0:parseInt(saisie,10);
-  if(isNaN(duree)||duree<0){alert('Valeur invalide.');return;}
-  try{
-    var r=await fetch(W+'?action=maj_duree_amort',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:codeIM,duree:duree})});
-    var res=await r.json();
-    if(res.success){
-      if(!immoMeta[codeIM])immoMeta[codeIM]={};
-      immoMeta[codeIM].duree_amort=duree;
-      chargerFicheImmo(codeIM); // recharge la fiche pour rafraîchir la VNC
-    }else{alert('Échec : '+(res.error||'inconnu'));}
-  }catch(e){alert('Erreur réseau : '+e.message);}
-}
 // État des filtres site par onglet (Réunion/Mayotte/'' = tous)
 var SITE_FILTERS={circulation:'',depot:'',historique:'',transferts:'',reservations:'',maintenance:'',alertes:''};
 function setSiteFilter(tab,val){SITE_FILTERS[tab]=val;renderTab(tab);}
@@ -2175,7 +2157,7 @@ function renderAnalyse(){
     html+='<tr><td style="padding:4px">'+drapeauSiteD(s)+' '+(s==='Reunion'?'La Réunion':'Mayotte')+'</td><td style="padding:4px">'+nbAmort[s]+'</td><td style="padding:4px">'+eur(vAchat[s])+'</td><td style="padding:4px;font-weight:700;color:var(--green)">'+eur(vVNC[s])+'</td><td style="padding:4px">'+pctS+'%</td></tr>';
   });
   html+='</tbody></table>';
-  html+='<p style="font-size:11px;color:var(--grey);margin-top:8px">Amortissement linéaire, calculé depuis la date de mise en service (ou d\'achat), selon la durée propre à chaque immo ou celle de sa catégorie.</p>';
+  html+='<p style="font-size:11px;color:var(--grey);margin-top:8px">Amortissement linéaire, calculé depuis la date de mise en service (ou d\'achat), selon la durée déduite automatiquement du compte d\'amortissement de chaque immo.</p>';
   html+='</div></div>';
 
   // ── Synthèse globale ─────────────────────────────────────────────────────
@@ -2418,7 +2400,7 @@ async function chargerFicheImmo(codeIM){
         html+='<div style="background:#F3E5F5;border-radius:10px;padding:12px 14px;margin-bottom:12px">'+
           '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'+
             '<div style="font-size:13px;font-weight:700;color:#6A1B9A">📉 Amortissement linéaire</div>'+
-            '<div style="font-size:11px;color:var(--grey)">Durée : <strong>'+am.duree+' ans</strong>'+(estAdmin(ADMIN_SESSION.code)?' <a href="#" onclick="modifierDureeAmort(\''+codeIM+'\');return false;" style="color:var(--blue);font-size:11px">modifier</a>':'')+'</div>'+
+            '<div style="font-size:11px;color:var(--grey)">Durée : <strong>'+(dureeAmortMois(codeIM)%12===0?(dureeAmortMois(codeIM)/12)+' an'+(dureeAmortMois(codeIM)>12?'s':''):dureeAmortMois(codeIM)+' mois')+'</strong> <span style="color:#aaa">(compte '+((immoMeta[codeIM]||{}).compte_amort||'?')+')</span></div>'+
           '</div>'+
           '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">'+
             '<div><span style="font-size:11px;color:var(--grey)">Valeur nette comptable</span><br><strong style="font-size:18px;color:'+vncColor+'">'+eur(am.vnc)+'</strong></div>'+
@@ -2429,7 +2411,7 @@ async function chargerFicheImmo(codeIM){
           '<div style="margin-top:8px;height:8px;background:#E0E0E0;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+vncColor+'"></div></div>'+
         '</div>';
       }else{
-        html+='<div style="background:#F5F5F5;border-radius:8px;padding:8px 14px;font-size:12px;color:var(--grey);margin-bottom:12px">Immobilisation non amortissable'+(estAdmin(ADMIN_SESSION.code)?' — <a href="#" onclick="modifierDureeAmort(\''+codeIM+'\');return false;" style="color:var(--blue)">définir une durée</a>':'')+'</div>';
+        html+='<div style="background:#F5F5F5;border-radius:8px;padding:8px 14px;font-size:12px;color:var(--grey);margin-bottom:12px">Immobilisation non amortissable (caution — compte '+((immoMeta[codeIM]||{}).compte_amort||'?')+')</div>';
       }
     }
     html+=locHtml;
