@@ -336,6 +336,7 @@ tr:hover td{background:#FAFBFC;}
         <input type="text" id="circ-q" placeholder="Immo, employé..." oninput="renderCirc()">
         <select id="circ-etat" onchange="renderCirc()"><option value="">Tous états</option><option>Neuf</option><option>Bon état</option><option>Usé</option><option>Abîmé</option><option>Hors service</option></select>
         <select id="circ-site" onchange="setSiteFilter('circulation',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
+        <button class="filter-btn" onclick="resetFiltresCirc()">🔄 Réinitialiser</button>
       </div>
       <div class="card"><div class="card-head"><h3>Matériel en circulation</h3><span class="card-cnt" id="cnt-circ"></span></div><div class="det-grid" id="dg-circ" style="padding:12px"></div></div>
     </div>
@@ -350,6 +351,7 @@ tr:hover td{background:#FAFBFC;}
         <select id="depot-nb" onchange="renderDepot()" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
           <option value="50">50 max</option><option value="100">100 max</option><option value="200">200 max</option><option value="0">Tous</option>
         </select>
+        <button class="filter-btn" onclick="resetFiltresDepot()">🔄 Réinitialiser</button>
       </div>
       <div class="card"><div class="card-head"><h3>Au dépôt</h3><span class="card-cnt" id="cnt-depot"></span></div>
         <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
@@ -384,6 +386,7 @@ tr:hover td{background:#FAFBFC;}
             <option value="0">Tous</option>
           </select>
           <button class="filter-btn" onclick="filterHist()">Filtrer</button>
+          <button class="filter-btn" onclick="resetFiltresHist()">🔄 Réinitialiser</button>
         </div>
         <div class="tbl-wrap"><table><thead><tr><th>Date (UTC+4)</th><th>Code IM</th><th>Libellé</th><th>Type</th><th>Employé</th><th>Donneur / Validé par</th><th>État</th><th>Note</th></tr></thead><tbody id="tb-hist"></tbody></table></div>
       </div>
@@ -394,7 +397,7 @@ tr:hover td{background:#FAFBFC;}
       <div class="card">
         <div class="card-head"><h3>Transferts en attente de validation</h3><span class="card-cnt" id="cnt-transf"></span></div>
         <p style="padding:8px 18px;font-size:13px;color:var(--grey);border-bottom:1px solid #f0f0f0">Valider ici la réception d'un matériel depuis le dashboard, sans scanner.</p>
-        <div style="padding:8px 18px"><select id="transf-site" onchange="setSiteFilter('transferts',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div>
+        <div style="padding:8px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="transf-site" onchange="setSiteFilter('transferts',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select><button class="filter-btn" onclick="resetFiltresTransf()">🔄 Réinitialiser</button></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Donneur</th><th>Receveur</th><th>État déclaré</th><th>Attente</th><th>Note</th><th>Action</th></tr></thead><tbody id="tb-transf"></tbody></table></div>
       </div>
     </div>
@@ -413,6 +416,7 @@ tr:hover td{background:#FAFBFC;}
           <option value="Annulee">Annulée</option>
         </select>
         <select id="resa-site" onchange="setSiteFilter('reservations',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
+        <button class="filter-btn" onclick="resetFiltresResa()">🔄 Réinitialiser</button>
       </div>
       <div id="resa-stats"></div>
       <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>Calendrier — 6 semaines</h3></div><div class="gantt-wrap" id="resa-gantt" style="padding:14px"></div></div>
@@ -435,6 +439,7 @@ tr:hover td{background:#FAFBFC;}
             <option value="avec_photos">Avec photos</option>
           </select>
           <select id="docs-site" onchange="renderDocs()"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
+          <button class="filter-btn" onclick="resetFiltresDocs()">🔄 Réinitialiser</button>
         </div>
         <div class="card"><div class="card-head"><h3>Suivi des documents</h3><span class="card-cnt" id="cnt-docs"></span></div>
           <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
@@ -1056,6 +1061,7 @@ async function cloturerCampagneInventaireDash(nom){
 
 async function voirDetailCampagneInventaire(nom){
   invCampagneOuverte=nom;
+  INV_ECART_FILTRES={q:'',site:'',statut:'',sansDesig:false,nb:100};
   await fetchLignesCampagne(nom);
   renderInventaireStock();
 }
@@ -1063,6 +1069,7 @@ async function voirDetailCampagneInventaire(nom){
 function renderDetailCampagneInventaire(nom){
   var c=invCampagnesList.find(function(x){return x.nom===nom;});
   var lignes=invLignesCache[nom]||[];
+  var f=INV_ECART_FILTRES;
   var html='<div class="card"><div class="card-head"><h3>📋 '+nom+'</h3>'+
     '<button onclick="exporterEcartInventaire(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export écart (CSV)</button></div>';
   // Campagne précédente clôturée (par date de début, chronologiquement avant celle-ci)
@@ -1075,22 +1082,55 @@ function renderDetailCampagneInventaire(nom){
       html+='<p class="es" style="padding:16px">Chargement de la comparaison…</p>';
       fetchLignesCampagne(precedente.nom).then(function(){if(invCampagneOuverte===nom)renderInventaireStock();});
     }else{
-      var ecarts=calculerEcartInventaire(lignes,invLignesCache[precedente.nom]);
-      var manquants=ecarts.filter(function(e){return e.statut==='Manquant';}).length;
-      var nouveaux=ecarts.filter(function(e){return e.statut==='Nouveau / Retrouvé';}).length;
-      var ecartsQte=ecarts.filter(function(e){return e.statut==='Écart quantité';}).length;
+      var ecartsBruts=calculerEcartInventaire(lignes,invLignesCache[precedente.nom]);
+      var manquants=ecartsBruts.filter(function(e){return e.statut==='Manquant';}).length;
+      var nouveaux=ecartsBruts.filter(function(e){return e.statut==='Nouveau / Retrouvé';}).length;
+      var ecartsQte=ecartsBruts.filter(function(e){return e.statut==='Écart quantité';}).length;
+      var sansRefBrutes=lignesSansReference(lignes);
       html+='<div style="display:flex;gap:12px;padding:0 14px 12px;flex-wrap:wrap">'+
         '<div style="background:#FFEBEE;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--red)">'+manquants+'</div><div style="font-size:11px;color:var(--grey)">Manquants</div></div>'+
         '<div style="background:#FFF3E0;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--orange)">'+ecartsQte+'</div><div style="font-size:11px;color:var(--grey)">Écarts de quantité</div></div>'+
         '<div style="background:#E8F5E9;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--green)">'+nouveaux+'</div><div style="font-size:11px;color:var(--grey)">Nouveaux / retrouvés</div></div>'+
+        '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)">'+sansRefBrutes.length+'</div><div style="font-size:11px;color:var(--grey)">Sans référence</div></div>'+
       '</div>';
+      // Filtres combinables (recherche + site + statut + sans désignation + nb affiché) + réinitialisation
+      html+='<div class="filters" style="padding:0 14px 12px">'+
+        '<input type="text" id="inv-ecart-q" value="'+(f.q||'').replace(/"/g,'&quot;')+'" oninput="appliquerFiltresInvEcart()" placeholder="Référence, désignation, lieu..." style="flex:1;min-width:180px">'+
+        '<select id="inv-ecart-site" onchange="appliquerFiltresInvEcart()"><option value=""'+(f.site===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(f.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(f.site==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
+        '<select id="inv-ecart-statut" onchange="appliquerFiltresInvEcart()">'+
+          '<option value=""'+(f.statut===''?' selected':'')+'>Tous statuts</option>'+
+          '<option value="Manquant"'+(f.statut==='Manquant'?' selected':'')+'>Manquants</option>'+
+          '<option value="Écart quantité"'+(f.statut==='Écart quantité'?' selected':'')+'>Écarts de quantité</option>'+
+          '<option value="Nouveau / Retrouvé"'+(f.statut==='Nouveau / Retrouvé'?' selected':'')+'>Nouveaux / retrouvés</option>'+
+          '<option value="Confirmé"'+(f.statut==='Confirmé'?' selected':'')+'>Confirmés</option>'+
+        '</select>'+
+        '<select id="inv-ecart-nb" onchange="appliquerFiltresInvEcart()"><option value="100"'+(f.nb===100?' selected':'')+'>100 max</option><option value="300"'+(f.nb===300?' selected':'')+'>300 max</option><option value="1000"'+(f.nb===1000?' selected':'')+'>1000 max</option><option value="0"'+(f.nb===0?' selected':'')+'>Tous</option></select>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--grey)"><input type="checkbox" id="inv-ecart-sans-desig" onchange="appliquerFiltresInvEcart()"'+(f.sansDesig?' checked':'')+'> Sans désignation uniquement</label>'+
+        '<button class="filter-btn" onclick="resetFiltresInvEcart()">🔄 Réinitialiser</button>'+
+      '</div>';
+      var ecarts=filtrerEcarts(ecartsBruts);
+      var ecartsAffiches=f.nb>0?ecarts.slice(0,f.nb):ecarts;
       html+='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Désignation</th><th>Site</th><th>Lieu</th><th>Qté avant</th><th>Qté actuelle</th><th>Écart</th><th>Statut</th></tr></thead><tbody>';
-      ecarts.slice(0,300).forEach(function(e){
+      if(!ecartsAffiches.length)html+='<tr><td colspan="8" class="es">Aucune ligne pour ces filtres.</td></tr>';
+      ecartsAffiches.forEach(function(e){
         var color=e.statut==='Manquant'?'var(--red)':e.statut==='Écart quantité'?'var(--orange)':e.statut==='Nouveau / Retrouvé'?'var(--green)':'var(--grey)';
         html+='<tr><td>'+e.reference+'</td><td style="font-size:12px">'+(e.designation||'—')+'</td><td>'+badgeSiteD(e.site)+'</td><td style="font-size:11px">'+(e.lieu||'—')+'</td><td>'+e.quantite_avant+'</td><td>'+e.quantite_actuelle+'</td><td>'+(e.delta>0?'+':'')+e.delta+'</td><td style="color:'+color+';font-weight:700;font-size:11px">'+e.statut+'</td></tr>';
       });
       html+='</tbody></table></div>';
-      if(ecarts.length>300)html+='<p style="font-size:11px;color:var(--grey);padding:8px 14px">… et '+(ecarts.length-300)+' ligne(s) supplémentaire(s), voir l\'export CSV complet.</p>';
+      html+='<p style="font-size:11px;color:var(--grey);padding:8px 14px">'+ecarts.length+' ligne(s) après filtre'+(ecarts.length>ecartsAffiches.length?' — '+ecartsAffiches.length+' affichée(s), augmenter "max" ou voir l\'export CSV complet pour la totalité':'')+'.</p>';
+      // Lignes sans référence : exclues du rapprochement (voir invGrouper), listées à part, non classées
+      var sansRefFiltrees=filtrerLignesSansRef(sansRefBrutes);
+      html+='<div class="card" style="margin:12px 14px;border-top:3px solid var(--grey)"><div class="card-head"><h3>❓ Sans référence ('+sansRefFiltrees.length+')</h3></div>'+
+        '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Lignes saisies sans référence : ne peuvent pas être rapprochées de manière fiable avec la campagne précédente, à corriger si possible.</p>';
+      if(!sansRefFiltrees.length)html+='<p class="es" style="padding:16px">Aucune (pour ces filtres).</p>';
+      else{
+        html+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Fabricant</th><th>Site</th><th>Lieu</th><th>Quantité</th><th>Saisi par</th></tr></thead><tbody>';
+        sansRefFiltrees.forEach(function(l){
+          html+='<tr><td style="font-size:12px">'+(l.designation||'—')+'</td><td style="font-size:12px">'+(l.fabriquant||'—')+'</td><td>'+badgeSiteD(l.site)+'</td><td style="font-size:11px">'+(l.chantier||l.zone||'—')+'</td><td>'+l.quantite+'</td><td style="font-size:11px;color:var(--grey)">'+nomEmploye(l.code_employe)+'</td></tr>';
+        });
+        html+='</tbody></table></div>';
+      }
+      html+='</div>';
     }
   }
   html+='<div style="padding:12px 14px"><button onclick="invCampagneOuverte=null;renderInventaireStock();" style="padding:6px 14px;background:#eee;border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
@@ -1106,12 +1146,22 @@ async function exporterEcartInventaire(nom){
   var precedente=closedBefore[0];
   if(!precedente){alert('Aucune campagne précédente clôturée à comparer.');return;}
   await fetchLignesCampagne(precedente.nom);
-  var ecarts=calculerEcartInventaire(invLignesCache[nom]||[],invLignesCache[precedente.nom]||[]);
+  var lignesActuelles=invLignesCache[nom]||[];
+  var ecarts=calculerEcartInventaire(lignesActuelles,invLignesCache[precedente.nom]||[]);
   var entetes=['Référence','Désignation','Site','Lieu (chantier/zone)','Quantité avant','Quantité actuelle','Écart','Statut'];
   var lignesCsv=[entetes.map(csvCell).join(';')];
   ecarts.forEach(function(e){
     lignesCsv.push([e.reference,e.designation,e.site,e.lieu,nbFr(e.quantite_avant),nbFr(e.quantite_actuelle),nbFr(e.delta),e.statut].map(csvCell).join(';'));
   });
+  var sansRef=lignesSansReference(lignesActuelles);
+  if(sansRef.length){
+    lignesCsv.push('');
+    lignesCsv.push(['SANS R\u00C9F\u00C9RENCE \u2014 non rapproch\u00E9es'].map(csvCell).join(';'));
+    lignesCsv.push(['D\u00E9signation','Fabricant','Site','Lieu (chantier/zone)','Quantit\u00E9','Saisi par'].map(csvCell).join(';'));
+    sansRef.forEach(function(l){
+      lignesCsv.push([l.designation,l.fabriquant,l.site,(l.chantier||l.zone||''),nbFr(l.quantite),nomEmploye(l.code_employe)].map(csvCell).join(';'));
+    });
+  }
   var csv='\uFEFF'+lignesCsv.join('\r\n');
   var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   var url=URL.createObjectURL(blob);
@@ -1122,15 +1172,21 @@ async function exporterEcartInventaire(nom){
 }
 
 function invCle(l){return (l.reference||'').trim().toUpperCase()+'|'+(l.site||'')+'|'+((l.chantier||'').trim()||(l.zone||'').trim());}
+// Lignes sans référence exclues du regroupement : une référence vide ne peut pas être rapprochée de façon fiable
+// (toutes les lignes "sans réf" se retrouveraient sinon fusionnées sous la même clé). Traitées à part, non classées.
 function invGrouper(lignes){
   var g={};
   (lignes||[]).forEach(function(l){
+    if(!(l.reference||'').trim())return;
     var k=invCle(l);
     if(!g[k])g[k]={reference:l.reference,site:l.site,lieu:(l.chantier||l.zone||''),designation:l.designation,quantite:0};
     g[k].quantite+=(parseFloat(l.quantite)||0);
     if(!g[k].designation&&l.designation)g[k].designation=l.designation;
   });
   return g;
+}
+function lignesSansReference(lignes){
+  return (lignes||[]).filter(function(l){return !(l.reference||'').trim();});
 }
 function calculerEcartInventaire(lignesActuelles,lignesPrecedentes){
   var gA=invGrouper(lignesActuelles),gP=invGrouper(lignesPrecedentes);
@@ -1149,6 +1205,39 @@ function calculerEcartInventaire(lignesActuelles,lignesPrecedentes){
   var ordre={'Manquant':0,'Écart quantité':1,'Nouveau / Retrouvé':2,'Confirmé':3};
   out.sort(function(x,y){return (ordre[x.statut]-ordre[y.statut])||(x.reference||'').localeCompare(y.reference||'');});
   return out;
+}
+// Filtres combinables du rapport d'écart (recherche + site + statut + sans désignation), avec réinitialisation
+var INV_ECART_FILTRES={q:'',site:'',statut:'',sansDesig:false,nb:100};
+function appliquerFiltresInvEcart(){
+  INV_ECART_FILTRES.q=(document.getElementById('inv-ecart-q')||{}).value||'';
+  INV_ECART_FILTRES.site=(document.getElementById('inv-ecart-site')||{}).value||'';
+  INV_ECART_FILTRES.statut=(document.getElementById('inv-ecart-statut')||{}).value||'';
+  INV_ECART_FILTRES.sansDesig=!!(document.getElementById('inv-ecart-sans-desig')||{}).checked;
+  INV_ECART_FILTRES.nb=parseInt((document.getElementById('inv-ecart-nb')||{}).value,10)||0;
+  renderInventaireStock();
+}
+function resetFiltresInvEcart(){
+  INV_ECART_FILTRES={q:'',site:'',statut:'',sansDesig:false,nb:100};
+  renderInventaireStock();
+}
+function filtrerEcarts(ecarts){
+  var qu=(INV_ECART_FILTRES.q||'').trim().toUpperCase();
+  return ecarts.filter(function(e){
+    if(INV_ECART_FILTRES.site&&e.site!==INV_ECART_FILTRES.site)return false;
+    if(INV_ECART_FILTRES.statut&&e.statut!==INV_ECART_FILTRES.statut)return false;
+    if(INV_ECART_FILTRES.sansDesig&&(e.designation||'').trim())return false;
+    if(qu&&!((e.reference||'').toUpperCase().includes(qu)||(e.designation||'').toUpperCase().includes(qu)||(e.lieu||'').toUpperCase().includes(qu)))return false;
+    return true;
+  });
+}
+function filtrerLignesSansRef(lignes){
+  var qu=(INV_ECART_FILTRES.q||'').trim().toUpperCase();
+  return lignes.filter(function(l){
+    if(INV_ECART_FILTRES.site&&l.site!==INV_ECART_FILTRES.site)return false;
+    if(INV_ECART_FILTRES.sansDesig&&(l.designation||'').trim())return false;
+    if(qu&&!((l.designation||'').toUpperCase().includes(qu)||(l.lieu||l.chantier||l.zone||'').toUpperCase().includes(qu)))return false;
+    return true;
+  });
 }
 
 async function importerInventaireDec2025(){
@@ -2149,6 +2238,24 @@ async function enrichirImmosEBP(){
 // État des filtres site par onglet (Réunion/Mayotte/'' = tous)
 var SITE_FILTERS={circulation:'',depot:'',historique:'',transferts:'',reservations:'',maintenance:'',alertes:''};
 function setSiteFilter(tab,val){SITE_FILTERS[tab]=val;renderTab(tab);}
+// Réinitialise une liste de champs filtres (texte/select) à leur valeur par défaut, puis exécute un callback
+function reinitialiserFiltres(ids,callback){
+  ids.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(el.tagName==='SELECT')el.selectedIndex=0;
+    else if(el.type==='checkbox')el.checked=false;
+    else el.value='';
+  });
+  if(callback)callback();
+}
+function resetFiltresCirc(){reinitialiserFiltres(['circ-q','circ-etat','circ-site'],function(){SITE_FILTERS.circulation='';renderCirc();});}
+function resetFiltresDepot(){reinitialiserFiltres(['depot-q','depot-cat','depot-etat','depot-site','depot-nb'],function(){SITE_FILTERS.depot='';renderDepot();});}
+function resetFiltresHist(){reinitialiserFiltres(['hist-q','hist-type','hist-site','hist-nb'],function(){SITE_FILTERS.historique='';filterHist();});}
+function resetFiltresTransf(){reinitialiserFiltres(['transf-site'],function(){SITE_FILTERS.transferts='';renderTransferts();});}
+function resetFiltresResa(){reinitialiserFiltres(['resa-q','resa-statut','resa-site'],function(){SITE_FILTERS.reservations='';renderResa();});}
+function resetFiltresDocs(){reinitialiserFiltres(['docs-q','docs-filter','docs-site'],function(){renderDocs();});}
+function resetFiltresUsers(){reinitialiserFiltres(['users-q','users-role','users-site'],function(){filterUsers();});}
 // Génère le HTML d'un sélecteur de filtre site pour un onglet
 function siteFilterSelect(tab){
   var v=SITE_FILTERS[tab]||'';
@@ -2251,6 +2358,7 @@ function renderUsers(){
     '<select id="users-role" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
     '<option value="">Tous les rôles</option><option value="Administrateur">Administrateur</option><option value="Gestionnaire dépôt RUN">Gestionnaire dépôt RUN</option><option value="Logistique Mayotte">Logistique Mayotte</option><option value="Responsable d’affaires">Responsable d’affaires</option><option value="CT spécialisé">CT spécialisé</option><option value="Conducteur de travaux">CT</option><option value="Ouvrier spécialisé">Ouvrier spécialisé</option><option value="Ouvrier">Ouvrier</option><option value="Encadrement">Encadrement</option></select>'+
     '<select id="users-site" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px"><option value="">Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>'+
+    '<button class="filter-btn" onclick="resetFiltresUsers()">🔄 Réinitialiser</button>'+
     '</div>';
 
   html+='<div class="card"><div class="card-head"><h3 id="users-title">👥 Tous les utilisateurs</h3></div><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Code</th><th>Rôle / Statut</th><th>Site</th><th>Actif</th><th>Mot de passe</th><th>Matériel</th><th>Modifier le rôle</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div>';
