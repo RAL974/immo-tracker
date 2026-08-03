@@ -156,6 +156,18 @@ Adresses à ouvrir directement dans un navigateur (Worker) :
 - Génération de documents Word via la librairie `docx` (Node.js) — scripts `gen_doc.js` (helpers) + `build.js`/`build_note.js` (contenu), conversion PDF de vérification via LibreOffice avant livraison.
 - Migration EBP : lecture des fichiers `.xls` via `xlrd` (Python), écriture SharePoint par lots de 20 via l'action Worker `bulk_patch_immos` (Graph `$batch`).
 
+## Déploiement du code (PWA/Dashboard) via Claude Code — leçon d'août 2026
+
+**Constat important, à ne pas redécouvrir à chaque session :** l'environnement Claude Code exécuté à distance (session cloud, celle qui tourne dans le navigateur ou dans l'app connectée à un environnement distant) **n'a pas les droits d'écriture (push) sur `RAL974/immo-tracker`**. L'app GitHub "Claude" n'y est qu'« autorisée » (identité), jamais réellement « installée » avec la permission `Contents: Read & write` — `git push` et l'API GitHub y renvoient systématiquement une 403, quels que soient les réglages testés côté GitHub (revoke/réinstall inclus). Ce n'est pas un bug ponctuel : partir du principe que **ça ne marche pas** depuis ce type de session, sans perdre de temps à re-tester.
+
+**Ce qui fonctionne, vérifié et à réutiliser :** Claude Code **local, dans VS Code, sur le PC de William**, utilise directement ses identifiants git locaux (Gestionnaire d'identification Windows) — le push fonctionne alors normalement, exactement comme pour ses autres projets (ex. "Atlas"). C'est la seule voie fiable pour committer sur ce dépôt.
+
+**Workflow à suivre pour toute évolution future :**
+1. Le travail de conception/implémentation peut se faire dans n'importe quelle session Claude (y compris une session distante en lecture seule).
+2. Les fichiers finaux et complets (jamais des fragments/diffs à fusionner à la main — cette exigence est ferme, elle a déjà causé des problèmes) sont transmis à William en pièce jointe dans le chat.
+3. William (ou une instruction donnée à Claude Code local) ouvre le dossier du projet dans VS Code — **`C:\Users\ral\Desktop\Immos`, toujours ce dossier** — et demande à Claude Code local de remplacer les fichiers concernés par les nouveaux, puis de committer et pousser **directement sur `main`** (pas de branche à part : projet solo, sans revue de code, déploiement auto sur commit).
+4. `worker.js` n'étant jamais commité sur GitHub (secret Azure séparé, mais logique interne volontairement gardée hors dépôt public), toute modification de Worker reste un copier-coller manuel dans Cloudflare — sauf si William fournit un jour le contenu actuel du fichier, ce qui permettrait de livrer un fichier complet plutôt qu'un bloc à fusionner.
+
 
 ---
 
@@ -439,7 +451,8 @@ Export CSV (18 colonnes) réservé aux admins, disponible depuis l'onglet Analys
 - Élargissement du périmètre des déclarants décidé avec William au-delà de la demande initiale (RA/CT) : ajout de CT_Specialise, Logistique et Admin, par cohérence avec leurs droits existants plus larges. Logistique_Mayotte inclus par parité avec Logistique (à confirmer/retirer si ce n'était pas l'intention).
 - Visibilité du registre volontairement restreinte à **Admin + Encadrement** (pas Logistique, pas les rôles terrain) : cohérent avec le fait qu'il s'agit d'une donnée RH/encadrement, pas d'une donnée logistique.
 - Implémentation : nouvelle capacité `absences` (déclarer) et `voitAbsences` (consulter) dans `ROLE_CAPS` (`app.js`) + fonctions miroir dans `dashboard.html` ; nouvelle case "🧑‍💼 Gestion personnel" sous "Réservations" sur l'accueil PWA (visible seulement si `peutSignalerAbsence()`) ; nouvel onglet "Absences" dans le dashboard (visible à tous mais contenu gated par `peutVoirAbsences()`, comme le reste du dashboard) ; nouvelle liste SharePoint `Absences` (voir `02_MODELE_DONNEES.md`).
-- **Reste à faire côté William** (hors dépôt Git, cf. `01_ARCHITECTURE_TECHNIQUE.md`) : créer la liste SharePoint `Absences` avec les colonnes documentées, et ajouter au Worker Cloudflare l'action d'écriture `signaler_absence` (POST) et de lecture `?absences=1` (GET) — le Worker n'étant jamais commité sur GitHub, ce code a été fourni séparément à intégrer manuellement puis déployer (Cloudflare → `immo-proxy` → Deploy).
+- **Bug corrigé avant mise en production** : le bouton "Gestion personnel" restait invisible pour tout le monde, y compris les rôles autorisés (ex. CT), car sa visibilité était calculée avant la fin du chargement des rôles depuis SharePoint et n'était jamais recalculée ensuite. Le bouton "Réservations" échappait au même défaut grâce à un repli historique sur `CONFIG.autorises` que la nouvelle capacité `absences` n'a pas. Corrigé en ré-appelant `afficherEmploye()` une fois `chargerEmployes()` résolu, aux deux points d'entrée (chargement de page + scan d'activation).
+- **Statut au moment de la rédaction** : code PWA + Dashboard livré et déployé sur GitHub Pages (via Claude Code local, voir section déploiement dans `01_ARCHITECTURE_TECHNIQUE.md`). Liste SharePoint `Absences` créée par William. **Reste à confirmer** : intégration de l'action Worker Cloudflare (`signaler_absence` en POST, `?absences=1` en GET) — le Worker n'étant jamais commité sur GitHub, ce code a été fourni séparément à coller manuellement dans Cloudflare (`immo-proxy` → Deploy). Sans cette étape, le formulaire PWA s'affiche mais l'enregistrement échouera silencieusement.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
