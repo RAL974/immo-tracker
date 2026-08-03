@@ -255,6 +255,7 @@ tr:hover td{background:#FAFBFC;}
   <div class="nav-item" data-tab="circulation"><span class="nav-icon">🔄</span><span class="nav-label">En circulation</span><span class="nav-badge blue" id="nb-circ">—</span></div>
   <div class="nav-item" data-tab="depot"><span class="nav-icon">🏭</span><span class="nav-label">Au dépôt</span><span class="nav-badge green" id="nb-depot">—</span></div>
   <div class="nav-item" data-tab="historique"><span class="nav-icon">📋</span><span class="nav-label">Historique</span></div>
+  <div class="nav-item" data-tab="inventaire-stock"><span class="nav-icon">📦</span><span class="nav-label">Inventaire stock</span></div>
 
   <div class="nav-group">LOGISTIQUE</div>
   <div class="nav-item" data-tab="transferts"><span class="nav-icon">📦</span><span class="nav-label">Transferts</span><span class="nav-badge" id="nb-transf">—</span></div>
@@ -454,6 +455,11 @@ tr:hover td{background:#FAFBFC;}
       </div>
     </div>
 
+    <!-- Inventaire stock (articles/consommables — distinct des immobilisations) -->
+    <div id="pane-inventaire-stock" class="tab-pane">
+      <div id="inventaire-stock-content"></div>
+    </div>
+
     <!-- Alertes -->
     <div id="pane-alertes" class="tab-pane"><div id="alertes-content"></div></div>
 
@@ -577,6 +583,18 @@ function peutEditerEmplacement(code){
   if(estAdmin(code))return true;
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='logistique';
+}
+// Peut lancer/clôturer une campagne d'inventaire de stock : Admin, Logistique, Logistique_Mayotte
+function peutGererInventaire(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='logistique'||role==='logistique_mayotte';
+}
+// Peut consulter l'onglet Inventaire stock : gestionnaires + Encadrement (view-only, comme le reste du dashboard)
+function peutVoirInventaire(code){
+  if(peutGererInventaire(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='encadrement';
 }
 var CT_CODES=['ROJO','LAHU','AUAR','BOMA','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
 var USERS_CACHE=null;
@@ -829,6 +847,7 @@ function renderTab(name){
     case 'documents':      if(!dataLoaded.docs)loadDocs(); else renderDocs(); break;
     case 'maintenance':    if(!dataLoaded.maint)loadMaint(); else renderMaint(); break;
     case 'absences':       if(!dataLoaded.absences)loadAbsences(); else renderAbsences(); break;
+    case 'inventaire-stock': if(!dataLoaded.invStock)loadInventaireStock(); else renderInventaireStock(); break;
     case 'alertes':        renderAlertes(); break;
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
@@ -949,6 +968,224 @@ function renderAbsences(){
   }).join('');
   document.getElementById('cnt-absences').textContent=absencesList.length+' signalement(s)';
   div.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Date absence</th><th>Employé</th><th>Signalé par</th><th>Site</th><th>Motif</th><th>Horodatage</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ── Inventaire de stock (articles/consommables — distinct de l'inventaire des immobilisations) ──
+var invCampagnesList=[];
+var invLignesCache={}; // nom de campagne -> lignes[]
+var invCampagneOuverte=null; // nom de la campagne dont le détail est actuellement affiché
+
+async function loadInventaireStock(){
+  dataLoaded.invStock=true;
+  if(!peutVoirInventaire(ADMIN_SESSION.code)){renderInventaireStock();return;}
+  try{
+    var r=await fetch(W+'?campagnes_inventaire=1');
+    invCampagnesList=await r.json();
+  }catch(e){invCampagnesList=[];}
+  renderInventaireStock();
+}
+
+async function fetchLignesCampagne(nom){
+  if(invLignesCache[nom])return invLignesCache[nom];
+  try{
+    var r=await fetch(W+'?lignes_inventaire='+encodeURIComponent(nom));
+    invLignesCache[nom]=(await r.json())||[];
+  }catch(e){invLignesCache[nom]=[];}
+  return invLignesCache[nom];
+}
+
+function renderInventaireStock(){
+  var div=document.getElementById('inventaire-stock-content');
+  if(!div)return;
+  if(!peutVoirInventaire(ADMIN_SESSION.code)){
+    div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
+    return;
+  }
+  var html='<div class="card"><div class="card-head"><h3>📦 Campagnes d\'inventaire de stock</h3>'+
+    (peutGererInventaire(ADMIN_SESSION.code)?'<button onclick="lancerCampagneInventaire()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Lancer une campagne</button>':'')+
+    '</div>';
+  html+='<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Comptage de stock d\'articles/consommables (visserie, câbles, appareillage…) — distinct de l\'inventaire des immobilisations.</p>';
+  if(!invCampagnesList.length){
+    html+='<p class="es" style="padding:16px">Aucune campagne pour l\'instant.</p>';
+  }else{
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Campagne</th><th>Début</th><th>Statut</th><th>Lignes</th><th>Créée par</th><th>Action</th></tr></thead><tbody>';
+    invCampagnesList.forEach(function(c){
+      html+='<tr>'+
+        '<td><a href="javascript:void(0)" onclick="voirDetailCampagneInventaire(\''+c.nom.replace(/'/g,"\\'")+'\')" style="font-weight:700;color:var(--blue)">'+c.nom+'</a></td>'+
+        '<td>'+dateFr(c.date_debut)+'</td>'+
+        '<td>'+(c.statut==='Clôturée'?'<span class="badge bh">Clôturée</span>':'<span class="badge bb">En cours</span>')+'</td>'+
+        '<td>'+c.nb_lignes+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+nomEmploye(c.cree_par)+'</td>'+
+        '<td>'+(c.statut!=='Clôturée'&&peutGererInventaire(ADMIN_SESSION.code)?'<button onclick="cloturerCampagneInventaireDash(\''+c.nom.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">Clôturer</button>':'')+'</td>'+
+      '</tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+  if(estAdmin(ADMIN_SESSION.code)&&!invCampagnesList.some(function(c){return c.nom==='Inventaire décembre 2025';})){
+    html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration : comptage décembre 2025</h3></div>'+
+      '<div style="padding:14px"><p style="font-size:12px;color:var(--grey);margin-bottom:10px">Importe les lignes du dernier comptage physique (déc. 2025) comme première campagne de référence, pour permettre un calcul d\'écart dès la prochaine campagne. À faire une seule fois.</p>'+
+      '<button onclick="importerInventaireDec2025()" style="padding:8px 16px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Importer maintenant</button>'+
+      '<div id="inv-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
+  }
+  if(invCampagneOuverte)html+=renderDetailCampagneInventaire(invCampagneOuverte);
+  div.innerHTML=html;
+}
+
+async function lancerCampagneInventaire(){
+  var nom=prompt('Nom de la campagne (ex : Inventaire annuel 2026) :');
+  if(!nom||!nom.trim())return;
+  var dateDebut=prompt('Date de début (AAAA-MM-JJ) :',new Date().toISOString().slice(0,10));
+  try{
+    var r=await fetch(W+'?action=creer_campagne_inventaire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom:nom.trim(),date_debut:dateDebut,par_code:ADMIN_SESSION.code})});
+    var d=await r.json();
+    if(d.success){alert('✅ Campagne créée.');dataLoaded.invStock=false;await loadInventaireStock();}
+    else alert('❌ Erreur : '+(d.message||d.error||''));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+async function cloturerCampagneInventaireDash(nom){
+  if(!confirm('Clôturer la campagne "'+nom+'" ? Les lignes seront figées définitivement.'))return;
+  try{
+    var r=await fetch(W+'?action=cloturer_campagne_inventaire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom:nom,par_code:ADMIN_SESSION.code})});
+    var d=await r.json();
+    if(d.success){alert('✅ Campagne clôturée.');dataLoaded.invStock=false;await loadInventaireStock();}
+    else alert('❌ Erreur lors de la clôture.');
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+async function voirDetailCampagneInventaire(nom){
+  invCampagneOuverte=nom;
+  await fetchLignesCampagne(nom);
+  renderInventaireStock();
+}
+
+function renderDetailCampagneInventaire(nom){
+  var c=invCampagnesList.find(function(x){return x.nom===nom;});
+  var lignes=invLignesCache[nom]||[];
+  var html='<div class="card"><div class="card-head"><h3>📋 '+nom+'</h3>'+
+    '<button onclick="exporterEcartInventaire(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export écart (CSV)</button></div>';
+  // Campagne précédente clôturée (par date de début, chronologiquement avant celle-ci)
+  var closedBefore=invCampagnesList.filter(function(x){return x.statut==='Clôturée'&&x.nom!==nom&&new Date(x.date_debut||0)<new Date(c?c.date_debut:Date.now());})
+    .sort(function(a,b){return new Date(b.date_debut)-new Date(a.date_debut);});
+  var precedente=closedBefore[0];
+  html+='<div style="padding:12px 14px;font-size:12px;color:var(--grey)">'+lignes.length+' ligne(s) saisie(s)'+(precedente?' — comparé à « '+precedente.nom+' »':' — aucune campagne précédente clôturée à comparer')+'</div>';
+  if(precedente){
+    if(!invLignesCache[precedente.nom]){
+      html+='<p class="es" style="padding:16px">Chargement de la comparaison…</p>';
+      fetchLignesCampagne(precedente.nom).then(function(){if(invCampagneOuverte===nom)renderInventaireStock();});
+    }else{
+      var ecarts=calculerEcartInventaire(lignes,invLignesCache[precedente.nom]);
+      var manquants=ecarts.filter(function(e){return e.statut==='Manquant';}).length;
+      var nouveaux=ecarts.filter(function(e){return e.statut==='Nouveau / Retrouvé';}).length;
+      var ecartsQte=ecarts.filter(function(e){return e.statut==='Écart quantité';}).length;
+      html+='<div style="display:flex;gap:12px;padding:0 14px 12px;flex-wrap:wrap">'+
+        '<div style="background:#FFEBEE;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--red)">'+manquants+'</div><div style="font-size:11px;color:var(--grey)">Manquants</div></div>'+
+        '<div style="background:#FFF3E0;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--orange)">'+ecartsQte+'</div><div style="font-size:11px;color:var(--grey)">Écarts de quantité</div></div>'+
+        '<div style="background:#E8F5E9;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--green)">'+nouveaux+'</div><div style="font-size:11px;color:var(--grey)">Nouveaux / retrouvés</div></div>'+
+      '</div>';
+      html+='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Désignation</th><th>Site</th><th>Lieu</th><th>Qté avant</th><th>Qté actuelle</th><th>Écart</th><th>Statut</th></tr></thead><tbody>';
+      ecarts.slice(0,300).forEach(function(e){
+        var color=e.statut==='Manquant'?'var(--red)':e.statut==='Écart quantité'?'var(--orange)':e.statut==='Nouveau / Retrouvé'?'var(--green)':'var(--grey)';
+        html+='<tr><td>'+e.reference+'</td><td style="font-size:12px">'+(e.designation||'—')+'</td><td>'+badgeSiteD(e.site)+'</td><td style="font-size:11px">'+(e.lieu||'—')+'</td><td>'+e.quantite_avant+'</td><td>'+e.quantite_actuelle+'</td><td>'+(e.delta>0?'+':'')+e.delta+'</td><td style="color:'+color+';font-weight:700;font-size:11px">'+e.statut+'</td></tr>';
+      });
+      html+='</tbody></table></div>';
+      if(ecarts.length>300)html+='<p style="font-size:11px;color:var(--grey);padding:8px 14px">… et '+(ecarts.length-300)+' ligne(s) supplémentaire(s), voir l\'export CSV complet.</p>';
+    }
+  }
+  html+='<div style="padding:12px 14px"><button onclick="invCampagneOuverte=null;renderInventaireStock();" style="padding:6px 14px;background:#eee;border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
+  html+='</div>';
+  return html;
+}
+
+async function exporterEcartInventaire(nom){
+  await fetchLignesCampagne(nom);
+  var c=invCampagnesList.find(function(x){return x.nom===nom;});
+  var closedBefore=invCampagnesList.filter(function(x){return x.statut==='Clôturée'&&x.nom!==nom&&new Date(x.date_debut||0)<new Date(c?c.date_debut:Date.now());})
+    .sort(function(a,b){return new Date(b.date_debut)-new Date(a.date_debut);});
+  var precedente=closedBefore[0];
+  if(!precedente){alert('Aucune campagne précédente clôturée à comparer.');return;}
+  await fetchLignesCampagne(precedente.nom);
+  var ecarts=calculerEcartInventaire(invLignesCache[nom]||[],invLignesCache[precedente.nom]||[]);
+  var entetes=['Référence','Désignation','Site','Lieu (chantier/zone)','Quantité avant','Quantité actuelle','Écart','Statut'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  ecarts.forEach(function(e){
+    lignesCsv.push([e.reference,e.designation,e.site,e.lieu,nbFr(e.quantite_avant),nbFr(e.quantite_actuelle),nbFr(e.delta),e.statut].map(csvCell).join(';'));
+  });
+  var csv='\uFEFF'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');
+  a2.href=url;a2.download='Ecart_Inventaire_'+nom.replace(/[^a-zA-Z0-9]+/g,'_')+'.csv';
+  document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+  URL.revokeObjectURL(url);
+}
+
+function invCle(l){return (l.reference||'').trim().toUpperCase()+'|'+(l.site||'')+'|'+((l.chantier||'').trim()||(l.zone||'').trim());}
+function invGrouper(lignes){
+  var g={};
+  (lignes||[]).forEach(function(l){
+    var k=invCle(l);
+    if(!g[k])g[k]={reference:l.reference,site:l.site,lieu:(l.chantier||l.zone||''),designation:l.designation,quantite:0};
+    g[k].quantite+=(parseFloat(l.quantite)||0);
+    if(!g[k].designation&&l.designation)g[k].designation=l.designation;
+  });
+  return g;
+}
+function calculerEcartInventaire(lignesActuelles,lignesPrecedentes){
+  var gA=invGrouper(lignesActuelles),gP=invGrouper(lignesPrecedentes);
+  var cles=Object.keys(gA).concat(Object.keys(gP)).filter(function(v,i,a){return a.indexOf(v)===i;});
+  var out=[];
+  cles.forEach(function(k){
+    var a=gA[k],p=gP[k];
+    var qa=a?a.quantite:0,qp=p?p.quantite:0;
+    var ref=(a||p).reference,site=(a||p).site,lieu=(a||p).lieu,desig=(a&&a.designation)||(p&&p.designation)||'';
+    var statut;
+    if(a&&p)statut=(qa===qp)?'Confirmé':'Écart quantité';
+    else if(a&&!p)statut='Nouveau / Retrouvé';
+    else statut='Manquant';
+    out.push({reference:ref,site:site,lieu:lieu,designation:desig,quantite_avant:qp,quantite_actuelle:qa,delta:qa-qp,statut:statut});
+  });
+  var ordre={'Manquant':0,'Écart quantité':1,'Nouveau / Retrouvé':2,'Confirmé':3};
+  out.sort(function(x,y){return (ordre[x.statut]-ordre[y.statut])||(x.reference||'').localeCompare(y.reference||'');});
+  return out;
+}
+
+async function importerInventaireDec2025(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('Importer le comptage de décembre 2025 comme campagne de référence clôturée ?\n\nCette opération est destinée à être faite UNE SEULE FOIS.'))return;
+  var statutEl=document.getElementById('inv-migration-statut');
+  var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
+  setStatut('⏳ Chargement du fichier…');
+  var lignes;
+  try{
+    var r=await fetch('inventaire_dec2025.json?t='+Date.now());
+    lignes=await r.json();
+  }catch(e){setStatut('❌ Impossible de charger inventaire_dec2025.json : '+e.message);return;}
+  var nomCampagne='Inventaire décembre 2025';
+  setStatut('⏳ Création de la campagne…');
+  try{
+    var rc=await fetch(W+'?action=creer_campagne_inventaire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom:nomCampagne,date_debut:'2025-12-01',par_code:ADMIN_SESSION.code})});
+    var dc=await rc.json();
+    if(!dc.success){setStatut('❌ Impossible de créer la campagne : '+(dc.message||dc.error||''));return;}
+  }catch(e){setStatut('❌ Erreur : '+e.message);return;}
+  var total=lignes.length,ok=0,ko=0,lot=20;
+  for(var i=0;i<lignes.length;i+=lot){
+    var tranche=lignes.slice(i,i+lot);
+    setStatut('⏳ Import '+Math.min(i+lot,total)+' / '+total+' lignes…');
+    try{
+      var rr=await fetch(W+'?action=bulk_import_lignes_inventaire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campagne:nomCampagne,lignes:tranche,par_code:ADMIN_SESSION.code,horodatage:'2025-12-31T12:00:00.000Z'})});
+      var res=await rr.json();
+      ok+=res.ok||0;ko+=res.ko||0;
+    }catch(e){ko+=tranche.length;}
+  }
+  setStatut('⏳ Clôture de la campagne…');
+  try{
+    await fetch(W+'?action=cloturer_campagne_inventaire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom:nomCampagne,par_code:ADMIN_SESSION.code,date_cloture:'2025-12-31T23:59:59.000Z'})});
+  }catch(e){}
+  setStatut('✅ Import terminé : '+ok+' lignes créées'+(ko?', '+ko+' en échec':'')+'.');
+  dataLoaded.invStock=false;
+  await loadInventaireStock();
 }
 
 function refreshAll(){d=null;dataLoaded={};loadEmployes(true);loadAll();loadReservations();}

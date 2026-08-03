@@ -47,12 +47,14 @@
 - Migration complète des données comptables EBP → SharePoint (dates, comptes, sites corrigés)
 - Documentation de pérennité (`Immo_Tracker_Documentation.docx`)
 - Note de synthèse comparative pour la direction (`Note_Synthese_Immo_Tracker.docx`)
+- Coûts de réparation structurés + seuil de réforme réglable (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
+- Worker Cloudflare (`worker.js`) désormais commité et déployé automatiquement via Git (août 2026, voir `01_ARCHITECTURE_TECHNIQUE.md`)
+- Campagne d'inventaire de stock d'articles/consommables (août 2026, distinct de l'inventaire des immobilisations — voir `04_HISTORIQUE_DECISIONS.md`)
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier
-- Inventaire physique annuel assisté par scan
+- Inventaire physique annuel des immobilisations par scan QR (projet séparé, non validé par la direction)
 - Photos et constat d'état en image
-- Coûts de réparation structurés + seuil de réforme
 - Demandes de matériel planifiées à l'avance
 - Interface simplifiée pour Mayotte
 - Digest de notifications hebdomadaire
@@ -302,10 +304,46 @@ Les rôles terrain (CT, Ouvrier, RA, Logistique_Mayotte, CT_Specialise, Ouvrier_
 
 Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour filtrer l'onglet "Au dépôt" et toutes les statistiques d'usage (Analyses) — avec un bouton pour révéler les immos administratives si besoin.
 
+## Liste `Campagnes_Inventaire` (ajoutée août 2026)
+
+*Campagnes de comptage physique du **stock d'articles/consommables** (visserie, câbles, appareillage électrique…) — à ne pas confondre avec l'inventaire des immobilisations (QR codes), projet séparé non encore validé par la direction.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de la campagne (ex. `Inventaire annuel 2026`) |
+| `Date_Debut` | Date | |
+| `Date_Fin` | Date | Optionnelle, indicative |
+| `Statut` | Texte | `En cours` / `Clôturée` |
+| `Cree_Par` | Texte | Code employé |
+| `Cloture_Par` | Texte | Code employé (vide tant qu'en cours) |
+| `Date_Cloture` | Date/heure | ISO |
+
+## Liste `Lignes_Inventaire` (ajoutée août 2026)
+
+*Une ligne = une référence comptée à un endroit donné, pendant une campagne. Une même référence peut apparaître plusieurs fois dans une campagne (endroits différents).*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de la campagne (référence texte simple, pas de colonne Lookup SharePoint — cohérent avec le reste du modèle) |
+| `Zone` | Texte | Emplacement physique dans le dépôt/atelier (ex. `30E`, `Atelier`, `Carton`) — sans signification si `Chantier` est renseigné |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Chantier` | Texte | Optionnel — renseigné quand le comptage a eu lieu sur un chantier plutôt qu'au dépôt |
+| `Fabriquant` | Texte | Tel que saisi par l'opérateur |
+| `Reference` | Texte | Référence article (texte libre, aucun catalogue de prix rattaché) |
+| `Designation` | Texte | Désignation libre |
+| `Quantite` | Nombre | |
+| `Chute_Cable` | Texte | `Oui` / vide — règle métier : un câble dont le métrage n'est pas un multiple des bobines standard (50/100/250/500/1000m, 3000/4000m pour RJ45 Telenco) est par définition une chute |
+| `Observations` | Texte | Libre, optionnel |
+| `Code_Employe` | Texte | Auteur de la ligne |
+| `Horodatage` | Date/heure | ISO |
+
+⚠️ Aucune valorisation (prix, valeur) n'est stockée : la base de prix utilisée lors du comptage de décembre 2025 a trop évolué depuis pour être fiable. Voir `04_HISTORIQUE_DECISIONS.md` pour le raisonnement complet.
+
 ## Fichiers JSON associés
 
 - **`immos.json`** (tableau) : catalogue léger utilisé par la PWA et le Dashboard pour les libellés/catégories/comptes en lecture rapide. Généré à partir de SharePoint, redéployé après modifications importantes.
 - **`immos_full.json`** (objet, clé = code IM) : catalogue complet utilisé uniquement par l'outil de migration EBP → SharePoint (`enrichirImmosEBP()` dans le dashboard). Contient 1167 immos (1023 actives + 144 sorties), issu de l'export comptable EBP (`Export_immos_030726_avec_sites.xls`).
+- **`inventaire_dec2025.json`** (tableau, ajouté août 2026) : ~2417 lignes de comptage brut du stock d'articles de décembre 2025 (zone, site, chantier, fabriquant, référence, désignation, quantité, chute de câble, observations — sans les colonnes de valorisation du fichier Excel d'origine, obsolètes). Utilisé une seule fois par l'outil de migration (`importerInventaireDec2025()` dans le dashboard) pour créer la première campagne de référence dans `Lignes_Inventaire`.
 
 
 ---
@@ -393,6 +431,28 @@ Une immobilisation est candidate à cession ("dormante") si :
 
 Export CSV (18 colonnes) réservé aux admins, disponible depuis l'onglet Analyses. Compatible Excel français (BOM UTF-8, séparateur `;`, décimales à la virgule, dates JJ/MM/AAAA). Contient pour chaque immo : identité, comptes, dates, valeur d'achat, durée, annuité, amortissement cumulé, VNC, % amorti, état — plus une ligne de totaux. Sert de base au rapprochement avec la comptabilité EBP.
 
+## Coûts de réparation structurés & seuil de réforme (août 2026)
+
+Coût de réparation stocké dans une colonne SharePoint dédiée `Cout_Reparation` sur `Mouvements` (une ligne = une réparation datée ; cumul par simple somme sur plusieurs lignes). Repli automatique sur l'ancien format texte (`##COUT:X##` dans `Note`) pour les mouvements créés avant l'ajout de cette colonne.
+
+**Double ratio** calculé et affiché (dashboard, onglet Analyses) : coût cumulé / valeur d'achat **et** coût cumulé / VNC actuelle. **Seuil de réforme réglable** (40/60/80%, défaut 60%, sélecteur dans Analyses, même principe que le seuil de dormance) : une immo est candidate à la réforme si l'un des deux ratios dépasse le seuil, ou si sa VNC est déjà épuisée alors que des réparations continuent.
+
+Le coût peut être saisi soit à la résolution d'une panne (mouvement `Réparation`, l'immo revient au dépôt), soit indépendamment via le bouton "🔧 Enregistrer réparation" sur la fiche immo (mouvement `Entretien`, entretien préventif — n'affecte pas la localisation courante de l'immo, comme `Panne`/`Suivi_Panne`).
+
+## Campagne d'inventaire de stock (articles/consommables — août 2026)
+
+*À ne pas confondre avec l'inventaire des immobilisations (QR codes), un chantier séparé non encore validé par la direction.*
+
+Deux nouvelles capacités `ROLE_CAPS` :
+- **`gererInventaire`** : peut lancer/clôturer une campagne (Admin, Logistique, Logistique_Mayotte).
+- **`compterInventaire`** : peut saisir des lignes de comptage (Admin, Logistique, Logistique_Mayotte, CT, CT_Specialise, RA, et le nouveau rôle `Compteur_Inventaire`).
+
+**Nouveau rôle `Compteur_Inventaire`** : rôle allégé sans aucune autre capacité, destiné au personnel temporaire (intérim, accompagnants logistique/achats) lors d'une campagne. Ces comptes sont créés via le flux existant d'ajout d'employé, avant chaque campagne, puis peuvent rester inactifs entre deux campagnes.
+
+**Cycle de vie d'une campagne** : `En cours` → `Clôturée` (action explicite, irréversible). Une ligne de comptage ne peut être modifiée/supprimée que par son auteur ou un admin, et uniquement tant que la campagne est `En cours` — vérifié côté Worker, pas seulement côté interface.
+
+**Calcul de l'écart** (dashboard, onglet Inventaire stock) : compare une campagne clôturée à la précédente clôturée, groupé par clé `(Référence, Site, Chantier si renseigné sinon Zone)`, quantités sommées par clé → statuts `Confirmé` / `Écart quantité` / `Manquant` / `Nouveau ou Retrouvé`. Aucune valorisation (prix/valeur) n'est calculée : la base de prix historique (BDD du fichier Excel de comptage) évolue trop vite pour être fiable — seules les quantités comptées sont comparées.
+
 
 ---
 
@@ -459,7 +519,22 @@ Export CSV (18 colonnes) réservé aux admins, disponible depuis l'onglet Analys
 - Visibilité du registre volontairement restreinte à **Admin + Encadrement** (pas Logistique, pas les rôles terrain) : cohérent avec le fait qu'il s'agit d'une donnée RH/encadrement, pas d'une donnée logistique.
 - Implémentation : nouvelle capacité `absences` (déclarer) et `voitAbsences` (consulter) dans `ROLE_CAPS` (`app.js`) + fonctions miroir dans `dashboard.html` ; nouvelle case "🧑‍💼 Gestion personnel" sous "Réservations" sur l'accueil PWA (visible seulement si `peutSignalerAbsence()`) ; nouvel onglet "Absences" dans le dashboard (visible à tous mais contenu gated par `peutVoirAbsences()`, comme le reste du dashboard) ; nouvelle liste SharePoint `Absences` (voir `02_MODELE_DONNEES.md`).
 - **Bug corrigé avant mise en production** : le bouton "Gestion personnel" restait invisible pour tout le monde, y compris les rôles autorisés (ex. CT), car sa visibilité était calculée avant la fin du chargement des rôles depuis SharePoint et n'était jamais recalculée ensuite. Le bouton "Réservations" échappait au même défaut grâce à un repli historique sur `CONFIG.autorises` que la nouvelle capacité `absences` n'a pas. Corrigé en ré-appelant `afficherEmploye()` une fois `chargerEmployes()` résolu, aux deux points d'entrée (chargement de page + scan d'activation).
-- **Statut au moment de la rédaction** : code PWA + Dashboard livré et déployé sur GitHub Pages (via Claude Code local, voir section déploiement dans `01_ARCHITECTURE_TECHNIQUE.md`). Liste SharePoint `Absences` créée par William. **Reste à confirmer** : intégration de l'action Worker Cloudflare (`signaler_absence` en POST, `?absences=1` en GET) — le Worker n'étant jamais commité sur GitHub, ce code a été fourni séparément à coller manuellement dans Cloudflare (`immo-proxy` → Deploy). Sans cette étape, le formulaire PWA s'affiche mais l'enregistrement échouera silencieusement.
+- **Mise à jour (août 2026)** : l'action Worker `signaler_absence` (POST) et la lecture `?absences=1` (GET) avaient été oubliées lors de la livraison initiale — le formulaire PWA s'affichait mais l'enregistrement échouait silencieusement, sans que personne ne s'en aperçoive (aucun signalement n'a donc abouti avant cette correction). Détecté en relisant le contenu réel de `worker.js` au moment où celui-ci a été committé pour la première fois dans le dépôt (voir entrée suivante) ; corrigé et déployé le jour même.
+
+## Coûts de réparation structurés & seuil de réforme (août 2026)
+- Besoin repris de `05_ROADMAP_EVOLUTIONS_FUTURES.md` (item C) : le ratio coût réparations / valeur d'achat affiché dans Analyses était calculé en extrayant un montant du texte libre de la `Note` d'un mouvement — fragile, et basé uniquement sur la valeur d'achat (pas la VNC).
+- **Décisions prises avec William avant développement** : (1) coût stocké dans une colonne SharePoint dédiée `Cout_Reparation` sur `Mouvements` ; (2) saisie possible aussi bien à la résolution d'une panne qu'indépendamment (entretien préventif) → nouveau type de mouvement `Entretien` ; (3) les **deux ratios** (valeur d'achat ET VNC) sont calculés et affichés ; (4) seuil réglable (40/60/80%) sur le même principe que le seuil de dormance déjà existant.
+- Distinction `Réparation` (résolution de panne, l'immo revient au dépôt) vs `Entretien` (coût structuré indépendant, sans effet sur la localisation courante).
+- **Rétrocompatibilité** : les réparations enregistrées avant l'ajout de la colonne `Cout_Reparation` restent comptées via un repli automatique sur l'ancien format texte (`##COUT:X##` dans `Note`).
+- **Changement d'infrastructure majeur au passage** : William a connecté le Worker Cloudflare `immo-proxy` au dépôt GitHub `RAL974/immo-tracker` (build automatique sur push). Cela lève la contrainte historique qui empêchait de committer `worker.js` : le fichier est désormais versionné normalement, accompagné d'un `wrangler.toml`. C'est en committant pour la première fois le contenu réel de `worker.js` que le bug de l'action `signaler_absence` manquante (entrée précédente) a été découvert et corrigé.
+- Bug corrigé au passage : l'ancienne liste "Candidats au remplacement" ne regardait que les 8 immos aux coûts cumulés les plus élevés (plus les immos en panne), ce qui pouvait faire passer à côté d'une immo à faible valeur d'achat mais à ratio élevé ; élargi à toutes les immos concernées.
+
+## Campagne d'inventaire de stock (articles/consommables — août 2026)
+- Repris de la roadmap (item A), mais **le besoin initialement décrit était en fait une confusion** : la roadmap parlait de scanner les QR codes des immobilisations, mais William a clarifié que ce chantier (QR codes immos) est un projet **séparé, non encore validé par la direction**. Le vrai besoin exprimé était un inventaire annuel du **stock d'articles/consommables** (visserie, câbles, appareillage électrique…), sans code-barres ni QR existants, et sans aucune liste de référence suivie au quotidien.
+- Seul point de départ disponible : l'inventaire manuel mené fin décembre 2025 (fichier Excel `INV 226`, ~2417 lignes de comptage physique, valorisation totale 864 033 € à l'époque). La procédure `LS04V2 - Procédure immobilisations.docx` fournie en référence s'est avérée décrire le circuit des immobilisations (existant), pas ce comptage de stock — les deux sujets ne doivent pas être confondus.
+- **Décisions de cadrage prises avec William avant développement** : portée = campagne ponctuelle (pas de suivi continu) ; comptage manuel uniquement, **aucune valorisation** (base de prix historique trop évoluée pour être fiable) ; périmètre = dépôt/atelier **et** chantiers actifs ; import des données brutes de décembre 2025 comme première campagne clôturée pour permettre un écart dès la 2e campagne ; saisie ouverte aux gestionnaires dépôt, CT/RA pour leur propre chantier, **et personnel temporaire d'agence d'intérim** (nouveau rôle `Compteur_Inventaire`) ; corrections par l'auteur ou un admin tant que la campagne est "En cours", figée à la clôture.
+- **Conséquence technique** : le personnel temporaire n'ayant pas de carte BTP imprimée, une option "Saisir mon code manuellement" a été ajoutée à l'écran d'activation de la PWA (`activationManuelle()` dans `app.js`), en plus du scan QR existant.
+- Implémentation : 2 nouvelles listes SharePoint (`Campagnes_Inventaire`, `Lignes_Inventaire`), 7 nouvelles actions Worker, nouvel écran PWA ("📋 Campagne d'inventaire"), nouvel onglet dashboard ("📦 Inventaire stock") avec rapport d'écart et export CSV.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
@@ -484,14 +559,17 @@ Ajouter une entrée à chaque décision structurante : la date approximative, ce
 
 ## Proposées par l'assistant
 
-### A. Inventaire physique annuel assisté (priorité suggérée : haute)
-Mode "campagne d'inventaire" : lancement d'une campagne, chaque gestionnaire scanne les QR codes du matériel physiquement présent, l'application calcule l'écart entre le théorique (SharePoint) et le constaté (scans), et liste les manquants / mal localisés / retrouvés. Répond directement au problème vécu par William (véhicules mal localisés pendant un an entre Réunion et Mayotte). Argument fort en interne : réponse à l'obligation comptable d'inventaire physique périodique.
+### A. Inventaire physique annuel assisté — deux sujets distincts, à ne pas confondre
+
+**A1. Immobilisations (scan QR codes)** — toujours **non fait**, projet séparé non encore validé par la direction. Mode "campagne d'inventaire" : lancement d'une campagne, chaque gestionnaire scanne les QR codes du matériel physiquement présent, l'application calcule l'écart entre le théorique (SharePoint) et le constaté (scans), et liste les manquants / mal localisés / retrouvés. Répondrait au problème vécu par William (véhicules mal localisés pendant un an entre Réunion et Mayotte). Nécessite au préalable la pose de QR codes/plaques sur les immos.
+
+**A2. Stock d'articles/consommables — ✅ FAIT (août 2026)**, développé après clarification que le besoin réel décrit ci-dessus (au moment de la première rédaction de cette roadmap) concernait en fait ce sujet, distinct des immobilisations. Campagne de comptage manuel (pas de QR/codes-barres sur les articles), dépôt + chantiers actifs, comparaison quantités vs comptage précédent (import du comptage décembre 2025 comme référence). Détail complet dans la section historique ci-dessus.
 
 ### B. Photos et constat d'état en image
 À la réception ou au retour d'un matériel, possibilité de joindre une photo (stockage SharePoint). Utile en particulier pour les retours en mauvais état validés par un garant : preuve visuelle qui évite les litiges "c'était déjà abîmé avant". Techniquement : accès à l'appareil photo du navigateur mobile + stockage lié au mouvement.
 
-### C. Coûts de réparation structurés + seuil de réforme
-Actuellement le dashboard affiche un ratio (coût réparations / valeur d'achat) de façon informelle. Évolution : saisie structurée du coût à chaque réparation, et déclenchement d'une alerte quand le cumul dépasse un seuil (ex. 60% de la VNC) → proposition automatique de mise en cession/réforme. Complète naturellement le module maintenance préventive (axe 3) et donne un chiffre d'arbitrage réparer/remplacer directement exploitable par la direction.
+### C. Coûts de réparation structurés + seuil de réforme — ✅ FAIT (août 2026)
+Développé et déployé : coût structuré (colonne SharePoint `Cout_Reparation` sur `Mouvements`), saisie possible à la résolution d'une panne ou indépendamment (entretien, nouveau type de mouvement `Entretien`), double ratio (valeur d'achat ET VNC), seuil de réforme réglable (40/60/80%, défaut 60%) dans l'onglet Analyses. Détail complet dans la section historique ci-dessus.
 
 ### D. Demandes de matériel planifiées à l'avance
 Un CT peut demander du matériel pour une date future (ex. "2 perceuses + 1 échafaudage semaine 32 sur tel chantier"), au lieu du mode réactif actuel (réservation immédiate uniquement). Le gestionnaire dépôt voit un planning de demandes à préparer. Fait passer l'app du suivi réactif à la planification logistique — cohérent avec le métier de William (achats/logistique).

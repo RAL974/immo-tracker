@@ -137,6 +137,11 @@
     🧑‍💼 Gestion personnel
   </button>
 
+  <!-- Campagne d'inventaire de stock (Admin / Logistique / CT / RA / Compteur_Inventaire) -->
+  <button id="btn-inventaire-stock" class="btn btn-link hidden" onclick="showScreen('screen-inventaire-stock')" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+    📋 Campagne d'inventaire
+  </button>
+
   <!-- Section admin -->
   <div class="admin-section admin-only hidden">
     <div class="separator">Actions logistique</div>
@@ -157,6 +162,7 @@
   <h2>Activation</h2>
   <p class="scanner-hint">Scanne le QR code de ta <strong>carte BTP</strong></p>
   <div id="scanner-activation" class="scanner-box"></div>
+  <button class="btn btn-link" onclick="activationManuelle()" style="font-size:12px;color:var(--grey)">Pas de carte ? Saisir mon code manuellement</button>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
 </div>
 
@@ -404,6 +410,33 @@
   <textarea id="absence-motif" class="note-textarea" placeholder="Ex : ne s'est pas présenté sur le chantier ce matin..."></textarea>
   <button class="btn btn-secondary" onclick="soumettreAbsence()">✅ Signaler l'absence</button>
   <button class="btn btn-outline" onclick="showScreen('screen-gestion-personnel')">Annuler</button>
+</div>
+
+<!-- ══════════════ CAMPAGNE D'INVENTAIRE DE STOCK ══════════════ -->
+<div id="screen-inventaire-stock" class="screen">
+  <h2>📋 Campagne d'inventaire</h2>
+  <div id="inv-sans-campagne" class="hidden" style="text-align:center;color:var(--grey);padding:20px 10px">Aucune campagne d'inventaire n'est en cours actuellement.</div>
+  <div id="inv-avec-campagne" class="hidden">
+    <p id="inv-nom-campagne" style="font-weight:700;color:var(--blue);font-size:15px"></p>
+    <label class="field-label">Zone dépôt (si compté au dépôt)</label>
+    <input type="text" id="inv-zone" class="select-input" placeholder="Ex : 30E, Atelier, Carton...">
+    <label class="field-label">Chantier (si compté sur un chantier, sinon laisser vide)</label>
+    <input type="text" id="inv-chantier" class="select-input" placeholder="Ex : 070 Singuizou...">
+    <label class="field-label">Fabriquant</label>
+    <input type="text" id="inv-fabriquant" class="select-input" placeholder="Ex : Legrand, Hager...">
+    <label class="field-label">Référence</label>
+    <input type="text" id="inv-reference" class="select-input" placeholder="Référence article">
+    <label class="field-label">Désignation</label>
+    <input type="text" id="inv-designation" class="select-input" placeholder="Description de l'article">
+    <label class="field-label">Quantité comptée</label>
+    <input type="number" id="inv-quantite" class="select-input" step="0.01" placeholder="0">
+    <label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px"><input type="checkbox" id="inv-chute-cable" style="width:18px;height:18px"> Chute de câble (métrage non standard)</label>
+    <label class="field-label">Observations (optionnel)</label>
+    <textarea id="inv-observations" class="note-textarea" placeholder="Ex : à vérifier, article lié, obsolète..."></textarea>
+    <button class="btn btn-secondary" id="inv-btn-soumettre" onclick="soumettreLigneInventaire()">✅ Ajouter la ligne</button>
+    <div id="inv-mes-lignes" style="margin-top:16px"></div>
+  </div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
 </div>
 
 <!-- ══════════════ RÉSERVATION ══════════════ -->
