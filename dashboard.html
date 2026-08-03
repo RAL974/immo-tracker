@@ -1036,6 +1036,7 @@ function renderVueGenerale(){
     {ic:'🔧',v:(s.chez_prestataire||0),l:'Chez prestataire',cl:(s.chez_prestataire||0)>0?'yellow':'green',tab:'alertes'},
     {ic:'⚫',v:nbHSDef,l:'HS définitif',cl:nbHSDef>0?'grey':'green',tab:'analyses'},
     {ic:'❌',v:nbPerdus,l:'Perdues',cl:nbPerdus>0?'red':'green',tab:'analyses'},
+    {ic:'🚨',v:countCandidatsReforme(),l:'À réformer',cl:countCandidatsReforme()>0?'red':'green',tab:'analyses'},
   ];
   document.getElementById('kpi-grid').innerHTML=kpis.map(function(k){return'<div class="kpi '+k.cl+'" onclick="goTab(\''+k.tab+'\')"><div style="font-size:18px;margin-bottom:6px">'+k.ic+'</div><div class="kv">'+k.v+'</div><div class="kl">'+k.l+'</div></div>';}).join('');
   var eList=[{k:'Neuf',c:'neuf',i:'⭐'},{k:'Bon état',c:'bon',i:'✅'},{k:'Usé',c:'use',i:'🔶'},{k:'Abîmé',c:'abime',i:'⚠️'},{k:'Hors service',c:'hs',i:'🔴'},{k:'Inconnu',c:'inc',i:'❓'}];
@@ -1501,6 +1502,8 @@ function renderDocs(){
 var GARANTIE_ANS=2;          // durée de garantie type (modifiable)
 var SEUIL_DORMANT_MOIS=6;    // seuil immo dormante (modifiable via le sélecteur)
 function setSeuilDormant(v){SEUIL_DORMANT_MOIS=parseInt(v,10)||6;renderMaint();}
+var SEUIL_REFORME_PCT=60;    // seuil % (coût réparations cumulé / valeur d'achat OU / VNC) déclenchant la proposition de réforme
+function setSeuilReforme(v){SEUIL_REFORME_PCT=parseInt(v,10)||60;renderAnalyse();}
 
 function renderMaint(){
   var cont=document.getElementById('maint-content');
@@ -1735,6 +1738,45 @@ function calcAmort(codeIM){
 }
 function eur(n){return (Math.round(n)).toLocaleString('fr-FR')+' €';}
 function pctAmort(codeIM){var a=calcAmort(codeIM);if(!a.amortissable||a.valeur<=0)return 0;return Math.min(100,Math.round(a.cumul/a.valeur*100));}
+
+// ── Coûts de réparation structurés & seuil de réforme (axe 3 maintenance) ──
+// Coût d'un mouvement Réparation/Entretien : colonne SharePoint dédiée (Cout_Reparation) si présente,
+// sinon repli sur l'ancien format texte dans Note (réparations saisies avant l'ajout de la colonne).
+function coutReparationMouvement(m){
+  if(m.cout_reparation!=null&&m.cout_reparation!==''){var c=parseFloat(m.cout_reparation);if(!isNaN(c)&&c>0)return c;}
+  var note=m.note||'';
+  var cm=note.match(/co[uû]t\s*r[eé]el\s*:?\s*([\d]+(?:[.,][\d]+)?)/i)
+    ||note.match(/([\d]+(?:[.,][\d]+)?)\s*[€EUR]/i)
+    ||note.match(/##COUT:([\d.,]+)##/i);
+  if(cm){var c2=parseFloat((cm[1]||'').replace(',','.'));if(!isNaN(c2)&&c2>0)return c2;}
+  return 0;
+}
+// Cumul des coûts de réparation/entretien d'une immo depuis toujours
+function coutReparationCumule(codeIM,all){
+  return (all||[]).filter(function(m){return m.code_im===codeIM&&(m.type_mouvement==='Réparation'||m.type_mouvement==='Entretien');})
+    .reduce(function(s,m){return s+coutReparationMouvement(m);},0);
+}
+// Ratios de réforme : coût cumulé / valeur d'achat ET / VNC actuelle
+function ratiosReforme(codeIM,all){
+  var mt=immoMeta[codeIM]||{};
+  var coutTotal=coutReparationCumule(codeIM,all);
+  var valAchat=mt.valeur_achat||0;
+  var vnc=calcAmort(codeIM).vnc;
+  var vncEpuisee=(vnc<=0&&coutTotal>0); // VNC déjà à 0 mais on continue à réparer → cas critique par définition
+  return {coutTotal:coutTotal,valAchat:valAchat,vnc:vnc,
+    ratioAchat:valAchat>0?Math.round(coutTotal/valAchat*100):0,
+    ratioVNC:vnc>0?Math.round(coutTotal/vnc*100):0,
+    vncEpuisee:vncEpuisee};
+}
+// Une immo est candidate à la réforme si l'un des deux ratios dépasse le seuil réglable
+function franchitSeuilReforme(r){return r.vncEpuisee||r.ratioAchat>=SEUIL_REFORME_PCT||r.ratioVNC>=SEUIL_REFORME_PCT;}
+// Nombre d'immos au-delà du seuil de réforme (pour le KPI de la vue générale)
+function countCandidatsReforme(){
+  if(!d)return 0;
+  var all=d.all_movements||[];
+  var codes={};all.forEach(function(m){if((m.type_mouvement==='Réparation'||m.type_mouvement==='Entretien')&&estImmoActivite(m.code_im))codes[m.code_im]=true;});
+  return Object.keys(codes).filter(function(c){return franchitSeuilReforme(ratiosReforme(c,all));}).length;
+}
 
 // ── Immos "activité" (terrain) vs "administratives" ──────────────────────
 // Les comptes administratifs (logiciels, mobilier, véhicules, informatique, cautions…) ne relèvent pas de l'activité terrain.
@@ -2257,70 +2299,71 @@ function renderAnalyse(){
   html+='</tbody></table></div></div>';
 
   // ── Top coûts maintenance ─────────────────────────────────────────────────
-  // Statistiques réparations depuis les mouvements réels
-  var reparations=all.filter(function(m){return m.type_mouvement==='Réparation'&&estImmoActivite(m.code_im);});
+  // Statistiques réparations/entretiens depuis les mouvements réels (colonne structurée Cout_Reparation, avec repli sur l'ancien texte en Note)
+  var reparations=all.filter(function(m){return (m.type_mouvement==='Réparation'||m.type_mouvement==='Entretien')&&estImmoActivite(m.code_im);});
   var costByImmo={};reparations.forEach(function(m){
-    var note=m.note||'';
-    // Multi-pattern : chercher le coût dans la note (format "Coût réel : X€" ou "COUT:X" ou premier nombre suivi de €)
-    var costMatch=note.match(/co[uû]t\s*r[eé]el\s*:?\s*([\d]+(?:[.,][\d]+)?)/i)
-      ||note.match(/([\d]+(?:[.,][\d]+)?)\s*[€EUR]/i)
-      ||note.match(/##COUT:([\d.,]+)##/i);
-    if(costMatch){
-      var c=parseFloat((costMatch[1]||'').replace(',','.'));
-      if(!isNaN(c)&&c>0){
-        if(!costByImmo[m.code_im])costByImmo[m.code_im]={code_im:m.code_im,total:0,count:0};
-        costByImmo[m.code_im].total+=c;
-        costByImmo[m.code_im].count++;
-      }
+    var c=coutReparationMouvement(m);
+    if(c>0){
+      if(!costByImmo[m.code_im])costByImmo[m.code_im]={code_im:m.code_im,total:0,count:0};
+      costByImmo[m.code_im].total+=c;
+      costByImmo[m.code_im].count++;
     }
   });
   var topCout=Object.values(costByImmo).sort(function(a,b){return b.total-a.total;}).slice(0,8);
   html+='<div class="card" style="border-top:3px solid var(--yellow)"><div class="card-head"><h3>💶 Top coûts réparations (réels)</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Réparations</th><th>Coût total</th></tr></thead><tbody>';
-  if(!topCout.length)html+='<tr><td colspan="4" class="es">Coûts saisis lors des résolutions de panne.</td></tr>';
+  if(!topCout.length)html+='<tr><td colspan="4" class="es">Coûts saisis lors des résolutions de panne ou des enregistrements de réparation/entretien.</td></tr>';
   else topCout.forEach(function(x){
     html+='<tr><td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+getLib(x.code_im).replace(/"/g,'')+'">'+x.code_im+'</span></td><td style="font-size:12px">'+getLib(x.code_im)+'</td><td>'+x.count+'</td><td style="font-weight:800;color:var(--orange)">'+x.total.toFixed(2)+'€</td></tr>';
   });
   html+='</tbody></table></div></div>';
 
-  // ── Candidats au remplacement — enrichis avec valeur d'achat ─────────────────
+  // ── Candidats à la réforme — coût réparations cumulé vs valeur d'achat ET VNC ──
   var candidats=[];
   var now_ts2=Date.now();
-  var allCodes=Object.keys(immoP).concat(topCout.map(function(x){return x.code_im;}));
+  // On considère TOUTES les immos ayant au moins une panne ou un coût de réparation/entretien (pas seulement le top 8 des coûts)
+  var allCodes=Object.keys(immoP).concat(Object.keys(costByImmo));
   allCodes=allCodes.filter(function(v,i,a){return a.indexOf(v)===i;});
   allCodes.forEach(function(code){
     var nbPannes=immoP[code]||0;
     var metaC=immoMeta[code]||{};
-    var valAchat=metaC.valeur_achat||0;
     var dateAchat=metaC.date_achat||'';
     var ageMois=dateAchat?Math.max(1,Math.round((now_ts2-new Date(dateAchat).getTime())/(30*86400000))):0;
-    var coutTotalRep=(costByImmo[code]||{}).total||0;
-    var ratio=valAchat>0?Math.round(coutTotalRep/valAchat*100):0;
-    var coutMensuel=ageMois>0&&coutTotalRep>0?Math.round(coutTotalRep/ageMois*10)/10:0;
+    var r=ratiosReforme(code,all);
+    var coutMensuel=ageMois>0&&r.coutTotal>0?Math.round(r.coutTotal/ageMois*10)/10:0;
+    var alerte=franchitSeuilReforme(r);
     var raison='';
-    if(valAchat>0&&ratio>=50)raison=ratio+'% valeur achat en reparations'+(ratio>=100?' CRITIQUE':'');
+    if(r.vncEpuisee)raison='VNC épuisée + réparations en cours';
+    else if(r.ratioVNC>=SEUIL_REFORME_PCT)raison=r.ratioVNC+'% de la VNC en réparations'+(r.ratioVNC>=100?' CRITIQUE':'');
+    else if(r.ratioAchat>=SEUIL_REFORME_PCT)raison=r.ratioAchat+'% de la valeur d\'achat en réparations';
     else if(nbPannes>=2)raison=nbPannes+'x en panne';
-    else if(coutTotalRep>500)raison='Cout reparations : '+coutTotalRep.toFixed(0)+'EUR';
+    else if(r.coutTotal>500)raison='Coût réparations : '+r.coutTotal.toFixed(0)+'€';
     else return;
-    candidats.push({code_im:code,libelle:getLib(code),nb_pannes:nbPannes,val_achat:valAchat,cout_rep:coutTotalRep,ratio:ratio,age_mois:ageMois,cout_mensuel:coutMensuel,raison:raison});
+    candidats.push({code_im:code,libelle:getLib(code),nb_pannes:nbPannes,val_achat:r.valAchat,vnc:r.vnc,vnc_epuisee:r.vncEpuisee,cout_rep:r.coutTotal,ratio_achat:r.ratioAchat,ratio_vnc:r.ratioVNC,age_mois:ageMois,cout_mensuel:coutMensuel,raison:raison,alerte:alerte});
   });
-  candidats.sort(function(a,b){return b.ratio-a.ratio||b.nb_pannes-a.nb_pannes||b.cout_rep-a.cout_rep;});
-  html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>Candidats au remplacement</h3></div>';
-  if(!candidats.length){html+='<p class="es" style="padding:16px">Aucun candidat. Renseignez Valeur_Achat dans SharePoint pour plus de precision.</p>';}
+  candidats.sort(function(a,b){return (b.alerte?1:0)-(a.alerte?1:0)||b.ratio_vnc-a.ratio_vnc||b.ratio_achat-a.ratio_achat||b.nb_pannes-a.nb_pannes;});
+  html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>🚨 Candidats à la réforme</h3>'+
+    '<label style="font-size:12px;color:var(--grey)">Seuil : <select onchange="setSeuilReforme(this.value)" style="padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:12px">'+
+    '<option value="40"'+(SEUIL_REFORME_PCT===40?' selected':'')+'>40%</option>'+
+    '<option value="60"'+(SEUIL_REFORME_PCT===60?' selected':'')+'>60%</option>'+
+    '<option value="80"'+(SEUIL_REFORME_PCT===80?' selected':'')+'>80%</option></select></label></div>';
+  if(!candidats.length){html+='<p class="es" style="padding:16px">Aucun candidat au seuil actuel. Renseignez Valeur_Achat dans SharePoint pour plus de précision.</p>';}
   else{
-    html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libelle</th><th>Pannes</th><th>Valeur achat</th><th>Cout reparations</th><th>Ratio</th><th>Age (mois)</th><th>Cout/mois</th></tr></thead><tbody>';
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Pannes</th><th>Valeur achat</th><th>VNC</th><th>Coût répar.</th><th>% achat</th><th>% VNC</th><th>Âge</th></tr></thead><tbody>';
     html+=candidats.slice(0,10).map(function(x){
-      var ratioColor=x.ratio>=100?'var(--red)':x.ratio>=50?'var(--orange)':'var(--grey)';
-      var rowClass=x.ratio>=100?'urgent-row':x.ratio>=50?'warn-row':'';
+      var rowClass=x.alerte?'urgent-row':((x.ratio_vnc>=SEUIL_REFORME_PCT*0.66||x.ratio_achat>=SEUIL_REFORME_PCT*0.66)?'warn-row':'');
+      var vncCell=x.vnc_epuisee?'<span style="color:var(--red);font-weight:800">épuisée</span>':(x.ratio_vnc?x.ratio_vnc+'%':'--');
       return '<tr class="'+rowClass+'">'+
         '<td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td>'+
         '<td style="font-size:12px">'+x.libelle+'</td>'+
         '<td style="color:var(--red);font-weight:700;text-align:center">'+x.nb_pannes+'</td>'+
-        '<td style="font-weight:600">'+(x.val_achat?x.val_achat.toLocaleString('fr-FR')+'EUR':'--')+'</td>'+
-        '<td style="font-weight:600;color:var(--orange)">'+(x.cout_rep?x.cout_rep.toFixed(0)+'EUR':'--')+'</td>'+
-        '<td style="font-weight:800;color:'+ratioColor+'">'+(x.ratio?x.ratio+'%':'--')+'</td>'+
-        '<td style="font-size:11px;color:var(--grey)">'+(x.age_mois?x.age_mois+'m':'--')+'</td>'+
-        '<td style="font-size:11px;color:var(--grey)">'+(x.cout_mensuel?x.cout_mensuel+'EUR/m':'--')+'</td></tr>';
+        '<td style="font-weight:600">'+(x.val_achat?eur(x.val_achat):'--')+'</td>'+
+        '<td style="font-weight:600;color:var(--green)">'+(x.vnc?eur(x.vnc):'--')+'</td>'+
+        '<td style="font-weight:600;color:var(--orange)">'+(x.cout_rep?eur(x.cout_rep):'--')+'</td>'+
+        '<td style="font-weight:800;color:'+(x.ratio_achat>=SEUIL_REFORME_PCT?'var(--red)':'var(--grey)')+'">'+(x.ratio_achat?x.ratio_achat+'%':'--')+'</td>'+
+        '<td style="font-weight:800;color:'+((x.vnc_epuisee||x.ratio_vnc>=SEUIL_REFORME_PCT)?'var(--red)':'var(--grey)')+'">'+vncCell+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+(x.age_mois?x.age_mois+'m':'--')+'</td></tr>';
     }).join('')+'</tbody></table></div>';
+    html+='<p style="font-size:11px;color:var(--grey);padding:8px 12px 0">🚨 (ligne rouge) = coût cumulé de réparations/entretiens ≥ '+SEUIL_REFORME_PCT+'% de la valeur d\'achat OU de la VNC (ou VNC déjà épuisée) → proposition de mise en cession/réforme.</p>';
   }
   html+='</div>';
 
@@ -2382,8 +2425,8 @@ async function chargerFicheImmo(codeIM){
     var hist=await r.json();
     var immoInfo=im[codeIM]||{};
     var l=immoInfo.Libelle||codeIM;
-    // Une Panne/Suivi_Panne n'est jamais un changement de possession : on l'ignore pour la localisation
-    var loc=hist.find(function(m){return m.type_mouvement!=='Panne'&&m.type_mouvement!=='Suivi_Panne';})||null;
+    // Une Panne/Suivi_Panne/Entretien n'est jamais un changement de possession : on l'ignore pour la localisation
+    var loc=hist.find(function(m){return m.type_mouvement!=='Panne'&&m.type_mouvement!=='Suivi_Panne'&&m.type_mouvement!=='Entretien';})||null;
     var estDepot=!loc||loc.type_mouvement==='Retour'||loc.type_mouvement==='Réparation'||loc.code_chantier==='DEPOT';
     // Panne active + prestataire éventuel
     var lastPanneF=hist.find(function(m){return m.type_mouvement==='Panne';});
@@ -2416,9 +2459,17 @@ async function chargerFicheImmo(codeIM){
       html+='<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">';
       if(mt2.valeur_achat)html+='<div style="background:#E8F5E9;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Valeur d achat :</span> <strong style="color:var(--green)">'+mt2.valeur_achat.toLocaleString('fr-FR')+'€</strong></div>';
       if(mt2.date_achat)html+='<div style="background:#E3F2FD;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Date d achat :</span> <strong style="color:var(--blue)">'+fmtD(mt2.date_achat)+'</strong></div>';
-      // Calcul ratio réparations
-      var coutRep2=0;(d.all_movements||[]).filter(function(m){return m.code_im===codeIM&&m.type_mouvement==='Réparation';}).forEach(function(m){var n=m.note||'';var cm=n.match(/Coût réel\s*:\s*([\d.,]+)/i);if(cm){var c=parseFloat(cm[1].replace(',','.'));if(!isNaN(c))coutRep2+=c;}});
-      if(coutRep2>0&&mt2.valeur_achat>0){var ratio2=Math.round(coutRep2/mt2.valeur_achat*100);var ratioColor=ratio2>=100?'var(--red)':ratio2>=50?'var(--orange)':'var(--green)';html+='<div style="background:#FFF3E0;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Coût réparations :</span> <strong style="color:'+ratioColor+'">'+coutRep2.toFixed(0)+'€ ('+ratio2+'% valeur achat)</strong></div>';}
+      // Coût réparations cumulé + double ratio (valeur d'achat et VNC) + alerte seuil de réforme
+      var rF=ratiosReforme(codeIM,d.all_movements||[]);
+      if(rF.coutTotal>0){
+        var alerteF=franchitSeuilReforme(rF);
+        var vncTxt=rF.vncEpuisee?'VNC épuisée':(rF.vnc>0?rF.ratioVNC+'% VNC':'—');
+        var ratioColorF=alerteF?'var(--red)':((rF.ratioAchat>=SEUIL_REFORME_PCT*0.66||rF.ratioVNC>=SEUIL_REFORME_PCT*0.66)?'var(--orange)':'var(--green)');
+        html+='<div style="background:#FFF3E0;border-radius:8px;padding:8px 14px;font-size:13px">'+
+          '<span style="color:var(--grey)">Coût réparations :</span> <strong style="color:'+ratioColorF+'">'+rF.coutTotal.toFixed(0)+'€ ('+rF.ratioAchat+'% achat · '+vncTxt+')</strong>'+
+          (alerteF?'<br><span style="font-size:11px;font-weight:700;color:var(--red)">🚨 Seuil de réforme atteint ('+SEUIL_REFORME_PCT+'%) — proposer une mise en cession/réforme.</span>':'')+
+          '</div>';
+      }
       html+='</div>';
     }
     // Données comptables (date mise en service + comptes) — réservé Admin / Gestionnaire Dépôt RUN / Encadrement
@@ -2496,6 +2547,9 @@ async function chargerFicheImmo(codeIM){
       var estEnPanneDash=(hist.length>0&&hist[0].type_mouvement==='Panne');
       panneBtn2.textContent=estEnPanneDash?'✅ Résoudre la panne':'📢 Déclarer une panne';
       (function(_c,_ep){panneBtn2.onclick=function(){if(_ep)resoudrePanneComplet(_c);else declarerPanneDash(_c);};})(codeIM,estEnPanneDash);actDiv.appendChild(panneBtn2);
+      // Bouton réparation/entretien indépendant d'une panne (coût structuré, sans passer par le circuit panne)
+      var repBtn2=document.createElement('button');repBtn2.style.cssText='padding:8px 14px;border:2px solid var(--blue);border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#E3F2FD;color:var(--blue)';repBtn2.textContent='🔧 Enregistrer réparation';
+      (function(_c){repBtn2.onclick=function(){ouvrirEnregistrerReparation(_c);};})(codeIM);actDiv.appendChild(repBtn2);
       // Boutons HS / Perdu / Volé / Disparu
       var sortieBtn=document.createElement('button');sortieBtn.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#B71C1C;color:#fff';sortieBtn.textContent='⛔ Sortie définitive';
       (function(_c,_l){sortieBtn.onclick=function(){ouvrirModalSortie(_c,_l);};})(codeIM,l);actDiv.appendChild(sortieBtn);
@@ -2723,6 +2777,37 @@ function resoudrePanneComplet(codeIM){
     fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
       .then(function(){btn.dataset.busy='';btn.disabled=false;fermerAction();refreshAll();alert('✅ Panne résolue ! ' + codeIM + ' est de retour dans le parc.');})
+      .catch(function(e){btn.dataset.busy='';btn.disabled=false;alert('Erreur : '+e.message);});
+  };
+  document.getElementById('act-overlay').classList.add('open');
+}
+
+// ── Enregistrement d'une réparation/entretien indépendant d'une panne ─────
+// (ex: entretien préventif, réparation ponctuelle sans passer par "Déclarer une panne")
+// Créé un mouvement de type "Entretien" : coût structuré compté dans le seuil de réforme,
+// mais SANS impact sur la localisation actuelle de l'immo (contrairement à "Réparation").
+function ouvrirEnregistrerReparation(codeIM){
+  document.getElementById('act-titre').textContent = '🔧 Enregistrer une réparation/entretien — ' + getLib(codeIM);
+  var today=new Date().toISOString().slice(0,10);
+  document.getElementById('act-form').innerHTML =
+    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:#F8FAFC"></div>' +
+    '<div class="frow"><label>Date de l\'intervention</label><input type="date" id="er-date" value="'+today+'"></div>' +
+    '<div class="frow"><label>Prestataire</label><input type="text" id="er-prest" placeholder="Nom du réparateur/prestataire..."></div>' +
+    '<div class="frow"><label>Coût (€) <span style="color:var(--red)">*</span></label><input type="number" id="er-cout" placeholder="0" step="0.01"></div>' +
+    '<div class="frow"><label>Note <span style="color:var(--red)">*</span></label><textarea id="er-note" rows="3" placeholder="Obligatoire — détailler l\'intervention effectuée..."></textarea></div>';
+  var btn = document.getElementById('act-confirm-btn');
+  if(btn) btn.onclick = function(){
+    var date  = (document.getElementById('er-date')||{}).value||today;
+    var prest = (document.getElementById('er-prest')||{}).value||'';
+    var cout  = (document.getElementById('er-cout')||{}).value||'';
+    var note  = (document.getElementById('er-note')||{}).value||'';
+    if(!cout||parseFloat(cout)<=0){ alert('Indique un coût supérieur à 0.'); return; }
+    if(!note||note.trim().length<10){ alert('La note est obligatoire (10 car. min.).'); return; }
+    if(btn.dataset.busy==='1')return; // anti double-clic
+    btn.dataset.busy='1'; btn.disabled=true;
+    fetch(W+'?action=enregistrer_reparation',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code_im:codeIM,date_reparation:date,prestataire:prest,cout_reparation:cout,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
+      .then(function(){btn.dataset.busy='';btn.disabled=false;fermerAction();refreshAll();alert('✅ Réparation/entretien enregistré pour ' + codeIM + '.');})
       .catch(function(e){btn.dataset.busy='';btn.disabled=false;alert('Erreur : '+e.message);});
   };
   document.getElementById('act-overlay').classList.add('open');
