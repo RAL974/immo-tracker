@@ -139,7 +139,7 @@ Le **secret client** (sensible) est stocké chiffré dans les variables Cloudfla
 | Dashboard cassé (codes affichés à la place des libellés, catégories vides) | `immos.json` écrasé/absent, ou confondu avec `immos_full.json` (mauvaise structure) | Vérifier `immos.json` commence par `[`, `immos_full.json` par `{` |
 | `tb-depot null` / panneau vide après clic sur un onglet | Ancien bug : le code détruisait le HTML interne du panneau avant que les données soient prêtes | Corrigé : `goTab` ne détruit plus la structure des panneaux |
 | Catégories dupliquées ×5 dans un menu déroulant | `appendChild` répété sans vider le `<select>` au préalable | Toujours réinitialiser `innerHTML` avant de repeupler une liste |
-| `Field 'X' is not recognized` à l'écriture SharePoint | Colonne inexistante dans la liste SharePoint (le code suppose son existence) | Vérifier la liste des colonnes réelles avant tout ajout de champ (voir `02_MODELE_DONNEES.md`) |
+| `Field 'X' is not recognized` à l'écriture SharePoint | Colonne inexistante dans la liste SharePoint, **ou renommée** : le nom interne peut différer du nom affiché après un renommage dans l'interface | Vérifier la liste des colonnes réelles avant tout ajout de champ (voir `02_MODELE_DONNEES.md`) ; en cas de doute sur le nom interne, interroger `?debug_inventaire_columns=1` (ou l'équivalent Graph `/lists/{liste}/columns`) plutôt que de se fier au nom affiché |
 | Erreur silencieuse sur écriture liste Employés | La liste **Employes n'a pas de colonne `Actif`** ; le statut est dans `field_2` | Toujours utiliser `field_2` pour le statut actif/inactif d'un employé |
 
 ## Outils de diagnostic
@@ -328,7 +328,7 @@ Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour
 | `Zone` | Texte | Emplacement physique dans le dépôt/atelier (ex. `30E`, `Atelier`, `Carton`) — sans signification si `Chantier` est renseigné |
 | `Site` | Texte | `Reunion` / `Mayotte` |
 | `Chantier` | Texte | Optionnel — renseigné quand le comptage a eu lieu sur un chantier plutôt qu'au dépôt |
-| `Fabriquant` | Texte | Tel que saisi par l'opérateur |
+| `Fabricant` | Texte | Tel que saisi par l'opérateur |
 | `Reference` | Texte | Référence article (texte libre, aucun catalogue de prix rattaché) |
 | `Designation` | Texte | Désignation libre |
 | `Quantite` | Nombre | |
@@ -535,6 +535,7 @@ Deux nouvelles capacités `ROLE_CAPS` :
 - **Décisions de cadrage prises avec William avant développement** : portée = campagne ponctuelle (pas de suivi continu) ; comptage manuel uniquement, **aucune valorisation** (base de prix historique trop évoluée pour être fiable) ; périmètre = dépôt/atelier **et** chantiers actifs ; import des données brutes de décembre 2025 comme première campagne clôturée pour permettre un écart dès la 2e campagne ; saisie ouverte aux gestionnaires dépôt, CT/RA pour leur propre chantier, **et personnel temporaire d'agence d'intérim** (nouveau rôle `Compteur_Inventaire`) ; corrections par l'auteur ou un admin tant que la campagne est "En cours", figée à la clôture.
 - **Conséquence technique** : le personnel temporaire n'ayant pas de carte BTP imprimée, une option "Saisir mon code manuellement" a été ajoutée à l'écran d'activation de la PWA (`activationManuelle()` dans `app.js`), en plus du scan QR existant.
 - Implémentation : 2 nouvelles listes SharePoint (`Campagnes_Inventaire`, `Lignes_Inventaire`), 7 nouvelles actions Worker, nouvel écran PWA ("📋 Campagne d'inventaire"), nouvel onglet dashboard ("📦 Inventaire stock") avec rapport d'écart et export CSV.
+- **Incident au premier essai d'import** : la migration décembre 2025 s'est terminée sans erreur visible mais avec 0 ligne réellement écrite — SharePoint rejetait le champ `Fabriquant` ("not recognized"). Diagnostiqué via un nouvel endpoint de debug (`?debug_inventaire_columns=1`, sur le même principe que les `debug_*` existants) qui liste les noms internes réels des colonnes. Cause : la colonne avait été recréée sous le nom `Fabricant` (orthographe standard, différente du nom `Fabriquant` initialement spécifié — le fichier Excel d'origine de déc. 2025 avait justement les deux orthographes sur deux colonnes distinctes, source de la confusion). Code et documentation alignés sur `Fabricant`. Leçon retenue : en cas d'erreur "Field 'X' is not recognized", vérifier le nom **interne** de la colonne (peut différer du nom affiché après un renommage), pas seulement le nom visible dans l'interface SharePoint.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
