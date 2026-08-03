@@ -211,6 +211,15 @@ async function handleRequest(request) {
     }));
   }
 
+  // ── Absences signalées (registre à sens unique, consultable Admin/Encadrement) ──
+  if (p.get('absences') === '1') {
+    const items = await paginate(GL + '/Absences/items?$expand=fields&$orderby=fields/Created%20desc&$top=500', 5);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { code_employe: f.Title || '', code_declarant: f.Code_Declarant || '', date_absence: f.Date_Absence || '', motif: f.Motif || '', site: f.Site || '', horodatage: f.Horodatage || f.Created || '' };
+    }));
+  }
+
   // ── Réservations par employé ──────────────────────────────────────────────────
   if (p.get('mes_reservations')) {
     const code = p.get('mes_reservations');
@@ -860,6 +869,22 @@ async function handleRequest(request) {
         Commentaire: body.par_nom || body.par_code || 'CONI', Note: note, Cout_Reparation: coutNum, Horodatage: horodatage
       } }) });
       return json({ success: r.ok });
+    }
+
+    // ── Signaler l'absence d'un employé (registre à sens unique) ──
+    if (action === 'signaler_absence') {
+      const codeAbsent = (body.code_employe || '').trim();
+      const dateAbsence = body.date_absence || '';
+      if (!codeAbsent || !dateAbsence) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Absences/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: codeAbsent, Code_Declarant: body.code_declarant || '', Date_Absence: dateAbsence,
+          Motif: body.motif || '', Site: body.site || 'Reunion', Horodatage: new Date().toISOString()
+        } }) });
+        const rd = await r.json();
+        if (r.ok) return json({ success: true, id: rd.id });
+        return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
     // ── Déclarer vol ou disparition ──
