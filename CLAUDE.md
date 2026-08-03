@@ -93,7 +93,7 @@ Les interfaces web ne parlent jamais directement à SharePoint : tout passe par 
 |---|---|---|---|
 | PWA terrain | `app.js`, `index.html` | GitHub Pages | https://ral974.github.io/immo-tracker/ |
 | Dashboard | `dashboard.html` (autonome HTML+CSS+JS) | GitHub Pages | https://ral974.github.io/immo-tracker/dashboard.html |
-| Worker (proxy sécurisé) | `worker.js` | Cloudflare Workers | https://immo-proxy.ral-85d.workers.dev/ |
+| Worker (proxy sécurisé) | `worker.js` + `wrangler.toml` (dans le dépôt depuis août 2026, voir plus bas) | Cloudflare Workers | https://immo-proxy.ral-85d.workers.dev/ |
 | Catalogue immos (léger) | `immos.json` — **tableau** `[...]` de 1023 immos | GitHub Pages (racine) | .../immos.json |
 | Catalogue immos (complet, migration) | `immos_full.json` — **objet** `{...}` de 1167 immos | GitHub Pages (racine) | .../immos_full.json |
 | Base de données | Listes SharePoint | Microsoft 365 Espace Soleil | espacesoleil97.sharepoint.com/sites/Logistique-Immos |
@@ -120,9 +120,13 @@ Le **secret client** (sensible) est stocké chiffré dans les variables Cloudfla
 4. **Vérifier après coup** en ouvrant l'URL du fichier dans un navigateur.
 
 ### Worker Cloudflare
-1. Cloudflare → Workers → `immo-proxy` → Edit code.
-2. Tout sélectionner, remplacer par le nouveau contenu, **Deploy**.
-3. Le `worker.js` n'est **jamais** publié sur GitHub (contient la logique d'accès) — conserver une sauvegarde hors ligne séparée.
+**Depuis août 2026 : déploiement automatique via Git.** William a connecté le Worker `immo-proxy` au dépôt `RAL974/immo-tracker` (Cloudflare → Workers → immo-proxy → Settings → Build → Git repository). Désormais :
+1. `worker.js` est commité normalement dans le dépôt (racine), avec un fichier `wrangler.toml` (`name = "immo-proxy"`, `main = "worker.js"`) obligatoire pour que le build sache quoi déployer.
+2. Un `git push` sur `main` déclenche automatiquement `npx wrangler deploy` côté Cloudflare — plus besoin de copier-coller manuellement le code dans l'éditeur Cloudflare.
+3. Le **secret Azure reste protégé** : `CLIENT_SECRET_ENV` est une variable d'environnement Cloudflare (Settings → Variables and Secrets), jamais dans le code ni dans le dépôt Git. Un déploiement Git ne touche pas à cette configuration.
+4. **Vérification après un push** : onglet *Deployments* du Worker dans Cloudflare (statut du build), puis tester une lecture simple ex. `?debug_mouvements=1` dans un navigateur pour confirmer que l'API répond toujours.
+
+⚠️ **Avant août 2026**, `worker.js` n'était jamais commité (l'app GitHub "Claude" n'avait pas les droits d'écriture nécessaires pour un dépôt gérant un secret, et le Worker n'était pas encore connecté en Git) : toute modification se faisait par copier-coller manuel dans l'éditeur Cloudflare. Cette contrainte n'existe plus, mais rester prudent : un déploiement Worker cassé coupe l'API pour tous les utilisateurs immédiatement (contrairement à un bug PWA/Dashboard, sans risque et facile à corriger).
 
 ## Pièges connus (vécus, à éviter)
 
@@ -217,12 +221,15 @@ Content-type de la liste : `Item`.
 |---|---|
 | `Title` | Code immobilisation concernée |
 | `Code_Employe` | Auteur du mouvement (pour un retour validé : le **déclarant terrain**, pas le validateur — voir ci-dessous) |
-| `Type_Mouvement` | `Transfert` / `Retour` / `Panne` / `Réparation` / `Archivage` |
+| `Type_Mouvement` | `Transfert` / `Retour` / `Panne` / `Réparation` / `Archivage` / `Entretien` (ajouté août 2026, voir ci-dessous) |
 | `Code_Chantier` | Destination. Pour un transfert classique : code du receveur. Pour un retour **validé par un garant** : format spécial `DEPOT|code_validateur|nom_validateur` |
 | `Commentaire` | Utilisé pour stocker le nom du déclarant terrain dans le cas d'un retour validé |
 | `Etat` | État constaté à ce mouvement |
 | `Note` | Commentaire libre + traçabilité automatique (ex. `[retour validé par COUTAREL Nicolas]`) |
+| `Cout_Reparation` | Nombre (ajoutée août 2026) — coût structuré d'une réparation/entretien. Source de vérité pour les calculs de ratio ; le dashboard se replie sur l'ancien format texte (`##COUT:X##` dans `Note`) pour les mouvements créés avant l'ajout de cette colonne. |
 | `Horodatage` | Date et heure ISO |
+
+⚠️ **`Entretien` vs `Réparation`** : un mouvement `Réparation` (résolution de panne) signifie que l'immo **revient au dépôt** — changement de possession. Un mouvement `Entretien` (bouton "🔧 Enregistrer réparation", indépendant d'une panne) **n'affecte pas** la localisation courante de l'immo, comme `Panne`/`Suivi_Panne`. Les deux comptent dans le cumul de coûts du seuil de réforme.
 
 ## Autres listes
 
