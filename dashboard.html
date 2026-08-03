@@ -1035,6 +1035,7 @@ function renderInventaireStock(){
   }
   if(invCampagneOuverte)html+=renderDetailCampagneInventaire(invCampagneOuverte);
   div.innerHTML=html;
+  if(invCampagneOuverte)refreshInvEcartResults();
 }
 
 async function lancerCampagneInventaire(){
@@ -1066,76 +1067,103 @@ async function voirDetailCampagneInventaire(nom){
   renderInventaireStock();
 }
 
+// Coquille statique (n'est reconstruite qu'à l'ouverture d'une campagne, jamais à chaque frappe dans la recherche —
+// sinon le champ de saisie perd le focus à chaque caractère tapé, ce qui rendait la recherche inutilisable).
 function renderDetailCampagneInventaire(nom){
   var c=invCampagnesList.find(function(x){return x.nom===nom;});
   var lignes=invLignesCache[nom]||[];
   var f=INV_ECART_FILTRES;
   var html='<div class="card"><div class="card-head"><h3>📋 '+nom+'</h3>'+
     '<button onclick="exporterEcartInventaire(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export écart (CSV)</button></div>';
-  // Campagne précédente clôturée (par date de début, chronologiquement avant celle-ci)
   var closedBefore=invCampagnesList.filter(function(x){return x.statut==='Clôturée'&&x.nom!==nom&&new Date(x.date_debut||0)<new Date(c?c.date_debut:Date.now());})
     .sort(function(a,b){return new Date(b.date_debut)-new Date(a.date_debut);});
   var precedente=closedBefore[0];
   html+='<div style="padding:12px 14px;font-size:12px;color:var(--grey)">'+lignes.length+' ligne(s) saisie(s)'+(precedente?' — comparé à « '+precedente.nom+' »':' — aucune campagne précédente clôturée à comparer')+'</div>';
   if(precedente){
-    if(!invLignesCache[precedente.nom]){
-      html+='<p class="es" style="padding:16px">Chargement de la comparaison…</p>';
-      fetchLignesCampagne(precedente.nom).then(function(){if(invCampagneOuverte===nom)renderInventaireStock();});
-    }else{
-      var ecartsBruts=calculerEcartInventaire(lignes,invLignesCache[precedente.nom]);
-      var manquants=ecartsBruts.filter(function(e){return e.statut==='Manquant';}).length;
-      var nouveaux=ecartsBruts.filter(function(e){return e.statut==='Nouveau / Retrouvé';}).length;
-      var ecartsQte=ecartsBruts.filter(function(e){return e.statut==='Écart quantité';}).length;
-      var sansRefBrutes=lignesSansReference(lignes);
-      html+='<div style="display:flex;gap:12px;padding:0 14px 12px;flex-wrap:wrap">'+
-        '<div style="background:#FFEBEE;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--red)">'+manquants+'</div><div style="font-size:11px;color:var(--grey)">Manquants</div></div>'+
-        '<div style="background:#FFF3E0;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--orange)">'+ecartsQte+'</div><div style="font-size:11px;color:var(--grey)">Écarts de quantité</div></div>'+
-        '<div style="background:#E8F5E9;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--green)">'+nouveaux+'</div><div style="font-size:11px;color:var(--grey)">Nouveaux / retrouvés</div></div>'+
-        '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)">'+sansRefBrutes.length+'</div><div style="font-size:11px;color:var(--grey)">Sans référence</div></div>'+
-      '</div>';
-      // Filtres combinables (recherche + site + statut + sans désignation + nb affiché) + réinitialisation
-      html+='<div class="filters" style="padding:0 14px 12px">'+
-        '<input type="text" id="inv-ecart-q" value="'+(f.q||'').replace(/"/g,'&quot;')+'" oninput="appliquerFiltresInvEcart()" placeholder="Référence, désignation, lieu..." style="flex:1;min-width:180px">'+
-        '<select id="inv-ecart-site" onchange="appliquerFiltresInvEcart()"><option value=""'+(f.site===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(f.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(f.site==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
-        '<select id="inv-ecart-statut" onchange="appliquerFiltresInvEcart()">'+
-          '<option value=""'+(f.statut===''?' selected':'')+'>Tous statuts</option>'+
-          '<option value="Manquant"'+(f.statut==='Manquant'?' selected':'')+'>Manquants</option>'+
-          '<option value="Écart quantité"'+(f.statut==='Écart quantité'?' selected':'')+'>Écarts de quantité</option>'+
-          '<option value="Nouveau / Retrouvé"'+(f.statut==='Nouveau / Retrouvé'?' selected':'')+'>Nouveaux / retrouvés</option>'+
-          '<option value="Confirmé"'+(f.statut==='Confirmé'?' selected':'')+'>Confirmés</option>'+
-        '</select>'+
-        '<select id="inv-ecart-nb" onchange="appliquerFiltresInvEcart()"><option value="100"'+(f.nb===100?' selected':'')+'>100 max</option><option value="300"'+(f.nb===300?' selected':'')+'>300 max</option><option value="1000"'+(f.nb===1000?' selected':'')+'>1000 max</option><option value="0"'+(f.nb===0?' selected':'')+'>Tous</option></select>'+
-        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--grey)"><input type="checkbox" id="inv-ecart-sans-desig" onchange="appliquerFiltresInvEcart()"'+(f.sansDesig?' checked':'')+'> Sans désignation uniquement</label>'+
-        '<button class="filter-btn" onclick="resetFiltresInvEcart()">🔄 Réinitialiser</button>'+
-      '</div>';
-      var ecarts=filtrerEcarts(ecartsBruts);
-      var ecartsAffiches=f.nb>0?ecarts.slice(0,f.nb):ecarts;
-      html+='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Désignation</th><th>Site</th><th>Lieu</th><th>Qté avant</th><th>Qté actuelle</th><th>Écart</th><th>Statut</th></tr></thead><tbody>';
-      if(!ecartsAffiches.length)html+='<tr><td colspan="8" class="es">Aucune ligne pour ces filtres.</td></tr>';
-      ecartsAffiches.forEach(function(e){
-        var color=e.statut==='Manquant'?'var(--red)':e.statut==='Écart quantité'?'var(--orange)':e.statut==='Nouveau / Retrouvé'?'var(--green)':'var(--grey)';
-        html+='<tr><td>'+e.reference+'</td><td style="font-size:12px">'+(e.designation||'—')+'</td><td>'+badgeSiteD(e.site)+'</td><td style="font-size:11px">'+(e.lieu||'—')+'</td><td>'+e.quantite_avant+'</td><td>'+e.quantite_actuelle+'</td><td>'+(e.delta>0?'+':'')+e.delta+'</td><td style="color:'+color+';font-weight:700;font-size:11px">'+e.statut+'</td></tr>';
-      });
-      html+='</tbody></table></div>';
-      html+='<p style="font-size:11px;color:var(--grey);padding:8px 14px">'+ecarts.length+' ligne(s) après filtre'+(ecarts.length>ecartsAffiches.length?' — '+ecartsAffiches.length+' affichée(s), augmenter "max" ou voir l\'export CSV complet pour la totalité':'')+'.</p>';
-      // Lignes sans référence : exclues du rapprochement (voir invGrouper), listées à part, non classées
-      var sansRefFiltrees=filtrerLignesSansRef(sansRefBrutes);
-      html+='<div class="card" style="margin:12px 14px;border-top:3px solid var(--grey)"><div class="card-head"><h3>❓ Sans référence ('+sansRefFiltrees.length+')</h3></div>'+
-        '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Lignes saisies sans référence : ne peuvent pas être rapprochées de manière fiable avec la campagne précédente, à corriger si possible.</p>';
-      if(!sansRefFiltrees.length)html+='<p class="es" style="padding:16px">Aucune (pour ces filtres).</p>';
-      else{
-        html+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Fabricant</th><th>Site</th><th>Lieu</th><th>Quantité</th><th>Saisi par</th></tr></thead><tbody>';
-        sansRefFiltrees.forEach(function(l){
-          html+='<tr><td style="font-size:12px">'+(l.designation||'—')+'</td><td style="font-size:12px">'+(l.fabriquant||'—')+'</td><td>'+badgeSiteD(l.site)+'</td><td style="font-size:11px">'+(l.chantier||l.zone||'—')+'</td><td>'+l.quantite+'</td><td style="font-size:11px;color:var(--grey)">'+nomEmploye(l.code_employe)+'</td></tr>';
-        });
-        html+='</tbody></table></div>';
-      }
-      html+='</div>';
-    }
+    html+='<div style="display:flex;gap:12px;padding:0 14px 12px;flex-wrap:wrap">'+
+      '<div style="background:#FFEBEE;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--red)" id="inv-tile-manquants">—</div><div style="font-size:11px;color:var(--grey)">Manquants</div></div>'+
+      '<div style="background:#FFF3E0;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--orange)" id="inv-tile-ecarts">—</div><div style="font-size:11px;color:var(--grey)">Écarts de quantité</div></div>'+
+      '<div style="background:#E8F5E9;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--green)" id="inv-tile-nouveaux">—</div><div style="font-size:11px;color:var(--grey)">Nouveaux / retrouvés</div></div>'+
+      '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)" id="inv-tile-sansref">—</div><div style="font-size:11px;color:var(--grey)">Sans référence</div></div>'+
+    '</div>';
+    html+='<div class="filters" style="padding:0 14px 12px">'+
+      '<input type="text" id="inv-ecart-q" value="'+(f.q||'').replace(/"/g,'&quot;')+'" oninput="appliquerFiltresInvEcart()" placeholder="Référence, désignation, lieu..." style="flex:1;min-width:180px">'+
+      '<select id="inv-ecart-site" onchange="appliquerFiltresInvEcart()"><option value=""'+(f.site===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(f.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(f.site==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
+      '<select id="inv-ecart-statut" onchange="appliquerFiltresInvEcart()">'+
+        '<option value=""'+(f.statut===''?' selected':'')+'>Tous statuts</option>'+
+        '<option value="Manquant"'+(f.statut==='Manquant'?' selected':'')+'>Manquants</option>'+
+        '<option value="Écart quantité"'+(f.statut==='Écart quantité'?' selected':'')+'>Écarts de quantité</option>'+
+        '<option value="Nouveau / Retrouvé"'+(f.statut==='Nouveau / Retrouvé'?' selected':'')+'>Nouveaux / retrouvés</option>'+
+        '<option value="Confirmé"'+(f.statut==='Confirmé'?' selected':'')+'>Confirmés</option>'+
+      '</select>'+
+      '<select id="inv-ecart-nb" onchange="appliquerFiltresInvEcart()"><option value="100"'+(f.nb===100?' selected':'')+'>100 max</option><option value="300"'+(f.nb===300?' selected':'')+'>300 max</option><option value="1000"'+(f.nb===1000?' selected':'')+'>1000 max</option><option value="0"'+(f.nb===0?' selected':'')+'>Tous</option></select>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--grey)"><input type="checkbox" id="inv-ecart-sans-desig" onchange="appliquerFiltresInvEcart()"'+(f.sansDesig?' checked':'')+'> Sans désignation uniquement</label>'+
+      '<button class="filter-btn" onclick="resetFiltresInvEcart()">🔄 Réinitialiser</button>'+
+    '</div>';
+    html+='<div id="inv-ecart-results"><p class="es" style="padding:16px">Chargement…</p></div>';
+    html+='<div id="inv-sans-ref-results"></div>';
   }
   html+='<div style="padding:12px 14px"><button onclick="invCampagneOuverte=null;renderInventaireStock();" style="padding:6px 14px;background:#eee;border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
   html+='</div>';
   return html;
+}
+
+// Recalcule et affiche les résultats (tableaux + tuiles) sans toucher aux champs de filtre eux-mêmes,
+// pour ne jamais interrompre la saisie en cours dans le champ de recherche.
+function refreshInvEcartResults(){
+  var nom=invCampagneOuverte;
+  if(!nom)return;
+  var resDiv=document.getElementById('inv-ecart-results');
+  var sansRefDiv=document.getElementById('inv-sans-ref-results');
+  if(!resDiv)return; // pas (encore) de campagne précédente à comparer : rien à faire
+  var c=invCampagnesList.find(function(x){return x.nom===nom;});
+  var lignes=invLignesCache[nom]||[];
+  var closedBefore=invCampagnesList.filter(function(x){return x.statut==='Clôturée'&&x.nom!==nom&&new Date(x.date_debut||0)<new Date(c?c.date_debut:Date.now());})
+    .sort(function(a,b){return new Date(b.date_debut)-new Date(a.date_debut);});
+  var precedente=closedBefore[0];
+  if(!precedente)return;
+  if(!invLignesCache[precedente.nom]){
+    resDiv.innerHTML='<p class="es" style="padding:16px">Chargement de la comparaison…</p>';
+    fetchLignesCampagne(precedente.nom).then(function(){if(invCampagneOuverte===nom)refreshInvEcartResults();});
+    return;
+  }
+  var f=INV_ECART_FILTRES;
+  var ecartsBruts=calculerEcartInventaire(lignes,invLignesCache[precedente.nom]);
+  var manquants=ecartsBruts.filter(function(e){return e.statut==='Manquant';}).length;
+  var nouveaux=ecartsBruts.filter(function(e){return e.statut==='Nouveau / Retrouvé';}).length;
+  var ecartsQte=ecartsBruts.filter(function(e){return e.statut==='Écart quantité';}).length;
+  var sansRefBrutes=lignesSansReference(lignes);
+  var tM=document.getElementById('inv-tile-manquants');if(tM)tM.textContent=manquants;
+  var tE=document.getElementById('inv-tile-ecarts');if(tE)tE.textContent=ecartsQte;
+  var tN=document.getElementById('inv-tile-nouveaux');if(tN)tN.textContent=nouveaux;
+  var tS=document.getElementById('inv-tile-sansref');if(tS)tS.textContent=sansRefBrutes.length;
+
+  var ecarts=filtrerEcarts(ecartsBruts);
+  var ecartsAffiches=f.nb>0?ecarts.slice(0,f.nb):ecarts;
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Désignation</th><th>Site</th><th>Lieu</th><th>Qté avant</th><th>Qté actuelle</th><th>Écart</th><th>Statut</th></tr></thead><tbody>';
+  if(!ecartsAffiches.length)html+='<tr><td colspan="8" class="es">Aucune ligne pour ces filtres.</td></tr>';
+  ecartsAffiches.forEach(function(e){
+    var color=e.statut==='Manquant'?'var(--red)':e.statut==='Écart quantité'?'var(--orange)':e.statut==='Nouveau / Retrouvé'?'var(--green)':'var(--grey)';
+    html+='<tr><td>'+e.reference+'</td><td style="font-size:12px">'+(e.designation||'—')+'</td><td>'+badgeSiteD(e.site)+'</td><td style="font-size:11px">'+(e.lieu||'—')+'</td><td>'+e.quantite_avant+'</td><td>'+e.quantite_actuelle+'</td><td>'+(e.delta>0?'+':'')+e.delta+'</td><td style="color:'+color+';font-weight:700;font-size:11px">'+e.statut+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<p style="font-size:11px;color:var(--grey);padding:8px 14px">'+ecarts.length+' ligne(s) après filtre'+(ecarts.length>ecartsAffiches.length?' — '+ecartsAffiches.length+' affichée(s), augmenter "max" ou voir l\'export CSV complet pour la totalité':'')+'.</p>';
+  resDiv.innerHTML=html;
+
+  // Lignes sans référence : exclues du rapprochement (voir invGrouper), listées à part, non classées
+  var sansRefFiltrees=filtrerLignesSansRef(sansRefBrutes);
+  var htmlSr='<div class="card" style="margin:12px 14px;border-top:3px solid var(--grey)"><div class="card-head"><h3>❓ Sans référence ('+sansRefFiltrees.length+')</h3></div>'+
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Lignes saisies sans référence : ne peuvent pas être rapprochées de manière fiable avec la campagne précédente, à corriger si possible.</p>';
+  if(!sansRefFiltrees.length)htmlSr+='<p class="es" style="padding:16px">Aucune (pour ces filtres).</p>';
+  else{
+    htmlSr+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Fabricant</th><th>Site</th><th>Lieu</th><th>Quantité</th><th>Saisi par</th></tr></thead><tbody>';
+    sansRefFiltrees.forEach(function(l){
+      htmlSr+='<tr><td style="font-size:12px">'+(l.designation||'—')+'</td><td style="font-size:12px">'+(l.fabriquant||'—')+'</td><td>'+badgeSiteD(l.site)+'</td><td style="font-size:11px">'+(l.chantier||l.zone||'—')+'</td><td>'+l.quantite+'</td><td style="font-size:11px;color:var(--grey)">'+nomEmploye(l.code_employe)+'</td></tr>';
+    });
+    htmlSr+='</tbody></table></div>';
+  }
+  htmlSr+='</div>';
+  sansRefDiv.innerHTML=htmlSr;
 }
 
 async function exporterEcartInventaire(nom){
@@ -1214,11 +1242,11 @@ function appliquerFiltresInvEcart(){
   INV_ECART_FILTRES.statut=(document.getElementById('inv-ecart-statut')||{}).value||'';
   INV_ECART_FILTRES.sansDesig=!!(document.getElementById('inv-ecart-sans-desig')||{}).checked;
   INV_ECART_FILTRES.nb=parseInt((document.getElementById('inv-ecart-nb')||{}).value,10)||0;
-  renderInventaireStock();
+  refreshInvEcartResults(); // ne touche que les résultats, jamais les champs de filtre (sinon la recherche perd le focus)
 }
 function resetFiltresInvEcart(){
   INV_ECART_FILTRES={q:'',site:'',statut:'',sansDesig:false,nb:100};
-  renderInventaireStock();
+  reinitialiserFiltres(['inv-ecart-q','inv-ecart-site','inv-ecart-statut','inv-ecart-nb','inv-ecart-sans-desig'],refreshInvEcartResults);
 }
 function filtrerEcarts(ecarts){
   var qu=(INV_ECART_FILTRES.q||'').trim().toUpperCase();
