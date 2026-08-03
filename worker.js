@@ -245,7 +245,7 @@ async function handleRequest(request) {
     const items = await paginate(GL + '/Lignes_Inventaire/items?$expand=fields&$top=5000', 15);
     return json(items.filter(i => (i.fields || {}).Title === nom).map(i => {
       const f = i.fields || {};
-      return { id: i.id, campagne: f.Title || '', zone: f.Zone || '', site: f.Site || '', chantier: f.Chantier || '', fabriquant: f.Fabriquant || '', reference: f.Reference || '', designation: f.Designation || '', quantite: f.Quantite || 0, chute_cable: f.Chute_Cable === 'Oui', observations: f.Observations || '', code_employe: f.Code_Employe || '', horodatage: f.Horodatage || f.Created || '' };
+      return { id: i.id, campagne: f.Title || '', zone: f.Zone || '', site: f.Site || '', chantier: f.Chantier || '', fabriquant: f.Fabricant || '', reference: f.Reference || '', designation: f.Designation || '', quantite: f.Quantite || 0, chute_cable: f.Chute_Cable === 'Oui', observations: f.Observations || '', code_employe: f.Code_Employe || '', horodatage: f.Horodatage || f.Created || '' };
     }));
   }
 
@@ -952,7 +952,7 @@ async function handleRequest(request) {
       try {
         const r = await fetch(GL + '/Lignes_Inventaire/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
           Title: campagne, Zone: body.zone || '', Site: body.site || 'Reunion', Chantier: body.chantier || '',
-          Fabriquant: body.fabriquant || '', Reference: String(body.reference || ''), Designation: body.designation || '',
+          Fabricant: body.fabriquant || '', Reference: String(body.reference || ''), Designation: body.designation || '',
           Quantite: parseFloat(body.quantite) || 0, Chute_Cable: body.chute_cable ? 'Oui' : '',
           Observations: body.observations || '', Code_Employe: body.code_employe || '', Horodatage: new Date().toISOString()
         } }) });
@@ -984,7 +984,7 @@ async function handleRequest(request) {
         }
         const fields = {
           Zone: body.zone || '', Site: body.site || 'Reunion', Chantier: body.chantier || '',
-          Fabriquant: body.fabriquant || '', Reference: String(body.reference || ''), Designation: body.designation || '',
+          Fabricant: body.fabriquant || '', Reference: String(body.reference || ''), Designation: body.designation || '',
           Quantite: parseFloat(body.quantite) || 0, Chute_Cable: body.chute_cable ? 'Oui' : '', Observations: body.observations || ''
         };
         const r = await fetch(GL + '/Lignes_Inventaire/items/' + ligneId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
@@ -1003,7 +1003,7 @@ async function handleRequest(request) {
         headers: { 'Content-Type': 'application/json' },
         body: { fields: {
           Title: campagne, Zone: l.zone || '', Site: l.site || 'Reunion', Chantier: l.chantier || '',
-          Fabriquant: l.fabriquant || '', Reference: String(l.reference || ''), Designation: l.designation || '',
+          Fabricant: l.fabriquant || '', Reference: String(l.reference || ''), Designation: l.designation || '',
           Quantite: l.quantite || 0, Chute_Cable: l.chute_cable ? 'Oui' : '', Observations: l.observations || '',
           Code_Employe: body.par_code || 'ADMIN', Horodatage: body.horodatage || new Date().toISOString()
         } }
