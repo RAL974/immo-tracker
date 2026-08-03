@@ -264,6 +264,9 @@ tr:hover td{background:#FAFBFC;}
   <div class="nav-item" data-tab="documents"><span class="nav-icon">📄</span><span class="nav-label">Documents FDS</span><span class="nav-badge orange" id="nb-docs">—</span></div>
   <div class="nav-item" data-tab="maintenance"><span class="nav-icon">🔧</span><span class="nav-label">Maintenance</span><span class="nav-badge" id="nb-maint">—</span></div>
 
+  <div class="nav-group">PERSONNEL</div>
+  <div class="nav-item" data-tab="absences"><span class="nav-icon">🧑‍💼</span><span class="nav-label">Absences</span><span class="nav-badge" id="nb-absences">—</span></div>
+
   <div class="nav-group">ANALYTICS</div>
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
   <div class="nav-item" data-tab="analyses"><span class="nav-icon">📈</span><span class="nav-label">Analyses</span></div>
@@ -444,6 +447,13 @@ tr:hover td{background:#FAFBFC;}
       <div id="maint-content" style="display:none"></div>
     </div>
 
+    <!-- Absences -->
+    <div id="pane-absences" class="tab-pane">
+      <div class="card"><div class="card-head"><h3>🧑‍💼 Absences signalées</h3><span class="card-cnt" id="cnt-absences"></span></div>
+        <div id="absences-content"></div>
+      </div>
+    </div>
+
     <!-- Alertes -->
     <div id="pane-alertes" class="tab-pane"><div id="alertes-content"></div></div>
 
@@ -472,6 +482,7 @@ tr:hover td{background:#FAFBFC;}
     <div class="bnav-item" data-tab="maintenance" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🔧</span><span>Maint.</span></div>
     <div class="bnav-item" data-tab="analyses" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📈</span><span>Analyses</span></div>
     <div class="bnav-item" data-tab="utilisateurs" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">👥</span><span>Users</span></div>
+    <div class="bnav-item" data-tab="absences" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🧑‍💼</span><span>Absences</span></div>
     <div class="bnav-item" onclick="closeMobileMenu()"><span class="bi">✕</span><span>Fermer</span></div>
   </div>
 </div>
@@ -554,6 +565,12 @@ function peutVoirCompta(code){
   if(estAdmin(code))return true;
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='logistique'||role==='encadrement';
+}
+// Peut voir le registre des absences signalées : Admin + Encadrement uniquement (donnée personnel, pas logistique)
+function peutVoirAbsences(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='encadrement';
 }
 // Peut modifier l'emplacement d'une immo : admins + Gestionnaire Dépôt RUN (Logistique)
 function peutEditerEmplacement(code){
@@ -811,6 +828,7 @@ function renderTab(name){
     case 'reservations':   renderResa(); break;
     case 'documents':      if(!dataLoaded.docs)loadDocs(); else renderDocs(); break;
     case 'maintenance':    if(!dataLoaded.maint)loadMaint(); else renderMaint(); break;
+    case 'absences':       if(!dataLoaded.absences)loadAbsences(); else renderAbsences(); break;
     case 'alertes':        renderAlertes(); break;
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
@@ -904,6 +922,33 @@ async function loadMaint(){
     document.getElementById('maint-content').style.display='block';
     renderMaint();
   }catch(e){}
+}
+
+// ── Absences signalées (RA/CT/CT_Specialise/Logistique/Admin depuis la PWA) ──────
+var absencesList=[];
+async function loadAbsences(){
+  dataLoaded.absences=true;
+  if(!peutVoirAbsences(ADMIN_SESSION.code)){renderAbsences();return;}
+  try{
+    var r=await fetch(W+'?absences=1');
+    absencesList=await r.json();
+  }catch(e){absencesList=[];}
+  document.getElementById('nb-absences').textContent=absencesList.length;
+  renderAbsences();
+}
+function renderAbsences(){
+  var div=document.getElementById('absences-content');
+  if(!div)return;
+  if(!peutVoirAbsences(ADMIN_SESSION.code)){
+    div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux administrateurs.</p>';
+    return;
+  }
+  if(!absencesList.length){div.innerHTML='<p class="es" style="padding:40px">Aucune absence signalée.</p>';return;}
+  var rows=absencesList.slice().sort(function(a,b){return new Date(b.horodatage||0)-new Date(a.horodatage||0);}).map(function(a){
+    return '<tr><td>'+fmtD(a.date_absence)+'</td><td>'+nomEmploye(a.code_employe)+' ('+a.code_employe+')</td><td>'+nomEmploye(a.code_declarant)+' ('+a.code_declarant+')</td><td>'+badgeSiteD(a.site)+'</td><td>'+(a.motif?a.motif:'—')+'</td><td>'+fmtDT(a.horodatage)+'</td></tr>';
+  }).join('');
+  document.getElementById('cnt-absences').textContent=absencesList.length+' signalement(s)';
+  div.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Date absence</th><th>Employé</th><th>Signalé par</th><th>Site</th><th>Motif</th><th>Horodatage</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
 function refreshAll(){d=null;dataLoaded={};loadEmployes(true);loadAll();loadReservations();}

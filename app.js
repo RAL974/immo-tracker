@@ -57,15 +57,15 @@ var SUPER_ADMIN_CODES = ['AIWI'];
 //    comptesExtra : comptes normalement masqués mais visibles pour ce rôle (exceptions)
 // ══════════════════════════════════════════════════════════════════════════
 var ROLE_CAPS = {
-  'Admin':              { reserver:true, bisite:true,  garant:true,  voitTout:true, admin:true },
-  'Logistique':         { reserver:true, bisite:true,  garant:true,  voitTout:true },            // Gestionnaire Dépôt RUN
-  'Logistique_Mayotte': { reserver:true, bisite:false, garant:true,  voitTout:false, comptesExtra:['2182'] }, // mono-Mayotte, voit AUSSI les véhicules (entretien sur place)
-  'RA':                 { reserver:true, bisite:true },
-  'CT_Specialise':      { reserver:true, bisite:true },
-  'CT':                 { reserver:true, bisite:false },
+  'Admin':              { reserver:true, bisite:true,  garant:true,  voitTout:true, admin:true, absences:true, voitAbsences:true },
+  'Logistique':         { reserver:true, bisite:true,  garant:true,  voitTout:true, absences:true },            // Gestionnaire Dépôt RUN
+  'Logistique_Mayotte': { reserver:true, bisite:false, garant:true,  voitTout:false, comptesExtra:['2182'], absences:true }, // mono-Mayotte, voit AUSSI les véhicules (entretien sur place)
+  'RA':                 { reserver:true, bisite:true, absences:true },
+  'CT_Specialise':      { reserver:true, bisite:true, absences:true },
+  'CT':                 { reserver:true, bisite:false, absences:true },
   'Ouvrier_Specialise': { reserver:true, bisite:true },
   'Ouvrier':            {},                                                                        // aucun droit particulier
-  'Encadrement':        { bisite:true,  voitTout:true }                                            // view-only : voit tout (2 îles) pour export, ne réserve pas
+  'Encadrement':        { bisite:true,  voitTout:true, voitAbsences:true }                         // view-only : voit tout (2 îles) pour export, ne réserve pas
 };
 
 // Comptes comptables "administratifs" masqués aux rôles terrain (logiciels, mobilier, véhicules, informatique, cautions…)
@@ -75,7 +75,7 @@ var ETIQUETEUSES_VISIBLES = ['IM000272','IM000495','IM000496','IM000605','IM0006
 
 // Renvoie les capacités d'une personne (super-admin = toutes)
 function caps(code) {
-  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return { reserver:true, bisite:true, garant:true, voitTout:true, admin:true };
+  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return { reserver:true, bisite:true, garant:true, voitTout:true, admin:true, absences:true, voitAbsences:true };
   var role = normRole(S.droitsByCode && S.droitsByCode[code]);
   return ROLE_CAPS[role] || {};
 }
@@ -110,6 +110,11 @@ function voitDeuxSites(code) {
 // Est-il garant du dépôt (peut valider un retour) ?
 function estGarant(code) {
   return !!caps(code).garant;
+}
+
+// Peut-il signaler l'absence d'un employé (RA, CT, CT_Specialise, Logistique, Admin) ?
+function peutSignalerAbsence(code) {
+  return !!caps(code).absences;
 }
 
 // Quels sites cette personne peut-elle voir/réserver ?
@@ -420,6 +425,9 @@ function afficherEmploye() {
       btnResa.innerHTML = label + ' <span id="badge-resa" class="badge-count hidden"></span>';
     }
   }
+  // Case "Gestion personnel" — réservée à RA / CT / CT_Specialise / Logistique / Admin
+  const btnPersonnel = document.getElementById('btn-gestion-personnel');
+  if (btnPersonnel) btnPersonnel.classList.toggle('hidden', !peutSignalerAbsence(S.employe.code));
 }
 
 function changerUtilisateur() {
@@ -1462,6 +1470,61 @@ async function signalerPannePWA(codeIM) {
       document.getElementById('alerte-degradation')?.classList.add('hidden');
       showScreen('screen-confirmation');
       rafraichirBadges();
+    } else {
+      toast('Erreur lors du signalement', 'error');
+    }
+  } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
+}
+
+// ── Gestion personnel : signaler l'absence d'un employé (RA/CT/CT_Specialise/Logistique/Admin) ──
+function ouvrirEcranSignalerAbsence() {
+  const sitesOK = sitesAutorises(S.employe.code);
+  const sel = document.getElementById('select-absence-employe');
+  if (sel) {
+    const actifs = (S.employes || []).filter(e => e.Actif !== false && sitesOK.indexOf(normSite(e.Site)) !== -1);
+    sel.innerHTML = '<option value="">-- Sélectionne un employé --</option>' +
+      actifs.sort((a, b) => a.Nom.localeCompare(b.Nom))
+            .map(e => '<option value="' + e.Code + '">' + e.Nom + ' (' + e.Code + ')</option>').join('');
+  }
+  const dateEl = document.getElementById('absence-date');
+  if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
+  const motifEl = document.getElementById('absence-motif');
+  if (motifEl) motifEl.value = '';
+  showScreen('screen-signaler-absence');
+}
+
+async function soumettreAbsence() {
+  const codeAbsent = (document.getElementById('select-absence-employe') || {}).value || '';
+  const date = (document.getElementById('absence-date') || {}).value || '';
+  const motif = (document.getElementById('absence-motif') || {}).value || '';
+  if (!codeAbsent) { toast('Sélectionne l\'employé absent', 'error'); return; }
+  if (!date) { toast('Indique la date de l\'absence', 'error'); return; }
+  const empObj = (S.employes || []).find(e => e.Code === codeAbsent);
+  const nomAbsent = empObj ? empObj.Nom : codeAbsent;
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=signaler_absence', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code_employe: codeAbsent,
+        code_declarant: S.employe.code,
+        nom_declarant: S.employe.nom,
+        date_absence: date,
+        motif: motif,
+        site: normSite(S.siteByCode && S.siteByCode[S.employe.code]),
+      }),
+    });
+    const d = await r.json();
+    if (d.success !== false) {
+      vib(200);
+      document.getElementById('recap').innerHTML =
+        '<strong>🧑‍💼 Absence signalée</strong><br>' +
+        '<strong>Employé :</strong> ' + nomAbsent + ' (' + codeAbsent + ')<br>' +
+        '<strong>Date :</strong> ' + date + '<br>' +
+        (motif ? '<strong>Motif :</strong> ' + motif + '<br>' : '') +
+        '<strong>Signalé par :</strong> ' + S.employe.nom + '<br>' +
+        '<em style="color:var(--grey)">L\'encadrement en est informé via le dashboard.</em>';
+      document.getElementById('alerte-degradation')?.classList.add('hidden');
+      showScreen('screen-confirmation');
     } else {
       toast('Erreur lors du signalement', 'error');
     }
