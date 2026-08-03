@@ -340,6 +340,7 @@ window.addEventListener('load', async () => {
     return;
   }
   await Promise.all([chargerImmos(), chargerEmployes()]);
+  afficherEmploye(); // rafraîchit la visibilité des boutons dépendant du rôle (ex: Gestion personnel), pas encore connu au premier appel
   rafraichirBadges();
 });
 
@@ -548,6 +549,8 @@ function onScanActivation(code) {
       if (badge) badge.classList.add('hidden');
       showScreen('screen-login');
       toast('⛔ Compte inactif. Contactez le dépôt.', 'error', 5000);
+    } else {
+      afficherEmploye(); // rafraîchit la visibilité des boutons dépendant du rôle, pas encore connu au premier appel
     }
   });
   rafraichirBadges();
