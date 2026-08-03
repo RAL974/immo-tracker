@@ -1484,7 +1484,8 @@ function ouvrirEcranSignalerAbsence() {
   const sitesOK = sitesAutorises(S.employe.code);
   const sel = document.getElementById('select-absence-employe');
   if (sel) {
-    const actifs = (S.employes || []).filter(e => e.Actif !== false && sitesOK.indexOf(normSite(e.Site)) !== -1);
+    const actifs = (S.employes || []).filter(e => e.Actif !== false && sitesOK.indexOf(normSite(e.Site)) !== -1 &&
+      ['Ouvrier', 'Ouvrier_Specialise'].indexOf(e.Droits) !== -1);
     sel.innerHTML = '<option value="">-- Sélectionne un employé --</option>' +
       actifs.sort((a, b) => a.Nom.localeCompare(b.Nom))
             .map(e => '<option value="' + e.Code + '">' + e.Nom + ' (' + e.Code + ')</option>').join('');
