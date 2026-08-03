@@ -900,6 +900,9 @@ async function handleRequest(request) {
       return json({ success: r.ok });
     }
 
+    // Diagnostic temporaire : renvoie tel quel ce que le Worker a reçu/décodé, sans passer par Graph
+    if (action === 'echo_debug') { return json({ received: body }); }
+
     // ── Signaler l'absence d'un employé (registre à sens unique) ──
     if (action === 'signaler_absence') {
       const codeAbsent = (body.code_employe || '').trim();
