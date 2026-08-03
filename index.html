@@ -132,6 +132,11 @@
     📅 Réservations <span id="badge-resa" class="badge-count hidden"></span>
   </button>
 
+  <!-- Gestion personnel (RA / CT / CT_Specialise / Logistique / Admin) -->
+  <button id="btn-gestion-personnel" class="btn btn-link hidden" onclick="showScreen('screen-gestion-personnel')" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+    🧑‍💼 Gestion personnel
+  </button>
+
   <!-- Section admin -->
   <div class="admin-section admin-only hidden">
     <div class="separator">Actions logistique</div>
@@ -377,6 +382,28 @@
   <div id="mes-resa-liste" class="liste-materiel"></div>
   <button class="btn btn-primary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ GESTION PERSONNEL ══════════════ -->
+<div id="screen-gestion-personnel" class="screen">
+  <h2>🧑‍💼 Gestion personnel</h2>
+  <button class="btn btn-primary" onclick="ouvrirEcranSignalerAbsence()">🚫 Signaler une absence</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ SIGNALER UNE ABSENCE ══════════════ -->
+<div id="screen-signaler-absence" class="screen">
+  <h2>🚫 Signaler une absence</h2>
+  <label class="field-label">Employé absent</label>
+  <select id="select-absence-employe" class="select-input">
+    <option value="">-- Sélectionne un employé --</option>
+  </select>
+  <label class="field-label">Date de l'absence</label>
+  <input type="date" id="absence-date" class="select-input">
+  <label class="field-label">Motif (optionnel)</label>
+  <textarea id="absence-motif" class="note-textarea" placeholder="Ex : ne s'est pas présenté sur le chantier ce matin..."></textarea>
+  <button class="btn btn-secondary" onclick="soumettreAbsence()">✅ Signaler l'absence</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-gestion-personnel')">Annuler</button>
 </div>
 
 <!-- ══════════════ RÉSERVATION ══════════════ -->

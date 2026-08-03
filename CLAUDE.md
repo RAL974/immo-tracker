@@ -219,6 +219,22 @@ Content-type de la liste : `Item`.
 | `Transferts_En_Attente` | Transferts et retours dépôt en attente de validation |
 | `Reservations` | Réservations de matériel |
 | `Chantiers` | Référentiel des chantiers |
+| `Absences` | Signalements d'absence d'un employé (voir ci-dessous) — ajoutée août 2026 |
+
+## Liste `Absences` (ajoutée août 2026)
+
+*Registre des signalements d'absence non prévue d'un collaborateur, déclarés depuis la PWA. À sens unique (pas de modification/suppression a posteriori), consultable uniquement par Admin et Encadrement dans le dashboard.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code de l'employé absent (ex. `IMOI`) |
+| `Code_Declarant` | Texte | Code de la personne qui signale (RA, CT, CT_Specialise, Logistique ou Admin) |
+| `Date_Absence` | Date | Jour concerné par l'absence (saisi par le déclarant, défaut = aujourd'hui) |
+| `Motif` | Texte | Motif libre, optionnel |
+| `Site` | Texte | `Reunion` / `Mayotte` (site du déclarant) |
+| `Horodatage` | Date/heure | Horodatage ISO du signalement (auto) |
+
+⚠️ Liste et action Worker (`signaler_absence` en écriture, `?absences=1` en lecture) à créer manuellement côté SharePoint/Cloudflare — non automatisé au moment de l'ajout du code PWA/Dashboard (voir `04_HISTORIQUE_DECISIONS.md`).
 
 ## Catégories dérivées du compte d'immobilisation
 
@@ -281,27 +297,33 @@ Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour
 
 Les droits sont définis dans **une seule table** (`ROLE_CAPS`, dans `app.js`), reprise avec la même logique côté `dashboard.html`. Chaque rôle déclare ses capacités — pour changer un droit, une seule ligne à modifier.
 
-Cinq capacités possibles :
+Sept capacités possibles :
 - **`reserver`** : peut réserver / recevoir du matériel
 - **`bisite`** : voit et agit sur les deux îles (sinon limité à son site)
 - **`garant`** : peut valider un retour dépôt (atteste de l'état du matériel)
 - **`voitTout`** : voit toutes les catégories, y compris les comptes administratifs
 - **`admin`** : gère la solution (rôles, ajouts, mots de passe, migration…)
 - **`comptesExtra`** : liste de comptes normalement masqués mais visibles en exception pour ce rôle
+- **`absences`** : peut signaler l'absence d'un employé depuis la case "Gestion personnel" de la PWA (ajouté août 2026)
+- **`voitAbsences`** : peut consulter le registre des absences signalées dans le dashboard (ajouté août 2026)
 
 ## Matrice des 9 rôles
 
-| Rôle | reserver | bisite | garant | voitTout | admin | Particularité |
-|---|:---:|:---:|:---:|:---:|:---:|---|
-| **Admin** | ✅ | ✅ | ✅ | ✅ | ✅ | Tous droits |
-| **Logistique** (Gestionnaire Dépôt RUN) | ✅ | ✅ | ✅ | ✅ | — | — |
-| **Logistique_Mayotte** | ✅ | ❌ (Mayotte only) | ✅ | ❌ | — | `comptesExtra: ['2182']` — voit aussi les véhicules pour l'entretien sur place |
-| **RA** (Responsable d'affaires) | ✅ | ✅ | — | — | — | — |
-| **CT_Specialise** | ✅ | ✅ | — | — | — | — |
-| **CT** (Conducteur de travaux) | ✅ | ❌ (son site) | — | — | — | — |
-| **Ouvrier_Specialise** | ✅ | ✅ | — | — | — | — |
-| **Ouvrier** | — | — | — | — | — | Aucun droit particulier |
-| **Encadrement** | — | ✅ | — | ✅ | — | View-only : voit tout (2 îles, toutes catégories) pour export/consultation, mais ne réserve pas, n'est pas garant. Destiné à la RH et services support. |
+| Rôle | reserver | bisite | garant | voitTout | admin | absences | voitAbsences | Particularité |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| **Admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Tous droits |
+| **Logistique** (Gestionnaire Dépôt RUN) | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — |
+| **Logistique_Mayotte** | ✅ | ❌ (Mayotte only) | ✅ | ❌ | — | ✅ | — | `comptesExtra: ['2182']` — voit aussi les véhicules pour l'entretien sur place |
+| **RA** (Responsable d'affaires) | ✅ | ✅ | — | — | — | ✅ | — | — |
+| **CT_Specialise** | ✅ | ✅ | — | — | — | ✅ | — | — |
+| **CT** (Conducteur de travaux) | ✅ | ❌ (son site) | — | — | — | ✅ | — | — |
+| **Ouvrier_Specialise** | ✅ | ✅ | — | — | — | — | — | — |
+| **Ouvrier** | — | — | — | — | — | — | — | Aucun droit particulier |
+| **Encadrement** | — | ✅ | — | ✅ | — | — | ✅ | View-only : voit tout (2 îles, toutes catégories) pour export/consultation, mais ne réserve pas, n'est pas garant. Destiné à la RH et services support. |
+
+## Signalement d'absence (ajouté août 2026)
+
+Un CT, RA, CT_Specialise, un référent Logistique ou un Admin peut signaler depuis la PWA (case "Gestion personnel" sur l'accueil, sous "Réservations") l'absence non prévue d'un employé de son/ses site(s) autorisé(s) (`sitesAutorises()`). Le signalement crée une entrée horodatée dans la liste SharePoint `Absences` (voir `02_MODELE_DONNEES.md`) : employé concerné, déclarant, date, motif optionnel. **À sens unique** : pas de modification ni suppression a posteriori, comme les mouvements matériel. Pas d'effet automatique sur les réservations/matériel de la personne (le matériel reste affecté, la récupération suit le circuit habituel). Le registre est consultable dans le dashboard (onglet "Absences") réservé à **Admin et Encadrement uniquement** (`peutVoirAbsences()`) — ni la Logistique ni les autres rôles terrain n'y ont accès, même s'ils peuvent déclarer. Pas de notification email pour l'instant (à ajouter plus tard via Power Automate si le besoin se confirme, cf. `01_ARCHITECTURE_TECHNIQUE.md`).
 
 ## Super-administrateur permanent
 
@@ -410,6 +432,14 @@ Export CSV (18 colonnes) réservé aux admins, disponible depuis l'onglet Analys
 - Rédaction de `Immo_Tracker_Documentation.docx` (documentation de pérennité, destinée à un repreneur potentiel de la solution).
 - Rédaction de `Note_Synthese_Immo_Tracker.docx` (note comparative pour la direction, avec tarifs Organilog/Hector vérifiés par recherche web en juillet 2026).
 - Passage en gestion "mode projet" avec base de connaissance structurée (ce jeu de documents) pour sécuriser la continuité malgré la dépendance à une seule personne.
+
+## Signalement d'absence d'un employé (août 2026)
+- Besoin exprimé par William : permettre à un RA ou un CT de signaler l'absence non prévue d'un collaborateur sur le chantier, sans faire de l'application un outil RH (cf. mise en garde déjà actée dans `05_ROADMAP_EVOLUTIONS_FUTURES.md` sur le module de gestion des temps).
+- Cadrage validé avant développement : absence **non prévue/injustifiée** uniquement (pas congés ni arrêts maladie) ; simple registre horodaté consultable, sans notification email dans un premier temps ; aucun effet automatique sur le matériel affecté à la personne (le circuit de récupération existant suffit) ; déclaration **à sens unique**, pas de modification a posteriori — mêmes garanties que les mouvements matériel.
+- Élargissement du périmètre des déclarants décidé avec William au-delà de la demande initiale (RA/CT) : ajout de CT_Specialise, Logistique et Admin, par cohérence avec leurs droits existants plus larges. Logistique_Mayotte inclus par parité avec Logistique (à confirmer/retirer si ce n'était pas l'intention).
+- Visibilité du registre volontairement restreinte à **Admin + Encadrement** (pas Logistique, pas les rôles terrain) : cohérent avec le fait qu'il s'agit d'une donnée RH/encadrement, pas d'une donnée logistique.
+- Implémentation : nouvelle capacité `absences` (déclarer) et `voitAbsences` (consulter) dans `ROLE_CAPS` (`app.js`) + fonctions miroir dans `dashboard.html` ; nouvelle case "🧑‍💼 Gestion personnel" sous "Réservations" sur l'accueil PWA (visible seulement si `peutSignalerAbsence()`) ; nouvel onglet "Absences" dans le dashboard (visible à tous mais contenu gated par `peutVoirAbsences()`, comme le reste du dashboard) ; nouvelle liste SharePoint `Absences` (voir `02_MODELE_DONNEES.md`).
+- **Reste à faire côté William** (hors dépôt Git, cf. `01_ARCHITECTURE_TECHNIQUE.md`) : créer la liste SharePoint `Absences` avec les colonnes documentées, et ajouter au Worker Cloudflare l'action d'écriture `signaler_absence` (POST) et de lecture `?absences=1` (GET) — le Worker n'étant jamais commité sur GitHub, ce code a été fourni séparément à intégrer manuellement puis déployer (Cloudflare → `immo-proxy` → Deploy).
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
