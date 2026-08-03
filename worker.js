@@ -107,6 +107,11 @@ async function handleRequest(request) {
   if (p.get('debug_transferts')=== '1') { const r = await fetch(GL + '/Transferts_En_Attente/items?$expand=fields&$top=5', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
   if (p.get('debug_employes') === '1') { const r = await fetch(GL + '/Employes/items?$expand=fields&$top=3', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
   if (p.get('debug_mouvements')=== '1') { const r = await fetch(GL + '/Mouvements/items?$expand=fields&$top=3&$orderby=fields/Created desc', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
+  // Noms internes réels des colonnes (peuvent différer du nom affiché après un renommage dans SharePoint)
+  if (p.get('debug_inventaire_columns') === '1') {
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/lists/Lignes_Inventaire/columns?$select=name,displayName', { headers: H });
+    return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
 
   // ── Métadonnées achat (valeur + date) ──────────────────────────────────────
   if (p.get('immo_metadata') === '1') {
