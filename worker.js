@@ -220,6 +220,30 @@ async function handleRequest(request) {
     }));
   }
 
+  // ── Campagnes d'inventaire de stock (articles/consommables) ─────────────────
+  if (p.get('campagnes_inventaire') === '1') {
+    const [campItems, ligneItems] = await Promise.all([
+      paginate(GL + '/Campagnes_Inventaire/items?$expand=fields&$orderby=fields/Created%20desc&$top=200', 5),
+      paginate(GL + '/Lignes_Inventaire/items?$expand=fields($select=Title)&$top=5000', 15)
+    ]);
+    const counts = {};
+    ligneItems.forEach(i => { const c = (i.fields || {}).Title || ''; counts[c] = (counts[c] || 0) + 1; });
+    return json(campItems.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, nom: f.Title || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut: f.Statut || 'En cours', cree_par: f.Cree_Par || '', cloture_par: f.Cloture_Par || '', date_cloture: f.Date_Cloture || '', nb_lignes: counts[f.Title || ''] || 0 };
+    }));
+  }
+
+  // Lignes d'une campagne d'inventaire donnée (nom passé tel quel, filtré côté Worker pour éviter tout souci d'échappement OData)
+  if (p.get('lignes_inventaire')) {
+    const nom = p.get('lignes_inventaire');
+    const items = await paginate(GL + '/Lignes_Inventaire/items?$expand=fields&$top=5000', 15);
+    return json(items.filter(i => (i.fields || {}).Title === nom).map(i => {
+      const f = i.fields || {};
+      return { id: i.id, campagne: f.Title || '', zone: f.Zone || '', site: f.Site || '', chantier: f.Chantier || '', fabriquant: f.Fabriquant || '', reference: f.Reference || '', designation: f.Designation || '', quantite: f.Quantite || 0, chute_cable: f.Chute_Cable === 'Oui', observations: f.Observations || '', code_employe: f.Code_Employe || '', horodatage: f.Horodatage || f.Created || '' };
+    }));
+  }
+
   // ── Réservations par employé ──────────────────────────────────────────────────
   if (p.get('mes_reservations')) {
     const code = p.get('mes_reservations');
@@ -884,6 +908,108 @@ async function handleRequest(request) {
         const rd = await r.json();
         if (r.ok) return json({ success: true, id: rd.id });
         return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Campagne d'inventaire de stock (articles/consommables — distinct des immobilisations) ──
+    if (action === 'creer_campagne_inventaire') {
+      const nom = (body.nom || '').trim();
+      if (!nom) return json({ success: false, error: 'nom_manquant' });
+      try {
+        const r = await fetch(GL + '/Campagnes_Inventaire/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: nom, Date_Debut: body.date_debut || new Date().toISOString().slice(0, 10), Date_Fin: body.date_fin || null,
+          Statut: body.statut === 'Clôturée' ? 'Clôturée' : 'En cours', Cree_Par: body.par_code || ''
+        } }) });
+        const rd = await r.json();
+        if (r.ok) return json({ success: true, id: rd.id });
+        return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    if (action === 'cloturer_campagne_inventaire') {
+      const nom = (body.nom || '').trim();
+      if (!nom) return json({ success: false, error: 'nom_manquant' });
+      try {
+        const cur = await fetch(GL + "/Campagnes_Inventaire/items?$expand=fields&$filter=fields/Title eq '" + nom.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        const itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+        if (!itemId) return json({ success: false, error: 'campagne_introuvable' });
+        const r = await fetch(GL + '/Campagnes_Inventaire/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({
+          Statut: 'Clôturée', Cloture_Par: body.par_code || '', Date_Cloture: body.date_cloture || new Date().toISOString()
+        }) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    if (action === 'ajouter_ligne_inventaire') {
+      const campagne = (body.campagne || '').trim();
+      if (!campagne || !body.reference) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Lignes_Inventaire/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: campagne, Zone: body.zone || '', Site: body.site || 'Reunion', Chantier: body.chantier || '',
+          Fabriquant: body.fabriquant || '', Reference: String(body.reference || ''), Designation: body.designation || '',
+          Quantite: parseFloat(body.quantite) || 0, Chute_Cable: body.chute_cable ? 'Oui' : '',
+          Observations: body.observations || '', Code_Employe: body.code_employe || '', Horodatage: new Date().toISOString()
+        } }) });
+        const rd = await r.json();
+        if (r.ok) return json({ success: true, id: rd.id });
+        return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Édition/suppression d'une ligne : réservé à son auteur ou à un admin (body.est_admin, asserté côté client
+    // comme le reste de l'app), et uniquement tant que la campagne associée est "En cours".
+    if (action === 'modifier_ligne_inventaire' || action === 'supprimer_ligne_inventaire') {
+      const ligneId = body.id;
+      if (!ligneId) return json({ success: false, error: 'id_manquant' });
+      try {
+        const cur = await fetch(GL + '/Lignes_Inventaire/items/' + ligneId + '?$expand=fields', { headers: H });
+        const curData = await cur.json();
+        const f = curData.fields || {};
+        if (!f.Title) return json({ success: false, error: 'ligne_introuvable' });
+        const estAuteur = (f.Code_Employe || '') === (body.par_code || '');
+        if (!estAuteur && !body.est_admin) return json({ success: false, error: 'non_autorise' });
+        const camp = await fetch(GL + "/Campagnes_Inventaire/items?$expand=fields&$filter=fields/Title eq '" + f.Title.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const campData = await camp.json();
+        const statutCamp = campData.value && campData.value[0] ? (campData.value[0].fields || {}).Statut : '';
+        if (statutCamp === 'Clôturée') return json({ success: false, error: 'campagne_cloturee' });
+        if (action === 'supprimer_ligne_inventaire') {
+          const r = await fetch(GL + '/Lignes_Inventaire/items/' + ligneId, { method: 'DELETE', headers: H });
+          return json({ success: r.ok || r.status === 204 });
+        }
+        const fields = {
+          Zone: body.zone || '', Site: body.site || 'Reunion', Chantier: body.chantier || '',
+          Fabriquant: body.fabriquant || '', Reference: String(body.reference || ''), Designation: body.designation || '',
+          Quantite: parseFloat(body.quantite) || 0, Chute_Cable: body.chute_cable ? 'Oui' : '', Observations: body.observations || ''
+        };
+        const r = await fetch(GL + '/Lignes_Inventaire/items/' + ligneId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Migration one-shot d'un comptage historique (ex: décembre 2025) par lots de 20 — même pattern que bulk_patch_immos
+    if (action === 'bulk_import_lignes_inventaire') {
+      const campagne = (body.campagne || '').trim();
+      const lignes = body.lignes || [];
+      if (!campagne || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = lignes.slice(0, 20).map((l, idx) => ({
+        id: String(idx), method: 'POST',
+        url: "/sites/" + SITE_ID + "/lists/Lignes_Inventaire/items",
+        headers: { 'Content-Type': 'application/json' },
+        body: { fields: {
+          Title: campagne, Zone: l.zone || '', Site: l.site || 'Reunion', Chantier: l.chantier || '',
+          Fabriquant: l.fabriquant || '', Reference: String(l.reference || ''), Designation: l.designation || '',
+          Quantite: l.quantite || 0, Chute_Cable: l.chute_cable ? 'Oui' : '', Observations: l.observations || '',
+          Code_Employe: body.par_code || 'ADMIN', Horodatage: body.horodatage || new Date().toISOString()
+        } }
+      }));
+      try {
+        const r = await fetch('https://graph.microsoft.com/v1.0/$batch', { method: 'POST', headers: H, body: JSON.stringify({ requests }) });
+        const rd = await r.json();
+        const resp = rd.responses || [];
+        let ok = 0, ko = 0; const errs = [];
+        resp.forEach(x => { if (x.status >= 200 && x.status < 300) ok++; else { ko++; if (errs.length < 3) errs.push({ status: x.status, body: x.body }); } });
+        return json({ success: ko === 0, ok: ok, ko: ko, erreurs: errs });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 

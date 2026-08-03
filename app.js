@@ -57,15 +57,18 @@ var SUPER_ADMIN_CODES = ['AIWI'];
 //    comptesExtra : comptes normalement masqués mais visibles pour ce rôle (exceptions)
 // ══════════════════════════════════════════════════════════════════════════
 var ROLE_CAPS = {
-  'Admin':              { reserver:true, bisite:true,  garant:true,  voitTout:true, admin:true, absences:true, voitAbsences:true },
-  'Logistique':         { reserver:true, bisite:true,  garant:true,  voitTout:true, absences:true },            // Gestionnaire Dépôt RUN
-  'Logistique_Mayotte': { reserver:true, bisite:false, garant:true,  voitTout:false, comptesExtra:['2182'], absences:true }, // mono-Mayotte, voit AUSSI les véhicules (entretien sur place)
-  'RA':                 { reserver:true, bisite:true, absences:true },
-  'CT_Specialise':      { reserver:true, bisite:true, absences:true },
-  'CT':                 { reserver:true, bisite:false, absences:true },
+  'Admin':              { reserver:true, bisite:true,  garant:true,  voitTout:true, admin:true, absences:true, voitAbsences:true, gererInventaire:true, compterInventaire:true },
+  'Logistique':         { reserver:true, bisite:true,  garant:true,  voitTout:true, absences:true, gererInventaire:true, compterInventaire:true },            // Gestionnaire Dépôt RUN
+  'Logistique_Mayotte': { reserver:true, bisite:false, garant:true,  voitTout:false, comptesExtra:['2182'], absences:true, gererInventaire:true, compterInventaire:true }, // mono-Mayotte, voit AUSSI les véhicules (entretien sur place)
+  'RA':                 { reserver:true, bisite:true, absences:true, compterInventaire:true },
+  'CT_Specialise':      { reserver:true, bisite:true, absences:true, compterInventaire:true },
+  'CT':                 { reserver:true, bisite:false, absences:true, compterInventaire:true },
   'Ouvrier_Specialise': { reserver:true, bisite:true },
   'Ouvrier':            {},                                                                        // aucun droit particulier
-  'Encadrement':        { bisite:true,  voitTout:true, voitAbsences:true }                         // view-only : voit tout (2 îles) pour export, ne réserve pas
+  'Encadrement':        { bisite:true,  voitTout:true, voitAbsences:true },                        // view-only : voit tout (2 îles) pour export, ne réserve pas
+  // Rôle allégé pour le personnel temporaire (intérim, accompagnants logistique/achats) lors d'une campagne
+  // d'inventaire de stock : aucune autre capacité que la saisie de comptage.
+  'Compteur_Inventaire':{ compterInventaire:true }
 };
 
 // Comptes comptables "administratifs" masqués aux rôles terrain (logiciels, mobilier, véhicules, informatique, cautions…)
@@ -75,7 +78,7 @@ var ETIQUETEUSES_VISIBLES = ['IM000272','IM000495','IM000496','IM000605','IM0006
 
 // Renvoie les capacités d'une personne (super-admin = toutes)
 function caps(code) {
-  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return { reserver:true, bisite:true, garant:true, voitTout:true, admin:true, absences:true, voitAbsences:true };
+  if (SUPER_ADMIN_CODES.indexOf(code) !== -1) return { reserver:true, bisite:true, garant:true, voitTout:true, admin:true, absences:true, voitAbsences:true, gererInventaire:true, compterInventaire:true };
   var role = normRole(S.droitsByCode && S.droitsByCode[code]);
   return ROLE_CAPS[role] || {};
 }
@@ -115,6 +118,15 @@ function estGarant(code) {
 // Peut-il signaler l'absence d'un employé (RA, CT, CT_Specialise, Logistique, Admin) ?
 function peutSignalerAbsence(code) {
   return !!caps(code).absences;
+}
+
+// Peut-il lancer/clôturer une campagne d'inventaire de stock (Admin, Logistique, Logistique_Mayotte) ?
+function peutGererInventaire(code) {
+  return !!caps(code).gererInventaire;
+}
+// Peut-il saisir des lignes de comptage (Admin, Logistique, CT, RA, Compteur_Inventaire...) ?
+function peutCompterInventaire(code) {
+  return !!caps(code).compterInventaire;
 }
 
 // Quels sites cette personne peut-elle voir/réserver ?
@@ -325,6 +337,7 @@ function showScreen(id, skipInit) {
     case 'screen-transferts-attente': afficherTransfertsEnAttente(); break;
     case 'screen-mes-reservations':   afficherMesReservations(); break;
     case 'screen-reserver':           if (!skipInit) initReservationScreen(false); break;
+    case 'screen-inventaire-stock':   ouvrirEcranInventaire(); break;
   }
 }
 
@@ -429,6 +442,9 @@ function afficherEmploye() {
   // Case "Gestion personnel" — réservée à RA / CT / CT_Specialise / Logistique / Admin
   const btnPersonnel = document.getElementById('btn-gestion-personnel');
   if (btnPersonnel) btnPersonnel.classList.toggle('hidden', !peutSignalerAbsence(S.employe.code));
+  // Case "Campagne d'inventaire" — Admin / Logistique / CT / RA / Compteur_Inventaire
+  const btnInventaire = document.getElementById('btn-inventaire-stock');
+  if (btnInventaire) btnInventaire.classList.toggle('hidden', !peutCompterInventaire(S.employe.code));
 }
 
 function changerUtilisateur() {
@@ -533,8 +549,22 @@ function onScanActivation(code) {
     toast('Ce QR code n\'est pas une carte employé', 'error');
     return;
   }
+  activerEmploye(parts[0].trim(), parts[1].trim());
+}
+
+// Activation manuelle (sans carte QR) — utile pour le personnel temporaire (intérim, accompagnants)
+// lors d'une campagne d'inventaire, qui n'a pas de carte BTP imprimée.
+function activationManuelle() {
+  const code = (prompt('Code employé (ex : AIWI) :') || '').trim().toUpperCase();
+  if (!code) return;
+  const nom = (prompt('Nom complet :') || '').trim();
+  if (!nom) return;
+  activerEmploye(code, nom);
+}
+
+function activerEmploye(code, nom) {
   stopScanner(); vib(300);
-  const employe = { code: parts[0].trim(), nom: parts[1].trim() };
+  const employe = { code: code, nom: nom };
   localStorage.setItem('employe', JSON.stringify(employe));
   S.employe = employe;
   afficherEmploye();
@@ -1533,6 +1563,136 @@ async function soumettreAbsence() {
       toast('Erreur lors du signalement', 'error');
     }
   } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
+}
+
+// ── Campagne d'inventaire de stock (articles/consommables — distinct des immobilisations) ──
+async function ouvrirEcranInventaire() {
+  document.getElementById('inv-sans-campagne').classList.add('hidden');
+  document.getElementById('inv-avec-campagne').classList.add('hidden');
+  document.getElementById('inv-mes-lignes').innerHTML = '<p style="color:var(--grey);text-align:center">Chargement…</p>';
+  try {
+    const r = await fetch(CONFIG.proxy + '?campagnes_inventaire=1');
+    const camps = await r.json();
+    const active = (camps || []).find(c => c.statut !== 'Clôturée');
+    if (!active) {
+      document.getElementById('inv-sans-campagne').classList.remove('hidden');
+      document.getElementById('inv-mes-lignes').innerHTML = '';
+      return;
+    }
+    S.invCampagne = active;
+    document.getElementById('inv-avec-campagne').classList.remove('hidden');
+    document.getElementById('inv-nom-campagne').textContent = '📋 ' + active.nom;
+    resetFormulaireInventaire();
+    await chargerMesLignesInventaire();
+  } catch (e) {
+    document.getElementById('inv-mes-lignes').innerHTML = '<p style="color:var(--red);text-align:center">Erreur de chargement.</p>';
+  }
+}
+
+function resetFormulaireInventaire() {
+  S.invLigneEnEdition = null;
+  document.getElementById('inv-zone').value = '';
+  document.getElementById('inv-chantier').value = '';
+  document.getElementById('inv-fabriquant').value = '';
+  document.getElementById('inv-reference').value = '';
+  document.getElementById('inv-designation').value = '';
+  document.getElementById('inv-quantite').value = '';
+  document.getElementById('inv-chute-cable').checked = false;
+  document.getElementById('inv-observations').value = '';
+  const btn = document.getElementById('inv-btn-soumettre');
+  if (btn) btn.textContent = '✅ Ajouter la ligne';
+}
+
+async function chargerMesLignesInventaire() {
+  const cont = document.getElementById('inv-mes-lignes');
+  if (!S.invCampagne) return;
+  try {
+    const r = await fetch(CONFIG.proxy + '?lignes_inventaire=' + encodeURIComponent(S.invCampagne.nom));
+    const lignes = await r.json();
+    const mesLignes = (lignes || []).filter(l => l.code_employe === S.employe.code)
+      .sort((a, b) => new Date(b.horodatage) - new Date(a.horodatage));
+    S.invMesLignes = mesLignes;
+    if (!mesLignes.length) { cont.innerHTML = '<p style="color:var(--grey);text-align:center;font-size:13px">Aucune ligne saisie pour l\'instant.</p>'; return; }
+    cont.innerHTML = '<p class="field-label">Mes lignes (' + mesLignes.length + ')</p>' +
+      mesLignes.map(l => '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:13px">' +
+        '<span>' + (l.reference || '—') + ' — ' + (l.designation || l.fabriquant || '') + ' <strong>x' + l.quantite + '</strong>' +
+        (l.chantier ? ' (' + l.chantier + ')' : (l.zone ? ' (' + l.zone + ')' : '')) + '</span>' +
+        '<span><button onclick="editerLigneInventaire(\'' + l.id + '\')" style="border:none;background:none;font-size:16px;cursor:pointer">✏️</button>' +
+        '<button onclick="supprimerLigneInventaire(\'' + l.id + '\')" style="border:none;background:none;font-size:16px;cursor:pointer">🗑️</button></span></div>').join('');
+  } catch (e) { cont.innerHTML = '<p style="color:var(--red);text-align:center">Erreur de chargement.</p>'; }
+}
+
+function editerLigneInventaire(id) {
+  const l = (S.invMesLignes || []).find(x => String(x.id) === String(id));
+  if (!l) return;
+  S.invLigneEnEdition = l.id;
+  document.getElementById('inv-zone').value = l.zone || '';
+  document.getElementById('inv-chantier').value = l.chantier || '';
+  document.getElementById('inv-fabriquant').value = l.fabriquant || '';
+  document.getElementById('inv-reference').value = l.reference || '';
+  document.getElementById('inv-designation').value = l.designation || '';
+  document.getElementById('inv-quantite').value = l.quantite || '';
+  document.getElementById('inv-chute-cable').checked = !!l.chute_cable;
+  document.getElementById('inv-observations').value = l.observations || '';
+  const btn = document.getElementById('inv-btn-soumettre');
+  if (btn) btn.textContent = '✅ Enregistrer la modification';
+  window.scrollTo(0, 0);
+}
+
+async function supprimerLigneInventaire(id) {
+  if (!confirm('Supprimer cette ligne de comptage ?')) return;
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=supprimer_ligne_inventaire', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id, par_code: S.employe.code, est_admin: !!caps(S.employe.code).admin }),
+    });
+    const d = await r.json();
+    if (d.success) { toast('🗑️ Ligne supprimée', 'success'); await chargerMesLignesInventaire(); }
+    else toast('Erreur : ' + (d.error || 'inconnue'), 'error');
+  } catch (e) { toast('Erreur réseau', 'error'); }
+}
+
+async function soumettreLigneInventaire() {
+  if (!S.invCampagne) { toast('Aucune campagne active', 'error'); return; }
+  const reference = (document.getElementById('inv-reference').value || '').trim();
+  const quantite = parseFloat(document.getElementById('inv-quantite').value);
+  if (!reference) { toast('La référence est obligatoire', 'error'); return; }
+  if (isNaN(quantite) || quantite <= 0) { toast('Indique une quantité supérieure à 0', 'error'); return; }
+  const payload = {
+    campagne: S.invCampagne.nom,
+    zone: (document.getElementById('inv-zone').value || '').trim(),
+    site: normSite(S.siteByCode && S.siteByCode[S.employe.code]),
+    chantier: (document.getElementById('inv-chantier').value || '').trim(),
+    fabriquant: (document.getElementById('inv-fabriquant').value || '').trim(),
+    reference: reference,
+    designation: (document.getElementById('inv-designation').value || '').trim(),
+    quantite: quantite,
+    chute_cable: document.getElementById('inv-chute-cable').checked,
+    observations: (document.getElementById('inv-observations').value || '').trim(),
+    code_employe: S.employe.code,
+  };
+  const btn = document.getElementById('inv-btn-soumettre');
+  if (btn.dataset.busy === '1') return;
+  btn.dataset.busy = '1'; btn.disabled = true;
+  const enEdition = S.invLigneEnEdition;
+  try {
+    let action = 'ajouter_ligne_inventaire', body = payload;
+    if (enEdition) {
+      action = 'modifier_ligne_inventaire';
+      body = Object.assign({ id: enEdition, par_code: S.employe.code, est_admin: !!caps(S.employe.code).admin }, payload);
+    }
+    const r = await fetch(CONFIG.proxy + '?action=' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    btn.dataset.busy = ''; btn.disabled = false;
+    if (d.success !== false) {
+      vib(150);
+      toast(enEdition ? '✅ Ligne modifiée' : '✅ Ligne ajoutée', 'success');
+      resetFormulaireInventaire();
+      await chargerMesLignesInventaire();
+    } else {
+      toast('Erreur : ' + (d.error || 'inconnue'), 'error');
+    }
+  } catch (e) { btn.dataset.busy = ''; btn.disabled = false; toast('Erreur réseau : ' + e.message, 'error'); }
 }
 
 // ══════════════════════════════════════════════════════════
