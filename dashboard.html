@@ -1029,13 +1029,13 @@ function renderInventaireStock(){
   html+='</div>';
   if(estAdmin(ADMIN_SESSION.code)&&!invCampagnesList.some(function(c){return c.nom==='Inventaire décembre 2025';})){
     html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration : comptage décembre 2025</h3></div>'+
-      '<div style="padding:14px"><p style="font-size:12px;color:var(--grey);margin-bottom:10px">Importe les lignes du dernier comptage physique (déc. 2025) comme première campagne de référence, pour permettre un calcul d\'écart dès la prochaine campagne. À faire une seule fois.</p>'+
+      '<div style="padding:14px"><p style="font-size:12px;color:var(--grey);margin-bottom:10px">Importe les lignes du dernier comptage physique (déc. 2025) comme historique consultable dans le dashboard. À faire une seule fois.</p>'+
       '<button onclick="importerInventaireDec2025()" style="padding:8px 16px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Importer maintenant</button>'+
       '<div id="inv-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
   }
   if(invCampagneOuverte)html+=renderDetailCampagneInventaire(invCampagneOuverte);
   div.innerHTML=html;
-  if(invCampagneOuverte)refreshInvEcartResults();
+  if(invCampagneOuverte)refreshInvStockResults();
 }
 
 async function lancerCampagneInventaire(){
@@ -1062,47 +1062,49 @@ async function cloturerCampagneInventaireDash(nom){
 
 async function voirDetailCampagneInventaire(nom){
   invCampagneOuverte=nom;
-  INV_ECART_FILTRES={q:'',site:'',statut:'',sansDesig:false,nb:100};
+  INV_STOCK_FILTRES={q:'',site:'',fabricant:'',sansDesig:false,nb:100};
   await fetchLignesCampagne(nom);
   renderInventaireStock();
 }
 
+// Fabricants "principaux" mis en avant en tête du filtre (le reste suit par ordre alphabétique)
+var FABRICANTS_PRIORITAIRES=['Legrand','Hager','Schneider Electric','Eurohm','SIB','BLM','Clareo','Courant'];
+function fabricantsDistincts(lignes){
+  var set={};
+  (lignes||[]).forEach(function(l){var f=(l.fabriquant||'').trim();if(f)set[f]=true;});
+  var all=Object.keys(set);
+  var prio=FABRICANTS_PRIORITAIRES.filter(function(p){return all.indexOf(p)!==-1;});
+  var reste=all.filter(function(a){return prio.indexOf(a)===-1;}).sort(function(a,b){return a.localeCompare(b);});
+  return prio.concat(reste);
+}
+
 // Coquille statique (n'est reconstruite qu'à l'ouverture d'une campagne, jamais à chaque frappe dans la recherche —
 // sinon le champ de saisie perd le focus à chaque caractère tapé, ce qui rendait la recherche inutilisable).
+// Pas de notion d'écart/comparaison avec une campagne précédente : chaque campagne reflète simplement l'état du
+// stock à l'instant T (une entreprise du bâtiment n'a pas de stock mini fixe ni de chantiers reconductibles d'une
+// année sur l'autre — comparer à décembre 2025 n'a pas de sens métier).
 function renderDetailCampagneInventaire(nom){
-  var c=invCampagnesList.find(function(x){return x.nom===nom;});
   var lignes=invLignesCache[nom]||[];
-  var f=INV_ECART_FILTRES;
+  var fabricants=fabricantsDistincts(lignes);
+  var f=INV_STOCK_FILTRES;
   var html='<div class="card"><div class="card-head"><h3>📋 '+nom+'</h3>'+
-    '<button onclick="exporterEcartInventaire(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export écart (CSV)</button></div>';
-  var closedBefore=invCampagnesList.filter(function(x){return x.statut==='Clôturée'&&x.nom!==nom&&new Date(x.date_debut||0)<new Date(c?c.date_debut:Date.now());})
-    .sort(function(a,b){return new Date(b.date_debut)-new Date(a.date_debut);});
-  var precedente=closedBefore[0];
-  html+='<div style="padding:12px 14px;font-size:12px;color:var(--grey)">'+lignes.length+' ligne(s) saisie(s)'+(precedente?' — comparé à « '+precedente.nom+' »':' — aucune campagne précédente clôturée à comparer')+'</div>';
-  if(precedente){
-    html+='<div style="display:flex;gap:12px;padding:0 14px 12px;flex-wrap:wrap">'+
-      '<div style="background:#FFEBEE;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--red)" id="inv-tile-manquants">—</div><div style="font-size:11px;color:var(--grey)">Manquants</div></div>'+
-      '<div style="background:#FFF3E0;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--orange)" id="inv-tile-ecarts">—</div><div style="font-size:11px;color:var(--grey)">Écarts de quantité</div></div>'+
-      '<div style="background:#E8F5E9;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--green)" id="inv-tile-nouveaux">—</div><div style="font-size:11px;color:var(--grey)">Nouveaux / retrouvés</div></div>'+
-      '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)" id="inv-tile-sansref">—</div><div style="font-size:11px;color:var(--grey)">Sans référence</div></div>'+
-    '</div>';
-    html+='<div class="filters" style="padding:0 14px 12px">'+
-      '<input type="text" id="inv-ecart-q" value="'+(f.q||'').replace(/"/g,'&quot;')+'" oninput="appliquerFiltresInvEcart()" placeholder="Référence, désignation, lieu..." style="flex:1;min-width:180px">'+
-      '<select id="inv-ecart-site" onchange="appliquerFiltresInvEcart()"><option value=""'+(f.site===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(f.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(f.site==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
-      '<select id="inv-ecart-statut" onchange="appliquerFiltresInvEcart()">'+
-        '<option value=""'+(f.statut===''?' selected':'')+'>Tous statuts</option>'+
-        '<option value="Manquant"'+(f.statut==='Manquant'?' selected':'')+'>Manquants</option>'+
-        '<option value="Écart quantité"'+(f.statut==='Écart quantité'?' selected':'')+'>Écarts de quantité</option>'+
-        '<option value="Nouveau / Retrouvé"'+(f.statut==='Nouveau / Retrouvé'?' selected':'')+'>Nouveaux / retrouvés</option>'+
-        '<option value="Confirmé"'+(f.statut==='Confirmé'?' selected':'')+'>Confirmés</option>'+
-      '</select>'+
-      '<select id="inv-ecart-nb" onchange="appliquerFiltresInvEcart()"><option value="100"'+(f.nb===100?' selected':'')+'>100 max</option><option value="300"'+(f.nb===300?' selected':'')+'>300 max</option><option value="1000"'+(f.nb===1000?' selected':'')+'>1000 max</option><option value="0"'+(f.nb===0?' selected':'')+'>Tous</option></select>'+
-      '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--grey)"><input type="checkbox" id="inv-ecart-sans-desig" onchange="appliquerFiltresInvEcart()"'+(f.sansDesig?' checked':'')+'> Sans désignation uniquement</label>'+
-      '<button class="filter-btn" onclick="resetFiltresInvEcart()">🔄 Réinitialiser</button>'+
-    '</div>';
-    html+='<div id="inv-ecart-results"><p class="es" style="padding:16px">Chargement…</p></div>';
-    html+='<div id="inv-sans-ref-results"></div>';
-  }
+    '<button onclick="exporterEtatStockInventaire(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export état du stock (CSV)</button></div>';
+  html+='<div style="display:flex;gap:12px;padding:12px 14px;flex-wrap:wrap">'+
+    '<div style="background:#E3F2FD;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--blue)">'+lignes.length+'</div><div style="font-size:11px;color:var(--grey)">Ligne(s) saisie(s)</div></div>'+
+    '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)" id="inv-tile-sansref">—</div><div style="font-size:11px;color:var(--grey)">Sans référence</div></div>'+
+  '</div>';
+  html+='<div class="filters" style="padding:0 14px 12px">'+
+    '<input type="text" id="inv-stock-q" value="'+(f.q||'').replace(/"/g,'&quot;')+'" oninput="appliquerFiltresInvStock()" placeholder="Référence, désignation, zone, chantier, fabricant..." style="flex:1;min-width:180px">'+
+    '<select id="inv-stock-site" onchange="appliquerFiltresInvStock()"><option value=""'+(f.site===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(f.site==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(f.site==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
+    '<select id="inv-stock-fabricant" onchange="appliquerFiltresInvStock()"><option value="">Tous fabricants</option>'+
+      fabricants.map(function(fb){return '<option value="'+fb.replace(/"/g,'&quot;')+'"'+(f.fabricant===fb?' selected':'')+'>'+fb+'</option>';}).join('')+
+    '</select>'+
+    '<select id="inv-stock-nb" onchange="appliquerFiltresInvStock()"><option value="100"'+(f.nb===100?' selected':'')+'>100 max</option><option value="300"'+(f.nb===300?' selected':'')+'>300 max</option><option value="1000"'+(f.nb===1000?' selected':'')+'>1000 max</option><option value="0"'+(f.nb===0?' selected':'')+'>Tous</option></select>'+
+    '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--grey)"><input type="checkbox" id="inv-stock-sans-desig" onchange="appliquerFiltresInvStock()"'+(f.sansDesig?' checked':'')+'> Sans désignation uniquement</label>'+
+    '<button class="filter-btn" onclick="resetFiltresInvStock()">🔄 Réinitialiser</button>'+
+  '</div>';
+  html+='<div id="inv-stock-results"><p class="es" style="padding:16px">Chargement…</p></div>';
+  html+='<div id="inv-sans-ref-results"></div>';
   html+='<div style="padding:12px 14px"><button onclick="invCampagneOuverte=null;renderInventaireStock();" style="padding:6px 14px;background:#eee;border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
   html+='</div>';
   return html;
@@ -1110,55 +1112,38 @@ function renderDetailCampagneInventaire(nom){
 
 // Recalcule et affiche les résultats (tableaux + tuiles) sans toucher aux champs de filtre eux-mêmes,
 // pour ne jamais interrompre la saisie en cours dans le champ de recherche.
-function refreshInvEcartResults(){
+function refreshInvStockResults(){
   var nom=invCampagneOuverte;
   if(!nom)return;
-  var resDiv=document.getElementById('inv-ecart-results');
+  var resDiv=document.getElementById('inv-stock-results');
   var sansRefDiv=document.getElementById('inv-sans-ref-results');
-  if(!resDiv)return; // pas (encore) de campagne précédente à comparer : rien à faire
-  var c=invCampagnesList.find(function(x){return x.nom===nom;});
+  if(!resDiv)return;
   var lignes=invLignesCache[nom]||[];
-  var closedBefore=invCampagnesList.filter(function(x){return x.statut==='Clôturée'&&x.nom!==nom&&new Date(x.date_debut||0)<new Date(c?c.date_debut:Date.now());})
-    .sort(function(a,b){return new Date(b.date_debut)-new Date(a.date_debut);});
-  var precedente=closedBefore[0];
-  if(!precedente)return;
-  if(!invLignesCache[precedente.nom]){
-    resDiv.innerHTML='<p class="es" style="padding:16px">Chargement de la comparaison…</p>';
-    fetchLignesCampagne(precedente.nom).then(function(){if(invCampagneOuverte===nom)refreshInvEcartResults();});
-    return;
-  }
-  var f=INV_ECART_FILTRES;
-  var ecartsBruts=calculerEcartInventaire(lignes,invLignesCache[precedente.nom]);
-  var manquants=ecartsBruts.filter(function(e){return e.statut==='Manquant';}).length;
-  var nouveaux=ecartsBruts.filter(function(e){return e.statut==='Nouveau / Retrouvé';}).length;
-  var ecartsQte=ecartsBruts.filter(function(e){return e.statut==='Écart quantité';}).length;
   var sansRefBrutes=lignesSansReference(lignes);
-  var tM=document.getElementById('inv-tile-manquants');if(tM)tM.textContent=manquants;
-  var tE=document.getElementById('inv-tile-ecarts');if(tE)tE.textContent=ecartsQte;
-  var tN=document.getElementById('inv-tile-nouveaux');if(tN)tN.textContent=nouveaux;
   var tS=document.getElementById('inv-tile-sansref');if(tS)tS.textContent=sansRefBrutes.length;
 
-  var ecarts=filtrerEcarts(ecartsBruts);
-  var ecartsAffiches=f.nb>0?ecarts.slice(0,f.nb):ecarts;
-  var html='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Désignation</th><th>Site</th><th>Lieu</th><th>Qté avant</th><th>Qté actuelle</th><th>Écart</th><th>Statut</th></tr></thead><tbody>';
-  if(!ecartsAffiches.length)html+='<tr><td colspan="8" class="es">Aucune ligne pour ces filtres.</td></tr>';
-  ecartsAffiches.forEach(function(e){
-    var color=e.statut==='Manquant'?'var(--red)':e.statut==='Écart quantité'?'var(--orange)':e.statut==='Nouveau / Retrouvé'?'var(--green)':'var(--grey)';
-    html+='<tr><td>'+e.reference+'</td><td style="font-size:12px">'+(e.designation||'—')+'</td><td>'+badgeSiteD(e.site)+'</td><td style="font-size:11px">'+(e.lieu||'—')+'</td><td>'+e.quantite_avant+'</td><td>'+e.quantite_actuelle+'</td><td>'+(e.delta>0?'+':'')+e.delta+'</td><td style="color:'+color+';font-weight:700;font-size:11px">'+e.statut+'</td></tr>';
+  var etat=calculerEtatStock(lignes);
+  var filtres=filtrerEtatStock(etat);
+  var f=INV_STOCK_FILTRES;
+  var affiches=f.nb>0?filtres.slice(0,f.nb):filtres;
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Zone</th><th>Chantier</th><th>Site</th><th>Fabricant</th><th>Référence</th><th>Désignation</th><th>Quantité</th></tr></thead><tbody>';
+  if(!affiches.length)html+='<tr><td colspan="7" class="es">Aucune ligne pour ces filtres.</td></tr>';
+  affiches.forEach(function(e){
+    html+='<tr><td>'+(e.zone||'—')+'</td><td style="font-size:11px">'+(e.chantier||'—')+'</td><td>'+badgeSiteD(e.site)+'</td><td style="font-size:12px">'+(e.fabricant||'—')+'</td><td>'+e.reference+'</td><td style="font-size:12px">'+(e.designation||'—')+'</td><td style="font-weight:700">'+e.quantite+'</td></tr>';
   });
   html+='</tbody></table></div>';
-  html+='<p style="font-size:11px;color:var(--grey);padding:8px 14px">'+ecarts.length+' ligne(s) après filtre'+(ecarts.length>ecartsAffiches.length?' — '+ecartsAffiches.length+' affichée(s), augmenter "max" ou voir l\'export CSV complet pour la totalité':'')+'.</p>';
+  html+='<p style="font-size:11px;color:var(--grey);padding:8px 14px">'+filtres.length+' référence(s) après filtre'+(filtres.length>affiches.length?' — '+affiches.length+' affichée(s), augmenter "max" ou voir l\'export CSV complet pour la totalité':'')+'.</p>';
   resDiv.innerHTML=html;
 
-  // Lignes sans référence : exclues du rapprochement (voir invGrouper), listées à part, non classées
+  // Lignes sans référence : exclues du regroupement (voir calculerEtatStock), listées à part
   var sansRefFiltrees=filtrerLignesSansRef(sansRefBrutes);
   var htmlSr='<div class="card" style="margin:12px 14px;border-top:3px solid var(--grey)"><div class="card-head"><h3>❓ Sans référence ('+sansRefFiltrees.length+')</h3></div>'+
-    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Lignes saisies sans référence : ne peuvent pas être rapprochées de manière fiable avec la campagne précédente, à corriger si possible.</p>';
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Lignes saisies sans référence : ne peuvent pas être regroupées de manière fiable dans l\'état du stock, à corriger si possible.</p>';
   if(!sansRefFiltrees.length)htmlSr+='<p class="es" style="padding:16px">Aucune (pour ces filtres).</p>';
   else{
-    htmlSr+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Fabricant</th><th>Site</th><th>Lieu</th><th>Quantité</th><th>Saisi par</th></tr></thead><tbody>';
+    htmlSr+='<div class="tbl-wrap"><table><thead><tr><th>Zone</th><th>Chantier</th><th>Désignation</th><th>Fabricant</th><th>Site</th><th>Quantité</th><th>Saisi par</th></tr></thead><tbody>';
     sansRefFiltrees.forEach(function(l){
-      htmlSr+='<tr><td style="font-size:12px">'+(l.designation||'—')+'</td><td style="font-size:12px">'+(l.fabriquant||'—')+'</td><td>'+badgeSiteD(l.site)+'</td><td style="font-size:11px">'+(l.chantier||l.zone||'—')+'</td><td>'+l.quantite+'</td><td style="font-size:11px;color:var(--grey)">'+nomEmploye(l.code_employe)+'</td></tr>';
+      htmlSr+='<tr><td>'+(l.zone||'—')+'</td><td style="font-size:11px">'+(l.chantier||'—')+'</td><td style="font-size:12px">'+(l.designation||'—')+'</td><td style="font-size:12px">'+(l.fabriquant||'—')+'</td><td>'+badgeSiteD(l.site)+'</td><td>'+l.quantite+'</td><td style="font-size:11px;color:var(--grey)">'+nomEmploye(l.code_employe)+'</td></tr>';
     });
     htmlSr+='</tbody></table></div>';
   }
@@ -1166,104 +1151,89 @@ function refreshInvEcartResults(){
   sansRefDiv.innerHTML=htmlSr;
 }
 
-async function exporterEcartInventaire(nom){
+async function exporterEtatStockInventaire(nom){
   await fetchLignesCampagne(nom);
-  var c=invCampagnesList.find(function(x){return x.nom===nom;});
-  var closedBefore=invCampagnesList.filter(function(x){return x.statut==='Clôturée'&&x.nom!==nom&&new Date(x.date_debut||0)<new Date(c?c.date_debut:Date.now());})
-    .sort(function(a,b){return new Date(b.date_debut)-new Date(a.date_debut);});
-  var precedente=closedBefore[0];
-  if(!precedente){alert('Aucune campagne précédente clôturée à comparer.');return;}
-  await fetchLignesCampagne(precedente.nom);
-  var lignesActuelles=invLignesCache[nom]||[];
-  var ecarts=calculerEcartInventaire(lignesActuelles,invLignesCache[precedente.nom]||[]);
-  var entetes=['Référence','Désignation','Site','Lieu (chantier/zone)','Quantité avant','Quantité actuelle','Écart','Statut'];
+  var lignes=invLignesCache[nom]||[];
+  var etat=calculerEtatStock(lignes);
+  var entetes=['Zone','Chantier','Site','Fabricant','Référence','Désignation','Quantité'];
   var lignesCsv=[entetes.map(csvCell).join(';')];
-  ecarts.forEach(function(e){
-    lignesCsv.push([e.reference,e.designation,e.site,e.lieu,nbFr(e.quantite_avant),nbFr(e.quantite_actuelle),nbFr(e.delta),e.statut].map(csvCell).join(';'));
+  etat.forEach(function(e){
+    lignesCsv.push([e.zone,e.chantier,e.site,e.fabricant,e.reference,e.designation,nbFr(e.quantite)].map(csvCell).join(';'));
   });
-  var sansRef=lignesSansReference(lignesActuelles);
+  var sansRef=lignesSansReference(lignes);
   if(sansRef.length){
     lignesCsv.push('');
-    lignesCsv.push(['SANS R\u00C9F\u00C9RENCE \u2014 non rapproch\u00E9es'].map(csvCell).join(';'));
-    lignesCsv.push(['D\u00E9signation','Fabricant','Site','Lieu (chantier/zone)','Quantit\u00E9','Saisi par'].map(csvCell).join(';'));
+    lignesCsv.push(['SANS R\u00C9F\u00C9RENCE'].map(csvCell).join(';'));
+    lignesCsv.push(['Zone','Chantier','D\u00E9signation','Fabricant','Site','Quantit\u00E9','Saisi par'].map(csvCell).join(';'));
     sansRef.forEach(function(l){
-      lignesCsv.push([l.designation,l.fabriquant,l.site,(l.chantier||l.zone||''),nbFr(l.quantite),nomEmploye(l.code_employe)].map(csvCell).join(';'));
+      lignesCsv.push([l.zone,l.chantier,l.designation,l.fabriquant,l.site,nbFr(l.quantite),nomEmploye(l.code_employe)].map(csvCell).join(';'));
     });
   }
   var csv='\uFEFF'+lignesCsv.join('\r\n');
   var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   var url=URL.createObjectURL(blob);
   var a2=document.createElement('a');
-  a2.href=url;a2.download='Ecart_Inventaire_'+nom.replace(/[^a-zA-Z0-9]+/g,'_')+'.csv';
+  a2.href=url;a2.download='Etat_Stock_'+nom.replace(/[^a-zA-Z0-9]+/g,'_')+'.csv';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
   URL.revokeObjectURL(url);
 }
 
-function invCle(l){return (l.reference||'').trim().toUpperCase()+'|'+(l.site||'')+'|'+((l.chantier||'').trim()||(l.zone||'').trim());}
+// Clé de regroupement : Zone + Site + Référence (le chantier est une info complémentaire optionnelle,
+// pas un axe de comptage à part entière — la zone dépôt est désormais obligatoire à la saisie).
+function invCle(l){return (l.zone||'').trim().toUpperCase()+'|'+(l.site||'')+'|'+(l.reference||'').trim().toUpperCase();}
 // Lignes sans référence exclues du regroupement : une référence vide ne peut pas être rapprochée de façon fiable
 // (toutes les lignes "sans réf" se retrouveraient sinon fusionnées sous la même clé). Traitées à part, non classées.
-function invGrouper(lignes){
+function calculerEtatStock(lignes){
   var g={};
   (lignes||[]).forEach(function(l){
     if(!(l.reference||'').trim())return;
     var k=invCle(l);
-    if(!g[k])g[k]={reference:l.reference,site:l.site,lieu:(l.chantier||l.zone||''),designation:l.designation,quantite:0};
+    if(!g[k])g[k]={zone:l.zone,site:l.site,chantier:l.chantier,fabricant:l.fabriquant,reference:l.reference,designation:l.designation,quantite:0};
     g[k].quantite+=(parseFloat(l.quantite)||0);
     if(!g[k].designation&&l.designation)g[k].designation=l.designation;
+    if(!g[k].chantier&&l.chantier)g[k].chantier=l.chantier;
+    if(!g[k].fabricant&&l.fabriquant)g[k].fabricant=l.fabriquant;
   });
-  return g;
+  var out=Object.values(g);
+  out.sort(function(a,b){return (a.zone||'').localeCompare(b.zone||'')||(a.reference||'').localeCompare(b.reference||'');});
+  return out;
 }
 function lignesSansReference(lignes){
   return (lignes||[]).filter(function(l){return !(l.reference||'').trim();});
 }
-function calculerEcartInventaire(lignesActuelles,lignesPrecedentes){
-  var gA=invGrouper(lignesActuelles),gP=invGrouper(lignesPrecedentes);
-  var cles=Object.keys(gA).concat(Object.keys(gP)).filter(function(v,i,a){return a.indexOf(v)===i;});
-  var out=[];
-  cles.forEach(function(k){
-    var a=gA[k],p=gP[k];
-    var qa=a?a.quantite:0,qp=p?p.quantite:0;
-    var ref=(a||p).reference,site=(a||p).site,lieu=(a||p).lieu,desig=(a&&a.designation)||(p&&p.designation)||'';
-    var statut;
-    if(a&&p)statut=(qa===qp)?'Confirmé':'Écart quantité';
-    else if(a&&!p)statut='Nouveau / Retrouvé';
-    else statut='Manquant';
-    out.push({reference:ref,site:site,lieu:lieu,designation:desig,quantite_avant:qp,quantite_actuelle:qa,delta:qa-qp,statut:statut});
-  });
-  var ordre={'Manquant':0,'Écart quantité':1,'Nouveau / Retrouvé':2,'Confirmé':3};
-  out.sort(function(x,y){return (ordre[x.statut]-ordre[y.statut])||(x.reference||'').localeCompare(y.reference||'');});
-  return out;
+// Filtres combinables de l'état du stock (recherche + site + fabricant + sans désignation), avec réinitialisation
+var INV_STOCK_FILTRES={q:'',site:'',fabricant:'',sansDesig:false,nb:100};
+function appliquerFiltresInvStock(){
+  INV_STOCK_FILTRES.q=(document.getElementById('inv-stock-q')||{}).value||'';
+  INV_STOCK_FILTRES.site=(document.getElementById('inv-stock-site')||{}).value||'';
+  INV_STOCK_FILTRES.fabricant=(document.getElementById('inv-stock-fabricant')||{}).value||'';
+  INV_STOCK_FILTRES.sansDesig=!!(document.getElementById('inv-stock-sans-desig')||{}).checked;
+  INV_STOCK_FILTRES.nb=parseInt((document.getElementById('inv-stock-nb')||{}).value,10)||0;
+  refreshInvStockResults(); // ne touche que les résultats, jamais les champs de filtre (sinon la recherche perd le focus)
 }
-// Filtres combinables du rapport d'écart (recherche + site + statut + sans désignation), avec réinitialisation
-var INV_ECART_FILTRES={q:'',site:'',statut:'',sansDesig:false,nb:100};
-function appliquerFiltresInvEcart(){
-  INV_ECART_FILTRES.q=(document.getElementById('inv-ecart-q')||{}).value||'';
-  INV_ECART_FILTRES.site=(document.getElementById('inv-ecart-site')||{}).value||'';
-  INV_ECART_FILTRES.statut=(document.getElementById('inv-ecart-statut')||{}).value||'';
-  INV_ECART_FILTRES.sansDesig=!!(document.getElementById('inv-ecart-sans-desig')||{}).checked;
-  INV_ECART_FILTRES.nb=parseInt((document.getElementById('inv-ecart-nb')||{}).value,10)||0;
-  refreshInvEcartResults(); // ne touche que les résultats, jamais les champs de filtre (sinon la recherche perd le focus)
+function resetFiltresInvStock(){
+  INV_STOCK_FILTRES={q:'',site:'',fabricant:'',sansDesig:false,nb:100};
+  reinitialiserFiltres(['inv-stock-q','inv-stock-site','inv-stock-fabricant','inv-stock-nb','inv-stock-sans-desig'],refreshInvStockResults);
 }
-function resetFiltresInvEcart(){
-  INV_ECART_FILTRES={q:'',site:'',statut:'',sansDesig:false,nb:100};
-  reinitialiserFiltres(['inv-ecart-q','inv-ecart-site','inv-ecart-statut','inv-ecart-nb','inv-ecart-sans-desig'],refreshInvEcartResults);
-}
-function filtrerEcarts(ecarts){
-  var qu=(INV_ECART_FILTRES.q||'').trim().toUpperCase();
-  return ecarts.filter(function(e){
-    if(INV_ECART_FILTRES.site&&e.site!==INV_ECART_FILTRES.site)return false;
-    if(INV_ECART_FILTRES.statut&&e.statut!==INV_ECART_FILTRES.statut)return false;
-    if(INV_ECART_FILTRES.sansDesig&&(e.designation||'').trim())return false;
-    if(qu&&!((e.reference||'').toUpperCase().includes(qu)||(e.designation||'').toUpperCase().includes(qu)||(e.lieu||'').toUpperCase().includes(qu)))return false;
+function filtrerEtatStock(etat){
+  var f=INV_STOCK_FILTRES;
+  var qu=(f.q||'').trim().toUpperCase();
+  return etat.filter(function(e){
+    if(f.site&&e.site!==f.site)return false;
+    if(f.fabricant&&e.fabricant!==f.fabricant)return false;
+    if(f.sansDesig&&(e.designation||'').trim())return false;
+    if(qu&&!((e.reference||'').toUpperCase().includes(qu)||(e.designation||'').toUpperCase().includes(qu)||(e.zone||'').toUpperCase().includes(qu)||(e.chantier||'').toUpperCase().includes(qu)||(e.fabricant||'').toUpperCase().includes(qu)))return false;
     return true;
   });
 }
 function filtrerLignesSansRef(lignes){
-  var qu=(INV_ECART_FILTRES.q||'').trim().toUpperCase();
+  var f=INV_STOCK_FILTRES;
+  var qu=(f.q||'').trim().toUpperCase();
   return lignes.filter(function(l){
-    if(INV_ECART_FILTRES.site&&l.site!==INV_ECART_FILTRES.site)return false;
-    if(INV_ECART_FILTRES.sansDesig&&(l.designation||'').trim())return false;
-    if(qu&&!((l.designation||'').toUpperCase().includes(qu)||(l.lieu||l.chantier||l.zone||'').toUpperCase().includes(qu)))return false;
+    if(f.site&&l.site!==f.site)return false;
+    if(f.fabricant&&(l.fabriquant||'')!==f.fabricant)return false;
+    if(f.sansDesig&&(l.designation||'').trim())return false;
+    if(qu&&!((l.designation||'').toUpperCase().includes(qu)||(l.zone||'').toUpperCase().includes(qu)||(l.chantier||'').toUpperCase().includes(qu)||(l.fabriquant||'').toUpperCase().includes(qu)))return false;
     return true;
   });
 }
