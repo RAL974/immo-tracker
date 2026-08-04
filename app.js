@@ -308,12 +308,15 @@ function immosFilt(cat, q, filtrerSite) {
 }
 
 // ── Scanner ───────────────────────────────────────────────
-function startScanner(elId, cb) {
+// boxConfig optionnel : zone de visée personnalisée (ex. rectangle large pour les codes-barres EAN,
+// par défaut un carré adapté aux QR codes). La lib html5-qrcode détecte QR ET codes-barres (EAN/UPC/Code128...)
+// simultanément sans configuration supplémentaire.
+function startScanner(elId, cb, boxConfig) {
   stopScanner();
   const el = document.getElementById(elId);
   if (!el) return;
   S.scanner = new Html5Qrcode(elId);
-  S.scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 240, height: 240 } }, cb, () => {}).catch(() => {
+  S.scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: boxConfig || { width: 240, height: 240 } }, cb, () => {}).catch(() => {
     if (el) el.innerHTML = '<p style="color:#fff;text-align:center;padding:40px 20px;font-size:14px">⚠️ Impossible d\'accéder à la caméra.<br>Vérifie les permissions.</p>';
   });
 }
@@ -337,7 +340,7 @@ function showScreen(id, skipInit) {
     case 'screen-transferts-attente': afficherTransfertsEnAttente(); break;
     case 'screen-mes-reservations':   afficherMesReservations(); break;
     case 'screen-reserver':           if (!skipInit) initReservationScreen(false); break;
-    case 'screen-inventaire-stock':   ouvrirEcranInventaire(); break;
+    case 'screen-inventaire-stock':   if (!skipInit) ouvrirEcranInventaire(); break;
   }
 }
 
@@ -1654,13 +1657,15 @@ async function supprimerLigneInventaire(id) {
 
 async function soumettreLigneInventaire() {
   if (!S.invCampagne) { toast('Aucune campagne active', 'error'); return; }
+  const zone = (document.getElementById('inv-zone').value || '').trim();
   const reference = (document.getElementById('inv-reference').value || '').trim();
   const quantite = parseFloat(document.getElementById('inv-quantite').value);
+  if (!zone) { toast('La zone est obligatoire', 'error'); return; }
   if (!reference) { toast('La référence est obligatoire', 'error'); return; }
   if (isNaN(quantite) || quantite <= 0) { toast('Indique une quantité supérieure à 0', 'error'); return; }
   const payload = {
     campagne: S.invCampagne.nom,
-    zone: (document.getElementById('inv-zone').value || '').trim(),
+    zone: zone,
     site: normSite(S.siteByCode && S.siteByCode[S.employe.code]),
     chantier: (document.getElementById('inv-chantier').value || '').trim(),
     fabriquant: (document.getElementById('inv-fabriquant').value || '').trim(),
@@ -1693,6 +1698,18 @@ async function soumettreLigneInventaire() {
       toast('Erreur : ' + (d.error || 'inconnue'), 'error');
     }
   } catch (e) { btn.dataset.busy = ''; btn.disabled = false; toast('Erreur réseau : ' + e.message, 'error'); }
+}
+
+// Scan du code-barres fabricant (EAN/UPC/Code128...) pour remplir directement la Référence.
+// Repli manuel toujours possible : la boîte d'origine n'est pas toujours disponible sur le terrain.
+function scannerReferenceInventaire() {
+  showScreen('screen-scan-inventaire-ref', true);
+  startScanner('scanner-inventaire-ref', onScanReferenceInventaire, { width: 280, height: 150 });
+}
+function onScanReferenceInventaire(code) {
+  stopScanner(); vib(150);
+  document.getElementById('inv-reference').value = (code || '').trim();
+  showScreen('screen-inventaire-stock', true);
 }
 
 // ══════════════════════════════════════════════════════════
