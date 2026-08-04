@@ -122,6 +122,12 @@ async function handleRequest(request) {
     const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/lists/Lignes_Inventaire/columns?$select=name,displayName', { headers: H });
     return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
+  // Noms internes réels des colonnes d'une liste quelconque (?debug_columns=NomDeLaListe) — utile après
+  // toute création manuelle de liste côté SharePoint pour vérifier avant d'écrire dedans.
+  if (p.get('debug_columns')) {
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/lists/' + encodeURIComponent(p.get('debug_columns')) + '/columns?$select=name,displayName', { headers: H });
+    return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
 
   // ── Métadonnées achat (valeur + date) ──────────────────────────────────────
   if (p.get('immo_metadata') === '1') {
