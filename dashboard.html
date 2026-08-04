@@ -1446,7 +1446,7 @@ function renderEPIGrille(container){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var html='<div class="card"><div class="card-head"><h3>📐 Grille de dotation standard</h3></div>'+
     '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Quantité standard remise par profil, utilisée pour générer automatiquement les fiches de dotation.'+(canEdit?' Cliquez sur une valeur pour la modifier.':'')+'</p>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Type d\'article</th>'+affectations.map(function(a){return '<th>'+a[1]+'</th>';}).join('')+'</tr></thead><tbody>';
+    '<div class="tbl-wrap"><table><thead><tr><th>Type d\'article</th>'+affectations.map(function(a){return '<th>'+a[1]+'</th>';}).join('')+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
   types.forEach(function(t){
     html+='<tr><td style="font-weight:700">'+t+'</td>';
     affectations.forEach(function(a){
@@ -1455,10 +1455,20 @@ function renderEPIGrille(container){
       if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleDotationEPI(\''+a[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:6px;text-align:center"></td>';
       else html+='<td style="text-align:center">'+qte+'</td>';
     });
+    if(canEdit)html+='<td><button onclick="supprimerTypeGrilleEPI(\''+t.replace(/'/g,"\\'")+'\')" title="Retirer ce type d\'article de la grille" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button></td>';
     html+='</tr>';
   });
   html+='</tbody></table></div></div>';
   container.innerHTML=html;
+}
+async function supprimerTypeGrilleEPI(typeArticle){
+  if(!confirm('Retirer "'+typeArticle+'" de la grille de dotation pour les 4 profils ?'))return;
+  var lignes=epiGrille.filter(function(g){return g.type_article===typeArticle;});
+  for(var i=0;i<lignes.length;i++){
+    try{await fetch(W+'?action=supprimer_grille_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:lignes[i].id})});}catch(e){}
+  }
+  dataLoaded.epi=false;
+  await loadEPI();
 }
 async function majGrilleDotationEPI(affectation,typeArticle,valeur){
   var q=parseFloat(valeur);

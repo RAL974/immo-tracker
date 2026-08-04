@@ -1094,11 +1094,18 @@ async function handleRequest(request) {
       'Pantalon': 'Taille_Pantalon', 'T-Shirts': 'Taille_Tshirt', 'T-Shirts manches longues': 'Taille_Tshirt',
       'Polos': 'Taille_Tshirt', 'Veste': 'Taille_Veste', 'Ensemble pluie': 'Taille_Tshirt',
       'Chaussures hautes': 'Pointure_Chaussures', 'Chaussures basses': 'Pointure_Chaussures',
-      'Gants a picot': 'Taille_Gants', 'Gants gros oeuvre': 'Taille_Gants'
+      'Gants à picot': 'Taille_Gants', 'Gants gros œuvre': 'Taille_Gants'
+      // Casque anti-bruit, Casque de chantier, Jugulaire pour casque, Lunettes incolores, Lunettes fumées :
+      // articles à taille unique (pas de champ de taille employé associé) — voir trouverArticleCatalogue ci-dessous.
     };
     // Un article catalogue matche si la taille employé correspond à la taille salarié OU à la taille affichage
-    // (gère nativement le cas où la taille est communiquée sous forme numérique OU alphabétique).
+    // (gère nativement le cas où la taille est communiquée sous forme numérique OU alphabétique). Pour un type
+    // sans champ de taille associé (article à taille unique type "Standard"), on prend directement l'entrée
+    // catalogue de ce type, sans comparaison de taille.
     function trouverArticleCatalogue(catalogue, typeArticle, tailleValeur) {
+      if (!TAILLE_FIELD_PAR_TYPE[typeArticle]) {
+        return catalogue.find(c => (c.Type_Article || '') === typeArticle) || null;
+      }
       const v = (tailleValeur || '').toString().trim().toLowerCase();
       if (!v) return null;
       return catalogue.find(c => (c.Type_Article || '') === typeArticle &&
@@ -1182,6 +1189,15 @@ async function handleRequest(request) {
         const rd = await r.json();
         return json({ success: r.ok, id: rd.id });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Supprime une ligne de la grille de dotation (ex : type d'article retiré de la grille, ou correction
+    // d'une ligne mal orthographiée) — Admin/Logistique
+    if (action === 'supprimer_grille_dotation_epi') {
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const r = await fetch(GL + '/Grille_Dotation_EPI/items/' + id, { method: 'DELETE', headers: H });
+      return json({ success: r.ok || r.status === 204 });
     }
 
     // Réception d'une commande fournisseur : incrémente le stock d'une ligne catalogue
