@@ -1,0 +1,582 @@
+[
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "36",
+  "taille_affichage": "S",
+  "reference": "31714",
+  "designation": "Pantalon de travail SMART noir-gris taille S",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "38",
+  "taille_affichage": "S",
+  "reference": "31714",
+  "designation": "Pantalon de travail SMART noir-gris taille S",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "40",
+  "taille_affichage": "M",
+  "reference": "31714",
+  "designation": "Pantalon de travail SMART noir-gris taille S",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "42",
+  "taille_affichage": "L",
+  "reference": "31705",
+  "designation": "Pantalon de travail SMART noir-gris taille M",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "44",
+  "taille_affichage": "XL",
+  "reference": "31706",
+  "designation": "Pantalon de travail SMART noir-gris taille L",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "46",
+  "taille_affichage": "XXL",
+  "reference": "31707",
+  "designation": "Pantalon de travail SMART noir-gris taille XL",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "48",
+  "taille_affichage": "XXXL",
+  "reference": "31707",
+  "designation": "Pantalon de travail SMART noir-gris taille XL",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "54",
+  "taille_affichage": "XXXXL",
+  "reference": "31708",
+  "designation": "Pantalon de travail SMART noir-gris taille XXL",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts",
+  "taille_salarie": "S",
+  "taille_affichage": "S",
+  "reference": "TEESHIRTCOTBC",
+  "designation": "Tee-Shirts coton 170grs couleur n°10 Bleu Ciel",
+  "fournisseur": "Roustanjee",
+  "tarif": 6.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts",
+  "taille_salarie": "M",
+  "taille_affichage": "M",
+  "reference": "TEESHIRTCOTBC",
+  "designation": "Tee-Shirts coton 170grs couleur n°10 Bleu Ciel",
+  "fournisseur": "Roustanjee",
+  "tarif": 6.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts",
+  "taille_salarie": "L",
+  "taille_affichage": "L",
+  "reference": "TEESHIRTCOTBC",
+  "designation": "Tee-Shirts coton 170grs couleur n°10 Bleu Ciel",
+  "fournisseur": "Roustanjee",
+  "tarif": 6.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts",
+  "taille_salarie": "XL",
+  "taille_affichage": "XL",
+  "reference": "TEESHIRTCOTBC",
+  "designation": "Tee-Shirts coton 170grs couleur n°10 Bleu Ciel",
+  "fournisseur": "Roustanjee",
+  "tarif": 6.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts",
+  "taille_salarie": "XXL",
+  "taille_affichage": "XXL",
+  "reference": "TEESHIRTCOTBC",
+  "designation": "Tee-Shirts coton 170grs couleur n°10 Bleu Ciel",
+  "fournisseur": "Roustanjee",
+  "tarif": 6.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Veste",
+  "taille_salarie": "S",
+  "taille_affichage": "S",
+  "reference": "35630",
+  "designation": "Veste de travail KAVIR grise taille S",
+  "fournisseur": "Soud'Service",
+  "tarif": 22,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Veste",
+  "taille_salarie": "M",
+  "taille_affichage": "M",
+  "reference": "35631",
+  "designation": "Veste de travail KAVIR grise taille M",
+  "fournisseur": "Soud'Service",
+  "tarif": 22,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Veste",
+  "taille_salarie": "L",
+  "taille_affichage": "L",
+  "reference": "35632",
+  "designation": "Veste de travail KAVIR grise taille L",
+  "fournisseur": "Soud'Service",
+  "tarif": 22,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Veste",
+  "taille_salarie": "XL",
+  "taille_affichage": "XL",
+  "reference": "35633",
+  "designation": "Veste de travail KAVIR grise taille XL",
+  "fournisseur": "Soud'Service",
+  "tarif": 22,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Veste",
+  "taille_salarie": "XXL",
+  "taille_affichage": "XXL",
+  "reference": "35634",
+  "designation": "Veste de travail KAVIR grise taille XXL",
+  "fournisseur": "Soud'Service",
+  "tarif": 22,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures hautes",
+  "taille_salarie": "40",
+  "taille_affichage": "40",
+  "reference": "4CI910040",
+  "designation": "CHAUSSURES HAUTES URANUS P.40",
+  "fournisseur": "Protecthoms",
+  "tarif": 61.74,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures hautes",
+  "taille_salarie": "41",
+  "taille_affichage": "41",
+  "reference": "4CI910041",
+  "designation": "CHAUSSURES HAUTES URANUS P.41",
+  "fournisseur": "Protecthoms",
+  "tarif": 61.74,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures hautes",
+  "taille_salarie": "42",
+  "taille_affichage": "42",
+  "reference": "4CI910042",
+  "designation": "CHAUSSURES HAUTES URANUS P.42",
+  "fournisseur": "Protecthoms",
+  "tarif": 61.74,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures hautes",
+  "taille_salarie": "43",
+  "taille_affichage": "43",
+  "reference": "4CI910043",
+  "designation": "CHAUSSURES HAUTES URANUS P.43",
+  "fournisseur": "Protecthoms",
+  "tarif": 61.74,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures hautes",
+  "taille_salarie": "44",
+  "taille_affichage": "44",
+  "reference": "4CI910044",
+  "designation": "CHAUSSURES HAUTES URANUS P.44",
+  "fournisseur": "Protecthoms",
+  "tarif": 61.74,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures hautes",
+  "taille_salarie": "45",
+  "taille_affichage": "45",
+  "reference": "4CI910045",
+  "designation": "CHAUSSURES HAUTES URANUS P.45",
+  "fournisseur": "Protecthoms",
+  "tarif": 61.74,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures basses",
+  "taille_salarie": "40",
+  "taille_affichage": "40",
+  "reference": "4CI909940",
+  "designation": "CHAUSSURES BASSES MERCURY P.40",
+  "fournisseur": "Protecthoms",
+  "tarif": 56.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures basses",
+  "taille_salarie": "41",
+  "taille_affichage": "41",
+  "reference": "4CI909941",
+  "designation": "CHAUSSURES BASSES MERCURY P.41",
+  "fournisseur": "Protecthoms",
+  "tarif": 56.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures basses",
+  "taille_salarie": "42",
+  "taille_affichage": "42",
+  "reference": "4CI909942",
+  "designation": "CHAUSSURES BASSES MERCURY P.42",
+  "fournisseur": "Protecthoms",
+  "tarif": 56.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures basses",
+  "taille_salarie": "43",
+  "taille_affichage": "43",
+  "reference": "4CI909943",
+  "designation": "CHAUSSURES BASSES MERCURY P.43",
+  "fournisseur": "Protecthoms",
+  "tarif": 56.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures basses",
+  "taille_salarie": "44",
+  "taille_affichage": "44",
+  "reference": "4CI909944",
+  "designation": "CHAUSSURES BASSES MERCURY P.44",
+  "fournisseur": "Protecthoms",
+  "tarif": 56.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Chaussures basses",
+  "taille_salarie": "45",
+  "taille_affichage": "45",
+  "reference": "4CI909945",
+  "designation": "CHAUSSURES BASSES MERCURY P.45",
+  "fournisseur": "Protecthoms",
+  "tarif": 56.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Gants à picot",
+  "taille_salarie": "8",
+  "taille_affichage": "8",
+  "reference": "AT042844-ZZ08ACA",
+  "designation": "GANT MAXIFLEX ENDURANCE (T08)",
+  "fournisseur": "SPIR",
+  "tarif": 4.96,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Gants à picot",
+  "taille_salarie": "9",
+  "taille_affichage": "9",
+  "reference": "AT042844-ZZ09ACA",
+  "designation": "GANT MAXIFLEX ENDURANCE (T09)",
+  "fournisseur": "SPIR",
+  "tarif": 4.96,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Gants à picot",
+  "taille_salarie": "10",
+  "taille_affichage": "10",
+  "reference": "AT042844-ZZ10ACA",
+  "designation": "GANT MAXIFLEX ENDURANCE (T10)",
+  "fournisseur": "SPIR",
+  "tarif": 4.96,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Gants gros œuvre",
+  "taille_salarie": "8",
+  "taille_affichage": "8",
+  "reference": "3GC020208",
+  "designation": "GANTS L2N/68-F002 T.08",
+  "fournisseur": "Protecthoms",
+  "tarif": 2.45,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Gants gros œuvre",
+  "taille_salarie": "9",
+  "taille_affichage": "9",
+  "reference": "3GC020209",
+  "designation": "GANTS L2N/68-F002 T.09",
+  "fournisseur": "Protecthoms",
+  "tarif": 2.45,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Gants gros œuvre",
+  "taille_salarie": "10",
+  "taille_affichage": "10",
+  "reference": "3GC020210",
+  "designation": "GANTS L2N/68-F002 T.10",
+  "fournisseur": "Protecthoms",
+  "tarif": 2.45,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Polos",
+  "taille_salarie": "S",
+  "taille_affichage": "S",
+  "reference": "POLOIMPBLD",
+  "designation": "Polo \"IMPERIUM\" 100% coton maille piqué 220grs couleur Bleu Dénim",
+  "fournisseur": "Roustanjee",
+  "tarif": 16.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Polos",
+  "taille_salarie": "M",
+  "taille_affichage": "M",
+  "reference": "POLOIMPBLD",
+  "designation": "Polo \"IMPERIUM\" 100% coton maille piqué 220grs couleur Bleu Dénim",
+  "fournisseur": "Roustanjee",
+  "tarif": 16.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Polos",
+  "taille_salarie": "L",
+  "taille_affichage": "L",
+  "reference": "POLOIMPBLD",
+  "designation": "Polo \"IMPERIUM\" 100% coton maille piqué 220grs couleur Bleu Dénim",
+  "fournisseur": "Roustanjee",
+  "tarif": 16.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Polos",
+  "taille_salarie": "XL",
+  "taille_affichage": "XL",
+  "reference": "POLOIMPBLD",
+  "designation": "Polo \"IMPERIUM\" 100% coton maille piqué 220grs couleur Bleu Dénim",
+  "fournisseur": "Roustanjee",
+  "tarif": 16.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Polos",
+  "taille_salarie": "XXL",
+  "taille_affichage": "XXL",
+  "reference": "POLOIMPBLD",
+  "designation": "Polo \"IMPERIUM\" 100% coton maille piqué 220grs couleur Bleu Dénim",
+  "fournisseur": "Roustanjee",
+  "tarif": 16.2,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts manches longues",
+  "taille_salarie": "S",
+  "taille_affichage": "S",
+  "reference": "TEESHIRTMLRO",
+  "designation": "Tee-shirt polyester M.L \"MOTECARLO LS\" couleur rouge ",
+  "fournisseur": "Roustanjee",
+  "tarif": 10.35,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts manches longues",
+  "taille_salarie": "M",
+  "taille_affichage": "M",
+  "reference": "TEESHIRTMLRO",
+  "designation": "Tee-shirt polyester M.L \"MOTECARLO LS\" couleur rouge ",
+  "fournisseur": "Roustanjee",
+  "tarif": 10.35,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts manches longues",
+  "taille_salarie": "L",
+  "taille_affichage": "L",
+  "reference": "TEESHIRTMLRO",
+  "designation": "Tee-shirt polyester M.L \"MOTECARLO LS\" couleur rouge ",
+  "fournisseur": "Roustanjee",
+  "tarif": 10.35,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts manches longues",
+  "taille_salarie": "XL",
+  "taille_affichage": "XL",
+  "reference": "TEESHIRTMLRO",
+  "designation": "Tee-shirt polyester M.L \"MOTECARLO LS\" couleur rouge ",
+  "fournisseur": "Roustanjee",
+  "tarif": 10.35,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "T-Shirts manches longues",
+  "taille_salarie": "XXL",
+  "taille_affichage": "XXL",
+  "reference": "TEESHIRTMLRO",
+  "designation": "Tee-shirt polyester M.L \"MOTECARLO LS\" couleur rouge ",
+  "fournisseur": "Roustanjee",
+  "tarif": 10.35,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Ensemble pluie",
+  "taille_salarie": "S",
+  "taille_affichage": "S",
+  "reference": "2VP012501",
+  "designation": "ENSEMBLE DE PLUIE PLUVIO/EN400 MARINE T.S",
+  "fournisseur": "Protecthoms",
+  "tarif": 12.52,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Ensemble pluie",
+  "taille_salarie": "M",
+  "taille_affichage": "M",
+  "reference": "2VP012502",
+  "designation": "ENSEMBLE DE PLUIE PLUVIO/EN400 MARINE T.M",
+  "fournisseur": "Protecthoms",
+  "tarif": 12.52,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Ensemble pluie",
+  "taille_salarie": "L",
+  "taille_affichage": "L",
+  "reference": "2VP012503",
+  "designation": "ENSEMBLE DE PLUIE PLUVIO/EN400 MARINE T.L",
+  "fournisseur": "Protecthoms",
+  "tarif": 12.52,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Ensemble pluie",
+  "taille_salarie": "XL",
+  "taille_affichage": "XL",
+  "reference": "2VP012504",
+  "designation": "ENSEMBLE DE PLUIE PLUVIO/EN400 MARINE T.XL",
+  "fournisseur": "Protecthoms",
+  "tarif": 12.52,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Ensemble pluie",
+  "taille_salarie": "XXL",
+  "taille_affichage": "XXL",
+  "reference": "2VP012505",
+  "designation": "ENSEMBLE DE PLUIE PLUVIO/EN400 MARINE T.XXL",
+  "fournisseur": "Protecthoms",
+  "tarif": 12.52,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Lunettes incolores",
+  "taille_salarie": "",
+  "taille_affichage": "Standard",
+  "reference": "1_SWIFTN10E",
+  "designation": "LUNETTE SWIFT INCOLORE",
+  "fournisseur": "Protecthoms",
+  "tarif": 3.43,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Lunettes fumées",
+  "taille_salarie": "",
+  "taille_affichage": "Standard",
+  "reference": "1_SWIFTN20E",
+  "designation": "LUNETTE SWIFT FUME",
+  "fournisseur": "Protecthoms",
+  "tarif": 3.43,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Casque anti-bruit",
+  "taille_salarie": "",
+  "taille_affichage": "Standard",
+  "reference": "1ST040610",
+  "designation": "CASQUE ANTI BRUIT SHELLY100P",
+  "fournisseur": "Protecthoms",
+  "tarif": 9.09,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "",
+  "taille_affichage": "Standard",
+  "reference": "31709",
+  "designation": "Pantalon de travail SMART noir-gris taille XXXL",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Pantalon",
+  "taille_salarie": "",
+  "taille_affichage": "Standard",
+  "reference": "31738",
+  "designation": "Pantalon de travail SMART noir-gris taille XXXXL",
+  "fournisseur": "Soud'Service",
+  "tarif": 21.5,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Casque de chantier",
+  "taille_salarie": "",
+  "taille_affichage": "Standard",
+  "reference": "Z-CLCAS002-CZ000IN",
+  "designation": "CASQUE DE CHANTIER BLANC",
+  "fournisseur": "SPIR",
+  "tarif": 4.14,
+  "stock_actuel": 0
+ },
+ {
+  "type_article": "Jugulaire pour casque",
+  "taille_salarie": "",
+  "taille_affichage": "Standard",
+  "reference": "Z-CLJUG001-ZZ000IN",
+  "designation": "JUGULAIRE AVEC MENTONNIERE POUR CASARTI",
+  "fournisseur": "SPIR",
+  "tarif": 1.46,
+  "stock_actuel": 0
+ }
+]

@@ -267,6 +267,7 @@ tr:hover td{background:#FAFBFC;}
 
   <div class="nav-group">PERSONNEL</div>
   <div class="nav-item" data-tab="absences"><span class="nav-icon">🧑‍💼</span><span class="nav-label">Absences</span><span class="nav-badge" id="nb-absences">—</span></div>
+  <div class="nav-item" data-tab="epi"><span class="nav-icon">🦺</span><span class="nav-label">EPI</span></div>
 
   <div class="nav-group">ANALYTICS</div>
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
@@ -465,6 +466,11 @@ tr:hover td{background:#FAFBFC;}
       <div id="inventaire-stock-content"></div>
     </div>
 
+    <!-- EPI : dotation & stock -->
+    <div id="pane-epi" class="tab-pane">
+      <div id="epi-content"></div>
+    </div>
+
     <!-- Alertes -->
     <div id="pane-alertes" class="tab-pane"><div id="alertes-content"></div></div>
 
@@ -511,9 +517,11 @@ async function loadEmployes(force){
     var r=await fetch(W+'?employes=1');
     var data=await r.json();
     if(Array.isArray(data)&&data.length){
-      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,HasPwd:!!e.has_password,itemId:e.itemId||null};});
+      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,HasPwd:!!e.has_password,itemId:e.itemId||null,
+        AffectationEPI:e.affectation_epi||'',TaillePantalon:e.taille_pantalon||'',TailleTshirt:e.taille_tshirt||'',TailleVeste:e.taille_veste||'',PointureChaussures:e.pointure_chaussures||'',TailleGants:e.taille_gants||''};});
       employesByCode={};
-      employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site,actif:e.Actif};});
+      employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site,actif:e.Actif,itemId:e.itemId,
+        affectationEpi:e.AffectationEPI,taillePantalon:e.TaillePantalon,tailleTshirt:e.TailleTshirt,tailleVeste:e.TailleVeste,pointureChaussures:e.PointureChaussures,tailleGants:e.TailleGants};});
       return;
     }
   }catch(e){/* fallback ci-dessous */}
@@ -598,6 +606,18 @@ function peutGererInventaire(code){
 // Peut consulter l'onglet Inventaire stock : gestionnaires + Encadrement (view-only, comme le reste du dashboard)
 function peutVoirInventaire(code){
   if(peutGererInventaire(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='encadrement';
+}
+// Peut gérer le module EPI (grille de dotation, génération/émargement de fiches, réception de stock) : Admin, Logistique, Logistique_Mayotte
+function peutGererEPI(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='logistique'||role==='logistique_mayotte';
+}
+// Peut consulter l'onglet EPI (view-only) : gestionnaires + Encadrement
+function peutVoirEPI(code){
+  if(peutGererEPI(code))return true;
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='encadrement';
 }
@@ -853,6 +873,7 @@ function renderTab(name){
     case 'maintenance':    if(!dataLoaded.maint)loadMaint(); else renderMaint(); break;
     case 'absences':       if(!dataLoaded.absences)loadAbsences(); else renderAbsences(); break;
     case 'inventaire-stock': if(!dataLoaded.invStock)loadInventaireStock(); else renderInventaireStock(); break;
+    case 'epi':             if(!dataLoaded.epi)loadEPI(); else renderEPI(); break;
     case 'alertes':        renderAlertes(); break;
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
@@ -1273,6 +1294,443 @@ async function importerInventaireDec2025(){
   setStatut('✅ Import terminé : '+ok+' lignes créées'+(ko?', '+ko+' en échec':'')+'.');
   dataLoaded.invStock=false;
   await loadInventaireStock();
+}
+
+// ══════════════ MODULE EPI (dotation & stock) ══════════════
+var epiCatalogue=[], epiGrille=[], epiDotations=[];
+var epiVue='stock'; // 'stock' | 'grille' | 'dotations' | 'ponctuelle'
+var EPI_ANNEE_SELECTIONNEE=null;
+var EPI_LIGNES_PONCTUELLES=[];
+var EPI_EMARGEMENT_ID=null;
+var EPI_AFF_LABELS={'':'— Non concerné —','C':'C — Chantier / Travaux Neufs','M':'M — Maintenance','Z':'Z — Conducteur de Travaux','A':'A — Atelier'};
+
+async function loadEPI(){
+  dataLoaded.epi=true;
+  if(!peutVoirEPI(ADMIN_SESSION.code)){renderEPI();return;}
+  try{
+    var rc=await fetch(W+'?catalogue_epi=1'),rg=await fetch(W+'?grille_dotation_epi=1'),rd=await fetch(W+'?dotations_epi=1');
+    epiCatalogue=await rc.json();epiGrille=await rg.json();epiDotations=await rd.json();
+  }catch(e){epiCatalogue=[];epiGrille=[];epiDotations=[];}
+  renderEPI();
+}
+
+function renderEPI(){
+  var div=document.getElementById('epi-content');
+  if(!div)return;
+  if(!peutVoirEPI(ADMIN_SESSION.code)){
+    div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
+    return;
+  }
+  var vues=[['stock','📦 Stock'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle']];
+  var html='';
+  if(estAdmin(ADMIN_SESSION.code)&&!epiCatalogue.length){
+    html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : tailles, catalogue & grille de dotation</h3></div>'+
+      '<div style="padding:14px"><p style="font-size:12px;color:var(--grey);margin-bottom:10px">Importe les tailles/affectation des 73 salariés, le catalogue d\'articles (~58 références) et la grille de dotation standard. À faire une seule fois.</p>'+
+      '<button onclick="importerDonneesEPI()" style="padding:8px 16px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Importer maintenant</button>'+
+      '<div id="epi-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
+  }
+  html+='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
+    vues.map(function(v){return '<button onclick="changerVueEPI(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(epiVue===v[0]?'var(--blue)':'#eee')+';color:'+(epiVue===v[0]?'#fff':'#444')+'">'+v[1]+'</button>';}).join('')+
+    '</div><div id="epi-vue-content"></div>';
+  div.innerHTML=html;
+  renderEPIVue();
+}
+
+async function importerDonneesEPI(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('Importer les données EPI initiales (tailles salariés, catalogue articles, grille de dotation) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  var statutEl=document.getElementById('epi-migration-statut');
+  var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
+  await loadEmployes();
+  setStatut('⏳ Chargement des tailles salariés…');
+  var personnel;
+  try{var r=await fetch('epi_personnel.json?t='+Date.now());personnel=await r.json();}catch(e){setStatut('❌ Impossible de charger epi_personnel.json : '+e.message);return;}
+  var rows=personnel.map(function(p){
+    var emp=employesByCode[p.code];
+    return emp&&emp.itemId?{item_id:emp.itemId,affectation_epi:p.affectation,taille_pantalon:p.taille_pantalon,taille_tshirt:p.taille_tshirt,taille_veste:p.taille_veste,pointure_chaussures:p.pointure_chaussures,taille_gants:p.taille_gants}:null;
+  }).filter(Boolean);
+  var orphelins=personnel.filter(function(p){return !employesByCode[p.code]||!employesByCode[p.code].itemId;}).map(function(p){return p.code;});
+  var ok1=0,ko1=0;
+  for(var i=0;i<rows.length;i+=20){
+    setStatut('⏳ Tailles salariés '+Math.min(i+20,rows.length)+' / '+rows.length+'…');
+    try{var rr=await fetch(W+'?action=bulk_import_tailles_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:rows.slice(i,i+20)})});var res=await rr.json();ok1+=res.ok||0;ko1+=res.ko||0;}catch(e){ko1+=20;}
+  }
+  setStatut('⏳ Chargement du catalogue…');
+  var catalogue;
+  try{var r2=await fetch('epi_catalogue.json?t='+Date.now());catalogue=await r2.json();}catch(e){setStatut('❌ Impossible de charger epi_catalogue.json : '+e.message);return;}
+  var ok2=0,ko2=0;
+  for(var j=0;j<catalogue.length;j+=20){
+    setStatut('⏳ Catalogue '+Math.min(j+20,catalogue.length)+' / '+catalogue.length+'…');
+    try{var rc=await fetch(W+'?action=bulk_import_catalogue_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:catalogue.slice(j,j+20)})});var resc=await rc.json();ok2+=resc.ok||0;ko2+=resc.ko||0;}catch(e){ko2+=20;}
+  }
+  setStatut('⏳ Chargement de la grille de dotation…');
+  var grille;
+  try{var r3=await fetch('epi_grille_dotation.json?t='+Date.now());grille=await r3.json();}catch(e){setStatut('❌ Impossible de charger epi_grille_dotation.json : '+e.message);return;}
+  var ok3=0,ko3=0;
+  try{var rg2=await fetch(W+'?action=bulk_import_grille_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:grille})});var resg=await rg2.json();ok3=resg.ok||0;ko3=resg.ko||0;}catch(e){ko3=grille.length;}
+  setStatut('✅ Import terminé : '+ok1+' salarié(s), '+ok2+' article(s) catalogue, '+ok3+' ligne(s) de grille.'+((ko1+ko2+ko3)?' ⚠️ '+(ko1+ko2+ko3)+' échec(s).':'')+(orphelins.length?' Codes non retrouvés dans Employes : '+orphelins.join(', ')+'.':''));
+  dataLoaded.epi=false;
+  await loadEPI();
+}
+function changerVueEPI(v){epiVue=v;renderEPI();}
+function renderEPIVue(){
+  var c=document.getElementById('epi-vue-content');
+  if(!c)return;
+  if(epiVue==='stock')renderEPIStock(c);
+  else if(epiVue==='grille')renderEPIGrille(c);
+  else if(epiVue==='dotations')renderEPIDotations(c);
+  else if(epiVue==='ponctuelle')renderEPIPonctuelle(c);
+}
+
+// ── Vue Stock ──
+function renderEPIStock(container){
+  container.innerHTML='<div class="card"><div class="card-head"><h3>📦 Stock articles EPI</h3>'+
+    '<button onclick="exporterStockEPI()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div>'+
+    '<div style="padding:10px 14px"><input type="text" id="epi-stock-q" oninput="refreshEPIStockResults()" placeholder="🔍 Filtrer par type, taille, référence..." style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px"></div>'+
+    '<div id="epi-stock-results"></div></div>';
+  refreshEPIStockResults();
+}
+function refreshEPIStockResults(){
+  var res=document.getElementById('epi-stock-results');
+  if(!res)return;
+  var q=((document.getElementById('epi-stock-q')||{}).value||'').trim().toUpperCase();
+  var rows=epiCatalogue.filter(function(a){
+    if(!q)return true;
+    return (a.type_article||'').toUpperCase().includes(q)||(a.taille_affichage||'').toString().toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.designation||'').toUpperCase().includes(q);
+  }).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'')||(a.taille_affichage||'').toString().localeCompare((b.taille_affichage||'').toString());});
+  if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun article'+(q?' pour ce filtre':'')+'.</p>';return;}
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Référence</th><th>Désignation</th><th>Stock actuel</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
+  rows.forEach(function(a){
+    var stockColor=a.stock_actuel<=0?'var(--red)':(a.stock_actuel<5?'var(--orange)':'var(--green)');
+    html+='<tr><td>'+a.type_article+'</td><td>'+a.taille_affichage+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.designation||'—')+'</td>'+
+      '<td style="font-weight:700;color:'+stockColor+'">'+a.stock_actuel+'</td>'+
+      (canEdit?'<td><button onclick="receptionCommandeEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button></td>':'')+
+    '</tr>';
+  });
+  html+='</tbody></table></div>';
+  res.innerHTML=html;
+}
+async function receptionCommandeEPI(catId,label){
+  var qte=prompt('Quantité reçue pour "'+label+'" :');
+  if(qte==null)return;
+  var n=parseFloat((qte||'').replace(',','.'));
+  if(!n||n<=0){alert('Quantité invalide.');return;}
+  try{
+    var r=await fetch(W+'?action=reception_commande_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:catId,quantite:n})});
+    var res=await r.json();
+    if(res.success){
+      var art=epiCatalogue.find(function(a){return a.id===catId;});
+      if(art)art.stock_actuel=res.nouveau_stock;
+      refreshEPIStockResults();
+    }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+function exporterStockEPI(){
+  var entetes=['Type','Taille','Référence','Désignation','Fournisseur','Stock actuel'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  epiCatalogue.forEach(function(a){lignesCsv.push([a.type_article,a.taille_affichage,a.reference,a.designation,a.fournisseur,nbFr(a.stock_actuel)].map(csvCell).join(';'));});
+  var csv='\uFEFF'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Stock_EPI.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
+}
+
+// ── Vue Grille de dotation ──
+function renderEPIGrille(container){
+  var affectations=[['C','Chantier / Travaux Neufs'],['M','Maintenance'],['Z','Conducteur de Travaux'],['A','Atelier']];
+  var types=[];
+  epiGrille.forEach(function(g){if(types.indexOf(g.type_article)===-1)types.push(g.type_article);});
+  types.sort();
+  var byKey={};epiGrille.forEach(function(g){byKey[g.affectation+'|'+g.type_article]=g;});
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<div class="card"><div class="card-head"><h3>📐 Grille de dotation standard</h3></div>'+
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Quantité standard remise par profil, utilisée pour générer automatiquement les fiches de dotation.'+(canEdit?' Cliquez sur une valeur pour la modifier.':'')+'</p>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Type d\'article</th>'+affectations.map(function(a){return '<th>'+a[1]+'</th>';}).join('')+'</tr></thead><tbody>';
+  types.forEach(function(t){
+    html+='<tr><td style="font-weight:700">'+t+'</td>';
+    affectations.forEach(function(a){
+      var g=byKey[a[0]+'|'+t];
+      var qte=g?g.quantite:0;
+      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleDotationEPI(\''+a[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:6px;text-align:center"></td>';
+      else html+='<td style="text-align:center">'+qte+'</td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  container.innerHTML=html;
+}
+async function majGrilleDotationEPI(affectation,typeArticle,valeur){
+  var q=parseFloat(valeur);
+  if(isNaN(q)||q<0){alert('Quantité invalide.');renderEPIVue();return;}
+  try{
+    var r=await fetch(W+'?action=maj_grille_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({affectation:affectation,type_article:typeArticle,quantite:q})});
+    var res=await r.json();
+    if(res.success){
+      var g=epiGrille.find(function(x){return x.affectation===affectation&&x.type_article===typeArticle;});
+      if(g)g.quantite=q;else epiGrille.push({id:res.id,affectation:affectation,type_article:typeArticle,quantite:q});
+    }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// ── Vue Dotations employés ──
+function renderEPIDotations(container){
+  var anneeCourante=new Date().getFullYear();
+  if(!EPI_ANNEE_SELECTIONNEE)EPI_ANNEE_SELECTIONNEE=anneeCourante;
+  var annees=[];for(var y=anneeCourante+1;y>=anneeCourante-2;y--)annees.push(y);
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<div class="card"><div class="card-head"><h3>🧾 Dotations employés</h3>'+
+    '<select id="epi-annee-sel" onchange="changerAnneeEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(y){return '<option value="'+y+'"'+(y===EPI_ANNEE_SELECTIONNEE?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+    '</div>';
+  if(canEdit)html+='<div style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
+    '<button onclick="genererFichesManquantesEPI()" style="padding:8px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">🚀 Générer les fiches manquantes '+EPI_ANNEE_SELECTIONNEE+'</button>'+
+    '<span id="epi-gen-statut" style="font-size:12px;color:var(--grey)"></span></div>';
+  var dotAnnee=epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(EPI_ANNEE_SELECTIONNEE);});
+  if(!dotAnnee.length)html+='<p class="es" style="padding:16px">Aucune fiche générée pour '+EPI_ANNEE_SELECTIONNEE+'.</p>';
+  else{
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Nom</th><th>Site</th><th>Type</th><th>Statut</th><th>Actions</th></tr></thead><tbody>';
+    dotAnnee.sort(function(a,b){return (a.nom_destinataire||'').localeCompare(b.nom_destinataire||'');}).forEach(function(dd){
+      html+='<tr><td>'+dd.code+'</td><td>'+dd.nom_destinataire+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dd.type_dotation+'</td>'+
+        '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
+        '<td style="white-space:nowrap">'+
+        '<button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
+        (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">✍️ Émarger</button>'+
+        '<button onclick="annulerDotationEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button>':'')+
+        '</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+  container.innerHTML=html;
+}
+function changerAnneeEPI(v){EPI_ANNEE_SELECTIONNEE=parseInt(v,10);renderEPIVue();}
+
+async function genererFichesManquantesEPI(){
+  var statut=document.getElementById('epi-gen-statut');
+  var annee=EPI_ANNEE_SELECTIONNEE;
+  var eligibles=employesList.filter(function(e){return e.Actif&&e.AffectationEPI;});
+  var dejaGeneres={};
+  epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);}).forEach(function(dd){dejaGeneres[dd.code]=true;});
+  var aGenerer=eligibles.filter(function(e){return !dejaGeneres[e.Code];});
+  if(!aGenerer.length){if(statut)statut.textContent='Toutes les fiches '+annee+' sont déjà générées.';return;}
+  if(!confirm('Générer '+aGenerer.length+' fiche(s) de dotation pour '+annee+' ?'))return;
+  var ok=0,ko=0;
+  for(var i=0;i<aGenerer.length;i++){
+    if(statut)statut.textContent='⏳ '+(i+1)+' / '+aGenerer.length+'…';
+    try{
+      var r=await fetch(W+'?action=generer_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:aGenerer[i].Code,annee:annee,type_dotation:'Annuelle',par_code:ADMIN_SESSION.code})});
+      var res=await r.json();
+      if(res.success)ok++;else ko++;
+    }catch(e){ko++;}
+  }
+  if(statut)statut.textContent='✅ '+ok+' fiche(s) générée(s)'+(ko?', '+ko+' échec(s)':'')+'.';
+  dataLoaded.epi=false;
+  await loadEPI();
+}
+
+async function annulerDotationEPI(id){
+  if(!confirm('Annuler cette fiche générée par erreur ?'))return;
+  try{
+    var r=await fetch(W+'?action=annuler_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+    var res=await r.json();
+    if(res.success){dataLoaded.epi=false;await loadEPI();}else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// Émargement : upload de la photo/scan de la fiche signée, puis décrémentation du stock côté Worker
+function ouvrirEmargementEPI(dotId){
+  EPI_EMARGEMENT_ID=dotId;
+  document.getElementById('add-titre').textContent='✍️ Enregistrer l\'émargement';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Photo / scan de la fiche signée *</label><input type="file" id="epi-emarge-file" accept="image/*" style="'+addFieldStyle+'"></div>'+
+    '<p style="font-size:11px;color:var(--grey)">Le stock des articles de cette fiche sera décrémenté à l\'enregistrement.</p>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=confirmerEmargementEPI;
+}
+async function confirmerEmargementEPI(){
+  var input=document.getElementById('epi-emarge-file');
+  var msg=document.getElementById('add-msg');
+  var btn=document.getElementById('add-confirm-btn');
+  if(!input.files||!input.files[0]){msg.style.color='var(--red)';msg.textContent='Photo requise.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=async function(){
+      var canvas=document.createElement('canvas');
+      var ratio=Math.min(1200/img.width,1200/img.height,1);
+      canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      var b64=canvas.toDataURL('image/jpeg',0.75);
+      var now=new Date();
+      var fn=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+now.getHours()+now.getMinutes()+now.getSeconds()+'.jpg';
+      try{
+        await fetch(W+'?action=upload_fiche_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dotation_id:EPI_EMARGEMENT_ID,data:b64,filename:fn})});
+        var r=await fetch(W+'?action=emarger_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:EPI_EMARGEMENT_ID,par_code:ADMIN_SESSION.code,filename:fn})});
+        var res=await r.json();
+        if(res.success){
+          msg.style.color='var(--green)';msg.textContent='✅ Émargement enregistré.';
+          setTimeout(function(){fermerAjout();dataLoaded.epi=false;loadEPI();},1000);
+        }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
+      }catch(e2){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Erreur réseau : '+e2.message;}
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+// Fiche imprimable — ouverte dans un nouvel onglet (impression navigateur → PDF)
+async function voirFicheEPI(dotId){
+  var dot=epiDotations.find(function(dd){return dd.id===dotId;});
+  if(!dot){alert('Fiche introuvable.');return;}
+  var lignes=[];
+  try{
+    var r=await fetch(W+'?lignes_dotation_epi='+encodeURIComponent(dotId));
+    lignes=await r.json();
+  }catch(e){}
+  var emp=employesByCode[dot.code]||{};
+  var affTxt=EPI_AFF_LABELS[emp.affectationEpi]||dot.type_dotation;
+  var annee=dot.annee_civile||new Date().getFullYear();
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>Fiche dotation EPI - '+dot.code+'</title>'+
+    '<style>body{font-family:Arial,sans-serif;padding:30px;color:#222}h1{color:#1A3A6B;font-size:20px;margin-bottom:4px}h2{font-size:14px;color:#555;margin-top:0;font-weight:400}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}th{background:#f0f2f5}.sign-row{display:flex;justify-content:space-between;margin-top:60px}.sign-box{width:30%;border-top:1px solid #999;padding-top:6px;font-size:12px;color:#555}@media print{button{display:none}}</style></head><body>'+
+    '<button onclick="window.print()" style="padding:10px 18px;background:#1A3A6B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;margin-bottom:20px">🖨️ Imprimer / Enregistrer en PDF</button>'+
+    '<h1>Espace Soleil</h1><h2>22, rue Pierre Brossolette - Atelier B7, 97420 Le Port</h2>'+
+    '<h1 style="margin-top:24px">FICHE DOTATION EPI '+annee+'</h1>'+
+    '<p><strong>Destinataire :</strong> '+dot.code+' — '+dot.nom_destinataire+' — '+(dot.site==='Mayotte'?'Mayotte':'Réunion')+' — '+affTxt+'</p>'+
+    '<table><thead><tr><th>Référence</th><th>Désignation</th><th>Taille</th><th>Quantité</th><th>Émargement</th></tr></thead><tbody>'+
+    lignes.map(function(l){return '<tr><td>'+(l.reference_article||'')+'</td><td>'+(l.type_article||'')+'</td><td>'+(l.taille_article||'')+'</td><td>'+l.quantite+'</td><td></td></tr>';}).join('')+
+    '</tbody></table>'+
+    '<div class="sign-row"><div class="sign-box">Date</div><div class="sign-box">Nom</div><div class="sign-box">Signature</div></div>'+
+    '</body></html>';
+  var w=window.open('','_blank');
+  if(!w){alert('Le navigateur a bloqué l\'ouverture de la fenêtre. Autorisez les pop-ups pour ce site.');return;}
+  w.document.write(html);
+  w.document.close();
+}
+
+// ── Vue Remise ponctuelle ──
+function renderEPIPonctuelle(container){
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<div class="card"><div class="card-head"><h3>✋ Remise ponctuelle</h3></div>'+
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Ex. : remise groupée de matériel demandée par un CT pour son équipe. Ne compte pas dans le suivi de dotation annuelle individuelle.</p>';
+  if(canEdit)html+='<div style="padding:0 14px 14px"><button onclick="ouvrirRemisePonctuelleEPI()" style="padding:10px 18px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">➕ Nouvelle remise ponctuelle</button></div>';
+  var ponct=epiDotations.filter(function(dd){return dd.type_dotation==='Ponctuelle';});
+  if(!ponct.length)html+='<p class="es" style="padding:0 14px 16px">Aucune remise ponctuelle pour l\'instant.</p>';
+  else{
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Destinataire</th><th>Site</th><th>Générée le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>';
+    ponct.sort(function(a,b){return new Date(b.genere_le)-new Date(a.genere_le);}).forEach(function(dd){
+      html+='<tr><td>'+dd.nom_destinataire+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dateFr(dd.genere_le)+'</td>'+
+        '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
+        '<td style="white-space:nowrap"><button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
+        (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✍️ Émarger</button>':'')+
+        '</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+  container.innerHTML=html;
+}
+
+function ouvrirRemisePonctuelleEPI(){
+  EPI_LIGNES_PONCTUELLES=[];
+  document.getElementById('add-titre').textContent='✋ Nouvelle remise ponctuelle';
+  document.getElementById('add-msg').textContent='';
+  var types=[];epiCatalogue.forEach(function(a){if(types.indexOf(a.type_article)===-1)types.push(a.type_article);});
+  types.sort();
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Destinataire *</label><input id="ep-dest" style="'+addFieldStyle+'" placeholder="Ex : Équipe de Nicolas CAZAMBO"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Site</label><select id="ep-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Articles</label>'+
+      '<div style="display:flex;gap:6px;margin-bottom:8px"><select id="ep-type" onchange="epiMajTaillesPonctuelles()" style="'+addFieldStyle+';flex:2"><option value="">Type...</option>'+types.map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('')+'</select>'+
+      '<select id="ep-taille" style="'+addFieldStyle+';flex:1"><option value="">Taille...</option></select>'+
+      '<input id="ep-qte" type="number" min="1" placeholder="Qté" style="'+addFieldStyle+';flex:1"></div>'+
+      '<button onclick="epiAjouterLignePonctuelle()" style="padding:6px 12px;background:#00695C;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;margin-bottom:8px">+ Ajouter la ligne</button>'+
+      '<div id="ep-lignes-liste" style="font-size:12px"></div>'+
+    '</div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Générer la fiche';
+  btn.onclick=confirmerRemisePonctuelleEPI;
+}
+function epiMajTaillesPonctuelles(){
+  var type=document.getElementById('ep-type').value;
+  var sel=document.getElementById('ep-taille');
+  var tailles=epiCatalogue.filter(function(a){return a.type_article===type;});
+  sel.innerHTML='<option value="">Taille...</option>'+tailles.map(function(a){return '<option value="'+a.id+'">'+a.taille_affichage+'</option>';}).join('');
+}
+function epiRenderLignesPonctuelles(){
+  var liste=document.getElementById('ep-lignes-liste');
+  if(!liste)return;
+  liste.innerHTML=EPI_LIGNES_PONCTUELLES.map(function(l,idx){return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee">'+l.type_article+' '+l.taille_article+' × '+l.quantite+' <a href="javascript:void(0)" onclick="epiSupprimerLignePonctuelle('+idx+')" style="color:var(--red)">✕</a></div>';}).join('');
+}
+function epiAjouterLignePonctuelle(){
+  var type=document.getElementById('ep-type').value;
+  var catId=document.getElementById('ep-taille').value;
+  var qte=parseFloat(document.getElementById('ep-qte').value);
+  if(!type||!catId||!qte||qte<=0){alert('Sélectionnez un type, une taille et une quantité valide.');return;}
+  var art=epiCatalogue.find(function(a){return a.id===catId;});
+  if(!art)return;
+  EPI_LIGNES_PONCTUELLES.push({type_article:art.type_article,taille_article:art.taille_affichage,reference_article:art.reference,quantite:qte});
+  document.getElementById('ep-qte').value='';
+  epiRenderLignesPonctuelles();
+}
+function epiSupprimerLignePonctuelle(idx){EPI_LIGNES_PONCTUELLES.splice(idx,1);epiRenderLignesPonctuelles();}
+async function confirmerRemisePonctuelleEPI(){
+  var dest=(document.getElementById('ep-dest').value||'').trim();
+  var site=document.getElementById('ep-site').value;
+  var msg=document.getElementById('add-msg');
+  var btn=document.getElementById('add-confirm-btn');
+  if(!dest){msg.style.color='var(--red)';msg.textContent='Destinataire requis.';return;}
+  if(!EPI_LIGNES_PONCTUELLES.length){msg.style.color='var(--red)';msg.textContent='Ajoutez au moins une ligne.';return;}
+  btn.disabled=true;btn.textContent='Génération…';
+  try{
+    var r=await fetch(W+'?action=generer_remise_ponctuelle_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destinataire:dest,site:site,lignes:EPI_LIGNES_PONCTUELLES,par_code:ADMIN_SESSION.code})});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Fiche générée.';
+      setTimeout(function(){fermerAjout();dataLoaded.epi=false;loadEPI();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Générer la fiche';msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Générer la fiche';msg.style.color='var(--red)';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+// ── Édition tailles/affectation + génération depuis la fiche employé ──
+async function sauvegarderTaillesEPI(code){
+  var payload={code:code,item_id:(employesByCode[code]&&employesByCode[code].itemId)||null,
+    affectation_epi:document.getElementById('epi-emp-affectation').value,
+    taille_pantalon:document.getElementById('epi-emp-pantalon').value.trim(),
+    taille_tshirt:document.getElementById('epi-emp-tshirt').value.trim(),
+    taille_veste:document.getElementById('epi-emp-veste').value.trim(),
+    pointure_chaussures:document.getElementById('epi-emp-chaussures').value.trim(),
+    taille_gants:document.getElementById('epi-emp-gants').value.trim()};
+  try{
+    var r=await fetch(W+'?action=maj_taille_employe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      if(employesByCode[code]){
+        employesByCode[code].affectationEpi=payload.affectation_epi;employesByCode[code].taillePantalon=payload.taille_pantalon;
+        employesByCode[code].tailleTshirt=payload.taille_tshirt;employesByCode[code].tailleVeste=payload.taille_veste;
+        employesByCode[code].pointureChaussures=payload.pointure_chaussures;employesByCode[code].tailleGants=payload.taille_gants;
+      }
+      var el=employesList.find(function(e){return e.Code===code;});
+      if(el){el.AffectationEPI=payload.affectation_epi;el.TaillePantalon=payload.taille_pantalon;el.TailleTshirt=payload.taille_tshirt;el.TailleVeste=payload.taille_veste;el.PointureChaussures=payload.pointure_chaussures;el.TailleGants=payload.taille_gants;}
+      chargerFicheEmploye(code,nomEmploye(code));
+    }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+async function genererDotationIndividuelleEPI(code){
+  var annee=prompt('Année civile de la dotation :',new Date().getFullYear());
+  if(!annee)return;
+  var type=confirm('Nouvelle entrée (première dotation de cet employé) ?\n\nOK = Entrée · Annuler = dotation annuelle standard.')?'Entree':'Annuelle';
+  try{
+    var r=await fetch(W+'?action=generer_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,annee:parseInt(annee,10),type_dotation:type,par_code:ADMIN_SESSION.code})});
+    var res=await r.json();
+    if(res.success){
+      alert('✅ Fiche générée ('+res.nb_lignes+' ligne(s))'+(res.non_trouves&&res.non_trouves.length?'\n⚠️ Article(s) non trouvés dans le catalogue : '+res.non_trouves.map(function(nt){return nt.type_article+' (taille '+nt.taille_recherchee+')';}).join(', '):''));
+      dataLoaded.epi=false;
+      chargerFicheEmploye(code,nomEmploye(code));
+    }else alert('Échec : '+(res.error==='deja_generee'?'une fiche existe déjà pour cette année.':(res.error==='affectation_manquante'?'affectation EPI non renseignée.':(res.error||'inconnu'))));
+  }catch(e){alert('Erreur réseau : '+e.message);}
 }
 
 function refreshAll(){d=null;dataLoaded={};loadEmployes(true);loadAll();loadReservations();}
@@ -2909,6 +3367,34 @@ async function chargerFicheEmploye(code,nom){
     var moyD=actuel.length?Math.round(actuel.reduce(function(a,m){return a+(m.horodatage?(Date.now()-new Date(m.horodatage).getTime())/86400000:0);},0)/actuel.length*10)/10:0;
     var siteEmp=(employesByCode[code]&&employesByCode[code].site)||'Reunion';
     var html='<div style="margin-bottom:10px">'+badgeSiteD(siteEmp)+' <span style="font-size:12px;color:var(--grey)">Rattachement</span></div>';
+    // ── Bloc EPI (affectation + tailles + génération de fiche) ──
+    var empEpi=employesByCode[code]||{};
+    var canEditEPI=peutGererEPI(ADMIN_SESSION.code);
+    html+='<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>🦺 EPI</h3></div><div style="padding:12px 14px">';
+    if(canEditEPI){
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px">'+
+        '<div><label style="font-size:11px;color:var(--grey)">Affectation</label><select id="epi-emp-affectation" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px">'+Object.keys(EPI_AFF_LABELS).map(function(k){return '<option value="'+k+'"'+(k===empEpi.affectationEpi?' selected':'')+'>'+EPI_AFF_LABELS[k]+'</option>';}).join('')+'</select></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Pantalon</label><input id="epi-emp-pantalon" value="'+(empEpi.taillePantalon||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">T-shirt</label><input id="epi-emp-tshirt" value="'+(empEpi.tailleTshirt||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Veste</label><input id="epi-emp-veste" value="'+(empEpi.tailleVeste||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Chaussures</label><input id="epi-emp-chaussures" value="'+(empEpi.pointureChaussures||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Gants</label><input id="epi-emp-gants" value="'+(empEpi.tailleGants||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+        '</div><button onclick="sauvegarderTaillesEPI(\''+code+'\')" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px">💾 Enregistrer</button>'+
+        (empEpi.affectationEpi?' <button onclick="genererDotationIndividuelleEPI(\''+code+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;margin-left:6px">🚀 Générer sa fiche EPI</button>':'');
+    }else{
+      html+='<p style="font-size:12px;color:var(--grey)">Affectation : '+(EPI_AFF_LABELS[empEpi.affectationEpi]||'—')+' · Pantalon '+(empEpi.taillePantalon||'—')+' · T-shirt '+(empEpi.tailleTshirt||'—')+' · Veste '+(empEpi.tailleVeste||'—')+' · Chaussures '+(empEpi.pointureChaussures||'—')+' · Gants '+(empEpi.tailleGants||'—')+'</p>';
+    }
+    if(peutVoirEPI(ADMIN_SESSION.code)){
+      try{
+        var rdotEmp=await fetch(W+'?dotations_epi=1&code='+encodeURIComponent(code));
+        var dotEmp=await rdotEmp.json();
+        if(dotEmp&&dotEmp.length){
+          html+='<div style="margin-top:8px"><span style="font-size:11px;color:var(--grey);font-weight:700">Fiches EPI :</span>'+
+            dotEmp.slice(0,10).map(function(dd){return '<div style="font-size:12px;padding:4px 0;display:flex;justify-content:space-between;align-items:center"><span>'+dd.type_dotation+' '+(dd.annee_civile||'')+' — '+(dd.statut==='Emargee'?'✅ Émargée':'⏳ En attente')+'</span><a href="javascript:void(0)" onclick="voirFicheEPI(\''+dd.id+'\')" style="color:var(--blue)">Voir</a></div>';}).join('')+'</div>';
+        }
+      }catch(e){}
+    }
+    html+='</div></div>';
     html+='<div class="fiche-stat-row">';
     html+='<div class="fiche-stat"><div class="sv">'+actuel.length+'</div><div class="sl">En possession</div></div>';
     html+='<div class="fiche-stat"><div class="sv">'+hist.length+'</div><div class="sl">Total mvt</div></div>';

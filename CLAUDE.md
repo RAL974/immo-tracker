@@ -341,11 +341,26 @@ Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour
 
 ⚠️ Le dashboard **ne compare pas** une campagne à la précédente (pas d'écart calculé) : chaque campagne restitue simplement l'état du stock à l'instant T (regroupé par Zone + Site + Référence). Pour une entreprise du bâtiment, il n'y a pas de stock minimum fixe ni de continuité garantie entre deux campagnes (chantiers qui se terminent, nature des chantiers qui change) — comparer à décembre 2025 n'a pas de sens métier. Voir `04_HISTORIQUE_DECISIONS.md`.
 
+## Module EPI — extension de la liste `Employes` et nouvelles listes (ajoutées août 2026)
+
+6 nouvelles colonnes sur `Employes` : `Affectation_EPI` (`C`/`M`/`Z`/`A`, vide = non concerné), `Taille_Pantalon`, `Taille_Tshirt` (réutilisée aussi pour Polos/T-shirts manches longues/Ensemble pluie), `Taille_Veste`, `Pointure_Chaussures`, `Taille_Gants` — valeurs stockées telles que communiquées (`M` ou `40`, indifféremment).
+
+**`Catalogue_Articles_EPI`** : `Title`/`Type_Article`, `Taille_Salarie`, `Taille_Affichage`, `Reference`, `Designation`, `Fournisseur`, `Stock_Actuel` (solde vivant). Recherche d'un article pour une taille employé donnée : `Type_Article` = X et (`Taille_Salarie` = valeur ou `Taille_Affichage` = valeur) — gère nativement les tailles numériques ou alphabétiques.
+
+**`Grille_Dotation_EPI`** : `Title`(=Affectation)/`Type_Article`/`Quantite` — éditable depuis le dashboard.
+
+**`Dotations_EPI`** : `Title`(=code employé ou id libre), `Type_Dotation` (`Annuelle`/`Entree`/`Ponctuelle`), `Annee_Civile`, `Nom_Destinataire`, `Site`, `Statut` (`Generee`/`Emargee`), `Genere_Par`/`Genere_Le`, `Emarge_Par`/`Emarge_Le`, `Photo_Fiche`.
+
+**`Lignes_Dotation_EPI`** : `Title`(=ID de la fiche parente, texte simple comme `Lignes_Inventaire`), `Type_Article`, `Taille_Article`, `Reference_Article`, `Quantite`.
+
+Détail complet dans `02_MODELE_DONNEES.md`.
+
 ## Fichiers JSON associés
 
 - **`immos.json`** (tableau) : catalogue léger utilisé par la PWA et le Dashboard pour les libellés/catégories/comptes en lecture rapide. Généré à partir de SharePoint, redéployé après modifications importantes.
 - **`immos_full.json`** (objet, clé = code IM) : catalogue complet utilisé uniquement par l'outil de migration EBP → SharePoint (`enrichirImmosEBP()` dans le dashboard). Contient 1167 immos (1023 actives + 144 sorties), issu de l'export comptable EBP (`Export_immos_030726_avec_sites.xls`).
 - **`inventaire_dec2025.json`** (tableau, ajouté août 2026) : ~2417 lignes de comptage brut du stock d'articles de décembre 2025 (zone, site, chantier, fabriquant, référence, désignation, quantité, chute de câble, observations — sans les colonnes de valorisation du fichier Excel d'origine, obsolètes). Utilisé une seule fois par l'outil de migration (`importerInventaireDec2025()` dans le dashboard) pour créer la première campagne de référence dans `Lignes_Inventaire`.
+- **`epi_personnel.json`**, **`epi_catalogue.json`**, **`epi_grille_dotation.json`** (ajoutés août 2026) : données initiales du module EPI (73 salariés, ~58 articles catalogue, 40 lignes de grille de dotation), issues de `Liste EPI.xlsx`. Utilisées une seule fois par l'outil de migration (`importerDonneesEPI()` dans le dashboard).
 
 
 ---
@@ -459,6 +474,26 @@ Deux nouvelles capacités `ROLE_CAPS` :
 
 **Scan du code-barres fabricant** : la PWA réutilise le scanner déjà présent pour les immos (`Html5Qrcode`, détecte QR ET codes-barres EAN/UPC/Code128 sans configuration supplémentaire) pour lire le code-barres imprimé par le fabricant sur l'emballage (Legrand, Hager, Schneider Electric en priorité, puis Eurohm, SIB, BLM, Clareo, Courant...) : le code scanné remplit directement le champ Référence. Saisie manuelle toujours possible en repli.
 
+## Module EPI — dotation & stock (ajouté août 2026)
+
+Chaque salarié "hors bureau" (poste chantier, maintenance, atelier, conducteur de travaux) reçoit un paquetage d'EPI à son entrée puis à chaque nouvelle année civile, dont le contenu dépend uniquement de son `Affectation_EPI` (C/M/Z/A — voir modèle de données).
+
+**Module 100% piloté depuis le dashboard, aucun écran PWA** : contrairement aux autres modules terrain (retours, campagne d'inventaire...), la génération des fiches, l'émargement et la réception de stock sont des actions de gestion faites par William/la Logistique, pas par les salariés eux-mêmes. Pas de nouvelle capacité `ROLE_CAPS` dans `app.js` — les droits vivent uniquement côté `dashboard.html` :
+- **`peutGererEPI(code)`** : Admin, Logistique, Logistique_Mayotte — gère la grille de dotation, génère/annule les fiches, enregistre les émargements, saisit les réceptions de commande.
+- **`peutVoirEPI(code)`** : `peutGererEPI` + Encadrement — consultation seule.
+
+**Grille de dotation éditable** (onglet EPI → "Grille de dotation") : contrairement au barème d'amortissement (figé dans le code), la quantité standard par profil × type d'article est modifiable directement dans le dashboard.
+
+**Stock vivant par article/taille** : un solde par référence, décrémenté **uniquement à l'émargement** d'une fiche (jamais à sa simple génération), incrémenté manuellement à chaque réception de commande fournisseur.
+
+**Trois types de fiches** : `Annuelle` (générée en masse une fois par an pour tous les employés éligibles n'ayant pas déjà de fiche cette année), `Entree` (générée individuellement pour un nouveau salarié), `Ponctuelle` (remise libre, destinataire en texte libre, ex. "30 gants pour l'équipe de untel" — ne compte pas dans le suivi annuel individuel).
+
+**Émargement = preuve photo, comme les FDS des immos** : une fois la fiche imprimée et signée à la main, la Logistique enregistre l'émargement en joignant une photo/scan de la fiche signée (même pipeline que les photos d'immos). C'est cet enregistrement qui décrémente le stock.
+
+**Fiche imprimable = HTML + impression navigateur, pas de nouvelle dépendance** : bouton "Voir/Imprimer" ouvrant un nouvel onglet avec `window.print()`, gabarit repris de l'ancienne fiche papier.
+
+Détail technique complet dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`, historique dans `04_HISTORIQUE_DECISIONS.md`.
+
 
 ---
 
@@ -551,6 +586,20 @@ Deux nouvelles capacités `ROLE_CAPS` :
 - **Zone vs Chantier, deux axes différents** : le champ "Lieu" du rapport (qui fusionnait Zone et Chantier en un seul affichage) a été supprimé au profit de deux colonnes distinctes. Clarification de William : la **zone dépôt est obligatoire** (c'est l'unique axe de comptage — "nous nous attachons uniquement à compter le matériel par zone") et correspond à un emplacement physique précis (n° de rack, lettre d'étage) ; le **chantier reste optionnel**, simple information complémentaire quand on sait où l'article ira, pas un second périmètre de comptage indépendant comme envisagé initialement. La clé de regroupement de l'état du stock est donc passée de `(Référence, Site, Chantier ou Zone)` à `(Zone, Site, Référence)`.
 - **Ajout du scan de code-barres fabricant** : pour accélérer la saisie sur les grandes marques (Legrand, Hager, Schneider Electric, puis Eurohm, SIB, BLM, Clareo, Courant...), qui ont presque toujours un code-barres (EAN) sur l'emballage. Réutilise le scanner déjà en place dans la PWA pour les immos (`Html5Qrcode`, qui détecte nativement QR ET codes-barres 1D sans configuration supplémentaire) : le code scanné remplit directement le champ Référence. La saisie manuelle reste toujours possible (motif de William : "il n'y a pas toujours la boîte", donc pas toujours de code-barres disponible sur le terrain).
 - **Bug corrigé au passage** : "Sans référence" affichait 0 alors que des lignes en étaient dépourvues. Cause : ce compteur était calculé dans le bloc de comparaison à la campagne précédente, qui ne s'affichait donc que pour une campagne ayant une "précédente" — si l'utilisateur consultait une campagne sans précédente, ou une campagne vide comparée à une campagne bien remplie, le chiffre affiché ne reflétait pas ce qu'on croyait regarder. Résolu de fait par la suppression de toute la logique de comparaison : "Sans référence" est désormais calculé directement à partir des lignes de la campagne consultée, sans dépendance à une autre campagne.
+
+## Ergonomie de saisie zone par zone (août 2026)
+- Retour terrain de William après la mise en place de l'état du stock : le comptage se fait physiquement **zone par zone**, mais le formulaire effaçait la zone après chaque ligne ajoutée — obligeant à la retaper à chaque article, contraire au geste réel sur le terrain.
+- **Décision** : le champ Zone n'est plus effacé automatiquement après l'ajout d'une ligne (seuls chantier/fabricant/référence/désignation/quantité/chute de câble/observations le sont) ; il n'est vidé qu'à l'ouverture de l'écran ou via un bouton explicite "🔁 Changer". Le focus revient automatiquement sur le champ Référence après l'ajout d'une ligne, pour enchaîner directement sur l'article suivant de la même zone.
+
+## Module EPI — dotation & stock (août 2026)
+- Besoin exprimé par William : automatiser la gestion des EPI, aujourd'hui gérée via 2 fichiers Excel séparés et une fiche de dotation remplie/imprimée manuellement, sans stock suivi.
+- **Cadrage validé avant développement** : (1) stock vivant par (article, taille), décrémenté à l'émargement et incrémenté à la réception d'une commande ; (2) grille de dotation standard éditable depuis le dashboard, pas figée dans le code ; (3) fiche générée en HTML imprimable + impression navigateur, zéro nouvelle dépendance PDF ; (4) remise ponctuelle allégée (destinataire en texte libre), distincte du suivi de dotation annuelle individuelle ; (5) émargement = photo/scan de la fiche signée jointe, comme les FDS des immobilisations.
+- **Analyse des données source** : les quantités par article dans `Liste EPI.xlsx` sont en réalité entièrement déterminées par la colonne `Affectation` (C/M/Z/A) — 4 profils fixes, pas une personnalisation individuelle.
+- **Point de vigilance signalé puis levé** : la table de correspondance taille salarié → référence article présentait des apparences d'incohérence avec le catalogue. **William a confirmé que cette table est correcte telle quelle** — importée sans modification, leçon retenue : ne pas "corriger" des données métier sur la base d'une supposition technique sans validation du terrain.
+- **Décision de conception** : le module est **100% piloté depuis le dashboard**, sans nouvel écran PWA — la génération des fiches, l'émargement et la réception de stock sont des actions de gestion (Logistique), pas des actions terrain des salariés eux-mêmes.
+- **Réutilisation systématique de patterns existants** : pipeline d'upload de fichier vers SharePoint (`upload_photo`) dupliqué pour les photos de fiches EPI signées ; modèle liste parent/liste enfant sans colonne Lookup (`Campagnes_Inventaire`/`Lignes_Inventaire`) repris pour `Dotations_EPI`/`Lignes_Dotation_EPI` ; écriture par lots `$batch` réutilisée pour l'import initial (73 salariés, ~58 articles catalogue, 40 lignes de grille).
+- **Stock initial à 0** : faute de comptage fiable au moment du développement — à William de saisir une réception initiale correspondant à son stock physique réel.
+- **Étapes bloquantes côté William avant mise en service** : création de 4 nouvelles listes SharePoint (`Catalogue_Articles_EPI`, `Grille_Dotation_EPI`, `Dotations_EPI`, `Lignes_Dotation_EPI`) et de 6 nouvelles colonnes sur `Employes`.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.

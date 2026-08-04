@@ -1,0 +1,202 @@
+[
+ {
+  "affectation": "A",
+  "type_article": "Chaussures basses",
+  "quantite": 1
+ },
+ {
+  "affectation": "A",
+  "type_article": "Chaussures hautes",
+  "quantite": 0
+ },
+ {
+  "affectation": "A",
+  "type_article": "Ensemble pluie",
+  "quantite": 1
+ },
+ {
+  "affectation": "A",
+  "type_article": "Gants a picot",
+  "quantite": 2
+ },
+ {
+  "affectation": "A",
+  "type_article": "Gants gros oeuvre",
+  "quantite": 0
+ },
+ {
+  "affectation": "A",
+  "type_article": "Pantalon",
+  "quantite": 3
+ },
+ {
+  "affectation": "A",
+  "type_article": "Polos",
+  "quantite": 0
+ },
+ {
+  "affectation": "A",
+  "type_article": "T-Shirts",
+  "quantite": 5
+ },
+ {
+  "affectation": "A",
+  "type_article": "T-Shirts manches longues",
+  "quantite": 0
+ },
+ {
+  "affectation": "A",
+  "type_article": "Veste",
+  "quantite": 1
+ },
+ {
+  "affectation": "C",
+  "type_article": "Chaussures basses",
+  "quantite": 0
+ },
+ {
+  "affectation": "C",
+  "type_article": "Chaussures hautes",
+  "quantite": 1
+ },
+ {
+  "affectation": "C",
+  "type_article": "Ensemble pluie",
+  "quantite": 1
+ },
+ {
+  "affectation": "C",
+  "type_article": "Gants a picot",
+  "quantite": 2
+ },
+ {
+  "affectation": "C",
+  "type_article": "Gants gros oeuvre",
+  "quantite": 1
+ },
+ {
+  "affectation": "C",
+  "type_article": "Pantalon",
+  "quantite": 3
+ },
+ {
+  "affectation": "C",
+  "type_article": "Polos",
+  "quantite": 0
+ },
+ {
+  "affectation": "C",
+  "type_article": "T-Shirts",
+  "quantite": 5
+ },
+ {
+  "affectation": "C",
+  "type_article": "T-Shirts manches longues",
+  "quantite": 2
+ },
+ {
+  "affectation": "C",
+  "type_article": "Veste",
+  "quantite": 1
+ },
+ {
+  "affectation": "M",
+  "type_article": "Chaussures basses",
+  "quantite": 1
+ },
+ {
+  "affectation": "M",
+  "type_article": "Chaussures hautes",
+  "quantite": 0
+ },
+ {
+  "affectation": "M",
+  "type_article": "Ensemble pluie",
+  "quantite": 1
+ },
+ {
+  "affectation": "M",
+  "type_article": "Gants a picot",
+  "quantite": 2
+ },
+ {
+  "affectation": "M",
+  "type_article": "Gants gros oeuvre",
+  "quantite": 0
+ },
+ {
+  "affectation": "M",
+  "type_article": "Pantalon",
+  "quantite": 3
+ },
+ {
+  "affectation": "M",
+  "type_article": "Polos",
+  "quantite": 0
+ },
+ {
+  "affectation": "M",
+  "type_article": "T-Shirts",
+  "quantite": 5
+ },
+ {
+  "affectation": "M",
+  "type_article": "T-Shirts manches longues",
+  "quantite": 0
+ },
+ {
+  "affectation": "M",
+  "type_article": "Veste",
+  "quantite": 1
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Chaussures basses",
+  "quantite": 1
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Chaussures hautes",
+  "quantite": 0
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Ensemble pluie",
+  "quantite": 1
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Gants a picot",
+  "quantite": 2
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Gants gros oeuvre",
+  "quantite": 0
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Pantalon",
+  "quantite": 3
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Polos",
+  "quantite": 5
+ },
+ {
+  "affectation": "Z",
+  "type_article": "T-Shirts",
+  "quantite": 0
+ },
+ {
+  "affectation": "Z",
+  "type_article": "T-Shirts manches longues",
+  "quantite": 0
+ },
+ {
+  "affectation": "Z",
+  "type_article": "Veste",
+  "quantite": 1
+ }
+]
