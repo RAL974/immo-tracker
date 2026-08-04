@@ -62,6 +62,16 @@ async function handleRequest(request) {
     return items;
   }
 
+  // Exécute un lot Graph $batch (max 20 requêtes) et résume le résultat — réutilisé par les imports EPI
+  async function graphBatch(requests) {
+    const r = await fetch('https://graph.microsoft.com/v1.0/$batch', { method: 'POST', headers: H, body: JSON.stringify({ requests }) });
+    const rd = await r.json();
+    const resp = rd.responses || [];
+    let ok = 0, ko = 0; const errs = [];
+    resp.forEach(x => { if (x.status >= 200 && x.status < 300) ok++; else { ko++; if (errs.length < 3) errs.push({ status: x.status, body: x.body }); } });
+    return { success: ko === 0, ok: ok, ko: ko, erreurs: errs };
+  }
+
   // Résolution du vrai nom d'un employé depuis son code (évite les doublons "CONI" vs "COUTAREL Nicolas")
   let _nomParCode = null;
   async function getNomResolver() {
@@ -179,6 +189,13 @@ async function handleRequest(request) {
     return new Response(await r.arrayBuffer(), { status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=3600' } });
   }
 
+  // ── Fiche EPI émargée (photo/scan) proxy ──────────────────────────────────────
+  if (p.get('fiche_epi')) {
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Fiches_EPI/' + p.get('fiche_epi') + ':/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+    if (!r.ok) return new Response('Fiche non trouvee', { status: 404, headers: cors });
+    return new Response(await r.arrayBuffer(), { status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=3600' } });
+  }
+
   // ── Photos liste ─────────────────────────────────────────────────────────────
   if (p.get('photos')) {
     const code = p.get('photos');
@@ -249,6 +266,45 @@ async function handleRequest(request) {
     }));
   }
 
+  // ── Module EPI : catalogue, grille de dotation, fiches ──────────────────────
+  if (p.get('catalogue_epi') === '1') {
+    const items = await paginate(GL + '/Catalogue_Articles_EPI/items?$expand=fields&$top=200', 5);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, type_article: f.Type_Article || f.Title || '', taille_salarie: f.Taille_Salarie || '', taille_affichage: f.Taille_Affichage || '', reference: f.Reference || '', designation: f.Designation || '', fournisseur: f.Fournisseur || '', stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0 };
+    }));
+  }
+
+  if (p.get('grille_dotation_epi') === '1') {
+    const items = await paginate(GL + '/Grille_Dotation_EPI/items?$expand=fields&$top=200', 5);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, affectation: f.Title || '', type_article: f.Type_Article || '', quantite: f.Quantite || 0 };
+    }));
+  }
+
+  if (p.get('dotations_epi') === '1') {
+    const items = await paginate(GL + '/Dotations_EPI/items?$expand=fields&$orderby=fields/Created%20desc&$top=1000', 10);
+    let mapped = items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, code: f.Title || '', type_dotation: f.Type_Dotation || '', annee_civile: f.Annee_Civile || null, nom_destinataire: f.Nom_Destinataire || '', site: f.Site || '', statut: f.Statut || 'Generee', genere_par: f.Genere_Par || '', genere_le: f.Genere_Le || '', emarge_par: f.Emarge_Par || '', emarge_le: f.Emarge_Le || '', photo_fiche: f.Photo_Fiche || '' };
+    });
+    const codeF = p.get('code'); const anneeF = p.get('annee');
+    if (codeF) mapped = mapped.filter(d => d.code === codeF);
+    if (anneeF) mapped = mapped.filter(d => String(d.annee_civile) === anneeF);
+    return json(mapped);
+  }
+
+  // Lignes d'une fiche de dotation donnée (id passé tel quel, filtré côté Worker)
+  if (p.get('lignes_dotation_epi')) {
+    const dotId = p.get('lignes_dotation_epi');
+    const items = await paginate(GL + '/Lignes_Dotation_EPI/items?$expand=fields&$top=2000', 10);
+    return json(items.filter(i => (i.fields || {}).Title === dotId).map(i => {
+      const f = i.fields || {};
+      return { id: i.id, type_article: f.Type_Article || '', taille_article: f.Taille_Article || '', reference_article: f.Reference_Article || '', quantite: f.Quantite || 0 };
+    }));
+  }
+
   // ── Réservations par employé ──────────────────────────────────────────────────
   if (p.get('mes_reservations')) {
     const code = p.get('mes_reservations');
@@ -284,6 +340,13 @@ async function handleRequest(request) {
         actif: (function(){ var a=(f.field_2||'').trim().toLowerCase(); return a==='non'||a==='no'||a==='false'?false:true; })(),
         // Un mot de passe est-il défini ? (booléen uniquement — le hash n'est JAMAIS exposé)
         has_password: !!(f.MotDePasse && String(f.MotDePasse).trim()),
+        // Module EPI : affectation (C/M/Z/A, vide = non concerné) + tailles telles que communiquées
+        affectation_epi: f.Affectation_EPI || '',
+        taille_pantalon: f.Taille_Pantalon || '',
+        taille_tshirt: f.Taille_Tshirt || '',
+        taille_veste: f.Taille_Veste || '',
+        pointure_chaussures: f.Pointure_Chaussures || '',
+        taille_gants: f.Taille_Gants || '',
         itemId: i.id // nécessaire pour les mises à jour PATCH
       };
     });
@@ -1015,6 +1078,269 @@ async function handleRequest(request) {
         let ok = 0, ko = 0; const errs = [];
         resp.forEach(x => { if (x.status >= 200 && x.status < 300) ok++; else { ko++; if (errs.length < 3) errs.push({ status: x.status, body: x.body }); } });
         return json({ success: ko === 0, ok: ok, ko: ko, erreurs: errs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Module EPI : dotation & stock ────────────────────────────────────────────
+    // Quel champ de taille employé consulter pour un type d'article donné (veste/polo/t-shirt manches
+    // longues/ensemble pluie suivent la même échelle de taille que le t-shirt, faute de champ dédié).
+    const TAILLE_FIELD_PAR_TYPE = {
+      'Pantalon': 'Taille_Pantalon', 'T-Shirts': 'Taille_Tshirt', 'T-Shirts manches longues': 'Taille_Tshirt',
+      'Polos': 'Taille_Tshirt', 'Veste': 'Taille_Veste', 'Ensemble pluie': 'Taille_Tshirt',
+      'Chaussures hautes': 'Pointure_Chaussures', 'Chaussures basses': 'Pointure_Chaussures',
+      'Gants a picot': 'Taille_Gants', 'Gants gros oeuvre': 'Taille_Gants'
+    };
+    // Un article catalogue matche si la taille employé correspond à la taille salarié OU à la taille affichage
+    // (gère nativement le cas où la taille est communiquée sous forme numérique OU alphabétique).
+    function trouverArticleCatalogue(catalogue, typeArticle, tailleValeur) {
+      const v = (tailleValeur || '').toString().trim().toLowerCase();
+      if (!v) return null;
+      return catalogue.find(c => (c.Type_Article || '') === typeArticle &&
+        (((c.Taille_Salarie || '').toString().trim().toLowerCase() === v) || ((c.Taille_Affichage || '').toString().trim().toLowerCase() === v))
+      ) || null;
+    }
+
+    // Mise à jour de l'affectation EPI + des 5 tailles d'un employé (édition individuelle)
+    if (action === 'maj_taille_employe') {
+      let itemId = body.item_id;
+      if (!itemId) {
+        const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + (body.code || '').replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+      }
+      if (!itemId) return json({ success: false, error: 'employe_introuvable', code: body.code });
+      try {
+        const r = await fetch(GL + '/Employes/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({
+          Affectation_EPI: body.affectation_epi || '', Taille_Pantalon: body.taille_pantalon || '', Taille_Tshirt: body.taille_tshirt || '',
+          Taille_Veste: body.taille_veste || '', Pointure_Chaussures: body.pointure_chaussures || '', Taille_Gants: body.taille_gants || ''
+        }) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial en masse des tailles/affectation (74 salariés, par lots de 20 — item_id déjà résolu côté client)
+    if (action === 'bulk_import_tailles_epi') {
+      const rows = (body.rows || []).filter(x => x.item_id);
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'PATCH', url: "/sites/" + SITE_ID + "/lists/Employes/items/" + x.item_id + "/fields",
+        headers: { 'Content-Type': 'application/json' }, body: {
+          Affectation_EPI: x.affectation_epi || '', Taille_Pantalon: x.taille_pantalon || '', Taille_Tshirt: x.taille_tshirt || '',
+          Taille_Veste: x.taille_veste || '', Pointure_Chaussures: x.pointure_chaussures || '', Taille_Gants: x.taille_gants || ''
+        }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial du catalogue articles/tailles/références (par lots de 20)
+    if (action === 'bulk_import_catalogue_epi') {
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Catalogue_Articles_EPI/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: {
+          Title: x.type_article || '', Type_Article: x.type_article || '', Taille_Salarie: x.taille_salarie || '',
+          Taille_Affichage: x.taille_affichage || '', Reference: String(x.reference || ''), Designation: x.designation || '',
+          Fournisseur: x.fournisseur || '', Stock_Actuel: x.stock_actuel || 0
+        } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial de la grille de dotation standard (4 profils × ~10 types, par lots de 20)
+    if (action === 'bulk_import_grille_dotation_epi') {
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Grille_Dotation_EPI/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: { Title: x.affectation || '', Type_Article: x.type_article || '', Quantite: x.quantite || 0 } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Upsert d'une ligne de la grille de dotation (édition depuis le dashboard, Admin/Logistique)
+    if (action === 'maj_grille_dotation_epi') {
+      const affectation = (body.affectation || '').trim();
+      const typeArticle = (body.type_article || '').trim();
+      const quantite = parseFloat(body.quantite);
+      if (!affectation || !typeArticle || isNaN(quantite)) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const cur = await fetch(GL + "/Grille_Dotation_EPI/items?$expand=fields&$filter=fields/Title eq '" + affectation.replace(/'/g, "''") + "' and fields/Type_Article eq '" + typeArticle.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        const itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+        if (itemId) {
+          const r = await fetch(GL + '/Grille_Dotation_EPI/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Quantite: quantite }) });
+          return json({ success: r.ok, id: itemId });
+        }
+        const r = await fetch(GL + '/Grille_Dotation_EPI/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: affectation, Type_Article: typeArticle, Quantite: quantite } }) });
+        const rd = await r.json();
+        return json({ success: r.ok, id: rd.id });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Réception d'une commande fournisseur : incrémente le stock d'une ligne catalogue
+    if (action === 'reception_commande_epi') {
+      const catId = body.id;
+      const qte = parseFloat(body.quantite);
+      if (!catId || !qte || qte <= 0) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const cur = await fetch(GL + '/Catalogue_Articles_EPI/items/' + catId + '?$expand=fields', { headers: H });
+        const curData = await cur.json();
+        const stockActuel = parseFloat((curData.fields || {}).Stock_Actuel) || 0;
+        const nouveauStock = stockActuel + qte;
+        const r = await fetch(GL + '/Catalogue_Articles_EPI/items/' + catId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Stock_Actuel: nouveauStock }) });
+        return json({ success: r.ok, nouveau_stock: nouveauStock });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Génère une fiche de dotation standard (Annuelle/Entree) pour un employé + une année, depuis la grille
+    // et ses tailles. Ne touche pas au stock (seulement à l'émargement, pour ne pas fausser le stock avec
+    // des fiches générées mais jamais signées).
+    if (action === 'generer_dotation_epi') {
+      const code = (body.code || '').trim().toUpperCase();
+      const annee = parseInt(body.annee, 10);
+      const typeDotation = body.type_dotation === 'Entree' ? 'Entree' : 'Annuelle';
+      if (!code || !annee) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const existRes = await fetch(GL + "/Dotations_EPI/items?$expand=fields&$filter=fields/Title eq '" + code.replace(/'/g, "''") + "' and fields/Annee_Civile eq " + annee + "&$top=5", { headers: H });
+        const existData = await existRes.json();
+        if ((existData.value || []).some(i => { const t = (i.fields || {}).Type_Dotation; return t === 'Annuelle' || t === 'Entree'; })) {
+          return json({ success: false, error: 'deja_generee' });
+        }
+        const empRes = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + code.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const empData = await empRes.json();
+        const emp = empData.value && empData.value[0] ? empData.value[0].fields : null;
+        if (!emp) return json({ success: false, error: 'employe_introuvable' });
+        const affectation = (emp.Affectation_EPI || '').trim();
+        if (!affectation) return json({ success: false, error: 'affectation_manquante' });
+        const [grilleItems, catItems] = await Promise.all([
+          paginate(GL + '/Grille_Dotation_EPI/items?$expand=fields&$top=200', 5),
+          paginate(GL + '/Catalogue_Articles_EPI/items?$expand=fields&$top=200', 5)
+        ]);
+        const grille = grilleItems.map(i => i.fields || {}).filter(f => (f.Title || '') === affectation);
+        const catalogue = catItems.map(i => i.fields || {});
+        const lignes = [], nonTrouves = [];
+        grille.forEach(g => {
+          const qte = parseFloat(g.Quantite) || 0;
+          if (qte <= 0) return;
+          const type = g.Type_Article || '';
+          const champTaille = TAILLE_FIELD_PAR_TYPE[type];
+          const tailleEmploye = champTaille ? emp[champTaille] : '';
+          const art = trouverArticleCatalogue(catalogue, type, tailleEmploye);
+          if (!art) { nonTrouves.push({ type_article: type, taille_recherchee: tailleEmploye || '' }); return; }
+          lignes.push({ type_article: type, taille_article: art.Taille_Affichage || '', reference_article: art.Reference || '', quantite: qte });
+        });
+        const nomDest = emp.field_1 || code;
+        const site = (emp.Site === 'Mayotte') ? 'Mayotte' : 'Reunion';
+        const dotRes = await fetch(GL + '/Dotations_EPI/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: code, Type_Dotation: typeDotation, Annee_Civile: annee, Nom_Destinataire: nomDest, Site: site,
+          Statut: 'Generee', Genere_Par: body.par_code || '', Genere_Le: new Date().toISOString()
+        } }) });
+        const dotData = await dotRes.json();
+        if (!dotRes.ok) return json({ success: false, error: 'sharepoint', message: (dotData.error && dotData.error.message) || 'Erreur écriture', details: dotData });
+        const dotId = dotData.id;
+        if (lignes.length) {
+          const requests = lignes.slice(0, 20).map((l, idx) => ({
+            id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Lignes_Dotation_EPI/items",
+            headers: { 'Content-Type': 'application/json' }, body: { fields: {
+              Title: String(dotId), Type_Article: l.type_article, Taille_Article: l.taille_article, Reference_Article: l.reference_article, Quantite: l.quantite
+            } }
+          }));
+          await graphBatch(requests);
+        }
+        return json({ success: true, id: dotId, nb_lignes: lignes.length, non_trouves: nonTrouves });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Remise ponctuelle (ex. "30 gants pour l'équipe de untel") : destinataire libre, lignes choisies à la
+    // volée depuis le catalogue. Ne compte pas dans le suivi de dotation annuelle individuelle.
+    if (action === 'generer_remise_ponctuelle_epi') {
+      const destinataire = (body.destinataire || '').trim();
+      const lignes = body.lignes || [];
+      if (!destinataire || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const idLibre = 'PONCTUEL-' + (body.par_code || 'X') + '-' + Date.now();
+        const site = (body.site === 'Mayotte') ? 'Mayotte' : 'Reunion';
+        const dotRes = await fetch(GL + '/Dotations_EPI/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: idLibre, Type_Dotation: 'Ponctuelle', Nom_Destinataire: destinataire, Site: site,
+          Statut: 'Generee', Genere_Par: body.par_code || '', Genere_Le: new Date().toISOString()
+        } }) });
+        const dotData = await dotRes.json();
+        if (!dotRes.ok) return json({ success: false, error: 'sharepoint', message: (dotData.error && dotData.error.message) || 'Erreur écriture', details: dotData });
+        const dotId = dotData.id;
+        const requests = lignes.slice(0, 20).map((l, idx) => ({
+          id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Lignes_Dotation_EPI/items",
+          headers: { 'Content-Type': 'application/json' }, body: { fields: {
+            Title: String(dotId), Type_Article: l.type_article || '', Taille_Article: l.taille_article || '', Reference_Article: l.reference_article || '', Quantite: parseFloat(l.quantite) || 0
+          } }
+        }));
+        if (requests.length) await graphBatch(requests);
+        return json({ success: true, id: dotId });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Émargement d'une fiche (photo déjà uploadée via upload_fiche_epi) : décrémente le stock des lignes
+    if (action === 'emarger_dotation_epi') {
+      const dotId = body.id;
+      if (!dotId) return json({ success: false, error: 'id_manquant' });
+      try {
+        const curRes = await fetch(GL + '/Dotations_EPI/items/' + dotId + '?$expand=fields', { headers: H });
+        const curData = await curRes.json();
+        const f = curData.fields || {};
+        if (!f.Title) return json({ success: false, error: 'fiche_introuvable' });
+        if (f.Statut === 'Emargee') return json({ success: false, error: 'deja_emargee' });
+        const lignesItems = await paginate(GL + '/Lignes_Dotation_EPI/items?$expand=fields&$top=2000', 10);
+        const lignes = lignesItems.filter(i => (i.fields || {}).Title === String(dotId)).map(i => i.fields || {});
+        if (lignes.length) {
+          const catItems = await paginate(GL + '/Catalogue_Articles_EPI/items?$expand=fields&$top=200', 5);
+          const catByKey = {};
+          catItems.forEach(i => { const cf = i.fields || {}; catByKey[(cf.Type_Article || '') + '|' + (cf.Taille_Affichage || '')] = { id: i.id, stock: parseFloat(cf.Stock_Actuel) || 0 }; });
+          const decrByCatId = {};
+          lignes.forEach(l => {
+            const cat = catByKey[(l.Type_Article || '') + '|' + (l.Taille_Article || '')];
+            if (!cat) return;
+            if (!decrByCatId[cat.id]) decrByCatId[cat.id] = { stockActuel: cat.stock, total: 0 };
+            decrByCatId[cat.id].total += (parseFloat(l.Quantite) || 0);
+          });
+          const requests = Object.keys(decrByCatId).slice(0, 20).map((catId, idx) => ({
+            id: String(idx), method: 'PATCH', url: "/sites/" + SITE_ID + "/lists/Catalogue_Articles_EPI/items/" + catId + "/fields",
+            headers: { 'Content-Type': 'application/json' }, body: { Stock_Actuel: decrByCatId[catId].stockActuel - decrByCatId[catId].total }
+          }));
+          if (requests.length) await graphBatch(requests);
+        }
+        const upRes = await fetch(GL + '/Dotations_EPI/items/' + dotId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({
+          Statut: 'Emargee', Emarge_Par: body.par_code || '', Emarge_Le: new Date().toISOString(), Photo_Fiche: body.filename || ''
+        }) });
+        return json({ success: upRes.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Upload de la photo/scan de la fiche signée (même pattern que upload_photo, dossier dédié)
+    if (action === 'upload_fiche_epi') {
+      try {
+        const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Fiches_EPI/' + encodeURIComponent(body.dotation_id) + '/' + encodeURIComponent(body.filename || (Date.now() + '.jpg')) + ':/content', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'image/jpeg' }, body: bytes.buffer });
+        return json({ success: r.ok, url: r.ok ? 'https://immo-proxy.ral-85d.workers.dev/?fiche_epi=' + encodeURIComponent(body.dotation_id + '/' + body.filename) : null });
+      } catch (e) { return json({ success: false, error: e.message }); }
+    }
+
+    // Annule une fiche générée par erreur — uniquement tant qu'elle n'est pas émargée (le stock n'a alors
+    // pas encore été touché, donc rien à recréditer)
+    if (action === 'annuler_dotation_epi') {
+      const dotId = body.id;
+      if (!dotId) return json({ success: false, error: 'id_manquant' });
+      try {
+        const cur = await fetch(GL + '/Dotations_EPI/items/' + dotId + '?$expand=fields', { headers: H });
+        const curData = await cur.json();
+        const f = curData.fields || {};
+        if (!f.Title) return json({ success: false, error: 'fiche_introuvable' });
+        if (f.Statut === 'Emargee') return json({ success: false, error: 'deja_emargee_non_annulable' });
+        const lignesItems = await paginate(GL + "/Lignes_Dotation_EPI/items?$expand=fields&$top=2000", 10);
+        const aSupprimer = lignesItems.filter(i => (i.fields || {}).Title === String(dotId));
+        for (const l of aSupprimer) { try { await fetch(GL + '/Lignes_Dotation_EPI/items/' + l.id, { method: 'DELETE', headers: H }); } catch (e) {} }
+        const r = await fetch(GL + '/Dotations_EPI/items/' + dotId, { method: 'DELETE', headers: H });
+        return json({ success: r.ok || r.status === 204 });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
