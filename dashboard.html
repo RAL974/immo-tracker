@@ -1504,6 +1504,7 @@ function renderEPIDotations(container){
         '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
         '<td style="white-space:nowrap">'+
         '<button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
+        (dd.statut==='Emargee'&&dd.photo_fiche?'<button onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">📷 Fiche émargée</button>':'')+
         (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">✍️ Émarger</button>'+
         '<button onclick="annulerDotationEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button>':'')+
         '</td></tr>';
@@ -1645,6 +1646,11 @@ async function voirFicheEPI(dotId){
   w.document.close();
 }
 
+// Ouvre la photo/scan de la fiche signée (uploadée à l'émargement), même pattern que les photos d'immos
+function voirPhotoFicheEPI(dotId,filename){
+  window.open(W+'?fiche_epi='+encodeURIComponent(dotId+'/'+filename),'_blank');
+}
+
 // ── Vue Remise ponctuelle ──
 function renderEPIPonctuelle(container){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
@@ -1659,6 +1665,7 @@ function renderEPIPonctuelle(container){
       html+='<tr><td>'+dd.nom_destinataire+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dateFr(dd.genere_le)+'</td>'+
         '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
         '<td style="white-space:nowrap"><button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
+        (dd.statut==='Emargee'&&dd.photo_fiche?'<button onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">📷 Fiche émargée</button>':'')+
         (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✍️ Émarger</button>':'')+
         '</td></tr>';
     });
@@ -3425,7 +3432,12 @@ async function chargerFicheEmploye(code,nom){
         var dotEmp=await rdotEmp.json();
         if(dotEmp&&dotEmp.length){
           html+='<div style="margin-top:8px"><span style="font-size:11px;color:var(--grey);font-weight:700">Fiches EPI :</span>'+
-            dotEmp.slice(0,10).map(function(dd){return '<div style="font-size:12px;padding:4px 0;display:flex;justify-content:space-between;align-items:center"><span>'+dd.type_dotation+' '+(dd.annee_civile||'')+' — '+(dd.statut==='Emargee'?'✅ Émargée':'⏳ En attente')+'</span><a href="javascript:void(0)" onclick="voirFicheEPI(\''+dd.id+'\')" style="color:var(--blue)">Voir</a></div>';}).join('')+'</div>';
+            dotEmp.slice(0,10).map(function(dd){
+              var actions='<a href="javascript:void(0)" onclick="voirFicheEPI(\''+dd.id+'\')" style="color:var(--blue)">Voir</a>';
+              if(dd.statut==='Emargee'&&dd.photo_fiche)actions+=' · <a href="javascript:void(0)" onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="color:var(--green)">📷 Fiche émargée</a>';
+              else if(dd.statut!=='Emargee'&&canEditEPI)actions+=' · <a href="javascript:void(0)" onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="color:var(--orange)">✍️ Émarger</a>';
+              return '<div style="font-size:12px;padding:4px 0;display:flex;justify-content:space-between;align-items:center"><span>'+dd.type_dotation+' '+(dd.annee_civile||'')+' — '+(dd.statut==='Emargee'?'✅ Émargée':'⏳ En attente')+'</span><span>'+actions+'</span></div>';
+            }).join('')+'</div>';
         }
       }catch(e){}
     }
