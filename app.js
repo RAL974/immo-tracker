@@ -1585,16 +1585,19 @@ async function ouvrirEcranInventaire() {
     S.invCampagne = active;
     document.getElementById('inv-avec-campagne').classList.remove('hidden');
     document.getElementById('inv-nom-campagne').textContent = '📋 ' + active.nom;
-    resetFormulaireInventaire();
+    resetFormulaireInventaire(true); // écran fraîchement ouvert : on efface aussi la zone
     await chargerMesLignesInventaire();
   } catch (e) {
     document.getElementById('inv-mes-lignes').innerHTML = '<p style="color:var(--red);text-align:center">Erreur de chargement.</p>';
   }
 }
 
-function resetFormulaireInventaire() {
+// L'inventaire se fait zone par zone : après l'ajout d'une ligne, la zone reste renseignée (clearZone=false)
+// pour ne pas avoir à la retaper à chaque article. Elle n'est effacée qu'à l'ouverture de l'écran ou via
+// "Changer de zone" (changerZoneInventaire()) quand on passe à la zone suivante.
+function resetFormulaireInventaire(clearZone) {
   S.invLigneEnEdition = null;
-  document.getElementById('inv-zone').value = '';
+  if (clearZone) document.getElementById('inv-zone').value = '';
   document.getElementById('inv-chantier').value = '';
   document.getElementById('inv-fabriquant').value = '';
   document.getElementById('inv-reference').value = '';
@@ -1604,6 +1607,12 @@ function resetFormulaireInventaire() {
   document.getElementById('inv-observations').value = '';
   const btn = document.getElementById('inv-btn-soumettre');
   if (btn) btn.textContent = '✅ Ajouter la ligne';
+}
+
+// Passage explicite à une nouvelle zone : vide le champ et lui redonne le focus.
+function changerZoneInventaire() {
+  const zoneEl = document.getElementById('inv-zone');
+  if (zoneEl) { zoneEl.value = ''; zoneEl.focus(); }
 }
 
 async function chargerMesLignesInventaire() {
@@ -1693,6 +1702,8 @@ async function soumettreLigneInventaire() {
       vib(150);
       toast(enEdition ? '✅ Ligne modifiée' : '✅ Ligne ajoutée', 'success');
       resetFormulaireInventaire();
+      const refEl = document.getElementById('inv-reference');
+      if (refEl) refEl.focus(); // prêt pour l'article suivant de la même zone, sans retaper la zone
       await chargerMesLignesInventaire();
     } else {
       toast('Erreur : ' + (d.error || 'inconnue'), 'error');

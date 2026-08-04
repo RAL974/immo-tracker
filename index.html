@@ -418,8 +418,11 @@
   <div id="inv-sans-campagne" class="hidden" style="text-align:center;color:var(--grey);padding:20px 10px">Aucune campagne d'inventaire n'est en cours actuellement.</div>
   <div id="inv-avec-campagne" class="hidden">
     <p id="inv-nom-campagne" style="font-weight:700;color:var(--blue);font-size:15px"></p>
-    <label class="field-label">Zone dépôt <span style="color:var(--red)">*</span> (n° de rack, lettre d'étage...)</label>
-    <input type="text" id="inv-zone" class="select-input" placeholder="Ex : 30E, Atelier, Carton...">
+    <label class="field-label">Zone dépôt <span style="color:var(--red)">*</span> (n° de rack, lettre d'étage...) — reste la même entre deux articles</label>
+    <div class="search-row">
+      <input type="text" id="inv-zone" class="select-input" placeholder="Ex : 30E, Atelier, Carton...">
+      <button class="btn btn-outline" onclick="changerZoneInventaire()" style="white-space:nowrap">🔁 Changer</button>
+    </div>
     <label class="field-label">Chantier (si connu, optionnel)</label>
     <input type="text" id="inv-chantier" class="select-input" placeholder="Ex : 070 Singuizou...">
     <label class="field-label">Fabriquant</label>
