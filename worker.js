@@ -1237,6 +1237,33 @@ async function handleRequest(request) {
       return json({ success: r.ok || r.status === 204 });
     }
 
+    // Ajoute un nouvel article au catalogue EPI (ex : nouveau modèle de chaussures acheté en promotion)
+    if (action === 'ajouter_article_epi') {
+      const typeArticle = (body.type_article || '').trim();
+      const reference = (body.reference || '').trim();
+      if (!typeArticle || !reference) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Catalogue_Articles_EPI/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: typeArticle, Type_Article: typeArticle, Taille_Salarie: body.taille_salarie || '', Taille_Affichage: body.taille_affichage || '',
+          Reference: reference, Designation: body.designation || '', Fournisseur: body.fournisseur || '', Stock_Actuel: parseFloat(body.stock_actuel) || 0
+        } }) });
+        const rd = await r.json();
+        return json({ success: r.ok, id: rd.id });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Inventaire physique du stock EPI : fixe (et non incrémente) le Stock_Actuel de plusieurs lignes
+    // catalogue d'un coup, par lots de 20 — utilisé par l'import Excel du comptage stock dans le dashboard.
+    if (action === 'bulk_maj_stock_epi') {
+      const rows = body.rows || []; // [{id, quantite}]
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'PATCH', url: "/sites/" + SITE_ID + "/lists/Catalogue_Articles_EPI/items/" + x.id + "/fields",
+        headers: { 'Content-Type': 'application/json' }, body: { Stock_Actuel: parseFloat(x.quantite) || 0 }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
     // Réception d'une commande fournisseur : incrémente le stock d'une ligne catalogue
     if (action === 'reception_commande_epi') {
       const catId = body.id;

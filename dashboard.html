@@ -365,7 +365,9 @@ tr:hover td{background:#FAFBFC;}
           <button onclick="sortDepot('since')" class="filter-btn" style="padding:4px 10px;font-size:12px">Durée au dépôt</button>
         </div>
         <div id="depot-admin-toggle" style="margin-bottom:8px"></div>
-        <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Site</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Site</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div>
+        <div id="depot-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;padding:12px;flex-wrap:wrap"></div>
+        </div>
     </div>
 
     <!-- Historique -->
@@ -1405,11 +1407,130 @@ function renderEPIVue(){
 
 // ── Vue Stock ──
 function renderEPIStock(container){
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
   container.innerHTML='<div class="card"><div class="card-head"><h3>📦 Stock articles EPI</h3>'+
-    '<button onclick="exporterStockEPI()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    (canEdit?'<button onclick="ouvrirAjoutArticleEPI()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
+    (canEdit?'<button onclick="document.getElementById(\'epi-stock-file\').click()" style="padding:6px 14px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📤 Importer inventaire (Excel)</button>'+
+      '<input type="file" id="epi-stock-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importerInventaireExcelEPI(this)">':'')+
+    '<button onclick="exporterStockEPI()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
+    '</div></div>'+
+    '<div id="epi-import-preview"></div>'+
     '<div style="padding:10px 14px"><input type="text" id="epi-stock-q" oninput="refreshEPIStockResults()" placeholder="🔍 Filtrer par type, taille, référence..." style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px"></div>'+
     '<div id="epi-stock-results"></div></div>';
   refreshEPIStockResults();
+}
+
+// ── Ajout d'un nouvel article catalogue EPI ──
+function ouvrirAjoutArticleEPI(){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter un article EPI';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Type d\'article *</label><input id="ax-type" style="'+addFieldStyle+'" placeholder="Ex: Chaussures"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Taille (salarié)</label><input id="ax-taille-sal" style="'+addFieldStyle+'" placeholder="Ex: 42"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Taille (affichage)</label><input id="ax-taille-aff" style="'+addFieldStyle+'" placeholder="Ex: 42"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Référence *</label><input id="ax-ref" style="'+addFieldStyle+'" placeholder="Référence fournisseur"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Désignation</label><input id="ax-desig" style="'+addFieldStyle+'" placeholder="Ex: Chaussure sécurité S3 modèle XYZ"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Fournisseur</label><input id="ax-fourn" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Stock initial</label><input id="ax-stock" type="number" min="0" value="0" style="'+addFieldStyle+'"></div></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=enregistrerArticleEPI;
+}
+async function enregistrerArticleEPI(){
+  var typeArticle=(document.getElementById('ax-type').value||'').trim();
+  var reference=(document.getElementById('ax-ref').value||'').trim();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!typeArticle){msg.textContent='Le type d\'article est obligatoire.';return;}
+  if(!reference){msg.textContent='La référence est obligatoire.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={type_article:typeArticle,taille_salarie:(document.getElementById('ax-taille-sal').value||'').trim(),
+    taille_affichage:(document.getElementById('ax-taille-aff').value||'').trim(),reference:reference,
+    designation:(document.getElementById('ax-desig').value||'').trim(),fournisseur:(document.getElementById('ax-fourn').value||'').trim(),
+    stock_actuel:document.getElementById('ax-stock').value};
+  try{
+    var r=await fetch(W+'?action=ajouter_article_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Article ajouté !';
+      epiCatalogue.push({id:res.id,type_article:payload.type_article,taille_salarie:payload.taille_salarie,taille_affichage:payload.taille_affichage,reference:payload.reference,designation:payload.designation,fournisseur:payload.fournisseur,stock_actuel:parseFloat(payload.stock_actuel)||0});
+      setTimeout(function(){fermerAjout();renderEPIVue();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+// ── Import inventaire stock EPI depuis un fichier Excel ──
+var EPI_IMPORT_MATCHES=[];
+function importerInventaireExcelEPI(input){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(!rows.length){alert('Fichier vide.');input.value='';return;}
+      var headerRow=rows[0].map(function(h){return String(h||'').trim().toLowerCase();});
+      var idxRef=headerRow.findIndex(function(h){return h.indexOf('ref')!==-1;});
+      var idxQte=headerRow.findIndex(function(h){return h.indexOf('quant')!==-1||h.indexOf('stock')!==-1;});
+      if(idxRef===-1||idxQte===-1){alert('Colonnes non reconnues.\n\nLe fichier doit contenir une colonne "Référence" et une colonne "Quantité" (ou "Stock") en première ligne.');input.value='';return;}
+      var matches=[],nonTrouves=[];
+      for(var i=1;i<rows.length;i++){
+        var row=rows[i];
+        if(!row||!row.length)continue;
+        var ref=String(row[idxRef]||'').trim();
+        if(!ref)continue;
+        var qte=parseFloat(String(row[idxQte]||'').replace(',','.'));
+        if(isNaN(qte))continue;
+        var art=epiCatalogue.find(function(a){return (a.reference||'').trim().toUpperCase()===ref.toUpperCase();});
+        if(art)matches.push({id:art.id,reference:ref,type_article:art.type_article,taille:art.taille_affichage,ancien:art.stock_actuel,nouveau:qte});
+        else nonTrouves.push(ref);
+      }
+      afficherPreviewImportEPI(matches,nonTrouves);
+    }catch(err){alert('Erreur de lecture du fichier : '+err.message);}
+    input.value='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+function afficherPreviewImportEPI(matches,nonTrouves){
+  EPI_IMPORT_MATCHES=matches;
+  var prev=document.getElementById('epi-import-preview');
+  if(!prev)return;
+  if(!matches.length){
+    prev.innerHTML='<div class="card" style="border-top:3px solid var(--red);margin:10px 14px"><div style="padding:14px"><b>Aucune référence reconnue</b> dans le fichier importé. Vérifiez que la colonne "Référence" correspond bien aux références du catalogue EPI.'+
+      (nonTrouves.length?'<p style="font-size:11px;color:var(--grey);margin-top:6px">Références lues : '+nonTrouves.slice(0,15).join(', ')+(nonTrouves.length>15?'…':'')+'</p>':'')+
+      '<button onclick="document.getElementById(\'epi-import-preview\').innerHTML=\'\'" style="margin-top:10px;padding:6px 14px;background:#eee;border:none;border-radius:8px;cursor:pointer">Fermer</button></div></div>';
+    return;
+  }
+  var changements=matches.filter(function(m){return m.ancien!==m.nouveau;});
+  var html='<div class="card" style="border-top:3px solid var(--orange);margin:10px 14px"><div class="card-head"><h3>📤 Aperçu de l\'import inventaire</h3></div><div style="padding:14px">'+
+    '<p style="font-size:13px;margin-bottom:10px"><b>'+matches.length+'</b> référence(s) reconnue(s) dont <b>'+changements.length+'</b> avec un changement de quantité.'+
+    (nonTrouves.length?' <span style="color:var(--red)">⚠️ '+nonTrouves.length+' référence(s) non trouvée(s) dans le catalogue</span> (ignorées).':'')+'</p>'+
+    (nonTrouves.length?'<p style="font-size:11px;color:var(--grey);margin-bottom:10px">Non trouvées : '+nonTrouves.slice(0,20).join(', ')+(nonTrouves.length>20?'…':'')+'</p>':'')+
+    '<div class="tbl-wrap" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Référence</th><th>Type</th><th>Taille</th><th>Ancien stock</th><th>Nouveau stock</th></tr></thead><tbody>'+
+    matches.map(function(m){var chg=m.ancien!==m.nouveau;return '<tr'+(chg?' style="background:#FFF8E1"':'')+'><td style="font-size:11px">'+m.reference+'</td><td>'+m.type_article+'</td><td>'+m.taille+'</td><td>'+m.ancien+'</td><td style="font-weight:700;color:'+(chg?'var(--orange)':'var(--grey)')+'">'+m.nouveau+'</td></tr>';}).join('')+
+    '</tbody></table></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px"><button onclick="confirmerImportEPI()" style="padding:8px 18px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Confirmer l\'import ('+matches.length+' article'+(matches.length>1?'s':'')+')</button>'+
+    '<button onclick="document.getElementById(\'epi-import-preview\').innerHTML=\'\'" style="padding:8px 18px;background:#eee;color:#444;border:none;border-radius:8px;cursor:pointer">Annuler</button></div>'+
+    '<div id="epi-import-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div>'+
+    '</div></div>';
+  prev.innerHTML=html;
+}
+async function confirmerImportEPI(){
+  var rows=EPI_IMPORT_MATCHES.map(function(m){return {id:m.id,quantite:m.nouveau};});
+  var statutEl=document.getElementById('epi-import-statut');
+  var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
+  var ok=0,ko=0;
+  for(var i=0;i<rows.length;i+=20){
+    setStatut('⏳ '+Math.min(i+20,rows.length)+' / '+rows.length+'…');
+    try{var r=await fetch(W+'?action=bulk_maj_stock_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:rows.slice(i,i+20)})});var res=await r.json();ok+=res.ok||0;ko+=res.ko||0;}catch(e){ko+=20;}
+  }
+  EPI_IMPORT_MATCHES.forEach(function(m){var art=epiCatalogue.find(function(a){return a.id===m.id;});if(art)art.stock_actuel=m.nouveau;});
+  setStatut('✅ Import terminé : '+ok+' article(s) mis à jour.'+(ko?' ⚠️ '+ko+' échec(s).':''));
+  refreshEPIStockResults();
+  setTimeout(function(){var p=document.getElementById('epi-import-preview');if(p)p.innerHTML='';},2500);
 }
 function refreshEPIStockResults(){
   var res=document.getElementById('epi-stock-results');
@@ -1465,7 +1586,9 @@ function renderEPIGrille(container){
   types.sort();
   var byKey={};epiGrille.forEach(function(g){byKey[g.affectation+'|'+g.type_article]=g;});
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
-  var html='<div class="card"><div class="card-head"><h3>📐 Grille de dotation standard</h3></div>'+
+  var html='<div class="card"><div class="card-head"><h3>📐 Grille de dotation standard</h3>'+
+    (canEdit?'<button onclick="ajouterTypeGrilleEPI()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
+    '</div>'+
     '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Quantité standard remise par profil, utilisée pour générer automatiquement les fiches de dotation.'+(canEdit?' Cliquez sur une valeur pour la modifier.':'')+'</p>'+
     '<div class="tbl-wrap"><table><thead><tr><th>Type d\'article</th>'+affectations.map(function(a){return '<th>'+a[1]+'</th>';}).join('')+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
   types.forEach(function(t){
@@ -1501,6 +1624,20 @@ async function majGrilleDotationEPI(affectation,typeArticle,valeur){
       var g=epiGrille.find(function(x){return x.affectation===affectation&&x.type_article===typeArticle;});
       if(g)g.quantite=q;else epiGrille.push({id:res.id,affectation:affectation,type_article:typeArticle,quantite:q});
     }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+async function ajouterTypeGrilleEPI(){
+  var types=[];epiGrille.forEach(function(g){if(types.indexOf(g.type_article)===-1)types.push(g.type_article);});
+  var typeArticle=prompt('Nom du type d\'article à ajouter à la grille de dotation (ex: Chaussures) :\n\nDoit correspondre à un "Type d\'article" du catalogue Stock pour que la génération de fiche fonctionne.');
+  if(typeArticle==null)return;
+  typeArticle=typeArticle.trim();
+  if(!typeArticle){alert('Nom vide.');return;}
+  if(types.indexOf(typeArticle)!==-1){alert('Ce type d\'article est déjà présent dans la grille.');return;}
+  try{
+    var r=await fetch(W+'?action=maj_grille_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({affectation:'C',type_article:typeArticle,quantite:0})});
+    var res=await r.json();
+    if(res.success){epiGrille.push({id:res.id,affectation:'C',type_article:typeArticle,quantite:0});renderEPIVue();}
+    else alert('Échec : '+(res.error||'inconnu'));
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
 
@@ -2359,7 +2496,7 @@ function renderCirc(){
 }
 
 // ── Rendu — Au dépôt ────────────────────────────────────
-var depotSortKey='code';var depotSortDir=1;
+var depotSortKey='code';var depotSortDir=1;var depotPage=0;var depotLastSig='';
 function sortDepot(key){
   if(depotSortKey===key)depotSortDir*=-1;
   else{depotSortKey=key;depotSortDir=1;}
@@ -2386,8 +2523,20 @@ function renderDepot(){
     return dir*a.code_im.localeCompare(b.code_im); // 'code' par défaut
   });
   var nb=parseInt((document.getElementById('depot-nb')||{}).value||'50')||50;
-  var affiche=nb===0?data:data.slice(0,nb);
+  var sig=qu+'|'+fc+'|'+fe+'|'+fs+'|'+nb+'|'+depotSortKey+'|'+depotSortDir+'|'+SHOW_ADMIN.depot;
+  if(sig!==depotLastSig){depotPage=0;depotLastSig=sig;}
+  var totalPages=nb===0?1:Math.max(1,Math.ceil(data.length/nb));
+  if(depotPage>=totalPages)depotPage=totalPages-1;
+  if(depotPage<0)depotPage=0;
+  var affiche=nb===0?data:data.slice(depotPage*nb,depotPage*nb+nb);
   var cntEl=document.getElementById('cnt-depot');if(cntEl)cntEl.textContent=affiche.length+(data.length>affiche.length?' / '+data.length+' (filtrés)':'')+' immos';
+  var pagEl=document.getElementById('depot-pagination');
+  if(pagEl){
+    if(nb===0||totalPages<=1)pagEl.innerHTML='';
+    else pagEl.innerHTML='<button onclick="depotChangerPage(-1)" class="filter-btn" style="padding:6px 14px"'+(depotPage<=0?' disabled':'')+'>◀ Précédent</button>'+
+      '<span style="font-size:13px;color:var(--grey);font-weight:700">Page '+(depotPage+1)+' / '+totalPages+'</span>'+
+      '<button onclick="depotChangerPage(1)" class="filter-btn" style="padding:6px 14px"'+(depotPage>=totalPages-1?' disabled':'')+'>Suivant ▶</button>';
+  }
   var toggleEl=document.getElementById('depot-admin-toggle');
   if(toggleEl){toggleEl.innerHTML=nbAdminDepot>0?'<button onclick="toggleAdminImmos(\'depot\')" style="padding:5px 12px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:'+(SHOW_ADMIN.depot?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.depot?'➖ Masquer':'➕ Afficher')+' les '+nbAdminDepot+' immos hors activité (mobilier, informatique, véhicules, financières…)</button>':'';}
   tbEl.innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
@@ -2413,6 +2562,7 @@ function renderDepot(){
     sel.onchange=function(){majSiteImmo(this.getAttribute('data-cim'),this.value);};
   });
 }
+function depotChangerPage(delta){depotPage+=delta;renderDepot();}
 
 // ══════════════ AJOUT IMMO / EMPLOYÉ ══════════════
 var addFieldStyle='width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-top:4px';
@@ -4128,7 +4278,7 @@ function exportExcel(){
   // Résumé
   var s=d.stats||{};var r4=[['Electricité Services Réunion — Tableau de bord'],['Génére le '+fmtDT(new Date().toISOString())],[],['Indicateur','Valeur'],['Immos tracées',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au dépôt',s.au_depot||0],['Total mouvements',s.total_mouvements||0],['Durée moy. hors dépôt',s.moyenne_jours_hors_depot+'j'],['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0]];
   var ws4=XLSX.utils.aoa_to_sheet(r4);XLSX.utils.book_append_sheet(wb,ws4,'Resume');
-  XLSX.writeFile(wb,'EspaceSoleil_Immos_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb,'Immos_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 

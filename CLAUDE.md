@@ -658,6 +658,13 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - **EPI exclus explicitement** (demande de William, "on ne peut pas les reprendre") — mention sur le document.
 - Réutilise les données déjà suivies (possession immos, `Lignes_Outillage` — pas de notion de restitution côté outillage, donc tout ce qui a été reçu apparaît). Pas de suivi de retour implémenté (document imprimable uniquement, case à cocher manuelle).
 
+## Ajout d'articles EPI, import Excel du stock & pagination "Au dépôt" (août 2026)
+- **Stock EPI** : bouton "➕ Ajouter article" (nouvelle action Worker `ajouter_article_epi`, création simple) pour ajouter un article en cours d'année (ex. nouveau modèle acheté en promotion) sans repasser par une migration.
+- **Grille de dotation EPI** : bouton "➕ Ajouter article" pour ajouter un nouveau type d'article à la grille (réutilise l'action existante `maj_grille_dotation_epi`).
+- **Import Excel du comptage de stock EPI** : upload d'un fichier (colonnes Référence/Quantité) qui **remplace** le stock actuel après un inventaire physique, au lieu d'une ressaisie manuelle — réutilise SheetJS déjà chargé dans le dashboard ; nouvelle action Worker `bulk_maj_stock_epi` (par lots de 20, `$batch`). Aperçu de contrôle avant validation.
+- **Pagination "Au dépôt"** : boutons Précédent/Suivant ajoutés (retour terrain : recherche par date d'achat peu pratique avec la seule limite d'affichage 50/100/200/Tous).
+- Aucune nouvelle liste/colonne SharePoint nécessaire pour ces trois ajouts.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
 
