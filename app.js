@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════
-// IMMO TRACKER — Espace Soleil — app.js
+// IMMO TRACKER — Electricité Services Réunion — app.js
 // ══════════════════════════════════════════════════════════
 
 const CONFIG = {
