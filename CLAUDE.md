@@ -520,6 +520,8 @@ Import historique sans reconstitution de preuve : les distributions déjà faite
 
 **Prime annuelle versée en paie de décembre (ajouté août 2026)** : `montant annuel = Prix_Unitaire × 12 / Duree_Amortissement_Mois`, sommé sur les outils réellement reçus par l'employé (pas la grille cible). Vue "💶 Prime annuelle" + export CSV pour la paie, calcul entièrement dynamique, rien n'est stocké.
 
+**Relevé de matériel à restituer, sortie d'employé (ajouté août 2026)** : bouton sur la fiche employé générant un document imprimable combinant immobilisations en possession + outils prime d'outillage reçus. **EPI volontairement exclus** (non repris au départ d'un salarié) — mention explicite sur le document. Case "Restitué" vierge par ligne, aucun suivi de retour enregistré dans l'app (document imprimable uniquement).
+
 Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`, historique dans `04_HISTORIQUE_DECISIONS.md`.
 
 
@@ -650,6 +652,11 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - Vérifié avant d'agir : 41 désignations/références identiques à celles déjà en base ; diff grille = 4 ajouts, 0 suppression, 0 changement — correction purement additive. Formule prime annuelle vérifiée sur plusieurs lignes (`Prix × 12 / Durée_mois`).
 - 2 lignes de devis non tranchées ("A faire chiffrer") ignorées sur demande de William.
 - Calcul entièrement dynamique, aucun montant stocké — export CSV pour la paie.
+
+## Relevé de matériel à restituer, sortie d'employé (août 2026)
+- Besoin : générer automatiquement, au départ d'un salarié, la liste du matériel attribué ou non rendu (immos + prime d'outillage).
+- **EPI exclus explicitement** (demande de William, "on ne peut pas les reprendre") — mention sur le document.
+- Réutilise les données déjà suivies (possession immos, `Lignes_Outillage` — pas de notion de restitution côté outillage, donc tout ce qui a été reçu apparaît). Pas de suivi de retour implémenté (document imprimable uniquement, case à cocher manuelle).
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
