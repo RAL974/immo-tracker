@@ -1,0 +1,22 @@
+[
+ {
+  "service": "Maintenance",
+  "type_article": "Pince coupante de précision",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pince à sertir hexagonale 0,8-16²",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Tenaille russe",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Règle à échelle triangulaire 20 / 25 / 33 / 50 / 75 / 100",
+  "quantite": 1
+ }
+]

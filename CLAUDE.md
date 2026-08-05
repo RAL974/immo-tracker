@@ -366,7 +366,7 @@ Détail complet dans `02_MODELE_DONNEES.md`.
 
 `Service_Outillage` sur `Employes` (`Travaux Neufs`/`Maintenance`/vide) — **indépendant de `Affectation_EPI`**, un CT ou un salarié Atelier peut être rattaché à l'un de ces services sans que ça reflète son profil EPI.
 
-**`Catalogue_Outillage`** : `Title`(=désignation), `Reference`, `Distributeur`, `Marque`, `Prix_Unitaire` (prix final négocié), `Stock_Actuel` (vivant).
+**`Catalogue_Outillage`** : `Title`(=désignation), `Reference`, `Distributeur`, `Marque`, `Prix_Unitaire` (prix final négocié), `Stock_Actuel` (vivant), `Duree_Amortissement_Mois` (ajoutée août 2026, pilote la prime annuelle).
 
 **`Grille_Outillage`** : `Title`(=service)/`Type_Article`/`Quantite` — kit standard par service, éditable.
 
@@ -518,6 +518,8 @@ Kit d'outils remis en nature aux salariés de terrain — distinct des EPI : dot
 
 Import historique sans reconstitution de preuve : les distributions déjà faites sont importées comme lignes "reçues" sans re-scanner les PDF déjà signés et classés — `Photo_Fiche` vide pour ces lignes, l'original papier fait foi.
 
+**Prime annuelle versée en paie de décembre (ajouté août 2026)** : `montant annuel = Prix_Unitaire × 12 / Duree_Amortissement_Mois`, sommé sur les outils réellement reçus par l'employé (pas la grille cible). Vue "💶 Prime annuelle" + export CSV pour la paie, calcul entièrement dynamique, rien n'est stocké.
+
 Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`, historique dans `04_HISTORIQUE_DECISIONS.md`.
 
 
@@ -641,6 +643,13 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - **Modèle simplifié vs EPI** : une seule liste plate `Lignes_Outillage`, distribution actée directement à l'émargement (pas d'étape "générée en attente" intermédiaire, pas de risque de fiche orpheline faussant le stock).
 - **Anomalie signalée sans correction arbitraire** : le code `ELSA` apparaît avec des données réelles dans les deux onglets de service — importé tel quel plutôt que deviné, à trancher par William.
 - **Étapes bloquantes côté William avant mise en service** : création de 3 nouvelles listes SharePoint (`Catalogue_Outillage`, `Grille_Outillage`, `Lignes_Outillage`) et d'une colonne `Service_Outillage` sur `Employes`.
+
+## Retour terrain Prime d'outillage : durée d'amortissement & prime annuelle (août 2026)
+- Bug signalé : grille affichant 37/41 articles — 4 articles avaient une quantité cible dans "Commande globale" mais n'étaient jamais devenus des lignes de suivi dans les feuilles opérationnelles source.
+- Nouveau fichier transmis (`1.6.5.115. Kit outillage électricien et EPI.xlsx`) : révèle une colonne durée d'amortissement par article et une note "Versement prime sur la paie du mois de décembre" — la prime d'outillage est aussi une prime monétaire, pas qu'un suivi physique.
+- Vérifié avant d'agir : 41 désignations/références identiques à celles déjà en base ; diff grille = 4 ajouts, 0 suppression, 0 changement — correction purement additive. Formule prime annuelle vérifiée sur plusieurs lignes (`Prix × 12 / Durée_mois`).
+- 2 lignes de devis non tranchées ("A faire chiffrer") ignorées sur demande de William.
+- Calcul entièrement dynamique, aucun montant stocké — export CSV pour la paie.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.

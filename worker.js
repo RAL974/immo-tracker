@@ -24,7 +24,7 @@ async function handleRequest(request) {
   const H = { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'application/json', 'Prefer': 'HonorNonIndexedQueriesWarningMayFailRandomly' };
   const url = new URL(request.url);
   const p   = url.searchParams;
-  const json = (data, s) => new Response(JSON.stringify(data), { status: s || 200, headers: { ...cors, 'Content-Type': 'application/json' } });
+  const json = (data, s) => new Response(JSON.stringify(data), { status: s || 200, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
   // ── Hachage sécurisé des mots de passe (PBKDF2 / SHA-256, jamais stocké en clair) ──
   const bytesToHex = (buf) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -323,7 +323,7 @@ async function handleRequest(request) {
     const items = await paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5);
     return json(items.map(i => {
       const f = i.fields || {};
-      return { id: i.id, type_article: f.Title || '', reference: f.Reference || '', distributeur: f.Distributeur || '', marque: f.Marque || '', prix_unitaire: f.Prix_Unitaire != null ? f.Prix_Unitaire : 0, stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0 };
+      return { id: i.id, type_article: f.Title || '', reference: f.Reference || '', distributeur: f.Distributeur || '', marque: f.Marque || '', prix_unitaire: f.Prix_Unitaire != null ? f.Prix_Unitaire : 0, stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, duree_amortissement_mois: f.Duree_Amortissement_Mois || 0 };
     }));
   }
 
@@ -1432,6 +1432,32 @@ async function handleRequest(request) {
         } }
       }));
       try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Backfill de la durée d'amortissement sur des articles catalogue existants (par désignation), par lots de 20.
+    // Sert au calcul de la prime annuelle (Prix_Unitaire × 12 / Duree_Amortissement_Mois) versée en paie.
+    if (action === 'bulk_maj_duree_outillage') {
+      const rows = body.rows || []; // [{type_article, duree_mois}]
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const catItems = await paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5);
+        const idByType = {};
+        catItems.forEach(i => { idByType[(i.fields || {}).Title || ''] = i.id; });
+        const requests = [];
+        const nonTrouves = [];
+        rows.forEach((x, idx) => {
+          const catId = idByType[x.type_article];
+          if (!catId) { nonTrouves.push(x.type_article); return; }
+          requests.push({ id: String(idx), method: 'PATCH', url: "/sites/" + SITE_ID + "/lists/Catalogue_Outillage/items/" + catId + "/fields", headers: { 'Content-Type': 'application/json' }, body: { Duree_Amortissement_Mois: x.duree_mois || 0 } });
+        });
+        let ok = 0, ko = 0, errs = [];
+        for (let i = 0; i < requests.length; i += 20) {
+          const chunk = requests.slice(i, i + 20).map((r, idx) => ({ ...r, id: String(idx) }));
+          const res = await graphBatch(chunk);
+          ok += res.ok; ko += res.ko; errs = errs.concat(res.erreurs);
+        }
+        return json({ success: ko === 0, ok, ko, erreurs: errs.slice(0, 3), non_trouves: nonTrouves });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
     // Import initial de la grille (par lots de 20)
