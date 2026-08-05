@@ -180,6 +180,12 @@ async function handleRequest(request) {
     const ir = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + code + "'&$top=1", { headers: H });
     const id = await ir.json();
     const u = id.value && id.value[0] && id.value[0].fields ? id.value[0].fields.FDS_URL || '' : '';
+    if (u.indexOf('FDS:') === 0) {
+      const path = u.slice(4).split('/').map(encodeURIComponent).join('/');
+      const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/FDS_Immos/' + path + ':/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+      if (r.ok) { const buf = await r.arrayBuffer(); return new Response(buf, { status: 200, headers: { ...cors, 'Content-Type': r.headers.get('Content-Type') || 'application/pdf', 'Cache-Control': 'max-age=3600' } }); }
+      return new Response('FDS non trouvee', { status: 404, headers: cors });
+    }
     if (u && u.includes('sharepoint.com')) {
       const sid = 'u!' + btoa(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       const sr = await fetch('https://graph.microsoft.com/v1.0/shares/' + encodeURIComponent(sid) + '/driveItem/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
@@ -594,6 +600,28 @@ async function handleRequest(request) {
       } catch (e) { return json({ success: false, error: e.message }); }
     }
 
+    // Upload d'une FDS (fiche de données de sécurité) pour une immo : stocke le fichier dans le drive
+    // SharePoint puis marque FDS_URL sur l'immo avec un repère "FDS:code/filename" — le proxy de lecture
+    // (?fds=code) sert alors le fichier directement depuis le drive, sans passer par un lien de partage.
+    if (action === 'upload_fds') {
+      const codeIm = (body.code_im || '').trim().toUpperCase();
+      if (!codeIm || !body.data) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const filename = body.filename || (Date.now() + '.pdf');
+        const putRes = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/FDS_Immos/' + encodeURIComponent(codeIm) + '/' + encodeURIComponent(filename) + ':/content', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': body.mime || 'application/pdf' }, body: bytes.buffer });
+        if (!putRes.ok) return json({ success: false, error: 'upload_echec' });
+        const ir = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + codeIm.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const idata = await ir.json();
+        const itemId = idata.value && idata.value[0] ? idata.value[0].id : null;
+        if (!itemId) return json({ success: false, error: 'immo_introuvable' });
+        const marker = 'FDS:' + codeIm + '/' + filename;
+        const pr = await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ FDS_URL: marker }) });
+        return json({ success: pr.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
     if (action === 'delete_photo') {
       const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos/' + encodeURIComponent(body.code_im) + '/' + encodeURIComponent(body.filename), { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + td.access_token } });
       return json({ success: r.ok });
@@ -671,6 +699,22 @@ async function handleRequest(request) {
         const rd = await r.json();
         if (r.ok) return json({ success: true, code: code, id: rd.id });
         return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import en masse : fixe l'affectation courante (détenteur) d'une immo déjà existante en créant
+    // directement un Mouvement (Transfert vers un détenteur, ou Retour vers DEPOT) — hors flux "en attente
+    // de validation", utilisé par l'import fichier du dashboard (immos ajoutées "déjà sur le terrain").
+    if (action === 'importer_affectation_immo') {
+      const codeIm = (body.code_im || '').trim().toUpperCase();
+      if (!codeIm) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const versDepot = !body.code_employe || body.code_employe === 'DEPOT';
+        const f = versDepot
+          ? { Title: codeIm, Code_Employe: '', Type_Mouvement: 'Retour', Code_Chantier: 'DEPOT', Commentaire: 'Depot', Etat: body.etat || '', Note: body.note || 'Affectation importée', Horodatage: new Date().toISOString() }
+          : { Title: codeIm, Code_Employe: body.code_employe, Type_Mouvement: 'Transfert', Code_Chantier: '', Commentaire: body.nom_employe || body.code_employe, Etat: body.etat || '', Note: body.note || 'Affectation importée', Horodatage: new Date().toISOString() };
+        const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: f }) });
+        return json({ success: r.ok });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 

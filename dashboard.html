@@ -355,7 +355,14 @@ tr:hover td{background:#FAFBFC;}
         </select>
         <button class="filter-btn" onclick="resetFiltresDepot()">🔄 Réinitialiser</button>
       </div>
-      <div class="card"><div class="card-head"><h3>Au dépôt</h3><span class="card-cnt" id="cnt-depot"></span></div>
+      <div class="card"><div class="card-head"><h3>Au dépôt</h3>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="card-cnt" id="cnt-depot"></span>
+          <button id="depot-add-btn" onclick="ouvrirAjoutImmo()" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter une immobilisation</button>
+          <button id="depot-import-btn" onclick="document.getElementById('depot-import-file').click()" style="padding:6px 14px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">📤 Importer un fichier</button>
+          <input type="file" id="depot-import-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importerFichierImmos(this)">
+        </div></div>
+        <div id="depot-import-preview"></div>
         <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
           <span style="font-size:12px;color:var(--grey);font-weight:700">Trier par :</span>
           <button onclick="sortDepot('code')" class="filter-btn" style="padding:4px 10px;font-size:12px">Code IM</button>
@@ -424,7 +431,11 @@ tr:hover td{background:#FAFBFC;}
       </div>
       <div id="resa-stats"></div>
       <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>Calendrier — 6 semaines</h3></div><div class="gantt-wrap" id="resa-gantt" style="padding:14px"></div></div>
-      <div class="card"><div class="card-head"><h3>Liste des réservations</h3><span class="card-cnt" id="cnt-resa"></span></div>
+      <div class="card"><div class="card-head"><h3>Liste des réservations</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="card-cnt" id="cnt-resa"></span>
+          <button id="resa-add-btn" onclick="ouvrirAjoutReservation()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter une réservation</button>
+        </div></div>
         <div class="tbl-wrap"><table><thead><tr><th>Statut</th><th>Code IM</th><th>Libellé</th><th>Demandeur</th><th>Chantier</th><th>Du</th><th>Au</th><th>Action</th></tr></thead><tbody id="tb-resa"></tbody></table></div>
       </div>
     </div>
@@ -445,7 +456,11 @@ tr:hover td{background:#FAFBFC;}
           <select id="docs-site" onchange="renderDocs()"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
           <button class="filter-btn" onclick="resetFiltresDocs()">🔄 Réinitialiser</button>
         </div>
-        <div class="card"><div class="card-head"><h3>Suivi des documents</h3><span class="card-cnt" id="cnt-docs"></span></div>
+        <div class="card"><div class="card-head"><h3>Suivi des documents</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="card-cnt" id="cnt-docs"></span>
+            <button id="docs-add-fds-btn" onclick="ouvrirAjoutFDS()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter FDS</button>
+          </div></div>
           <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
         </div>
       </div>
@@ -660,7 +675,7 @@ function getLib(code){return im[code]?im[code].Libelle||code:code;}
 function getCat(code){return im[code]?im[code].Categorie||'':''}
 function ebadge(e){var m={'Neuf':'bn','Bon état':'bb','Usé':'bu','Abîmé':'ba','Hors service':'bh','En panne':'bpanne'};return e?'<span class="badge '+(m[e]||'bi')+'">'+e+'</span>':'<span class="badge bi">—</span>';}
 function rsLabel(s){var c=SCOL[s]||'#999';var l=SLAB[s]||s;return '<span style="display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:'+c+'22;color:'+c+'">'+l+'</span>';}
-function getFdsUrl(code){var u=fdsMap[code]||(im[code]?im[code].FDS_URL||'':'');if(!u)return'';if(u.includes('sharepoint.com'))return W+'?fds='+encodeURIComponent(code);return u;}
+function getFdsUrl(code){var u=fdsMap[code]||(im[code]?im[code].FDS_URL||'':'');if(!u)return'';if(u.indexOf('FDS:')===0||u.includes('sharepoint.com'))return W+'?fds='+encodeURIComponent(code);return u;}
 
 // ── Login ────────────────────────────────────────────────
 function checkPin(){
@@ -2506,6 +2521,9 @@ function renderDepot(){
   if(!d)return;
   var tbEl=document.getElementById('tb-depot');
   if(!tbEl)return; // panneau pas encore prêt (évite le crash si appelé trop tôt)
+  var addBtn=document.getElementById('depot-add-btn'),impBtn=document.getElementById('depot-import-btn');
+  if(addBtn)addBtn.style.display=estAdmin(ADMIN_SESSION.code)?'inline-block':'none';
+  if(impBtn)impBtn.style.display=estAdmin(ADMIN_SESSION.code)?'inline-block':'none';
   var q=(document.getElementById('depot-q')||{}).value||'';
   var fc=(document.getElementById('depot-cat')||{}).value||'';
   var fe=(document.getElementById('depot-etat')||{}).value||'';
@@ -2563,6 +2581,149 @@ function renderDepot(){
   });
 }
 function depotChangerPage(delta){depotPage+=delta;renderDepot();}
+
+// ── Import fichier Au dépôt : crée des immos et/ou fixe l'affectation d'immos déjà existantes ──
+// (le code IM fait toujours foi pour distinguer création vs affectation — anti-doublon garanti côté Worker)
+function normHdrDepot(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toLowerCase();}
+function formatDateExcelDepot(raw){
+  if(raw==null||raw==='')return '';
+  if(typeof raw==='number'){var dd=new Date(Math.round((raw-25569)*86400*1000));return isNaN(dd.getTime())?'':dd.toISOString().slice(0,10)+'T00:00:00Z';}
+  var s=String(raw).trim();
+  var m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0')+'T00:00:00Z';
+  var m2=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m2)return m2[1]+'-'+m2[2].padStart(2,'0')+'-'+m2[3].padStart(2,'0')+'T00:00:00Z';
+  return '';
+}
+function importerFichierImmos(input){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(!rows.length){alert('Fichier vide.');input.value='';return;}
+      var hdr=rows[0].map(normHdrDepot);
+      var find=function(pred){return hdr.findIndex(pred);};
+      var idxCode=find(function(h){return h.replace(/[^a-z]/g,'').indexOf('codeim')!==-1;});
+      if(idxCode===-1)idxCode=find(function(h){return h==='code';});
+      var idxLib=find(function(h){return h.indexOf('libell')!==-1;});
+      var idxCat=find(function(h){return h.indexOf('categ')!==-1;});
+      var idxSerie=find(function(h){return h.indexOf('serie')!==-1;});
+      var idxValeur=find(function(h){return h.indexOf('valeur')!==-1||h.indexOf('prix')!==-1;});
+      var idxEtat=find(function(h){return h.indexOf('etat')!==-1;});
+      var idxDateAchat=find(function(h){return h.indexOf('date')!==-1&&h.indexOf('achat')!==-1;});
+      var idxSite=find(function(h){return h.indexOf('site')!==-1;});
+      var idxDet=find(function(h){return h.indexOf('detenteur')!==-1||h.indexOf('affectation')!==-1||h.indexOf('porteur')!==-1||h.indexOf('possede')!==-1;});
+      if(idxCode===-1){alert('Colonne "Code IM" non trouvée.\n\nLe fichier doit contenir une colonne avec le code de l\'immobilisation (ex: "Code IM"), qui fait toujours foi pour distinguer une création d\'une affectation.');input.value='';return;}
+      var vus={},creations=[],affectations=[],erreurs=[];
+      for(var i=1;i<rows.length;i++){
+        var row=rows[i];
+        if(!row||!row.length)continue;
+        var code=String(row[idxCode]||'').trim().toUpperCase();
+        if(!code)continue;
+        if(!/^IM\d{6}$/.test(code)){erreurs.push({ligne:i+1,code:code,motif:'Format de code invalide (attendu IMxxxxxx)'});continue;}
+        if(vus[code]){erreurs.push({ligne:i+1,code:code,motif:'Doublon dans le fichier (ignoré)'});continue;}
+        vus[code]=true;
+        var libelle=idxLib!==-1?String(row[idxLib]||'').trim():'';
+        var categorie=idxCat!==-1?String(row[idxCat]||'').trim():'';
+        var nSerie=idxSerie!==-1?String(row[idxSerie]||'').trim():'';
+        var valeurRaw=idxValeur!==-1?parseFloat(String(row[idxValeur]||'').replace(',','.')):NaN;
+        var etat=idxEtat!==-1?String(row[idxEtat]||'').trim():'';
+        var dateAchat=idxDateAchat!==-1?formatDateExcelDepot(row[idxDateAchat]):'';
+        var siteRaw=idxSite!==-1?String(row[idxSite]||'').trim():'';
+        var siteNorm=/mayotte/i.test(siteRaw)?'Mayotte':'Reunion';
+        var detRaw=idxDet!==-1?String(row[idxDet]||'').trim():'';
+        var detCode=detRaw?detRaw.toUpperCase():'';
+        var estDepot=!detCode||detCode==='DEPOT'||detCode==='DÉPÔT'||detCode==='DEPOSE';
+        if(im[code]){
+          // Immo déjà existante → ligne d'affectation (jamais de recréation, garanti par le code IM)
+          if(!detCode&&!etat){erreurs.push({ligne:i+1,code:code,motif:'Immo déjà existante, rien à mettre à jour (ignorée)'});continue;}
+          if(detCode&&!estDepot&&!employesByCode[detCode]){erreurs.push({ligne:i+1,code:code,motif:'Employé "'+detCode+'" introuvable (ignorée)'});continue;}
+          var empNomA=(detCode&&employesByCode[detCode])?employesByCode[detCode].Nom:detCode;
+          affectations.push({ligne:i+1,code:code,libelle:getLib(code),detCode:estDepot?'DEPOT':detCode,detNom:estDepot?'Dépôt':(empNomA||detCode),etat:etat});
+        }else{
+          if(!libelle){erreurs.push({ligne:i+1,code:code,motif:'Nouvelle immo sans libellé (ignorée)'});continue;}
+          if(detCode&&!estDepot&&!employesByCode[detCode])erreurs.push({ligne:i+1,code:code,motif:'Employé "'+detCode+'" introuvable — immo créée sans affectation'});
+          var empNomC=(detCode&&!estDepot&&employesByCode[detCode])?employesByCode[detCode].Nom:'';
+          creations.push({ligne:i+1,code:code,libelle:libelle,categorie:categorie,n_serie:nSerie,valeur_achat:isNaN(valeurRaw)?'':valeurRaw,etat:etat,date_achat:dateAchat,site:siteNorm,detCode:(detCode&&!estDepot&&employesByCode[detCode])?detCode:'',detNom:empNomC});
+        }
+      }
+      afficherPreviewImportImmos(creations,affectations,erreurs);
+    }catch(err){alert('Erreur de lecture du fichier : '+err.message);}
+    input.value='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+var DEPOT_IMPORT_DATA={creations:[],affectations:[]};
+function afficherPreviewImportImmos(creations,affectations,erreurs){
+  DEPOT_IMPORT_DATA={creations:creations,affectations:affectations};
+  var prev=document.getElementById('depot-import-preview');
+  if(!prev)return;
+  if(!creations.length&&!affectations.length){
+    prev.innerHTML='<div class="card" style="border-top:3px solid var(--red);margin:10px 0"><div style="padding:14px"><b>Aucune ligne exploitable</b> dans le fichier importé.'+
+      (erreurs.length?'<p style="font-size:11px;color:var(--grey);margin-top:6px">'+erreurs.length+' ligne(s) ignorée(s) — ex : '+erreurs.slice(0,5).map(function(e){return 'L'+e.ligne+' '+e.code+' ('+e.motif+')';}).join(', ')+(erreurs.length>5?'…':'')+'</p>':'')+
+      '<button onclick="document.getElementById(\'depot-import-preview\').innerHTML=\'\'" style="margin-top:10px;padding:6px 14px;background:#eee;border:none;border-radius:8px;cursor:pointer">Fermer</button></div></div>';
+    return;
+  }
+  var html='<div class="card" style="border-top:3px solid var(--orange);margin:10px 0"><div class="card-head"><h3>📤 Aperçu de l\'import</h3></div><div style="padding:14px">'+
+    '<p style="font-size:13px;margin-bottom:10px"><b>'+creations.length+'</b> nouvelle(s) immobilisation(s) à créer, <b>'+affectations.length+'</b> affectation(s) à enregistrer sur des immos déjà existantes.'+
+    (erreurs.length?' <span style="color:var(--red)">⚠️ '+erreurs.length+' ligne(s) ignorée(s)</span>.':'')+'</p>';
+  if(creations.length){
+    html+='<h4 style="font-size:13px;color:var(--blue);margin:10px 0 6px">➕ Nouvelles immobilisations</h4><div class="tbl-wrap" style="max-height:260px;overflow-y:auto"><table><thead><tr><th>Code</th><th>Libellé</th><th>Catégorie</th><th>Valeur achat</th><th>État</th><th>Site</th><th>Détenteur</th></tr></thead><tbody>'+
+      creations.map(function(c){return '<tr><td style="font-size:11px">'+c.code+'</td><td style="font-size:12px">'+c.libelle+'</td><td style="font-size:11px;color:var(--grey)">'+(c.categorie||'—')+'</td><td style="font-size:12px">'+(c.valeur_achat!==''?Number(c.valeur_achat).toLocaleString('fr-FR')+'€':'—')+'</td><td style="font-size:11px">'+(c.etat||'—')+'</td><td style="font-size:11px">'+c.site+'</td><td style="font-size:11px">'+(c.detNom||'—')+'</td></tr>';}).join('')+
+      '</tbody></table></div>';
+  }
+  if(affectations.length){
+    html+='<h4 style="font-size:13px;color:var(--blue);margin:14px 0 6px">🔄 Affectations (immos déjà existantes)</h4><div class="tbl-wrap" style="max-height:260px;overflow-y:auto"><table><thead><tr><th>Code</th><th>Libellé</th><th>Nouveau détenteur</th><th>État</th></tr></thead><tbody>'+
+      affectations.map(function(a){return '<tr><td style="font-size:11px">'+a.code+'</td><td style="font-size:12px">'+a.libelle+'</td><td style="font-size:12px;font-weight:700">'+a.detNom+'</td><td style="font-size:11px">'+(a.etat||'—')+'</td></tr>';}).join('')+
+      '</tbody></table></div>';
+  }
+  if(erreurs.length){
+    html+='<p style="font-size:11px;color:var(--red);margin-top:10px">⚠️ Lignes ignorées : '+erreurs.slice(0,20).map(function(e){return 'L'+e.ligne+' '+e.code+' ('+e.motif+')';}).join(' · ')+(erreurs.length>20?'…':'')+'</p>';
+  }
+  html+='<div style="display:flex;gap:8px;margin-top:14px"><button onclick="confirmerImportImmos()" style="padding:8px 18px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Confirmer l\'import ('+(creations.length+affectations.length)+' ligne'+((creations.length+affectations.length)>1?'s':'')+')</button>'+
+    '<button onclick="document.getElementById(\'depot-import-preview\').innerHTML=\'\'" style="padding:8px 18px;background:#eee;color:#444;border:none;border-radius:8px;cursor:pointer">Annuler</button></div>'+
+    '<div id="depot-import-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div>'+
+    '</div></div>';
+  prev.innerHTML=html;
+}
+async function confirmerImportImmos(){
+  var statutEl=document.getElementById('depot-import-statut');
+  var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
+  var creations=DEPOT_IMPORT_DATA.creations,affectations=DEPOT_IMPORT_DATA.affectations;
+  var okC=0,koC=[],okA=0,koA=[];
+  for(var i=0;i<creations.length;i++){
+    var c=creations[i];
+    setStatut('⏳ Création '+(i+1)+' / '+creations.length+' ('+c.code+')…');
+    try{
+      var r=await fetch(W+'?action=ajouter_immo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:c.code,libelle:c.libelle,categorie:c.categorie,n_serie:c.n_serie,etat:c.etat,valeur_achat:c.valeur_achat,date_achat:c.date_achat,site:c.site})});
+      var res=await r.json();
+      if(res.success){
+        okC++;
+        im[c.code]={Libelle:c.libelle,Categorie:c.categorie};
+        immoMeta[c.code]={site:c.site,valeur_achat:Number(c.valeur_achat)||0,date_achat:c.date_achat};
+        if(c.detCode||c.etat){
+          await fetch(W+'?action=importer_affectation_immo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:c.code,code_employe:c.detCode||'DEPOT',nom_employe:c.detNom,etat:c.etat})});
+        }
+      }else koC.push(c.code+' ('+(res.message||res.error)+')');
+    }catch(e){koC.push(c.code+' (erreur réseau)');}
+  }
+  for(var j=0;j<affectations.length;j++){
+    var a=affectations[j];
+    setStatut('⏳ Affectation '+(j+1)+' / '+affectations.length+' ('+a.code+')…');
+    try{
+      var r2=await fetch(W+'?action=importer_affectation_immo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:a.code,code_employe:a.detCode,nom_employe:a.detNom,etat:a.etat})});
+      var res2=await r2.json();
+      if(res2.success)okA++;else koA.push(a.code);
+    }catch(e){koA.push(a.code);}
+  }
+  setStatut('✅ '+okC+'/'+creations.length+' immo(s) créée(s), '+okA+'/'+affectations.length+' affectation(s) enregistrée(s).'+((koC.length||koA.length)?' ⚠️ Échecs : '+koC.concat(koA).join(', '):''));
+  loadAll();
+  setTimeout(function(){var p=document.getElementById('depot-import-preview');if(p)p.innerHTML='';},3000);
+}
 
 // ══════════════ AJOUT IMMO / EMPLOYÉ ══════════════
 var addFieldStyle='width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-top:4px';
@@ -2827,6 +2988,8 @@ async function validerTransfertDash(btn,tid,cim,rec,recNom,etat){
 
 // ── Rendu — Réservations ─────────────────────────────────
 function renderResa(){
+  var addBtn=document.getElementById('resa-add-btn');
+  if(addBtn)addBtn.style.display=estGarant(ADMIN_SESSION.code)?'inline-block':'none';
   var q=(document.getElementById('resa-q')||{}).value||'';
   var sf=(document.getElementById('resa-statut')||{}).value||'';
   var fs=SITE_FILTERS.reservations||'';
@@ -2902,6 +3065,67 @@ function renderResa(){
     }).join('');
 }
 
+// ── Ajout d'une réservation depuis le dashboard, pour le compte de quelqu'un ──
+// (réseau indisponible sur le terrain, notamment Mayotte)
+function ouvrirAjoutReservation(){
+  if(!estGarant(ADMIN_SESSION.code)){alert('Réservé aux administrateurs et gestionnaires dépôt.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter une réservation';
+  document.getElementById('add-msg').textContent='';
+  var actifs=employesList.filter(function(e){return e.Actif!==false;}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+  var empOpts='<option value="">— Sélectionner —</option>'+actifs.map(function(e){return '<option value="'+e.Code+'">'+e.Code+' — '+(e.Nom||e.Code)+'</option>';}).join('');
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Pour qui ? *</label><select id="ar-employe" style="'+addFieldStyle+'">'+empOpts+'</select></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Code immobilisation *</label><div style="display:flex;gap:8px;align-items:center"><input id="ar-code" style="'+addFieldStyle+'" placeholder="Ex: IM000123"><span id="ar-code-check" style="font-size:18px"></span></div><p id="ar-code-lib" style="font-size:11px;color:var(--grey);margin-top:2px"></p></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Chantier</label><input id="ar-chantier" style="'+addFieldStyle+'" placeholder="Optionnel"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date de début *</label><input id="ar-date-debut" type="date" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date de fin *</label><input id="ar-date-fin" type="date" style="'+addFieldStyle+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Note</label><input id="ar-note" style="'+addFieldStyle+'" placeholder="Optionnel"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=enregistrerReservationAdmin;
+  var checkCode=function(){
+    var code=(document.getElementById('ar-code').value||'').trim().toUpperCase();
+    var chk=document.getElementById('ar-code-check'),lib=document.getElementById('ar-code-lib');
+    if(!code){chk.textContent='';lib.textContent='';return;}
+    if(im[code]){chk.textContent='✅';lib.textContent=getLib(code);}else{chk.textContent='❌';lib.textContent='Code introuvable dans le catalogue.';}
+  };
+  document.getElementById('ar-code').oninput=checkCode;
+}
+function reunionISODash(dateStr,heureLocale){
+  if(!dateStr)return null;
+  var p=dateStr.split('-').map(Number);
+  return new Date(Date.UTC(p[0],p[1]-1,p[2],heureLocale-4,0,0)).toISOString();
+}
+async function enregistrerReservationAdmin(){
+  var empCode=document.getElementById('ar-employe').value;
+  var codeIm=(document.getElementById('ar-code').value||'').trim().toUpperCase();
+  var debut=document.getElementById('ar-date-debut').value;
+  var fin=document.getElementById('ar-date-fin').value;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!empCode){msg.textContent='Sélectionne le bénéficiaire.';return;}
+  if(!im[codeIm]){msg.textContent='Code immobilisation invalide ou introuvable.';return;}
+  if(!debut||!fin){msg.textContent='Indique les deux dates.';return;}
+  if(new Date(fin)<new Date(debut)){msg.textContent='La date de retour doit être après le départ.';return;}
+  var conflits=reservations.filter(function(r){return r.code_im===codeIm&&r.statut!=='Annulee'&&r.statut!=='Rendue'&&!(new Date(fin)<new Date(r.date_debut)||new Date(debut)>new Date(r.date_fin));});
+  if(conflits.length&&!confirm('Cette immo est déjà réservée : '+conflits.map(function(c){return c.nom_employe+' ('+fmtD(c.date_debut)+' → '+fmtD(c.date_fin)+')';}).join(' | ')+'. Enregistrer quand même ?'))return;
+  var empSel=document.getElementById('ar-employe');
+  var nomEmp=empSel.options[empSel.selectedIndex].textContent.split(' — ')[1]||empCode;
+  var chantier=(document.getElementById('ar-chantier').value||'').trim();
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=reserver',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      code_im:codeIm,code_employe:empCode,nom_employe:nomEmp,code_chantier:chantier,nom_chantier:chantier,
+      date_debut:reunionISODash(debut,7),date_fin:reunionISODash(fin,15),note:(document.getElementById('ar-note').value||'').trim()
+    })});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Réservation enregistrée !';
+      setTimeout(function(){fermerAjout();loadReservations();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
 function majStatutResa(id,statut,sel){
   if(!statut)return;
   sel.disabled=true;
@@ -2912,6 +3136,8 @@ function majStatutResa(id,statut,sel){
 
 // ── Rendu — Documents ────────────────────────────────────
 function renderDocs(){
+  var addBtn=document.getElementById('docs-add-fds-btn');
+  if(addBtn)addBtn.style.display=estGarant(ADMIN_SESSION.code)?'inline-block':'none';
   var q=(document.getElementById('docs-q')||{}).value||'';
   var f=(document.getElementById('docs-filter')||{}).value||'';
   var fs=(document.getElementById('docs-site')||{}).value||'';
@@ -2933,8 +3159,54 @@ function renderDocs(){
       '<td style="font-size:12px">'+r.libelle+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+r.categorie+'</td>'+
       '<td><span class="badge '+(r.statut==='En circulation'?'bb':'bn')+'">'+r.statut+'</span></td>'+
-      '<td>'+(r.hasFds?'<a href="'+u+'" target="_blank" style="color:#0D47A1;font-weight:700;font-size:12px">Voir FDS</a>':'<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>')+'</td>'+
+      '<td>'+(r.hasFds?'<a href="'+u+'" target="_blank" style="color:#0D47A1;font-weight:700;font-size:12px">Voir FDS</a>':(estGarant(ADMIN_SESSION.code)?'<span onclick="ouvrirAjoutFDS(\''+r.code_im+'\')" style="color:var(--red);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">Manquante — ajouter</span>':'<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>'))+'</td>'+
       '<td>'+(r.hasPhotos?'<button onclick="ouvrirPhotosModal(\''+r.code_im+'\')" style="font-size:11px;padding:3px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>':'<span style="font-size:11px;color:#ccc">—</span>')+'</td></tr>';}).join('');
+}
+
+// ── Ajout d'une FDS (fiche de données de sécurité) ──
+function ouvrirAjoutFDS(prefillCode){
+  if(!estGarant(ADMIN_SESSION.code)){alert('Réservé aux administrateurs et gestionnaires dépôt.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter une FDS';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Code immobilisation *</label><div style="display:flex;gap:8px;align-items:center"><input id="fds-code" style="'+addFieldStyle+'" placeholder="Ex: IM000123" value="'+(prefillCode||'')+'"><span id="fds-code-check" style="font-size:18px"></span></div><p id="fds-code-lib" style="font-size:11px;color:var(--grey);margin-top:2px"></p></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Fichier (PDF ou image) *</label><input type="file" id="fds-file" accept=".pdf,image/*" style="'+addFieldStyle+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=confirmerUploadFDS;
+  var checkCode=function(){
+    var code=(document.getElementById('fds-code').value||'').trim().toUpperCase();
+    var chk=document.getElementById('fds-code-check'),lib=document.getElementById('fds-code-lib');
+    if(!code){chk.textContent='';lib.textContent='';return;}
+    if(im[code]){chk.textContent='✅';lib.textContent=getLib(code);}else{chk.textContent='❌';lib.textContent='Code introuvable dans le catalogue.';}
+  };
+  document.getElementById('fds-code').oninput=checkCode;
+  checkCode();
+}
+async function confirmerUploadFDS(){
+  var code=(document.getElementById('fds-code').value||'').trim().toUpperCase();
+  var input=document.getElementById('fds-file');
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!im[code]){msg.textContent='Code immobilisation invalide ou introuvable.';return;}
+  if(!input.files||!input.files[0]){msg.textContent='Fichier requis.';return;}
+  var file=input.files[0];
+  btn.disabled=true;btn.textContent='Envoi…';
+  var reader=new FileReader();
+  reader.onload=async function(e){
+    var ext=(file.name.split('.').pop()||'pdf').toLowerCase();
+    var fn='FDS_'+Date.now()+'.'+ext;
+    try{
+      var r=await fetch(W+'?action=upload_fds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:code,data:e.target.result,filename:fn,mime:file.type||'application/pdf'})});
+      var res=await r.json();
+      if(res.success){
+        fdsMap[code]='FDS:'+code+'/'+fn;
+        msg.style.color='var(--green)';msg.textContent='✅ FDS ajoutée !';
+        setTimeout(function(){fermerAjout();renderDocs();},1000);
+      }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+    }catch(err){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+err.message;}
+  };
+  reader.readAsDataURL(file);
 }
 
 // ── Rendu — Maintenance ──────────────────────────────────
