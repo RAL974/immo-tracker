@@ -665,6 +665,12 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - **Pagination "Au dépôt"** : boutons Précédent/Suivant ajoutés (retour terrain : recherche par date d'achat peu pratique avec la seule limite d'affichage 50/100/200/Tous).
 - Aucune nouvelle liste/colonne SharePoint nécessaire pour ces trois ajouts.
 
+## Ajout d'immo/affectation depuis "Au dépôt", réservation manuelle & ajout de FDS (août 2026)
+- **"Au dépôt"** : bouton "➕ Ajouter une immobilisation" dupliqué depuis Utilisateurs (même formulaire) + **import fichier** unique pour créer des immos en masse OU renseigner l'affectation courante d'immos déjà suivies — le code IM fait foi pour distinguer les deux cas. Anti-doublon garanti côté Worker (`ajouter_immo` fait déjà une vérification bloquante, réutilisée). Nouvelle action Worker `importer_affectation_immo` (crée un Mouvement direct, hors flux "en attente"). Aperçu de contrôle avant validation.
+- **"Réservations"** : bouton "➕ Ajouter une réservation" pour enregistrer une réservation pour le compte de quelqu'un depuis le dashboard (réseau parfois indisponible sur le terrain, notamment Mayotte) — réutilise l'action Worker `reserver` déjà existante, réservé à Admin/Logistique/Logistique_Mayotte.
+- **"Documents"** : bouton "➕ Ajouter FDS" (upload PDF/image vers `FDS_Immos/{code}/`, `FDS_URL` = repère `FDS:code/fichier`) — les FDS déjà saisies en lien de partage SharePoint continuent de fonctionner (`?fds=code` sert les deux formats).
+- Aucune nouvelle liste/colonne SharePoint nécessaire pour ces trois ajouts.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
 
