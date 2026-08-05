@@ -1,0 +1,381 @@
+[
+ {
+  "code": "ABNA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "AHAB",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "ANFL",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "ATAB",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "ATMA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "BADA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "BIFL",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "BLFA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "BOFA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "BUKE",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "CALU",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "CANI",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "CHMO",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "DACH",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "ELSA",
+  "services": [
+   "Travaux Neufs",
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "FAZI",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "FLDA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "GASE",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "GOLU",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "GRWI",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "IADA",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "ILJE",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "JADI",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "KOLO",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "LAHU",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "LAJC",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "LAJD",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "LEDI",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "LEMI",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "LEWI",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "MAMA",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "MEJO",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "MIAN",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "MKSA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "MOAS",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "MOEL",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "NAIR",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "NAJE",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "NALU",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "ORFA",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "PACH",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "PALO",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "PALU",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "PAYV",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "PIBE",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "POGU",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "REST",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "RIJB",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "ROCH",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "ROJY",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "SAAL",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "SAER",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "SAMA",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "SCST",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "SEJU",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "SIDE",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "SOBE",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "SOMO",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "TOHO",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "TUJM",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "VAAL",
+  "services": [
+   "Travaux Neufs"
+  ]
+ },
+ {
+  "code": "VILO",
+  "services": [
+   "Maintenance"
+  ]
+ },
+ {
+  "code": "VIMT",
+  "services": [
+   "Maintenance"
+  ]
+ }
+]

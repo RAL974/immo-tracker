@@ -268,6 +268,7 @@ tr:hover td{background:#FAFBFC;}
   <div class="nav-group">PERSONNEL</div>
   <div class="nav-item" data-tab="absences"><span class="nav-icon">🧑‍💼</span><span class="nav-label">Absences</span><span class="nav-badge" id="nb-absences">—</span></div>
   <div class="nav-item" data-tab="epi"><span class="nav-icon">🦺</span><span class="nav-label">EPI</span></div>
+  <div class="nav-item" data-tab="outillage"><span class="nav-icon">🧰</span><span class="nav-label">Prime d'outillage</span></div>
 
   <div class="nav-group">ANALYTICS</div>
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
@@ -471,6 +472,11 @@ tr:hover td{background:#FAFBFC;}
       <div id="epi-content"></div>
     </div>
 
+    <!-- Prime d'outillage -->
+    <div id="pane-outillage" class="tab-pane">
+      <div id="outillage-content"></div>
+    </div>
+
     <!-- Alertes -->
     <div id="pane-alertes" class="tab-pane"><div id="alertes-content"></div></div>
 
@@ -518,10 +524,12 @@ async function loadEmployes(force){
     var data=await r.json();
     if(Array.isArray(data)&&data.length){
       employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,HasPwd:!!e.has_password,itemId:e.itemId||null,
-        AffectationEPI:e.affectation_epi||'',TaillePantalon:e.taille_pantalon||'',TailleTshirt:e.taille_tshirt||'',TailleVeste:e.taille_veste||'',PointureChaussures:e.pointure_chaussures||'',TailleGants:e.taille_gants||''};});
+        AffectationEPI:e.affectation_epi||'',TaillePantalon:e.taille_pantalon||'',TailleTshirt:e.taille_tshirt||'',TailleVeste:e.taille_veste||'',PointureChaussures:e.pointure_chaussures||'',TailleGants:e.taille_gants||'',
+        ServiceOutillage:e.service_outillage||''};});
       employesByCode={};
       employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site,actif:e.Actif,itemId:e.itemId,
-        affectationEpi:e.AffectationEPI,taillePantalon:e.TaillePantalon,tailleTshirt:e.TailleTshirt,tailleVeste:e.TailleVeste,pointureChaussures:e.PointureChaussures,tailleGants:e.TailleGants};});
+        affectationEpi:e.AffectationEPI,taillePantalon:e.TaillePantalon,tailleTshirt:e.TailleTshirt,tailleVeste:e.TailleVeste,pointureChaussures:e.PointureChaussures,tailleGants:e.TailleGants,
+        serviceOutillage:e.ServiceOutillage};});
       return;
     }
   }catch(e){/* fallback ci-dessous */}
@@ -618,6 +626,18 @@ function peutGererEPI(code){
 // Peut consulter l'onglet EPI (view-only) : gestionnaires + Encadrement
 function peutVoirEPI(code){
   if(peutGererEPI(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='encadrement';
+}
+// Peut gérer la prime d'outillage (grille, distribution, réception de stock) : Admin, Logistique, Logistique_Mayotte
+function peutGererOutillage(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='logistique'||role==='logistique_mayotte';
+}
+// Peut consulter l'onglet Prime d'outillage (view-only) : gestionnaires + Encadrement
+function peutVoirOutillage(code){
+  if(peutGererOutillage(code))return true;
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='encadrement';
 }
@@ -874,6 +894,7 @@ function renderTab(name){
     case 'absences':       if(!dataLoaded.absences)loadAbsences(); else renderAbsences(); break;
     case 'inventaire-stock': if(!dataLoaded.invStock)loadInventaireStock(); else renderInventaireStock(); break;
     case 'epi':             if(!dataLoaded.epi)loadEPI(); else renderEPI(); break;
+    case 'outillage':       if(!dataLoaded.outillage)loadOutillage(); else renderOutillage(); break;
     case 'alertes':        renderAlertes(); break;
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
@@ -1772,6 +1793,394 @@ async function genererDotationIndividuelleEPI(code){
       dataLoaded.epi=false;
       chargerFicheEmploye(code,nomEmploye(code));
     }else alert('Échec : '+(res.error==='deja_generee'?'une fiche existe déjà pour cette année.':(res.error==='affectation_manquante'?'affectation EPI non renseignée.':(res.error||'inconnu'))));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// ══════════════ MODULE PRIME D'OUTILLAGE ══════════════
+var outilCatalogue=[], outilGrille=[], outilLignes=[];
+var outilVue='stock'; // 'stock' | 'grille' | 'manquant' | 'distribution'
+var OUTIL_EMPLOYE_SELECTIONNE=null;
+var OUTIL_LIGNES_SELECTIONNEES=[];
+
+async function loadOutillage(){
+  dataLoaded.outillage=true;
+  if(!peutVoirOutillage(ADMIN_SESSION.code)){renderOutillage();return;}
+  try{
+    var rc=await fetch(W+'?catalogue_outillage=1'),rg=await fetch(W+'?grille_outillage=1'),rl=await fetch(W+'?lignes_outillage=1');
+    outilCatalogue=await rc.json();outilGrille=await rg.json();outilLignes=await rl.json();
+  }catch(e){outilCatalogue=[];outilGrille=[];outilLignes=[];}
+  renderOutillage();
+}
+
+function renderOutillage(){
+  var div=document.getElementById('outillage-content');
+  if(!div)return;
+  if(!peutVoirOutillage(ADMIN_SESSION.code)){
+    div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
+    return;
+  }
+  var vues=[['stock','📦 Stock'],['grille','📐 Grille par service'],['manquant','📋 Reste à distribuer'],['distribution','🧰 Distribution par employé']];
+  var html='';
+  if(estAdmin(ADMIN_SESSION.code)&&!outilCatalogue.length){
+    html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : catalogue, grille & historique de distribution</h3></div>'+
+      '<div style="padding:14px"><p style="font-size:12px;color:var(--grey);margin-bottom:10px">Importe le catalogue d\'outils, la grille de kit par service et l\'historique des distributions déjà faites. À faire une seule fois.</p>'+
+      '<button onclick="importerDonneesOutillage()" style="padding:8px 16px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Importer maintenant</button>'+
+      '<div id="outil-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
+  }
+  html+='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
+    vues.map(function(v){return '<button onclick="changerVueOutillage(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(outilVue===v[0]?'var(--blue)':'#eee')+';color:'+(outilVue===v[0]?'#fff':'#444')+'">'+v[1]+'</button>';}).join('')+
+    '</div><div id="outillage-vue-content"></div>';
+  div.innerHTML=html;
+  renderOutillageVue();
+}
+function changerVueOutillage(v){outilVue=v;renderOutillage();}
+function renderOutillageVue(){
+  var c=document.getElementById('outillage-vue-content');
+  if(!c)return;
+  if(outilVue==='stock')renderOutilStock(c);
+  else if(outilVue==='grille')renderOutilGrille(c);
+  else if(outilVue==='manquant')renderOutilManquant(c);
+  else if(outilVue==='distribution')renderOutilDistribution(c);
+}
+
+async function importerDonneesOutillage(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('Importer les données prime d\'outillage initiales (catalogue, grille, historique de distribution) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  var statutEl=document.getElementById('outil-migration-statut');
+  var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
+  await loadEmployes();
+  setStatut('⏳ Chargement du catalogue…');
+  var catalogue;
+  try{var r=await fetch('outillage_catalogue.json?t='+Date.now());catalogue=await r.json();}catch(e){setStatut('❌ Impossible de charger outillage_catalogue.json : '+e.message);return;}
+  var ok1=0,ko1=0;
+  for(var i=0;i<catalogue.length;i+=20){
+    setStatut('⏳ Catalogue '+Math.min(i+20,catalogue.length)+' / '+catalogue.length+'…');
+    try{var rc=await fetch(W+'?action=bulk_import_catalogue_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:catalogue.slice(i,i+20)})});var resc=await rc.json();ok1+=resc.ok||0;ko1+=resc.ko||0;}catch(e){ko1+=20;}
+  }
+  setStatut('⏳ Chargement de la grille…');
+  var grille;
+  try{var r2=await fetch('outillage_grille.json?t='+Date.now());grille=await r2.json();}catch(e){setStatut('❌ Impossible de charger outillage_grille.json : '+e.message);return;}
+  var ok2=0,ko2=0;
+  for(var j=0;j<grille.length;j+=20){
+    setStatut('⏳ Grille '+Math.min(j+20,grille.length)+' / '+grille.length+'…');
+    try{var rg=await fetch(W+'?action=bulk_import_grille_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:grille.slice(j,j+20)})});var resg=await rg.json();ok2+=resg.ok||0;ko2+=resg.ko||0;}catch(e){ko2+=20;}
+  }
+  setStatut('⏳ Chargement des services employés…');
+  var services;
+  try{var r3=await fetch('outillage_services.json?t='+Date.now());services=await r3.json();}catch(e){setStatut('❌ Impossible de charger outillage_services.json : '+e.message);return;}
+  var ok3=0,ko3=0,orphelins3=[];
+  for(var k=0;k<services.length;k++){
+    var s=services[k];
+    var emp=employesByCode[s.code];
+    if(!emp||!emp.itemId){orphelins3.push(s.code);continue;}
+    try{
+      var rs=await fetch(W+'?action=maj_service_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:emp.itemId,service_outillage:s.services[0]})});
+      var ress=await rs.json();
+      if(ress.success)ok3++;else ko3++;
+    }catch(e){ko3++;}
+  }
+  setStatut('⏳ Chargement de l\'historique de distribution…');
+  var lignes;
+  try{var r4=await fetch('outillage_lignes.json?t='+Date.now());lignes=await r4.json();}catch(e){setStatut('❌ Impossible de charger outillage_lignes.json : '+e.message);return;}
+  var ok4=0,ko4=0;
+  for(var l=0;l<lignes.length;l+=20){
+    setStatut('⏳ Historique '+Math.min(l+20,lignes.length)+' / '+lignes.length+'…');
+    try{var rl=await fetch(W+'?action=bulk_import_lignes_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:lignes.slice(l,l+20)})});var resl=await rl.json();ok4+=resl.ok||0;ko4+=resl.ko||0;}catch(e){ko4+=20;}
+  }
+  setStatut('✅ Import terminé : '+ok1+' article(s) catalogue, '+ok2+' ligne(s) grille, '+ok3+' service(s) employé, '+ok4+' ligne(s) d\'historique.'+((ko1+ko2+ko3+ko4)?' ⚠️ '+(ko1+ko2+ko3+ko4)+' échec(s).':'')+(orphelins3.length?' Codes non retrouvés : '+orphelins3.join(', ')+'.':''));
+  dataLoaded.outillage=false;
+  await loadOutillage();
+}
+
+// ── Vue Stock ──
+function renderOutilStock(container){
+  container.innerHTML='<div class="card"><div class="card-head"><h3>📦 Stock outillage</h3>'+
+    '<button onclick="exporterStockOutillage()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div>'+
+    '<div style="padding:10px 14px"><input type="text" id="outil-stock-q" oninput="refreshOutilStockResults()" placeholder="🔍 Filtrer par désignation, référence, marque..." style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px"></div>'+
+    '<div id="outil-stock-results"></div></div>';
+  refreshOutilStockResults();
+}
+function refreshOutilStockResults(){
+  var res=document.getElementById('outil-stock-results');
+  if(!res)return;
+  var q=((document.getElementById('outil-stock-q')||{}).value||'').trim().toUpperCase();
+  var rows=outilCatalogue.filter(function(a){
+    if(!q)return true;
+    return (a.type_article||'').toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.marque||'').toUpperCase().includes(q);
+  }).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'');});
+  if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun article'+(q?' pour ce filtre':'')+'.</p>';return;}
+  var canEdit=peutGererOutillage(ADMIN_SESSION.code);
+  var valeurTotale=outilCatalogue.reduce(function(s,a){return s+(a.stock_actuel*a.prix_unitaire);},0);
+  var html='<div style="padding:0 14px 8px;font-size:12px;color:var(--grey)">Valeur totale du stock : <strong style="color:var(--blue)">'+valeurTotale.toFixed(2)+' €</strong></div>';
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Référence</th><th>Marque</th><th>Prix unitaire</th><th>Stock actuel</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
+  rows.forEach(function(a){
+    var stockColor=a.stock_actuel<=0?'var(--red)':(a.stock_actuel<3?'var(--orange)':'var(--green)');
+    html+='<tr><td>'+a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.marque||'—')+'</td><td>'+a.prix_unitaire.toFixed(2)+' €</td>'+
+      '<td style="font-weight:700;color:'+stockColor+'">'+a.stock_actuel+'</td>'+
+      (canEdit?'<td><button onclick="receptionCommandeOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button></td>':'')+
+    '</tr>';
+  });
+  html+='</tbody></table></div>';
+  res.innerHTML=html;
+}
+async function receptionCommandeOutillage(catId,label){
+  var qte=prompt('Quantité reçue pour "'+label+'" :');
+  if(qte==null)return;
+  var n=parseFloat((qte||'').replace(',','.'));
+  if(!n||n<=0){alert('Quantité invalide.');return;}
+  try{
+    var r=await fetch(W+'?action=reception_commande_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:catId,quantite:n})});
+    var res=await r.json();
+    if(res.success){
+      var art=outilCatalogue.find(function(a){return a.id===catId;});
+      if(art)art.stock_actuel=res.nouveau_stock;
+      refreshOutilStockResults();
+    }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+function exporterStockOutillage(){
+  var entetes=['Désignation','Référence','Distributeur','Marque','Prix unitaire','Stock actuel','Valeur stock'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  outilCatalogue.forEach(function(a){lignesCsv.push([a.type_article,a.reference,a.distributeur,a.marque,nbFr(a.prix_unitaire),nbFr(a.stock_actuel),nbFr(a.stock_actuel*a.prix_unitaire)].map(csvCell).join(';'));});
+  var csv='\uFEFF'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Stock_Outillage.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
+}
+
+// ── Vue Grille par service ──
+function renderOutilGrille(container){
+  var services=[['Travaux Neufs','Travaux Neufs'],['Maintenance','Maintenance']];
+  var types=[];
+  outilGrille.forEach(function(g){if(types.indexOf(g.type_article)===-1)types.push(g.type_article);});
+  types.sort();
+  var byKey={};outilGrille.forEach(function(g){byKey[g.service+'|'+g.type_article]=g;});
+  var canEdit=peutGererOutillage(ADMIN_SESSION.code);
+  var html='<div class="card"><div class="card-head"><h3>📐 Grille par service</h3></div>'+
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Kit standard remis par service.'+(canEdit?' Cliquez sur une valeur pour la modifier.':'')+'</p>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Outil</th>'+services.map(function(s){return '<th>'+s[1]+'</th>';}).join('')+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
+  types.forEach(function(t){
+    html+='<tr><td style="font-weight:700">'+t+'</td>';
+    services.forEach(function(s){
+      var g=byKey[s[0]+'|'+t];
+      var qte=g?g.quantite:0;
+      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleOutillage(\''+s[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:6px;text-align:center"></td>';
+      else html+='<td style="text-align:center">'+qte+'</td>';
+    });
+    if(canEdit)html+='<td><button onclick="supprimerTypeGrilleOutillage(\''+t.replace(/'/g,"\\'")+'\')" title="Retirer ce type d\'article de la grille" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button></td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  container.innerHTML=html;
+}
+async function majGrilleOutillage(service,typeArticle,valeur){
+  var q=parseFloat(valeur);
+  if(isNaN(q)||q<0){alert('Quantité invalide.');renderOutillageVue();return;}
+  try{
+    var r=await fetch(W+'?action=maj_grille_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:service,type_article:typeArticle,quantite:q})});
+    var res=await r.json();
+    if(res.success){
+      var g=outilGrille.find(function(x){return x.service===service&&x.type_article===typeArticle;});
+      if(g)g.quantite=q;else outilGrille.push({id:res.id,service:service,type_article:typeArticle,quantite:q});
+    }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+async function supprimerTypeGrilleOutillage(typeArticle){
+  if(!confirm('Retirer "'+typeArticle+'" de la grille pour les 2 services ?'))return;
+  var lignes=outilGrille.filter(function(g){return g.type_article===typeArticle;});
+  for(var i=0;i<lignes.length;i++){
+    try{await fetch(W+'?action=supprimer_grille_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:lignes[i].id})});}catch(e){}
+  }
+  dataLoaded.outillage=false;
+  await loadOutillage();
+}
+
+// ── Vue "Ce qui reste à distribuer" ──
+function calculerManquantsOutillage(){
+  var employesParService={};
+  employesList.forEach(function(e){
+    if(!e.ServiceOutillage)return;
+    employesParService[e.ServiceOutillage]=employesParService[e.ServiceOutillage]||[];
+    employesParService[e.ServiceOutillage].push(e.Code);
+  });
+  var recuSet={};
+  outilLignes.forEach(function(l){recuSet[l.code+'|'+l.type_article]=true;});
+  var manquants=[];
+  outilGrille.forEach(function(g){
+    var emps=employesParService[g.service]||[];
+    var manqCodes=emps.filter(function(c){return !recuSet[c+'|'+g.type_article];});
+    if(manqCodes.length)manquants.push({type_article:g.type_article,service:g.service,employes:manqCodes});
+  });
+  return manquants;
+}
+function renderOutilManquant(container){
+  var manquants=calculerManquantsOutillage();
+  var parArticle={};
+  manquants.forEach(function(m){
+    parArticle[m.type_article]=parArticle[m.type_article]||{total:0,detail:[]};
+    parArticle[m.type_article].total+=m.employes.length;
+    m.employes.forEach(function(c){parArticle[m.type_article].detail.push({code:c,service:m.service});});
+  });
+  var articles=Object.keys(parArticle).sort();
+  var html='<div class="card"><div class="card-head"><h3>📋 Ce qui reste à distribuer</h3></div>';
+  if(!articles.length){container.innerHTML=html+'<p class="es" style="padding:16px">Tout est distribué ! 🎉</p></div>';return;}
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Outil</th><th>Manquant</th><th>Détail</th></tr></thead><tbody>';
+  articles.forEach(function(a){
+    var info=parArticle[a];
+    var detailId='outil-detail-'+a.replace(/[^a-zA-Z0-9]/g,'_');
+    html+='<tr><td>'+a+'</td><td style="font-weight:700;color:var(--red)">'+info.total+'</td>'+
+      '<td><a href="javascript:void(0)" onclick="var el=document.getElementById(\''+detailId+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="color:var(--blue)">Voir</a>'+
+      '<div id="'+detailId+'" style="display:none;font-size:11px;color:var(--grey);margin-top:4px">'+info.detail.map(function(d){return nomEmploye(d.code)+' ('+d.code+', '+d.service+')';}).join(', ')+'</div></td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  container.innerHTML=html;
+}
+
+// ── Vue Distribution par employé ──
+function renderOutilDistribution(container){
+  var eligibles=employesList.filter(function(e){return e.ServiceOutillage;}).sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+  var html='<div class="card"><div class="card-head"><h3>🧰 Distribution par employé</h3></div>'+
+    '<div style="padding:10px 14px"><select id="outil-emp-sel" onchange="changerEmployeOutillage(this.value)" style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px">'+
+    '<option value="">-- Sélectionner un employé --</option>'+
+    eligibles.map(function(e){return '<option value="'+e.Code+'"'+(OUTIL_EMPLOYE_SELECTIONNE===e.Code?' selected':'')+'>'+e.Nom+' ('+e.Code+') — '+e.ServiceOutillage+'</option>';}).join('')+
+    '</select></div><div id="outil-emp-detail"></div></div>';
+  container.innerHTML=html;
+  if(OUTIL_EMPLOYE_SELECTIONNE)renderOutilEmployeDetail();
+}
+function changerEmployeOutillage(code){OUTIL_EMPLOYE_SELECTIONNE=code||null;OUTIL_LIGNES_SELECTIONNEES=[];renderOutilEmployeDetail();}
+function renderOutilEmployeDetail(){
+  var div=document.getElementById('outil-emp-detail');
+  if(!div)return;
+  if(!OUTIL_EMPLOYE_SELECTIONNE){div.innerHTML='';return;}
+  var emp=employesList.find(function(e){return e.Code===OUTIL_EMPLOYE_SELECTIONNE;});
+  if(!emp){div.innerHTML='';return;}
+  var kit=outilGrille.filter(function(g){return g.service===emp.ServiceOutillage;});
+  var recus=outilLignes.filter(function(l){return l.code===OUTIL_EMPLOYE_SELECTIONNE;}).map(function(l){return l.type_article;});
+  var manquants=kit.filter(function(g){return recus.indexOf(g.type_article)===-1;});
+  var canEdit=peutGererOutillage(ADMIN_SESSION.code);
+  var html='<div style="margin-top:10px"><span style="font-size:13px;font-weight:700;color:var(--blue)">'+recus.length+' / '+kit.length+' outils reçus</span></div>';
+  if(!manquants.length){
+    html+='<p style="color:var(--green);font-size:13px;margin-top:8px">✅ Kit complet.</p>';
+  }else{
+    html+='<div style="margin-top:10px"><span style="font-size:12px;color:var(--grey);font-weight:700">Manquants — cocher ce qui est distribué maintenant :</span>'+
+      manquants.map(function(g){return '<div style="padding:3px 0"><label style="font-size:13px"><input type="checkbox" onchange="toggleLigneOutillage(\''+g.type_article.replace(/'/g,"\\'")+'\',this.checked)"> '+g.type_article+'</label></div>';}).join('')+
+      '</div>';
+    if(canEdit)html+='<button onclick="ouvrirDistributionOutillage()" style="margin-top:10px;padding:8px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">🧰 Distribuer la sélection</button>';
+  }
+  html+='<div style="margin-top:16px"><span style="font-size:12px;color:var(--grey);font-weight:700">Déjà reçus ('+recus.length+') :</span>'+
+    (recus.length?'<div style="font-size:12px;color:var(--grey);margin-top:4px">'+recus.join(', ')+'</div>':'<p style="font-size:12px;color:var(--grey)">Aucun.</p>')+'</div>';
+  div.innerHTML=html;
+}
+function toggleLigneOutillage(typeArticle,checked){
+  if(checked){if(OUTIL_LIGNES_SELECTIONNEES.indexOf(typeArticle)===-1)OUTIL_LIGNES_SELECTIONNEES.push(typeArticle);}
+  else{OUTIL_LIGNES_SELECTIONNEES=OUTIL_LIGNES_SELECTIONNEES.filter(function(t){return t!==typeArticle;});}
+}
+
+// Fiche imprimable — gabarit repris de voirFicheEPI, sans colonne Taille
+function voirFicheOutillage(code,typesArticles){
+  var emp=employesList.find(function(e){return e.Code===code;})||{};
+  var lignes=typesArticles.map(function(t){
+    var art=outilCatalogue.find(function(a){return a.type_article===t;})||{};
+    return {reference:art.reference||'',designation:t,quantite:1};
+  });
+  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.png';
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>Prime outillage - '+code+'</title>'+
+    '<style>'+
+    '@page{margin:16mm}'+
+    'body{font-family:"Segoe UI",Arial,sans-serif;color:#222;margin:0;padding:24px 32px}'+
+    '.letterhead{display:flex;align-items:center;gap:18px;border-bottom:4px solid #F2A93C;padding-bottom:14px;margin-bottom:22px}'+
+    '.letterhead img{height:64px;width:auto}'+
+    '.letterhead .coord{font-size:11.5px;color:#555;line-height:1.5}'+
+    '.letterhead .coord b{color:#1A3A6B;font-size:15px;display:block;margin-bottom:2px}'+
+    '.titre-fiche{text-align:center;background:#1A3A6B;color:#fff;padding:10px 16px;border-radius:8px;font-size:18px;font-weight:700;letter-spacing:.5px;margin-bottom:22px}'+
+    '.dest-box{background:#F4F6FA;border:1px solid #DCE2EC;border-radius:10px;padding:14px 18px;margin-bottom:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}'+
+    '.dest-box div span{display:block;font-size:10.5px;color:#7A828E;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}'+
+    '.dest-box div b{font-size:14px;color:#1A3A6B}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:34px}'+
+    'th{background:#1A3A6B;color:#fff;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;padding:9px 10px;text-align:left}'+
+    'td{border-bottom:1px solid #E4E7EC;padding:9px 10px;font-size:13px}'+
+    'tbody tr:nth-child(even){background:#F7F9FC}'+
+    '.sign-row{display:flex;justify-content:space-between;gap:24px;margin-top:10px}'+
+    '.sign-box{flex:1;border:1px solid #DCE2EC;border-radius:8px;min-height:70px;padding:8px 10px;font-size:11px;color:#7A828E;text-transform:uppercase;letter-spacing:.3px}'+
+    '.print-btn{padding:10px 18px;background:#1A3A6B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;margin-bottom:20px;font-size:14px}'+
+    '@media print{.print-btn{display:none}body{padding:0}}'+
+    '</style></head><body>'+
+    '<button class="print-btn" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>'+
+    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Espace Soleil"><div class="coord"><b>Espace Soleil</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
+    '<div class="titre-fiche">PRIME D\'OUTILLAGE</div>'+
+    '<div class="dest-box">'+
+      '<div><span>Code</span><b>'+code+'</b></div>'+
+      '<div><span>Destinataire</span><b>'+(emp.Nom||code)+'</b></div>'+
+      '<div><span>Service</span><b>'+(emp.ServiceOutillage||'—')+'</b></div>'+
+    '</div>'+
+    '<table><thead><tr><th>Référence</th><th>Désignation</th><th>Quantité</th></tr></thead><tbody>'+
+    lignes.map(function(l){return '<tr><td>'+(l.reference||'—')+'</td><td>'+l.designation+'</td><td>'+l.quantite+'</td></tr>';}).join('')+
+    '</tbody></table>'+
+    '<div class="sign-row"><div class="sign-box">Date</div><div class="sign-box">Nom</div><div class="sign-box">Signature</div></div>'+
+    '</body></html>';
+  var w=window.open('','_blank');
+  if(!w){alert('Le navigateur a bloqué l\'ouverture de la fenêtre. Autorisez les pop-ups pour ce site.');return;}
+  w.document.write(html);
+  w.document.close();
+}
+
+function ouvrirDistributionOutillage(){
+  if(!OUTIL_LIGNES_SELECTIONNEES.length){alert('Sélectionnez au moins un article.');return;}
+  voirFicheOutillage(OUTIL_EMPLOYE_SELECTIONNE,OUTIL_LIGNES_SELECTIONNEES.slice());
+  document.getElementById('add-titre').textContent='✍️ Enregistrer la distribution';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<p style="font-size:12px;color:var(--grey);margin-bottom:8px">'+OUTIL_LIGNES_SELECTIONNEES.length+' article(s) sélectionné(s). Imprimez/faites signer la fiche (ouverte dans un nouvel onglet), puis joignez la photo de la fiche signée ici.</p>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Photo / scan de la fiche signée *</label><input type="file" id="outil-emarge-file" accept="image/*" style="'+addFieldStyle+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=confirmerDistributionOutillage;
+}
+async function confirmerDistributionOutillage(){
+  var input=document.getElementById('outil-emarge-file');
+  var msg=document.getElementById('add-msg');
+  var btn=document.getElementById('add-confirm-btn');
+  if(!input.files||!input.files[0]){msg.style.color='var(--red)';msg.textContent='Photo requise.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=async function(){
+      var canvas=document.createElement('canvas');
+      var ratio=Math.min(1200/img.width,1200/img.height,1);
+      canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      var b64=canvas.toDataURL('image/jpeg',0.75);
+      var now=new Date();
+      var fn=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+now.getHours()+now.getMinutes()+now.getSeconds()+'.jpg';
+      try{
+        await fetch(W+'?action=upload_fiche_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:OUTIL_EMPLOYE_SELECTIONNE,data:b64,filename:fn})});
+        var lignes=OUTIL_LIGNES_SELECTIONNEES.map(function(t){return {type_article:t};});
+        var r=await fetch(W+'?action=distribuer_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:OUTIL_EMPLOYE_SELECTIONNE,lignes:lignes,par_code:ADMIN_SESSION.code,filename:fn})});
+        var res=await r.json();
+        if(res.success){
+          msg.style.color='var(--green)';msg.textContent='✅ Distribution enregistrée.';
+          var codeFait=OUTIL_EMPLOYE_SELECTIONNE;
+          setTimeout(function(){fermerAjout();OUTIL_LIGNES_SELECTIONNEES=[];OUTIL_EMPLOYE_SELECTIONNE=codeFait;dataLoaded.outillage=false;loadOutillage().then(function(){outilVue='distribution';renderOutillage();});},1000);
+        }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
+      }catch(e2){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Erreur réseau : '+e2.message;}
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+async function sauvegarderServiceOutillage(code){
+  var service=document.getElementById('outil-emp-service').value;
+  try{
+    var r=await fetch(W+'?action=maj_service_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,item_id:(employesByCode[code]&&employesByCode[code].itemId)||null,service_outillage:service})});
+    var res=await r.json();
+    if(res.success){
+      if(employesByCode[code])employesByCode[code].serviceOutillage=service;
+      var el=employesList.find(function(e){return e.Code===code;});
+      if(el)el.ServiceOutillage=service;
+      chargerFicheEmploye(code,nomEmploye(code));
+    }else alert('Échec : '+(res.error||'inconnu'));
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
 
@@ -3440,6 +3849,32 @@ async function chargerFicheEmploye(code,nom){
             }).join('')+'</div>';
         }
       }catch(e){}
+    }
+    html+='</div></div>';
+    // ── Bloc Prime d'outillage ──
+    var empOutil=employesByCode[code]||{};
+    var canEditOutil=peutGererOutillage(ADMIN_SESSION.code);
+    html+='<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>🧰 Prime d\'outillage</h3></div><div style="padding:12px 14px">';
+    if(canEditOutil){
+      html+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'+
+        '<label style="font-size:11px;color:var(--grey)">Service</label>'+
+        '<select id="outil-emp-service" style="padding:6px;border:1px solid #ddd;border-radius:6px">'+
+        ['','Travaux Neufs','Maintenance'].map(function(s){return '<option value="'+s+'"'+(s===empOutil.serviceOutillage?' selected':'')+'>'+(s||'— Non concerné —')+'</option>';}).join('')+
+        '</select>'+
+        '<button onclick="sauvegarderServiceOutillage(\''+code+'\')" style="padding:6px 12px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Enregistrer</button>'+
+        '</div>';
+    }
+    if(peutVoirOutillage(ADMIN_SESSION.code)&&empOutil.serviceOutillage){
+      try{
+        if(!outilGrille.length){var rgOutil=await fetch(W+'?grille_outillage=1');outilGrille=await rgOutil.json();}
+        var rlOutil=await fetch(W+'?lignes_outillage=1&code='+encodeURIComponent(code));
+        var lignesOutil=await rlOutil.json();
+        var kitOutil=outilGrille.filter(function(g){return g.service===empOutil.serviceOutillage;});
+        html+='<p style="font-size:13px"><strong style="color:var(--blue)">'+lignesOutil.length+' / '+kitOutil.length+'</strong> outils reçus'+
+          (kitOutil.length>lignesOutil.length?' — <a href="javascript:void(0)" onclick="fermerFiche();goTab(\'outillage\');changerVueOutillage(\'distribution\');changerEmployeOutillage(\''+code+'\')" style="color:var(--orange)">compléter</a>':'')+'</p>';
+      }catch(e){}
+    }else if(!empOutil.serviceOutillage){
+      html+='<p style="font-size:12px;color:var(--grey)">Non concerné par la prime d\'outillage.</p>';
     }
     html+='</div></div>';
     html+='<div class="fiche-stat-row">';

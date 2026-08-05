@@ -1,0 +1,332 @@
+[
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Jeu de clés allen 1,5 / 2 / 2,5 / 3 / 4 / 5 / 6",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Pince universelle 180mm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Pince multiprise 250mm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Pince pour colliers de fixation",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Cisaille à tole 250mm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Marteau menuisier 25mm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Massette 1500g",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Pointerolle 350mm avec pare-coups",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Burin 350mm  avec pare-coups",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Couteau d'électricien",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Vérificateur d'absence de tension",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Multimètre 600V",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Tire-fil Nylon 20m",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Mètre 8mx25mm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Niveau à bulle 40cm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Equerre menuiser inox 20cm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Cutter",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Pistolet à cartouche",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Caisse à outil 54,5 x 27 x 27",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Scie à métaux 300mm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Jeu de 2 lames pour scie à métaux",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Couteau de paquiste 150mm",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Cordex",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Poudre Cordex 1L",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Dénude-câbles isolé",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Auge caoutchouc",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Taloche 18x27",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20",
+  "quantite": 1
+ },
+ {
+  "service": "Travaux Neufs",
+  "type_article": "Truelle ronde",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Jeu de clés allen 1,5 / 2 / 2,5 / 3 / 4 / 5 / 6",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pince universelle 180mm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pince multiprise 250mm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pince pour colliers de fixation",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Cisaille à tole 250mm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Marteau menuisier 25mm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Massette 1500g",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pointerolle 350mm avec pare-coups",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Burin 350mm  avec pare-coups",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Ciseau à bois 16 à 20",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Couteau d'électricien",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Vérificateur d'absence de tension",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pince ampermétrique 600V",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Tire-fil Nylon 20m",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Mètre 8mx25mm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Niveau à bulle 40cm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Equerre menuiser inox 20cm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Cutter",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pistolet à cartouche",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Caisse à outil 54,5 x 27 x 27",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Pince coupante à onglet",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Scie à métaux 300mm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Jeu de 2 lames pour scie à métaux",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Couteau de paquiste 150mm",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Cordex",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Poudre Cordex 1L",
+  "quantite": 1
+ },
+ {
+  "service": "Maintenance",
+  "type_article": "Dénude-câbles isolé",
+  "quantite": 1
+ }
+]

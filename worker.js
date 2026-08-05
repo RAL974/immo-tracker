@@ -202,6 +202,13 @@ async function handleRequest(request) {
     return new Response(await r.arrayBuffer(), { status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=3600' } });
   }
 
+  // ── Fiche Prime d'outillage émargée (photo/scan) proxy ────────────────────────
+  if (p.get('fiche_outillage')) {
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Fiches_Outillage/' + p.get('fiche_outillage') + ':/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+    if (!r.ok) return new Response('Fiche non trouvee', { status: 404, headers: cors });
+    return new Response(await r.arrayBuffer(), { status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=3600' } });
+  }
+
   // ── Photos liste ─────────────────────────────────────────────────────────────
   if (p.get('photos')) {
     const code = p.get('photos');
@@ -311,6 +318,34 @@ async function handleRequest(request) {
     }));
   }
 
+  // ── Module Prime d'outillage : catalogue, grille, lignes de distribution ────
+  if (p.get('catalogue_outillage') === '1') {
+    const items = await paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, type_article: f.Title || '', reference: f.Reference || '', distributeur: f.Distributeur || '', marque: f.Marque || '', prix_unitaire: f.Prix_Unitaire != null ? f.Prix_Unitaire : 0, stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0 };
+    }));
+  }
+
+  if (p.get('grille_outillage') === '1') {
+    const items = await paginate(GL + '/Grille_Outillage/items?$expand=fields&$top=200', 5);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, service: f.Title || '', type_article: f.Type_Article || '', quantite: f.Quantite || 0 };
+    }));
+  }
+
+  if (p.get('lignes_outillage') === '1') {
+    const items = await paginate(GL + '/Lignes_Outillage/items?$expand=fields&$top=5000', 15);
+    let mapped = items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, code: f.Title || '', type_article: f.Type_Article || '', date_remise: f.Date_Remise || '', emarge_par: f.Emarge_Par || '', photo_fiche: f.Photo_Fiche || '', lot_distribution: f.Lot_Distribution || '' };
+    });
+    const codeF = p.get('code');
+    if (codeF) mapped = mapped.filter(l => l.code === codeF);
+    return json(mapped);
+  }
+
   // ── Réservations par employé ──────────────────────────────────────────────────
   if (p.get('mes_reservations')) {
     const code = p.get('mes_reservations');
@@ -353,6 +388,8 @@ async function handleRequest(request) {
         taille_veste: f.Taille_Veste || '',
         pointure_chaussures: f.Pointure_Chaussures || '',
         taille_gants: f.Taille_Gants || '',
+        // Module Prime d'outillage : service concerné ('Travaux Neufs'/'Maintenance'), indépendant de l'affectation EPI
+        service_outillage: f.Service_Outillage || '',
         itemId: i.id // nécessaire pour les mises à jour PATCH
       };
     });
@@ -1362,6 +1399,169 @@ async function handleRequest(request) {
         const aSupprimer = lignesItems.filter(i => (i.fields || {}).Title === String(dotId));
         for (const l of aSupprimer) { try { await fetch(GL + '/Lignes_Dotation_EPI/items/' + l.id, { method: 'DELETE', headers: H }); } catch (e) {} }
         const r = await fetch(GL + '/Dotations_EPI/items/' + dotId, { method: 'DELETE', headers: H });
+        return json({ success: r.ok || r.status === 204 });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Module Prime d'outillage : distribution ponctuelle & stock ──────────────
+
+    // Assigne le service outillage d'un employé (Travaux Neufs / Maintenance / vide) — indépendant de l'affectation EPI
+    if (action === 'maj_service_outillage') {
+      let itemId = body.item_id;
+      if (!itemId) {
+        const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + (body.code || '').replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+      }
+      if (!itemId) return json({ success: false, error: 'employe_introuvable', code: body.code });
+      try {
+        const r = await fetch(GL + '/Employes/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Service_Outillage: body.service_outillage || '' }) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial du catalogue (par lots de 20)
+    if (action === 'bulk_import_catalogue_outillage') {
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Catalogue_Outillage/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: {
+          Title: x.type_article || '', Reference: String(x.reference || ''), Distributeur: x.distributeur || '',
+          Marque: x.marque || '', Prix_Unitaire: x.prix_unitaire || 0, Stock_Actuel: x.stock_actuel || 0
+        } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial de la grille (par lots de 20)
+    if (action === 'bulk_import_grille_outillage') {
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Grille_Outillage/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: { Title: x.service || '', Type_Article: x.type_article || '', Quantite: x.quantite || 0 } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial des lignes de distribution historiques (par lots de 20)
+    if (action === 'bulk_import_lignes_outillage') {
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Lignes_Outillage/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: {
+          Title: x.code || '', Type_Article: x.type_article || '', Date_Remise: x.date_remise || null,
+          Emarge_Par: x.emarge_par || '', Photo_Fiche: x.photo_fiche || '', Lot_Distribution: x.lot_distribution || 'MIGRATION'
+        } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Upsert d'une ligne de la grille (édition depuis le dashboard, Admin/Logistique)
+    if (action === 'maj_grille_outillage') {
+      const service = (body.service || '').trim();
+      const typeArticle = (body.type_article || '').trim();
+      const quantite = parseFloat(body.quantite);
+      if (!service || !typeArticle || isNaN(quantite)) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const cur = await fetch(GL + "/Grille_Outillage/items?$expand=fields&$filter=fields/Title eq '" + service.replace(/'/g, "''") + "' and fields/Type_Article eq '" + typeArticle.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        const itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+        if (itemId) {
+          const r = await fetch(GL + '/Grille_Outillage/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Quantite: quantite }) });
+          return json({ success: r.ok, id: itemId });
+        }
+        const r = await fetch(GL + '/Grille_Outillage/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: service, Type_Article: typeArticle, Quantite: quantite } }) });
+        const rd = await r.json();
+        return json({ success: r.ok, id: rd.id });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Supprime une ligne de la grille (type d'article retiré du kit standard)
+    if (action === 'supprimer_grille_outillage') {
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const r = await fetch(GL + '/Grille_Outillage/items/' + id, { method: 'DELETE', headers: H });
+      return json({ success: r.ok || r.status === 204 });
+    }
+
+    // Réception d'une commande fournisseur : incrémente le stock d'un article
+    if (action === 'reception_commande_outillage') {
+      const catId = body.id;
+      const qte = parseFloat(body.quantite);
+      if (!catId || !qte || qte <= 0) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const cur = await fetch(GL + '/Catalogue_Outillage/items/' + catId + '?$expand=fields', { headers: H });
+        const curData = await cur.json();
+        const stockActuel = parseFloat((curData.fields || {}).Stock_Actuel) || 0;
+        const nouveauStock = stockActuel + qte;
+        const r = await fetch(GL + '/Catalogue_Outillage/items/' + catId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Stock_Actuel: nouveauStock }) });
+        return json({ success: r.ok, nouveau_stock: nouveauStock });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Distribue un ou plusieurs articles à un employé en une seule action (photo de la preuve signée déjà
+    // uploadée via upload_fiche_outillage) : crée les lignes de distribution et décrémente le stock. Pas
+    // d'étape "générée en attente" intermédiaire comme les EPI — la distribution est actée directement.
+    if (action === 'distribuer_outillage') {
+      const code = (body.code || '').trim().toUpperCase();
+      const lignes = body.lignes || []; // [{type_article}]
+      if (!code || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const catItems = await paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5);
+        const catByType = {};
+        catItems.forEach(i => { const cf = i.fields || {}; catByType[cf.Title || ''] = { id: i.id, stock: parseFloat(cf.Stock_Actuel) || 0 }; });
+        const decrParType = {};
+        lignes.forEach(l => { decrParType[l.type_article] = (decrParType[l.type_article] || 0) + 1; });
+        const stockRequests = Object.keys(decrParType).map((type, idx) => {
+          const cat = catByType[type];
+          if (!cat) return null;
+          return { id: String(idx), method: 'PATCH', url: "/sites/" + SITE_ID + "/lists/Catalogue_Outillage/items/" + cat.id + "/fields", headers: { 'Content-Type': 'application/json' }, body: { Stock_Actuel: cat.stock - decrParType[type] } };
+        }).filter(Boolean);
+        if (stockRequests.length) await graphBatch(stockRequests);
+        const lot = body.lot || ('LOT-' + Date.now());
+        const horodatage = new Date().toISOString();
+        const ligneRequests = lignes.slice(0, 20).map((l, idx) => ({
+          id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Lignes_Outillage/items",
+          headers: { 'Content-Type': 'application/json' }, body: { fields: {
+            Title: code, Type_Article: l.type_article, Date_Remise: horodatage, Emarge_Par: body.par_code || '',
+            Photo_Fiche: body.filename || '', Lot_Distribution: lot
+          } }
+        }));
+        const res = await graphBatch(ligneRequests);
+        return json({ success: res.success, ok: res.ok, ko: res.ko, lot: lot });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Upload de la photo/scan de la fiche de remise signée (même pattern que upload_fiche_epi)
+    if (action === 'upload_fiche_outillage') {
+      try {
+        const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Fiches_Outillage/' + encodeURIComponent(body.code) + '/' + encodeURIComponent(body.filename || (Date.now() + '.jpg')) + ':/content', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'image/jpeg' }, body: bytes.buffer });
+        return json({ success: r.ok, url: r.ok ? 'https://immo-proxy.ral-85d.workers.dev/?fiche_outillage=' + encodeURIComponent(body.code + '/' + body.filename) : null });
+      } catch (e) { return json({ success: false, error: e.message }); }
+    }
+
+    // Annule une ligne de distribution (erreur de saisie) : recrédite le stock de l'article
+    if (action === 'annuler_ligne_outillage') {
+      const ligneId = body.id;
+      if (!ligneId) return json({ success: false, error: 'id_manquant' });
+      try {
+        const cur = await fetch(GL + '/Lignes_Outillage/items/' + ligneId + '?$expand=fields', { headers: H });
+        const curData = await cur.json();
+        const f = curData.fields || {};
+        if (!f.Title) return json({ success: false, error: 'ligne_introuvable' });
+        const catRes = await fetch(GL + "/Catalogue_Outillage/items?$expand=fields&$filter=fields/Title eq '" + (f.Type_Article || '').replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const catData = await catRes.json();
+        const catItem = catData.value && catData.value[0] ? catData.value[0] : null;
+        if (catItem) {
+          const stockActuel = parseFloat((catItem.fields || {}).Stock_Actuel) || 0;
+          await fetch(GL + '/Catalogue_Outillage/items/' + catItem.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Stock_Actuel: stockActuel + 1 }) });
+        }
+        const r = await fetch(GL + '/Lignes_Outillage/items/' + ligneId, { method: 'DELETE', headers: H });
         return json({ success: r.ok || r.status === 204 });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }

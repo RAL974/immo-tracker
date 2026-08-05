@@ -1,0 +1,7582 @@
+[
+ {
+  "code": "ABNA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "REST",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "REST",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "REST",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "REST",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "REST",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "REST",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "REST",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "REST",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "REST",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "REST",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Multimètre 600V"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "REST",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "REST",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "REST",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "REST",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "REST",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "REST",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "REST",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "REST",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "REST",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Taloche 18x27"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "REST",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Couteau à enduire inox 4 / 8 / 20"
+ },
+ {
+  "code": "ABNA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "AHAB",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "ATAB",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "BOFA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "CHMO",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "DACH",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "FAZI",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "MIAN",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "MKSA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "MOEL",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "NAIR",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "SAAL",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "SAER",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "SOMO",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "TOHO",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "ANFL",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "ATMA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "BADA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "BLFA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "BUKE",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "CANI",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "FLDA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "GASE",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "JADI",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "KOLO",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "LAHU",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "LAJC",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "LAJD",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "LEMI",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "MEJO",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "NAJE",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "NALU",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "PACH",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "PAYV",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "PIBE",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "REST",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "RIJB",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "SAMA",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "SEJU",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "SOBE",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "VAAL",
+  "type_article": "Truelle ronde"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Jeu de tournevis isolés 2,5 / 3 / 3,5 / 5,5 / PZ1 / PZ2 / Testeur"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Jeu de clés torx 9 / 10 / 15 / 20 / 25 / 27 / 30 / 40"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince coupante diagonale / Pince à dénuder / Pince bec long"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince universelle 180mm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince multiprise 250mm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince pour colliers de fixation"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Cisaille à tole 250mm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Clé à pipe 7 / 8 / 10 / 13 / 17 / 19"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Clés mixtes 7 / 8 / 10 / 13 /15 / 17"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Marteau menuisier 25mm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Massette 1500g"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pointerolle 350mm avec pare-coups"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Burin 350mm  avec pare-coups"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Ciseau à bois 16 à 20"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Couteau d'électricien"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Vérificateur d'absence de tension"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince ampermétrique 600V"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Tire-fil Nylon 20m"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Mètre 8mx25mm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Niveau à bulle 40cm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Equerre menuiser inox 20cm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Cutter"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pistolet à cartouche"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Caisse à outil 54,5 x 27 x 27"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Pince coupante à onglet"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Scie à métaux 300mm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Jeu de 2 lames pour scie à métaux"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Couteau de paquiste 150mm"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Cordex"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Poudre Cordex 1L"
+ },
+ {
+  "code": "BIFL",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "CALU",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "GRWI",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "IADA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "LEDI",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "LEWI",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "MAMA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ORFA",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "PALO",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "POGU",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ROCH",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ROJY",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SIDE",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "TUJM",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "VILO",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "VIMT",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "GOLU",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "SCST",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "MOAS",
+  "type_article": "Dénude-câbles isolé"
+ },
+ {
+  "code": "ELSA",
+  "type_article": "Dénude-câbles isolé"
+ }
+]

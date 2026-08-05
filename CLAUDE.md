@@ -362,6 +362,20 @@ Détail complet dans `02_MODELE_DONNEES.md`.
 - **`inventaire_dec2025.json`** (tableau, ajouté août 2026) : ~2417 lignes de comptage brut du stock d'articles de décembre 2025 (zone, site, chantier, fabriquant, référence, désignation, quantité, chute de câble, observations — sans les colonnes de valorisation du fichier Excel d'origine, obsolètes). Utilisé une seule fois par l'outil de migration (`importerInventaireDec2025()` dans le dashboard) pour créer la première campagne de référence dans `Lignes_Inventaire`.
 - **`epi_personnel.json`**, **`epi_catalogue.json`**, **`epi_grille_dotation.json`** (ajoutés août 2026) : données initiales du module EPI (73 salariés, ~58 articles catalogue, 40 lignes de grille de dotation), issues de `Liste EPI.xlsx`. Utilisées une seule fois par l'outil de migration (`importerDonneesEPI()` dans le dashboard).
 
+## Extension `Employes` + nouvelles listes — module Prime d'outillage (ajoutées août 2026)
+
+`Service_Outillage` sur `Employes` (`Travaux Neufs`/`Maintenance`/vide) — **indépendant de `Affectation_EPI`**, un CT ou un salarié Atelier peut être rattaché à l'un de ces services sans que ça reflète son profil EPI.
+
+**`Catalogue_Outillage`** : `Title`(=désignation), `Reference`, `Distributeur`, `Marque`, `Prix_Unitaire` (prix final négocié), `Stock_Actuel` (vivant).
+
+**`Grille_Outillage`** : `Title`(=service)/`Type_Article`/`Quantite` — kit standard par service, éditable.
+
+**`Lignes_Outillage`** : `Title`(=code employé), `Type_Article`, `Date_Remise`, `Emarge_Par`, `Photo_Fiche`, `Lot_Distribution`. Une seule liste plate (pas de fiche/lignes séparées comme les EPI) — la distribution est actée directement à l'émargement, sans étape "générée en attente" intermédiaire.
+
+**`outillage_catalogue.json`**, **`outillage_grille.json`**, **`outillage_services.json`**, **`outillage_lignes.json`** (ajoutés août 2026) : données initiales du module Prime d'outillage (~41 outils, ~66 lignes de grille, ~63 services employés, ~1895 lignes de distribution historique), issues de `Détail prime d'outillage.xlsx`. Utilisées une seule fois par l'outil de migration (`importerDonneesOutillage()` dans le dashboard).
+
+Détail complet dans `02_MODELE_DONNEES.md`.
+
 
 ---
 
@@ -490,9 +504,21 @@ Chaque salarié "hors bureau" (poste chantier, maintenance, atelier, conducteur 
 
 **Émargement = preuve photo, comme les FDS des immos** : une fois la fiche imprimée et signée à la main, la Logistique enregistre l'émargement en joignant une photo/scan de la fiche signée (même pipeline que les photos d'immos). C'est cet enregistrement qui décrémente le stock.
 
-**Fiche imprimable = HTML + impression navigateur, pas de nouvelle dépendance** : bouton "Voir/Imprimer" ouvrant un nouvel onglet avec `window.print()`, gabarit repris de l'ancienne fiche papier.
+**Fiche imprimable = HTML + impression navigateur, pas de nouvelle dépendance** : bouton "Voir/Imprimer" ouvrant un nouvel onglet avec `window.print()`, gabarit repris de l'ancienne fiche papier (logo Espace Soleil, bandeau de titre, encadré destinataire, tableau, bloc signature).
 
 Détail technique complet dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`, historique dans `04_HISTORIQUE_DECISIONS.md`.
+
+## Module Prime d'outillage (ajouté août 2026)
+
+Kit d'outils remis en nature aux salariés de terrain — distinct des EPI : dotation **ponctuelle** (une fois, complétée plus tard), pas de cycle annuel. Périmètre = employés rattachés à un `Service_Outillage` (`Travaux Neufs`/`Maintenance`), une dimension **indépendante** de `Affectation_EPI`.
+
+100% piloté depuis le dashboard, mêmes principes que les EPI : `peutGererOutillage`/`peutVoirOutillage`, grille par service éditable, stock vivant décrémenté à la distribution et incrémenté à la réception. Différence clé : **pas d'étape "fiche générée en attente"** — `distribuer_outillage` décrémente le stock directement à l'enregistrement de la preuve photo, une seule liste plate `Lignes_Outillage` (pas de fiche/lignes séparées).
+
+**Vue "Ce qui reste à distribuer"** (besoin explicite de William) : pour chaque outil, nombre d'employés de son service ne l'ayant pas encore reçu, calculé dynamiquement (grille − lignes déjà reçues) — équivalent de la colonne "Manquant" du fichier Excel d'origine, toujours à jour.
+
+Import historique sans reconstitution de preuve : les distributions déjà faites sont importées comme lignes "reçues" sans re-scanner les PDF déjà signés et classés — `Photo_Fiche` vide pour ces lignes, l'original papier fait foi.
+
+Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`, historique dans `04_HISTORIQUE_DECISIONS.md`.
 
 
 ---
@@ -600,6 +626,21 @@ Détail technique complet dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_RO
 - **Réutilisation systématique de patterns existants** : pipeline d'upload de fichier vers SharePoint (`upload_photo`) dupliqué pour les photos de fiches EPI signées ; modèle liste parent/liste enfant sans colonne Lookup (`Campagnes_Inventaire`/`Lignes_Inventaire`) repris pour `Dotations_EPI`/`Lignes_Dotation_EPI` ; écriture par lots `$batch` réutilisée pour l'import initial (73 salariés, ~58 articles catalogue, 40 lignes de grille).
 - **Stock initial à 0** : faute de comptage fiable au moment du développement — à William de saisir une réception initiale correspondant à son stock physique réel.
 - **Étapes bloquantes côté William avant mise en service** : création de 4 nouvelles listes SharePoint (`Catalogue_Articles_EPI`, `Grille_Dotation_EPI`, `Dotations_EPI`, `Lignes_Dotation_EPI`) et de 6 nouvelles colonnes sur `Employes`.
+
+## Retours terrain après mise en production du module EPI (août 2026)
+- Colonne `Dotations_EPI` incomplète (`Genere_Le`/`Emarge_Le` manquantes) détectée via un nouvel outil générique `?debug_columns=<liste>` — corrigée par William côté SharePoint.
+- Bug de correspondance "Gants à picot"/"Gants gros œuvre" : grille importée sans accent (onglet source différent du catalogue), comparaison stricte échouait silencieusement — corrigé.
+- 5 articles universels (casque anti-bruit, casque de chantier, jugulaire, lunettes incolores/fumées) absents de la grille car jamais isolés comme variable dans le fichier source (donnés à tous, donc constants) — William a confirmé quantité 1 pour les 4 profils, ajoutés (60 lignes de grille au total). A nécessité la notion d'"article à taille unique" dans la génération de fiche.
+- Fiche jugée trop sommaire : refonte avec logo Espace Soleil, bandeau de titre, encadré destinataire, tableau structuré.
+- Accès à la fiche émargée ajouté directement depuis le profil employé (émarger ou voir la preuve photo), pas seulement depuis l'onglet EPI.
+
+## Module Prime d'outillage (août 2026)
+- Besoin exprimé par William : intégrer le suivi de la prime d'outillage (kit d'outils remis en nature), aujourd'hui géré via `Détail prime d'outillage.xlsx` et des fiches PDF signées déjà classées. Besoin explicite : voir facilement ce qui a été distribué et ce qui reste à distribuer, prix intégré.
+- **Fiches PDF déjà signées repérées** (même gabarit que les EPI) : a confirmé la pertinence de réutiliser directement le pipeline émargement + photo déjà construit, plutôt qu'une nouvelle mécanique.
+- **Cadrage validé avant développement** : (1) périmètre = employés des onglets Tx Neufs/Maintenance (William a précisé que ces listes contiennent déjà des CT et de l'Atelier — le service outillage est indépendant de `Affectation_EPI`) ; (2) dotation ponctuelle et complétable, sans cycle annuel (outils durables) ; (3) stock vivant initialisé depuis les quantités déjà reçues du fichier (donnée fiable disponible, contrairement aux EPI où le stock partait à 0) ; (4) source unique `Détail prime d'outillage.xlsx`, les autres fichiers `Prime d'outillage*.xlsx` repérés ignorés (exports antérieurs probables).
+- **Modèle simplifié vs EPI** : une seule liste plate `Lignes_Outillage`, distribution actée directement à l'émargement (pas d'étape "générée en attente" intermédiaire, pas de risque de fiche orpheline faussant le stock).
+- **Anomalie signalée sans correction arbitraire** : le code `ELSA` apparaît avec des données réelles dans les deux onglets de service — importé tel quel plutôt que deviné, à trancher par William.
+- **Étapes bloquantes côté William avant mise en service** : création de 3 nouvelles listes SharePoint (`Catalogue_Outillage`, `Grille_Outillage`, `Lignes_Outillage`) et d'une colonne `Service_Outillage` sur `Employes`.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
