@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — Espace Soleil Logistique</title>
+<title>Dashboard — Electricité Services Réunion Logistique</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -207,9 +207,9 @@ tr:hover td{background:#FAFBFC;}
 <!-- Login -->
 <div id="pin-overlay">
   <div id="pin-box">
-    <img src="logo.png" alt="Espace Soleil" onerror="this.style.display='none'">
+    <img src="logo.jpg" alt="Electricité Services Réunion" onerror="this.style.display='none'">
     <h2>Tableau de bord logistique</h2>
-    <p>Espace Soleil — Accès encadrement</p>
+    <p>Electricité Services Réunion — Accès encadrement</p>
     <div id="pin-step1">
       <input type="password" id="pin-input" maxlength="10" placeholder="Code PIN" onkeydown="if(event.key==='Enter')checkPin()">
       <button id="pin-btn" onclick="checkPin()">Accéder →</button>
@@ -235,8 +235,8 @@ tr:hover td{background:#FAFBFC;}
 
 <!-- Header -->
 <div id="header">
-  <img src="logo.png" alt="ES" onerror="this.style.display='none'">
-  <h1>Immo Tracker — Espace Soleil</h1>
+  <img src="logo-dark.jpg" alt="Electricité Services Réunion" onerror="this.style.display='none'">
+  <h1>Immo Tracker — Electricité Services Réunion</h1>
   <button id="hamburger" onclick="toggleSidebar()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;display:none">☰</button>
   <div id="header-actions">
     <span id="admin-identite-badge" style="font-size:11px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px;white-space:nowrap;cursor:pointer" onclick="changerIdentite()" title="Changer d'identité"></span>
@@ -1625,7 +1625,7 @@ async function voirFicheEPI(dotId){
   var emp=employesByCode[dot.code]||{};
   var affTxt=EPI_AFF_LABELS[emp.affectationEpi]||dot.type_dotation;
   var annee=dot.annee_civile||new Date().getFullYear();
-  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.png';
+  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.jpg';
   var html='<!doctype html><html><head><meta charset="utf-8"><title>Fiche dotation EPI - '+dot.code+'</title>'+
     '<style>'+
     '@page{margin:16mm}'+
@@ -1648,7 +1648,7 @@ async function voirFicheEPI(dotId){
     '@media print{.print-btn{display:none}body{padding:0}}'+
     '</style></head><body>'+
     '<button class="print-btn" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>'+
-    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Espace Soleil"><div class="coord"><b>Espace Soleil</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
+    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Electricité Services Réunion"><div class="coord"><b>Electricité Services Réunion</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
     '<div class="titre-fiche">FICHE DOTATION EPI '+annee+'</div>'+
     '<div class="dest-box">'+
       '<div><span>Code</span><b>'+dot.code+'</b></div>'+
@@ -2139,7 +2139,7 @@ function voirFicheOutillage(code,typesArticles){
     var art=outilCatalogue.find(function(a){return a.type_article===t;})||{};
     return {reference:art.reference||'',designation:t,quantite:1};
   });
-  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.png';
+  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.jpg';
   var html='<!doctype html><html><head><meta charset="utf-8"><title>Prime outillage - '+code+'</title>'+
     '<style>'+
     '@page{margin:16mm}'+
@@ -2162,7 +2162,7 @@ function voirFicheOutillage(code,typesArticles){
     '@media print{.print-btn{display:none}body{padding:0}}'+
     '</style></head><body>'+
     '<button class="print-btn" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>'+
-    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Espace Soleil"><div class="coord"><b>Espace Soleil</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
+    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Electricité Services Réunion"><div class="coord"><b>Electricité Services Réunion</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
     '<div class="titre-fiche">PRIME D\'OUTILLAGE</div>'+
     '<div class="dest-box">'+
       '<div><span>Code</span><b>'+code+'</b></div>'+
@@ -3968,7 +3968,7 @@ async function genererReleveMaterielSortie(code, nom, actuelImmos){
     var r=await fetch(W+'?lignes_outillage=1&code='+encodeURIComponent(code));
     outillageLignes=await r.json();
   }catch(e){}
-  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.png';
+  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.jpg';
   var dateStr=new Date().toLocaleDateString('fr-FR');
   var html='<!doctype html><html><head><meta charset="utf-8"><title>Relevé de matériel - '+code+'</title>'+
     '<style>'+
@@ -3993,7 +3993,7 @@ async function genererReleveMaterielSortie(code, nom, actuelImmos){
     '@media print{.print-btn{display:none}body{padding:0}}'+
     '</style></head><body>'+
     '<button class="print-btn" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>'+
-    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Espace Soleil"><div class="coord"><b>Espace Soleil</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
+    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Electricité Services Réunion"><div class="coord"><b>Electricité Services Réunion</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
     '<div class="titre-fiche">RELEVÉ DE MATÉRIEL — SORTIE</div>'+
     '<div class="dest-box">'+
       '<div><span>Code</span><b>'+code+'</b></div>'+
@@ -4126,7 +4126,7 @@ function exportExcel(){
   reservations.forEach(function(r){r3.push([r.statut,r.code_im,getLib(r.code_im),r.nom_employe,r.nom_chantier||'',fmtDT(r.date_debut),fmtDT(r.date_fin),r.note||'']);});
   var ws3=XLSX.utils.aoa_to_sheet(r3);ws3['!cols']=[14,12,40,28,28,20,20,30].map(function(w){return{wch:w};});hdr(ws3,r3[0].length);XLSX.utils.book_append_sheet(wb,ws3,'Reservations');
   // Résumé
-  var s=d.stats||{};var r4=[['Espace Soleil — Tableau de bord'],['Génére le '+fmtDT(new Date().toISOString())],[],['Indicateur','Valeur'],['Immos tracées',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au dépôt',s.au_depot||0],['Total mouvements',s.total_mouvements||0],['Durée moy. hors dépôt',s.moyenne_jours_hors_depot+'j'],['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0]];
+  var s=d.stats||{};var r4=[['Electricité Services Réunion — Tableau de bord'],['Génére le '+fmtDT(new Date().toISOString())],[],['Indicateur','Valeur'],['Immos tracées',s.total_mouvementes||0],['En circulation',s.en_circulation||0],['Au dépôt',s.au_depot||0],['Total mouvements',s.total_mouvements||0],['Durée moy. hors dépôt',s.moyenne_jours_hors_depot+'j'],['Transferts en attente',s.transferts_en_attente||0],['Hors service',s.hors_service||0]];
   var ws4=XLSX.utils.aoa_to_sheet(r4);XLSX.utils.book_append_sheet(wb,ws4,'Resume');
   XLSX.writeFile(wb,'EspaceSoleil_Immos_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }

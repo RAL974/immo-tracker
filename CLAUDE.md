@@ -13,11 +13,11 @@
 
 ## Qui, quoi, pourquoi
 
-**Porteur du projet :** William, Responsable Achats & Logistique chez Espace Soleil (entreprise d'électricité basée à La Réunion, opérant aussi à Mayotte). William est autodidacte en développement (Python, VS Code, GitHub, Cloudflare, SharePoint, Power Automate) et développe/maintient seul cette solution.
+**Porteur du projet :** William, Responsable Achats & Logistique chez Electricité Services Réunion (entreprise d'électricité basée à La Réunion, opérant aussi à Mayotte). William est autodidacte en développement (Python, VS Code, GitHub, Cloudflare, SharePoint, Power Automate) et développe/maintient seul cette solution.
 
-**Ce qu'est Immo Tracker :** une application de suivi des immobilisations et du parc matériel (outillage, matériel de chantier, véhicules, informatique…) pour Espace Soleil, sur les deux territoires La Réunion et Mayotte. Elle remplace un suivi Excel manuel.
+**Ce qu'est Immo Tracker :** une application de suivi des immobilisations et du parc matériel (outillage, matériel de chantier, véhicules, informatique…) pour Electricité Services Réunion, sur les deux territoires La Réunion et Mayotte. Elle remplace un suivi Excel manuel.
 
-**Pourquoi ça existe :** la direction d'Espace Soleil a demandé d'évaluer des alternatives commerciales (Organilog, Hector). Une note de synthèse a comparé les options et conclu à la supériorité économique et fonctionnelle de la solution interne (voir `Note_Synthese_Immo_Tracker.docx`). Le principal risque identifié est la dépendance à une seule personne (« bus factor ») — d'où l'existence de ce projet structuré et de la documentation de pérennité.
+**Pourquoi ça existe :** la direction d'Electricité Services Réunion a demandé d'évaluer des alternatives commerciales (Organilog, Hector). Une note de synthèse a comparé les options et conclu à la supériorité économique et fonctionnelle de la solution interne (voir `Note_Synthese_Immo_Tracker.docx`). Le principal risque identifié est la dépendance à une seule personne (« bus factor ») — d'où l'existence de ce projet structuré et de la documentation de pérennité.
 
 ## Les deux interfaces
 
@@ -28,7 +28,7 @@
 
 - **1023 immobilisations actives** suivies, dont **812 liées à l'activité terrain** (211 « administratives » : mobilier, informatique, véhicules, logiciels, financières)
 - **~97 collaborateurs** référencés
-- **Coût d'hébergement : ≈ 0 €** (GitHub Pages + Cloudflare Workers gratuits + Microsoft 365 déjà en place chez Espace Soleil)
+- **Coût d'hébergement : ≈ 0 €** (GitHub Pages + Cloudflare Workers gratuits + Microsoft 365 déjà en place chez Electricité Services Réunion)
 - Bi-site : **1013 immos Réunion / ~154 Mayotte** (après correction via la migration EBP)
 
 ## Statut d'avancement (juillet 2026)
@@ -98,7 +98,7 @@ Les interfaces web ne parlent jamais directement à SharePoint : tout passe par 
 | Worker (proxy sécurisé) | `worker.js` + `wrangler.toml` (dans le dépôt depuis août 2026, voir plus bas) | Cloudflare Workers | https://immo-proxy.ral-85d.workers.dev/ |
 | Catalogue immos (léger) | `immos.json` — **tableau** `[...]` de 1023 immos | GitHub Pages (racine) | .../immos.json |
 | Catalogue immos (complet, migration) | `immos_full.json` — **objet** `{...}` de 1167 immos | GitHub Pages (racine) | .../immos_full.json |
-| Base de données | Listes SharePoint | Microsoft 365 Espace Soleil | espacesoleil97.sharepoint.com/sites/Logistique-Immos |
+| Base de données | Listes SharePoint | Microsoft 365 Electricité Services Réunion | espacesoleil97.sharepoint.com/sites/Logistique-Immos |
 | Authentification API | App Azure AD "Immo Tracker" | Azure / Entra ID | — |
 | Notifications | Flux "Notification_Mouvement_Immo" | Power Automate | — |
 
@@ -504,7 +504,7 @@ Chaque salarié "hors bureau" (poste chantier, maintenance, atelier, conducteur 
 
 **Émargement = preuve photo, comme les FDS des immos** : une fois la fiche imprimée et signée à la main, la Logistique enregistre l'émargement en joignant une photo/scan de la fiche signée (même pipeline que les photos d'immos). C'est cet enregistrement qui décrémente le stock.
 
-**Fiche imprimable = HTML + impression navigateur, pas de nouvelle dépendance** : bouton "Voir/Imprimer" ouvrant un nouvel onglet avec `window.print()`, gabarit repris de l'ancienne fiche papier (logo Espace Soleil, bandeau de titre, encadré destinataire, tableau, bloc signature).
+**Fiche imprimable = HTML + impression navigateur, pas de nouvelle dépendance** : bouton "Voir/Imprimer" ouvrant un nouvel onglet avec `window.print()`, gabarit repris de l'ancienne fiche papier (logo Electricité Services Réunion, bandeau de titre, encadré destinataire, tableau, bloc signature).
 
 Détail technique complet dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`, historique dans `04_HISTORIQUE_DECISIONS.md`.
 
@@ -532,7 +532,7 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 *Journal chronologique des choix structurants et de leur raison d'être. Objectif : ne jamais perdre le "pourquoi" derrière une fonctionnalité. À compléter à chaque évolution notable.*
 
 ## Socle applicatif (avant juillet 2026)
-- Choix d'une architecture PWA + Dashboard + Worker Cloudflare + SharePoint : zéro coût d'hébergement, propriété totale du code et des données par Espace Soleil.
+- Choix d'une architecture PWA + Dashboard + Worker Cloudflare + SharePoint : zéro coût d'hébergement, propriété totale du code et des données par Electricité Services Réunion.
 - Filtres site (Réunion/Mayotte) et badges drapeaux déployés sur toutes les rubriques d'inventaire.
 - Authentification dashboard : passage de mots de passe en clair à un hachage PBKDF2/SHA-256 (100k itérations, sel par utilisateur).
 - Création du super-admin permanent AIWI, protégé contre toute rétrogradation accidentelle.
@@ -611,7 +611,7 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - **Bug de recherche corrigé (août 2026)** : la recherche du rapport d'écart perdait le focus à chaque caractère tapé (un seul caractère s'appliquait à la fois), rendant la recherche inutilisable en pratique. Cause : la fonction de rendu reconstruisait tout le panneau — y compris le champ de recherche lui-même — à chaque frappe (`oninput`), ce qui détruit et recrée le `<input>` et casse le focus. Contrairement aux autres onglets (Circulation, Dépôt…) qui ne redessinent que la zone de résultats, jamais les champs de filtre. Corrigé en séparant la "coquille" (construite une seule fois à l'ouverture d'une campagne) des résultats (recalculés à chaque frappe dans une zone dédiée, sans toucher aux champs de filtre). *Piste initialement explorée par erreur* : une suspicion de corruption d'encodage UTF-8 (accents devenus illisibles côté SharePoint) s'est révélée être un faux positif causé par les propres outils de diagnostic de l'assistant (terminal Windows mal configuré pour l'UTF-8) — les données réelles n'ont jamais été corrompues. Leçon retenue : toujours valider un diagnostic d'encodage avec une méthode de lecture fiable (fichier + décodage explicite) avant de conclure à un bug de données.
 
 ## Pivot majeur : état du stock plutôt qu'écart entre campagnes (août 2026)
-- **Retour terrain de William après le premier déploiement** : le rapport d'écart (comparaison à la campagne précédente) ne correspond pas au métier. Espace Soleil est une entreprise du bâtiment : pas de stock minimum à tenir, la nature des chantiers varie (tertiaire vs logements neufs), des chantiers se terminent et d'autres démarrent — **il n'y a donc aucun rapport de continuité entre le stock de décembre 2025 et celui d'aujourd'hui**. Comparer les deux n'a pas de sens et produisait un rapport trompeur (tout apparaissait "Manquant" ou "Nouveau" sans que ça ne signifie quoi que ce soit).
+- **Retour terrain de William après le premier déploiement** : le rapport d'écart (comparaison à la campagne précédente) ne correspond pas au métier. Electricité Services Réunion est une entreprise du bâtiment : pas de stock minimum à tenir, la nature des chantiers varie (tertiaire vs logements neufs), des chantiers se terminent et d'autres démarrent — **il n'y a donc aucun rapport de continuité entre le stock de décembre 2025 et celui d'aujourd'hui**. Comparer les deux n'a pas de sens et produisait un rapport trompeur (tout apparaissait "Manquant" ou "Nouveau" sans que ça ne signifie quoi que ce soit).
 - **Décision** : suppression complète de la logique d'écart/comparaison entre campagnes (`calculerEcartInventaire`, statuts Confirmé/Écart quantité/Manquant/Nouveau). Remplacée par un simple **état du stock à l'instant T** : pour la campagne consultée, un tableau regroupé par `(Zone, Site, Référence)` avec les quantités comptées, sans aucune référence à une campagne antérieure. Objectif clarifié par William : savoir ce qui est en stock maintenant, pour pouvoir le valoriser ensuite (en externe, pas dans l'outil).
 - **Zone vs Chantier, deux axes différents** : le champ "Lieu" du rapport (qui fusionnait Zone et Chantier en un seul affichage) a été supprimé au profit de deux colonnes distinctes. Clarification de William : la **zone dépôt est obligatoire** (c'est l'unique axe de comptage — "nous nous attachons uniquement à compter le matériel par zone") et correspond à un emplacement physique précis (n° de rack, lettre d'étage) ; le **chantier reste optionnel**, simple information complémentaire quand on sait où l'article ira, pas un second périmètre de comptage indépendant comme envisagé initialement. La clé de regroupement de l'état du stock est donc passée de `(Référence, Site, Chantier ou Zone)` à `(Zone, Site, Référence)`.
 - **Ajout du scan de code-barres fabricant** : pour accélérer la saisie sur les grandes marques (Legrand, Hager, Schneider Electric, puis Eurohm, SIB, BLM, Clareo, Courant...), qui ont presque toujours un code-barres (EAN) sur l'emballage. Réutilise le scanner déjà en place dans la PWA pour les immos (`Html5Qrcode`, qui détecte nativement QR ET codes-barres 1D sans configuration supplémentaire) : le code scanné remplit directement le champ Référence. La saisie manuelle reste toujours possible (motif de William : "il n'y a pas toujours la boîte", donc pas toujours de code-barres disponible sur le terrain).
@@ -635,7 +635,7 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - Colonne `Dotations_EPI` incomplète (`Genere_Le`/`Emarge_Le` manquantes) détectée via un nouvel outil générique `?debug_columns=<liste>` — corrigée par William côté SharePoint.
 - Bug de correspondance "Gants à picot"/"Gants gros œuvre" : grille importée sans accent (onglet source différent du catalogue), comparaison stricte échouait silencieusement — corrigé.
 - 5 articles universels (casque anti-bruit, casque de chantier, jugulaire, lunettes incolores/fumées) absents de la grille car jamais isolés comme variable dans le fichier source (donnés à tous, donc constants) — William a confirmé quantité 1 pour les 4 profils, ajoutés (60 lignes de grille au total). A nécessité la notion d'"article à taille unique" dans la génération de fiche.
-- Fiche jugée trop sommaire : refonte avec logo Espace Soleil, bandeau de titre, encadré destinataire, tableau structuré.
+- Fiche jugée trop sommaire : refonte avec logo Electricité Services Réunion, bandeau de titre, encadré destinataire, tableau structuré.
 - Accès à la fiche émargée ajouté directement depuis le profil employé (émarger ou voir la preuve photo), pas seulement depuis l'onglet EPI.
 
 ## Module Prime d'outillage (août 2026)
@@ -675,7 +675,7 @@ Ajouter une entrée à chaque décision structurante : la date approximative, ce
 **Analyse et mise en garde :** ce module change le périmètre de l'application (on sort du suivi d'immobilisations pour entrer en gestion des temps / RH). Deux angles distincts à ne pas confondre :
 
 1. **Pré-pointage opérationnel par chantier** (recommandé) : un CT ou ouvrier déclare "tant d'heures sur tel chantier, telle date", pour ventiler les coûts et remonter une donnée exploitable. C'est un ajout naturel — l'infrastructure (employés, chantiers, rôles, auth, PWA mobile) s'y prête directement. Une liste SharePoint `Heures` (Code_Employe, Code_Chantier, Date, Nb_Heures, Note_Manager) suffirait techniquement.
-2. **Gestion RH des congés/compteurs légaux** (à éviter en l'état) : implique des obligations légales (droit du travail), un risque d'erreur à conséquence salariale, et un possible doublon avec un outil paie déjà existant chez Espace Soleil (à vérifier — Silae, PayFit, module EBP Paie ?). Ne pas construire de "faux outil RH" en interne sans validation de la direction / du service paie.
+2. **Gestion RH des congés/compteurs légaux** (à éviter en l'état) : implique des obligations légales (droit du travail), un risque d'erreur à conséquence salariale, et un possible doublon avec un outil paie déjà existant chez Electricité Services Réunion (à vérifier — Silae, PayFit, module EBP Paie ?). Ne pas construire de "faux outil RH" en interne sans validation de la direction / du service paie.
 
 **Recommandation :** si ce module est lancé, le cadrer strictement comme "suivi opérationnel des heures par chantier" (donnée de gestion, pas de paie), avec validation manager et export — pas comme un système de gestion des congés légaux. Prévoir une phase de cadrage dédiée avant tout développement : qui saisit, qui valide, quel export, quelle articulation avec l'outil paie existant.
 
