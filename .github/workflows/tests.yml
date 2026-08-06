@@ -1,0 +1,21 @@
+name: Vérifications
+
+# Filet de sécurité en plus du hook pre-push local (voir docs/DEV.md) : le projet est en push
+# direct sur main (solo, sans revue de code), donc ce workflow ne bloque pas le déploiement
+# GitHub Pages / Cloudflare Worker (déjà déclenchés indépendamment). Il sert à être alerté vite
+# si un test échoue malgré tout (hook sauté avec --no-verify, push depuis une autre machine...).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm run check
+      - run: npm test
