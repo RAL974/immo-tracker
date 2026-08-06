@@ -2880,7 +2880,7 @@ async function enregistrerEmploye(){
     var res=await r.json();
     if(res.success){
       msg.style.color='var(--green)';msg.textContent='✅ Employé '+code+' ajouté !';
-      setTimeout(function(){fermerAjout();loadEmployes().then(function(){filterUsers();});},1200);
+      setTimeout(function(){fermerAjout();loadEmployes(true).then(function(){renderUsers();});},1200);
     }else{
       btn.disabled=false;btn.textContent='✅ Enregistrer';
       msg.textContent='❌ '+(res.message||res.error||'Échec');
