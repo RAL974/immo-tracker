@@ -12,9 +12,19 @@ permissions:
   pages: write
   id-token: write
 
+# Empêche deux déploiements de tourner en même temps (recommandation officielle GitHub pour ce
+# type de workflow, absente jusqu'ici) — des runs concurrents sur le même environnement "pages"
+# peuvent se bloquer mutuellement, symptôme déjà rencontré par le passé (voir "Multiple artifacts
+# named github-pages" dans 01_ARCHITECTURE_TECHNIQUE.md). cancel-in-progress: false pour ne jamais
+# annuler un déploiement déjà commencé, juste mettre en file d'attente les suivants.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
