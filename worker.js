@@ -1,5 +1,69 @@
 addEventListener('fetch', event => { event.respondWith(handleRequest(event.request)); });
 
+// ── Fonctions pures de session (jeton HMAC-SHA256), hors de handleRequest ────────────────────
+// Isolées en haut de fichier pour être testables indépendamment de la requête en cours
+// (voir tests/worker.session.test.js). Comportement inchangé : handleRequest() délègue à ces
+// fonctions en leur passant le secret lu à chaque requête (SESSION_SECRET_ENV), exactement
+// comme avant ce réagencement — aucun changement de comportement, seulement d'organisation.
+const GESTIONNAIRES = ['CONI', 'AIWI', 'NAXA', 'BAKA'];
+const SESSION_DUREE_MS = 12 * 3600 * 1000; // 12h — une session dure une journée de travail large
+function b64url(bytes) { return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(bytes)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function b64urlToBytes(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+async function getSessionKeyFor(secret) {
+  if (!secret) return null;
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+async function signSessionWith(code, role, secret, dureeMs) {
+  const key = await getSessionKeyFor(secret);
+  if (!key) return null;
+  const payloadB64 = b64url(new TextEncoder().encode(JSON.stringify({ code: code, role: role || '', exp: Date.now() + (dureeMs || SESSION_DUREE_MS) })));
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadB64));
+  return payloadB64 + '.' + b64url(sig);
+}
+async function verifySessionWith(token, secret) {
+  if (!token || token.indexOf('.') === -1) return null;
+  const key = await getSessionKeyFor(secret);
+  if (!key) return null;
+  const parts = token.split('.');
+  let valid;
+  try { valid = await crypto.subtle.verify('HMAC', key, b64urlToBytes(parts[1]), new TextEncoder().encode(parts[0])); } catch (e) { return null; }
+  if (!valid) return null;
+  let payload;
+  try { payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[0]))); } catch (e) { return null; }
+  if (!payload.exp || payload.exp < Date.now()) return null;
+  return payload; // { code, role, exp }
+}
+function roleNorm(r) { return (r || '').trim().toLowerCase().replace(/[\s-]+/g, '_'); }
+function estAdminSessionPure(session, gestionnaires) {
+  if (!session) return false;
+  if ((gestionnaires || GESTIONNAIRES).includes(session.code)) return true; // super-admins permanents (ex. AIWI), comme côté client
+  return roleNorm(session.role) === 'admin';
+}
+function estGarantSessionPure(session, gestionnaires) {
+  if (estAdminSessionPure(session, gestionnaires)) return true;
+  const r = roleNorm(session.role);
+  return r === 'logistique' || r === 'logistique_mayotte';
+}
+async function requireAdminWith(reqBody, secret, gestionnaires) {
+  if (!secret) return { ok: false, error: 'session_secret_manquant' };
+  const session = await verifySessionWith(reqBody.token, secret);
+  if (!session) return { ok: false, error: 'session_invalide' };
+  if (!estAdminSessionPure(session, gestionnaires)) return { ok: false, error: 'droits_insuffisants' };
+  return { ok: true, session: session };
+}
+async function requireGarantWith(reqBody, secret, gestionnaires) {
+  if (!secret) return { ok: false, error: 'session_secret_manquant' };
+  const session = await verifySessionWith(reqBody.token, secret);
+  if (!session) return { ok: false, error: 'session_invalide' };
+  if (!estGarantSessionPure(session, gestionnaires)) return { ok: false, error: 'droits_insuffisants' };
+  return { ok: true, session: session };
+}
+// N'existe pas dans le runtime Cloudflare Worker (pas de CommonJS) : ce bloc ne s'exécute
+// jamais en production, uniquement quand le fichier est chargé via require() par les tests.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { signSessionWith, verifySessionWith, estAdminSessionPure, estGarantSessionPure, roleNorm, requireAdminWith, requireGarantWith, b64url, b64urlToBytes, GESTIONNAIRES, SESSION_DUREE_MS, handleRequest };
+}
+
 async function handleRequest(request) {
   const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
@@ -12,7 +76,6 @@ async function handleRequest(request) {
   if (!CLIENT_SECRET) return new Response(JSON.stringify({ error: 'config', message: 'La variable CLIENT_SECRET_ENV n\'est pas configurée dans le Worker.' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   const SITE_ID      = 'espacesoleil97.sharepoint.com,4157ffef-a5f6-4e7e-8a19-4f6ab57d7128,d15dad00-7bed-4e78-bb2f-d0156e6e49a7';
   const GL           = 'https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/lists';
-  const GESTIONNAIRES= ['CONI', 'AIWI', 'NAXA', 'BAKA'];
 
   const tok = await fetch('https://login.microsoftonline.com/' + TENANT_ID + '/oauth2/v2.0/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -35,59 +98,13 @@ async function handleRequest(request) {
   // (Settings > Variables and Secrets) — si elle n'est pas définie, la connexion au dashboard
   // continue de fonctionner mais aucune action protégée ne pourra s'exécuter (échec explicite
   // 'session_secret_manquant'), plutôt qu'une panne totale du Worker pour tout le monde.
+  // Logique pure (signature, vérification, rôles) hoistée en haut de fichier — voir le bloc
+  // signSessionWith/verifySessionWith/requireAdminWith/requireGarantWith juste après
+  // addEventListener() ; ces wrappers ne font que lui passer le secret lu à chaque requête.
   const SESSION_SECRET = (typeof SESSION_SECRET_ENV !== 'undefined' && SESSION_SECRET_ENV) || (typeof globalThis !== 'undefined' && globalThis.SESSION_SECRET_ENV) || '';
-  const SESSION_DUREE_MS = 12 * 3600 * 1000; // 12h — une session dure une journée de travail large
-  const b64url = (bytes) => btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(bytes)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const b64urlToBytes = (s) => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
-  async function getSessionKey() {
-    if (!SESSION_SECRET) return null;
-    return crypto.subtle.importKey('raw', new TextEncoder().encode(SESSION_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
-  }
-  async function signSession(code, role) {
-    const key = await getSessionKey();
-    if (!key) return null;
-    const payloadB64 = b64url(new TextEncoder().encode(JSON.stringify({ code: code, role: role || '', exp: Date.now() + SESSION_DUREE_MS })));
-    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadB64));
-    return payloadB64 + '.' + b64url(sig);
-  }
-  async function verifySession(token) {
-    if (!token || token.indexOf('.') === -1) return null;
-    const key = await getSessionKey();
-    if (!key) return null;
-    const parts = token.split('.');
-    let valid;
-    try { valid = await crypto.subtle.verify('HMAC', key, b64urlToBytes(parts[1]), new TextEncoder().encode(parts[0])); } catch (e) { return null; }
-    if (!valid) return null;
-    let payload;
-    try { payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[0]))); } catch (e) { return null; }
-    if (!payload.exp || payload.exp < Date.now()) return null;
-    return payload; // { code, role, exp }
-  }
-  function roleNorm(r) { return (r || '').toLowerCase().replace(/[\s-]+/g, '_'); }
-  function estAdminSession(session) {
-    if (!session) return false;
-    if (GESTIONNAIRES.includes(session.code)) return true; // super-admins permanents (ex. AIWI), comme côté client
-    return roleNorm(session.role) === 'admin';
-  }
-  function estGarantSession(session) {
-    if (estAdminSession(session)) return true;
-    const r = roleNorm(session.role);
-    return r === 'logistique' || r === 'logistique_mayotte';
-  }
-  async function requireAdmin(reqBody) {
-    if (!SESSION_SECRET) return { ok: false, error: 'session_secret_manquant' };
-    const session = await verifySession(reqBody.token);
-    if (!session) return { ok: false, error: 'session_invalide' };
-    if (!estAdminSession(session)) return { ok: false, error: 'droits_insuffisants' };
-    return { ok: true, session: session };
-  }
-  async function requireGarant(reqBody) {
-    if (!SESSION_SECRET) return { ok: false, error: 'session_secret_manquant' };
-    const session = await verifySession(reqBody.token);
-    if (!session) return { ok: false, error: 'session_invalide' };
-    if (!estGarantSession(session)) return { ok: false, error: 'droits_insuffisants' };
-    return { ok: true, session: session };
-  }
+  const signSession = (code, role) => signSessionWith(code, role, SESSION_SECRET);
+  const requireAdmin = (reqBody) => requireAdminWith(reqBody, SESSION_SECRET, GESTIONNAIRES);
+  const requireGarant = (reqBody) => requireGarantWith(reqBody, SESSION_SECRET, GESTIONNAIRES);
 
   // ── Hachage sécurisé des mots de passe (PBKDF2 / SHA-256, jamais stocké en clair) ──
   const bytesToHex = (buf) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');

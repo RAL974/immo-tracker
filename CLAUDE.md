@@ -677,6 +677,13 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - **Portée volontairement limitée** : les actions partagées avec la PWA terrain (`reserver`, `transfert`, `declarer_panne`...) restent non protégées par ce mécanisme — les 97 collaborateurs s'identifient par scan de badge sans mot de passe, un choix de conception assumé, pas la faille visée.
 - Détail complet dans `03_REGLES_METIER_ET_ROLES.md` § Autorisation côté serveur et `01_ARCHITECTURE_TECHNIQUE.md` (variable `SESSION_SECRET_ENV`).
 
+## Tests automatisés & garde-fous avant push (août 2026)
+- Sur demande de William après le contrôle d'accès : tests automatisés + envisagé une préprod, avec exigence explicite de **zéro risque pour la production**. William a choisi de commencer par les tests automatisés isolés (aucune nouvelle infra), la préprod avec vraies données restant à évaluer plus tard.
+- `npm test` (Node natif, `node --test`, zéro dépendance) — 3 fichiers dans `tests/` : logique pure du jeton de session, garde-fou anti-régression (les actions protégées côté Worker et `GATED_ACTIONS` côté dashboard doivent rester synchronisées), et un test d'intégration bout-en-bout de `handleRequest()` avec Microsoft Graph entièrement mocké (zéro appel réseau réel).
+- Refactorisation préalable de la logique de session (extraite de `handleRequest()` vers des fonctions pures paramétrées en haut du fichier) pour la rendre testable — comportement inchangé, vérifié par les mêmes tests avant/après.
+- Bug réel trouvé dès la première exécution des tests : `roleNorm()` ne retirait pas les espaces en début/fin (`' admin '` → `'_admin_'`, non reconnu) — corrigé.
+- Hook `pre-push` local (`.githooks/`, bloque le push si `npm run verify` échoue) + GitHub Actions en filet de sécurité. Voir `README.md` du dépôt pour les commandes.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
 
