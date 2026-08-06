@@ -684,6 +684,14 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - Bug réel trouvé dès la première exécution des tests : `roleNorm()` ne retirait pas les espaces en début/fin (`' admin '` → `'_admin_'`, non reconnu) — corrigé.
 - Hook `pre-push` local (`.githooks/`, bloque le push si `npm run verify` échoue) + GitHub Actions en filet de sécurité. Voir `README.md` du dépôt pour les commandes.
 
+## Module Matériel IT — téléphones, puis ordinateurs (août 2026)
+- Besoin de William : suivre qui a quel téléphone/ordinateur pro, **hors circuit immobilisations** — difficile à savoir aujourd'hui. Fichier Excel de suivi (40 téléphones, "incomplet") + facture Free Pro (en réalité 4 pages, 29 lignes à 23,22€ HT/mois, noms réels par ligne) fournis en pièce jointe.
+- **Cadrage validé** : historique complet des détenteurs successifs (comme les Mouvements des immos, mais sans workflow panne/réservation) ; coût mensuel inclus (champ simple, pas d'amortissement) ; 100% dashboard, pas d'écran PWA (cohérent avec EPI/Outillage).
+- 2 nouvelles listes : `Materiel_IT` (catalogue, codes `TEL######`/`PC######` par préfixe de type — anticipe l'ajout des PC annoncé par William) et `Mouvements_Materiel_IT` (historique, détenteur courant = dernier mouvement). Droits réutilisés (`peutGererEPI()`, pas de nouvelle capacité `ROLE_CAPS`).
+- 5 actions Worker protégées dès l'écriture par le mécanisme de jeton de session (pas ajoutées après coup) — validé automatiquement par `security.gated-actions.test.js`.
+- Migration : 40 appareils, coût appliqué aux 28 lignes FREE actives. 3 codes détenteurs (`ADWI`, `HOAL`, `VIMA`) non retrouvés dans `Employes`, importés tels quels — à corriger par William. Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
+- **Étape bloquante côté William** : créer les 2 listes SharePoint avant mise en service.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
 

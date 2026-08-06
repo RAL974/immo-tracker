@@ -432,6 +432,62 @@ async function handleRequest(request) {
     return json(mapped);
   }
 
+  // ── Module Matériel IT (téléphones, puis ordinateurs) — hors circuit immobilisations,
+  // détenteur courant dérivé du dernier Mouvement_Materiel_IT par appareil (même principe que
+  // Mouvements/Immos, mais sans le workflow panne/réservation, pas nécessaire ici) ───────────
+  if (p.get('materiel_it') === '1') {
+    const [items, mouvements] = await Promise.all([
+      paginate(GL + '/Materiel_IT/items?$expand=fields&$top=500', 8),
+      paginate(GL + '/Mouvements_Materiel_IT/items?$expand=fields&$top=2000', 10)
+    ]);
+    const mvByCode = {};
+    mouvements.forEach(i => {
+      const f = i.fields || {};
+      const code = f.Title || '';
+      const h = f.Horodatage || f.Created || '';
+      if (!mvByCode[code] || new Date(h) > new Date(mvByCode[code].horodatage)) {
+        mvByCode[code] = { code_employe: f.Code_Employe || '', nom_detenteur: f.Nom_Detenteur || '', horodatage: h };
+      }
+    });
+    return json(items.map(i => {
+      const f = i.fields || {};
+      const code = f.Title || '';
+      const det = mvByCode[code] || null;
+      return {
+        id: i.id, code, type_materiel: f.Type_Materiel || '', marque: f.Marque || '', modele: f.Modele || '',
+        n_serie: f.N_Serie || '', site: f.Site || '', statut: f.Statut || 'En service',
+        date_sortie_service: f.Date_Sortie_Service || '', cout_mensuel: f.Cout_Mensuel != null ? f.Cout_Mensuel : 0,
+        n_telephone: f.N_Telephone || '', operateur: f.Operateur || '', n_carte_sim: f.N_Carte_SIM || '',
+        code_pin: f.Code_PIN || '', code_puk: f.Code_PUK || '', code_rio: f.Code_RIO || '', code_deverrouillage: f.Code_Deverrouillage || '',
+        commentaire: f.Commentaire || '',
+        detenteur_code: det ? det.code_employe : '', detenteur_nom: det ? det.nom_detenteur : '', depuis: det ? det.horodatage : ''
+      };
+    }));
+  }
+
+  if (p.get('mouvements_materiel_it')) {
+    const code = p.get('mouvements_materiel_it');
+    const items = await paginate(GL + "/Mouvements_Materiel_IT/items?$expand=fields&$top=2000", 10);
+    const mapped = items.filter(i => (i.fields || {}).Title === code).map(i => {
+      const f = i.fields || {};
+      return { id: i.id, code_employe: f.Code_Employe || '', nom_detenteur: f.Nom_Detenteur || '', note: f.Note || '', horodatage: f.Horodatage || f.Created || '' };
+    }).sort((a, b) => new Date(b.horodatage) - new Date(a.horodatage));
+    return json(mapped);
+  }
+
+  if (p.get('next_code_materiel_it')) {
+    const prefixe = (p.get('next_code_materiel_it') || 'TEL').toUpperCase().replace(/[^A-Z]/g, '') || 'TEL';
+    let maxNum = 0;
+    const items = await paginate(GL + "/Materiel_IT/items?$expand=fields($select=Title)&$top=200", 10);
+    items.forEach(it => {
+      const t = (it.fields && it.fields.Title) || '';
+      const m = new RegExp('^' + prefixe + '(\\d{1,6})$').exec(t);
+      if (m) { const n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+    });
+    const next = prefixe + String(maxNum + 1).padStart(6, '0');
+    return json({ next_code: next, max_num: maxNum });
+  }
+
   // ── Réservations par employé ──────────────────────────────────────────────────
   if (p.get('mes_reservations')) {
     const code = p.get('mes_reservations');
@@ -1793,6 +1849,113 @@ async function handleRequest(request) {
         const r = await fetch(GL + '/Lignes_Outillage/items/' + ligneId, { method: 'DELETE', headers: H });
         return json({ success: r.ok || r.status === 204 });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Module Matériel IT (téléphones, puis ordinateurs) — hors circuit immobilisations ────
+    // Ajouter un appareil au catalogue (code auto-généré côté dashboard via ?next_code_materiel_it=)
+    if (action === 'ajouter_materiel_it') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const code = (body.code || '').trim().toUpperCase();
+      if (!/^[A-Z]{2,4}\d{6}$/.test(code)) return json({ success: false, error: 'code_invalide', message: 'Le code doit être au format préfixe + 6 chiffres (ex: TEL000001).' });
+      const dup = await fetch(GL + "/Materiel_IT/items?$filter=fields/Title eq '" + code + "'&$top=1", { headers: H });
+      const dupData = await dup.json();
+      if ((dupData.value || []).length > 0) return json({ success: false, error: 'doublon', message: 'Le code ' + code + ' existe déjà.' });
+      const f = { Title: code, Site: (body.site === 'Mayotte') ? 'Mayotte' : 'Reunion', Statut: 'En service' };
+      if (body.type_materiel) f.Type_Materiel = body.type_materiel;
+      if (body.marque) f.Marque = body.marque;
+      if (body.modele) f.Modele = body.modele;
+      if (body.n_serie) f.N_Serie = body.n_serie;
+      if (body.cout_mensuel != null && body.cout_mensuel !== '') f.Cout_Mensuel = Number(body.cout_mensuel);
+      if (body.n_telephone) f.N_Telephone = body.n_telephone;
+      if (body.operateur) f.Operateur = body.operateur;
+      if (body.n_carte_sim) f.N_Carte_SIM = body.n_carte_sim;
+      if (body.code_pin) f.Code_PIN = body.code_pin;
+      if (body.code_puk) f.Code_PUK = body.code_puk;
+      if (body.code_rio) f.Code_RIO = body.code_rio;
+      if (body.code_deverrouillage) f.Code_Deverrouillage = body.code_deverrouillage;
+      if (body.commentaire) f.Commentaire = body.commentaire;
+      try {
+        const r = await fetch(GL + '/Materiel_IT/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: f }) });
+        const rd = await r.json();
+        if (r.ok) return json({ success: true, code: code, id: rd.id });
+        return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Modifier les champs d'un appareil (fiche technique, statut, sortie de service, coût mensuel...)
+    if (action === 'maj_materiel_it') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const f = {};
+      if (body.type_materiel != null) f.Type_Materiel = body.type_materiel;
+      if (body.marque != null) f.Marque = body.marque;
+      if (body.modele != null) f.Modele = body.modele;
+      if (body.n_serie != null) f.N_Serie = body.n_serie;
+      if (body.site) f.Site = body.site === 'Mayotte' ? 'Mayotte' : 'Reunion';
+      if (body.statut != null) f.Statut = body.statut;
+      if (body.date_sortie_service != null) f.Date_Sortie_Service = body.date_sortie_service || null;
+      if (body.cout_mensuel != null) f.Cout_Mensuel = body.cout_mensuel === '' ? null : Number(body.cout_mensuel);
+      if (body.n_telephone != null) f.N_Telephone = body.n_telephone;
+      if (body.operateur != null) f.Operateur = body.operateur;
+      if (body.n_carte_sim != null) f.N_Carte_SIM = body.n_carte_sim;
+      if (body.code_pin != null) f.Code_PIN = body.code_pin;
+      if (body.code_puk != null) f.Code_PUK = body.code_puk;
+      if (body.code_rio != null) f.Code_RIO = body.code_rio;
+      if (body.code_deverrouillage != null) f.Code_Deverrouillage = body.code_deverrouillage;
+      if (body.commentaire != null) f.Commentaire = body.commentaire;
+      try {
+        const r = await fetch(GL + '/Materiel_IT/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(f) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Affecter un appareil (crée un Mouvement_Materiel_IT — le dernier mouvement par appareil
+    // détermine le détenteur courant, même principe que les Mouvements des immos mais sans le
+    // workflow panne/réservation, inutile ici)
+    if (action === 'affecter_materiel_it') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const code = (body.code || '').trim().toUpperCase();
+      if (!code) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Mouvements_Materiel_IT/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: code, Code_Employe: body.code_employe || '', Nom_Detenteur: body.nom_detenteur || '', Note: body.note || '', Horodatage: new Date().toISOString()
+        } }) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial du catalogue (migration one-shot depuis le fichier Excel de suivi)
+    if (action === 'bulk_import_materiel_it') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Materiel_IT/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: {
+          Title: x.code || '', Type_Materiel: x.type_materiel || '', Marque: x.marque || '', Modele: x.modele || '',
+          N_Serie: x.n_serie || '', Site: x.site || 'Reunion', Statut: x.statut || 'En service',
+          Date_Sortie_Service: x.date_sortie_service || null, Cout_Mensuel: x.cout_mensuel != null ? x.cout_mensuel : null,
+          N_Telephone: x.n_telephone || '', Operateur: x.operateur || '', N_Carte_SIM: x.n_carte_sim || '',
+          Code_PIN: x.code_pin || '', Code_PUK: x.code_puk || '', Code_RIO: x.code_rio || '', Code_Deverrouillage: x.code_deverrouillage || '',
+          Commentaire: x.commentaire || ''
+        } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Import initial de l'historique de détention (une ligne = un mouvement, migration one-shot)
+    if (action === 'bulk_import_mouvements_materiel_it') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Mouvements_Materiel_IT/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: {
+          Title: x.code || '', Code_Employe: x.code_employe || '', Nom_Detenteur: x.nom_detenteur || '', Note: x.note || '', Horodatage: x.horodatage || new Date().toISOString()
+        } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
     // ── Déclarer vol ou disparition ──
