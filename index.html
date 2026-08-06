@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1A3A6B">
   <title>Immo Tracker – Electricité Services Réunion</title>
+  <!-- Observabilité (août 2026) : remonte les erreurs JS en temps réel plutôt que de les découvrir
+       via une plainte utilisateur (voir 04_HISTORIQUE_DECISIONS.md) — DSN pas un secret, prévu pour
+       être embarqué côté client. Chargé tôt pour capter les erreurs des scripts suivants aussi. -->
+  <script src="https://browser.sentry-cdn.com/10.69.0/bundle.min.js" crossorigin="anonymous"></script>
+  <script>if(window.Sentry)Sentry.init({dsn:"https://8823eceab72dee7235becd4b7bd40e26@o4511863564533760.ingest.de.sentry.io/4511863574560848",environment:"pwa"});</script>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <style>
