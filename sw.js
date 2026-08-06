@@ -47,7 +47,13 @@ self.addEventListener('fetch', event => {
   // App shell : réseau d'abord (fraîcheur à chaque déploiement), cache en repli si hors-ligne.
   event.respondWith(
     fetch(req).then(res => {
-      if (res.ok) caches.open(CACHE_NAME).then(cache => cache.put(req, res.clone()));
+      // clone() DOIT être appelé avant tout passage asynchrone (ex. caches.open() qui n'est pas
+      // encore résolu) — sinon le corps de la réponse peut déjà être en cours de lecture par le
+      // navigateur au moment où clone() s'exécute, d'où "Response body is already used".
+      if (res.ok) {
+        const resPourCache = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(req, resPourCache));
+      }
       return res;
     }).catch(() =>
       caches.match(req).then(cached => cached || caches.match('./index.html'))
