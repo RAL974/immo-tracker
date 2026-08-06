@@ -693,6 +693,12 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - **Étape bloquante côté William** : créer les 2 listes SharePoint avant mise en service.
 - **Incident au premier import** : `Materiel_IT` restée vide malgré un import qui semblait progresser (`Mouvements_Materiel_IT` OK). Cause : colonne créée sous le nom interne `Code_deverouillage` (pas `Code_Deverrouillage`) — un seul champ non reconnu fait échouer toute la ligne. Corrigé dans `worker.js`, diagnostiqué en lecture seule via `?debug_columns=<liste>`. Même leçon que l'incident `Fabricant`/`Fabriquant`.
 
+## Mode hors-ligne de la PWA (service worker, août 2026)
+- Périmètre choisi avec William (2 options proposées) : coquille + données en cache (l'app s'ouvre hors-ligne, affiche les dernières données connues) — **pas** de file d'attente des actions hors-ligne (trop risqué en une seule passe, réflexion dédiée si besoin confirmé).
+- Nouveau `sw.js` : coquille (`index.html`/`app.js`/`manifest.json`/logos) en réseau-d'abord-repli-cache, catalogues `immos.json`/`employes.json` en cache-d'abord-rafraîchi-en-arrière-plan. Les appels au Worker (données live) ne sont jamais interceptés — échec propre si hors-ligne, pas de données périmées affichées comme à jour.
+- Bannière hors-ligne ajoutée dans `index.html` (écoute `online`/`offline`).
+- Vérifié dans le navigateur : SW activé, 8 ressources en cache, bascule de la bannière testée.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
 
