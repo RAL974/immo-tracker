@@ -26,6 +26,69 @@ async function handleRequest(request) {
   const p   = url.searchParams;
   const json = (data, s) => new Response(JSON.stringify(data), { status: s || 200, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
+  // ── Jeton de session signé (HMAC-SHA256), émis à la connexion dashboard (verify_password) ──
+  // Vérifié côté serveur avant toute action sensible (admin ou gestion dépôt) — avant août 2026,
+  // ces actions n'étaient protégées que côté affichage (boutons cachés), jamais côté Worker :
+  // n'importe qui connaissant l'URL du Worker (public depuis que worker.js est commité sur GitHub)
+  // pouvait appeler ajouter_immo, maj_droits, etc. sans être authentifié. Corrigé ici.
+  // SESSION_SECRET_ENV est une variable d'environnement Cloudflare distincte de CLIENT_SECRET_ENV
+  // (Settings > Variables and Secrets) — si elle n'est pas définie, la connexion au dashboard
+  // continue de fonctionner mais aucune action protégée ne pourra s'exécuter (échec explicite
+  // 'session_secret_manquant'), plutôt qu'une panne totale du Worker pour tout le monde.
+  const SESSION_SECRET = (typeof SESSION_SECRET_ENV !== 'undefined' && SESSION_SECRET_ENV) || (typeof globalThis !== 'undefined' && globalThis.SESSION_SECRET_ENV) || '';
+  const SESSION_DUREE_MS = 12 * 3600 * 1000; // 12h — une session dure une journée de travail large
+  const b64url = (bytes) => btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(bytes)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64urlToBytes = (s) => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
+  async function getSessionKey() {
+    if (!SESSION_SECRET) return null;
+    return crypto.subtle.importKey('raw', new TextEncoder().encode(SESSION_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+  }
+  async function signSession(code, role) {
+    const key = await getSessionKey();
+    if (!key) return null;
+    const payloadB64 = b64url(new TextEncoder().encode(JSON.stringify({ code: code, role: role || '', exp: Date.now() + SESSION_DUREE_MS })));
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadB64));
+    return payloadB64 + '.' + b64url(sig);
+  }
+  async function verifySession(token) {
+    if (!token || token.indexOf('.') === -1) return null;
+    const key = await getSessionKey();
+    if (!key) return null;
+    const parts = token.split('.');
+    let valid;
+    try { valid = await crypto.subtle.verify('HMAC', key, b64urlToBytes(parts[1]), new TextEncoder().encode(parts[0])); } catch (e) { return null; }
+    if (!valid) return null;
+    let payload;
+    try { payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[0]))); } catch (e) { return null; }
+    if (!payload.exp || payload.exp < Date.now()) return null;
+    return payload; // { code, role, exp }
+  }
+  function roleNorm(r) { return (r || '').toLowerCase().replace(/[\s-]+/g, '_'); }
+  function estAdminSession(session) {
+    if (!session) return false;
+    if (GESTIONNAIRES.includes(session.code)) return true; // super-admins permanents (ex. AIWI), comme côté client
+    return roleNorm(session.role) === 'admin';
+  }
+  function estGarantSession(session) {
+    if (estAdminSession(session)) return true;
+    const r = roleNorm(session.role);
+    return r === 'logistique' || r === 'logistique_mayotte';
+  }
+  async function requireAdmin(reqBody) {
+    if (!SESSION_SECRET) return { ok: false, error: 'session_secret_manquant' };
+    const session = await verifySession(reqBody.token);
+    if (!session) return { ok: false, error: 'session_invalide' };
+    if (!estAdminSession(session)) return { ok: false, error: 'droits_insuffisants' };
+    return { ok: true, session: session };
+  }
+  async function requireGarant(reqBody) {
+    if (!SESSION_SECRET) return { ok: false, error: 'session_secret_manquant' };
+    const session = await verifySession(reqBody.token);
+    if (!session) return { ok: false, error: 'session_invalide' };
+    if (!estGarantSession(session)) return { ok: false, error: 'droits_insuffisants' };
+    return { ok: true, session: session };
+  }
+
   // ── Hachage sécurisé des mots de passe (PBKDF2 / SHA-256, jamais stocké en clair) ──
   const bytesToHex = (buf) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   const hexToBytes = (hex) => { const a = new Uint8Array(hex.length / 2); for (let i = 0; i < a.length; i++) a[i] = parseInt(hex.substr(i * 2, 2), 16); return a; };
@@ -42,11 +105,11 @@ async function handleRequest(request) {
     const recomputed = await hashPassword(password, saltHex);
     return recomputed === stored;
   }
-  // Retrouve l'itemId (et le hash stocké) d'un employé par son code
+  // Retrouve l'itemId (le hash stocké et le rôle) d'un employé par son code
   async function getEmployeAuth(code) {
     const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + code + "'&$top=5", { headers: H });
     const cd = await cur.json();
-    const items = (cd.value || []).map(i => ({ id: i.id, hash: (i.fields || {}).MotDePasse || '' }));
+    const items = (cd.value || []).map(i => ({ id: i.id, hash: (i.fields || {}).MotDePasse || '', role: (i.fields || {}).Code_CT || (i.fields || {}).Droits || '' }));
     return items;
   }
 
@@ -553,7 +616,9 @@ async function handleRequest(request) {
       const withHash = items.find(it => it.hash);
       if (!withHash) return json({ success: false, needs_setup: true });
       const ok = await verifyPassword(body.password || '', withHash.hash);
-      return json({ success: ok, needs_setup: false });
+      if (!ok) return json({ success: false, needs_setup: false });
+      const token = await signSession(code, withHash.role);
+      return json({ success: true, needs_setup: false, token: token, role: withHash.role || '' });
     }
 
     // ── Définir / changer un mot de passe ──
@@ -575,12 +640,19 @@ async function handleRequest(request) {
       for (const it of items) {
         try { const r = await fetch(GL + '/Employes/items/' + it.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ MotDePasse: newHash }) }); if (r.ok) okCount++; } catch (e) {}
       }
-      return json({ success: okCount > 0 });
+      if (okCount === 0) return json({ success: false });
+      // is_reset = un admin réinitialise le mot de passe de quelqu'un d'autre : pas de jeton pour la
+      // session de l'admin appelant (le code concerné n'est pas forcément le sien).
+      if (body.is_reset) return json({ success: true });
+      const role = (items.find(it => it.role) || {}).role || '';
+      const token = await signSession(code, role);
+      return json({ success: true, token: token, role: role });
     }
 
     // ── Réinitialiser un mot de passe (efface le hash → l'employé en recrée un) ──
     if (action === 'reset_password') {
-      if (body.confirm !== 'ESPACE-SOLEIL') return json({ success: false, error: 'confirmation_requise' });
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      if (body.confirm !== 'ESR-CONFIRME') return json({ success: false, error: 'confirmation_requise' });
       const code = (body.code || '').trim();
       const items = await getEmployeAuth(code);
       if (!items.length) return json({ success: false, error: 'employe_introuvable' });
@@ -604,6 +676,7 @@ async function handleRequest(request) {
     // SharePoint puis marque FDS_URL sur l'immo avec un repère "FDS:code/filename" — le proxy de lecture
     // (?fds=code) sert alors le fichier directement depuis le drive, sans passer par un lien de partage.
     if (action === 'upload_fds') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const codeIm = (body.code_im || '').trim().toUpperCase();
       if (!codeIm || !body.data) return json({ success: false, error: 'donnees_invalides' });
       try {
@@ -629,6 +702,7 @@ async function handleRequest(request) {
 
     // ── Mettre à jour le rôle/droits d'un employé ──
     if (action === 'maj_droits') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       let itemId = body.item_id;
       if (!itemId) {
         // Retrouver l'item par code (essai Title puis Code)
@@ -654,6 +728,7 @@ async function handleRequest(request) {
 
     // ── Mettre à jour le site de rattachement d'un employé ──
     if (action === 'maj_site_employe') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       let itemId = body.item_id;
       if (!itemId) {
         const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + body.code + "'&$top=1", { headers: H });
@@ -673,6 +748,7 @@ async function handleRequest(request) {
     // ── Mettre à jour l'emplacement (site) d'une immo ──
     // ── Ajouter une immobilisation ──
     if (action === 'ajouter_immo') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const code = (body.code_im || '').trim().toUpperCase();
       if (!/^IM\d{6}$/.test(code)) return json({ success: false, error: 'code_invalide', message: 'Le code doit être au format IMxxxxxx (6 chiffres).' });
       // Vérification anti-doublon BLOQUANTE
@@ -706,6 +782,7 @@ async function handleRequest(request) {
     // directement un Mouvement (Transfert vers un détenteur, ou Retour vers DEPOT) — hors flux "en attente
     // de validation", utilisé par l'import fichier du dashboard (immos ajoutées "déjà sur le terrain").
     if (action === 'importer_affectation_immo') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const codeIm = (body.code_im || '').trim().toUpperCase();
       if (!codeIm) return json({ success: false, error: 'donnees_invalides' });
       try {
@@ -720,6 +797,7 @@ async function handleRequest(request) {
 
     // ── Ajouter un employé ──
     if (action === 'ajouter_employe') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const code = (body.code || '').trim().toUpperCase();
       if (!code || code.length < 2) return json({ success: false, error: 'code_invalide', message: 'Code employé requis (min. 2 caractères).' });
       // Anti-doublon BLOQUANT
@@ -744,6 +822,7 @@ async function handleRequest(request) {
     // ── Mettre à jour la durée d'amortissement d'une immo ──
     // ── Mise à jour groupée d'immos (migration EBP) via Graph $batch ──
     if (action === 'bulk_patch_immos') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const patches = body.patches || []; // [{id, fields}, ...] max 20
       if (!patches.length) return json({ success: false, error: 'aucun_patch' });
       const requests = patches.slice(0, 20).map((pp, idx) => ({
@@ -783,6 +862,7 @@ async function handleRequest(request) {
     }
 
     if (action === 'maj_site_immo') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const code = (body.code_im || '').trim();
       if (!code) return json({ success: false, error: 'code_manquant' });
       const site = (body.site === 'Mayotte') ? 'Mayotte' : 'Reunion';
@@ -799,7 +879,8 @@ async function handleRequest(request) {
     }
     // ── Nettoyage des doublons d'employés (garde 1 ligne par code) ──
     if (action === 'dedupe_employes') {
-      if (body.confirm !== 'ESPACE-SOLEIL') return json({ success: false, error: 'confirmation_requise' });
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      if (body.confirm !== 'ESR-CONFIRME') return json({ success: false, error: 'confirmation_requise' });
       const emp = await paginate(GL + '/Employes/items?$expand=fields&$top=300', 6);
       // Grouper par code (Title)
       const groupes = {};
@@ -831,6 +912,7 @@ async function handleRequest(request) {
 
     // ── Basculer Actif / Inactif d'un employé ──
     if (action === 'maj_actif') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       let itemId = body.item_id;
       if (!itemId) {
         const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + body.code + "'&$top=1", { headers: H });
@@ -849,7 +931,8 @@ async function handleRequest(request) {
 
     // ── SEED : appliquer les sites aux immos (one-shot) ──
     if (action === 'seed_immo_sites') {
-      if (body.confirm !== 'ESPACE-SOLEIL') return json({ success: false, error: 'confirmation_requise' });
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      if (body.confirm !== 'ESR-CONFIRME') return json({ success: false, error: 'confirmation_requise' });
       const SITES = {"IM000018":"Reunion","IM000021":"Reunion","IM000178":"Reunion","IM000179":"Reunion","IM000180":"Reunion","IM000182":"Reunion","IM000204":"Reunion","IM000210":"Reunion","IM000809":"Reunion","IM000810":"Reunion","IM000928":"Reunion","IM000929":"Reunion","IM000931":"Reunion","IM001153":"Reunion","IM001154":"Reunion","IM001155":"Reunion","IM001156":"Reunion","IM001157":"Reunion","IM001158":"Reunion","IM001159":"Reunion","IM001025":"Reunion","IM000009":"Reunion","IM000037":"Reunion","IM000047":"Reunion","IM000064":"Reunion","IM000076":"Reunion","IM000078":"Reunion","IM000080":"Reunion","IM000087":"Reunion","IM000102":"Reunion","IM000148":"Reunion","IM000174":"Reunion","IM000226":"Mayotte","IM000227":"Reunion","IM000228":"Reunion","IM000229":"Reunion","IM000230":"Reunion","IM000232":"Reunion","IM000234":"Reunion","IM000237":"Reunion","IM000238":"Reunion","IM000240":"Reunion","IM000241":"Reunion","IM000242":"Reunion","IM000247":"Reunion","IM000250":"Reunion","IM000251":"Reunion","IM000252":"Mayotte","IM000253":"Reunion","IM000265":"Reunion","IM000281":"Reunion","IM000319":"Mayotte","IM000322":"Reunion","IM000323":"Reunion","IM000331":"Reunion","IM000350":"Mayotte","IM000351":"Reunion","IM000352":"Reunion","IM000353":"Reunion","IM000362":"Reunion","IM000363":"Reunion","IM000364":"Reunion","IM000365":"Reunion","IM000367":"Reunion","IM000400":"Reunion","IM000401":"Reunion","IM000403":"Mayotte","IM000404":"Reunion","IM000405":"Reunion","IM000407":"Reunion","IM000408":"Reunion","IM000409":"Reunion","IM000410":"Reunion","IM000411":"Reunion","IM000415":"Reunion","IM000416":"Mayotte","IM000445":"Mayotte","IM000446":"Reunion","IM000455":"Reunion","IM000459":"Mayotte","IM000460":"Mayotte","IM000462":"Reunion","IM000464":"Reunion","IM000465":"Reunion","IM000466":"Reunion","IM000467":"Reunion","IM000468":"Reunion","IM000482":"Reunion","IM000486":"Reunion","IM000487":"Reunion","IM000502":"Reunion","IM000503":"Reunion","IM000507":"Reunion","IM000515":"Reunion","IM000516":"Reunion","IM000517":"Reunion","IM000518":"Reunion","IM000519":"Reunion","IM000527":"Reunion","IM000528":"Reunion","IM000531":"Reunion","IM000532":"Reunion","IM000533":"Reunion","IM000534":"Reunion","IM000535":"Reunion","IM000536":"Reunion","IM000541":"Reunion","IM000542":"Reunion","IM000543":"Reunion","IM000556":"Reunion","IM000557":"Reunion","IM000560":"Reunion","IM000561":"Reunion","IM000562":"Reunion","IM000563":"Reunion","IM000564":"Reunion","IM000565":"Reunion","IM000567":"Mayotte","IM000568":"Mayotte","IM000569":"Mayotte","IM000582":"Reunion","IM000583":"Reunion","IM000584":"Reunion","IM000585":"Reunion","IM000591":"Reunion","IM000600":"Reunion","IM000603":"Reunion","IM000614":"Mayotte","IM000615":"Mayotte","IM000616":"Mayotte","IM000637":"Reunion","IM000640":"Reunion","IM000642":"Reunion","IM000652":"Reunion","IM000660":"Mayotte","IM000661":"Mayotte","IM000676":"Reunion","IM000687":"Reunion","IM000688":"Reunion","IM000699":"Mayotte","IM000700":"Mayotte","IM000701":"Mayotte","IM000702":"Mayotte","IM000703":"Mayotte","IM000704":"Mayotte","IM000705":"Mayotte","IM000706":"Mayotte","IM000718":"Reunion","IM000720":"Reunion","IM000725":"Mayotte","IM000758":"Reunion","IM000766":"Mayotte","IM000775":"Mayotte","IM000776":"Mayotte","IM000777":"Mayotte","IM000781":"Reunion","IM000782":"Mayotte","IM000783":"Mayotte","IM000784":"Mayotte","IM000785":"Mayotte","IM000786":"Mayotte","IM000787":"Mayotte","IM000788":"Mayotte","IM000815":"Reunion","IM000832":"Reunion","IM000835":"Reunion","IM000857":"Reunion","IM000869":"Reunion","IM000890":"Reunion","IM000894":"Reunion","IM000895":"Reunion","IM000905":"Reunion","IM000909":"Reunion","IM000917":"Reunion","IM000918":"Reunion","IM000919":"Reunion","IM000932":"Reunion","IM000933":"Reunion","IM000934":"Reunion","IM000935":"Reunion","IM000936":"Reunion","IM000937":"Reunion","IM000938":"Reunion","IM000939":"Reunion","IM000942":"Reunion","IM000943":"Reunion","IM000944":"Reunion","IM000945":"Reunion","IM000946":"Reunion","IM000950":"Reunion","IM000951":"Reunion","IM000952":"Reunion","IM000953":"Reunion","IM000954":"Reunion","IM000955":"Reunion","IM000956":"Reunion","IM000957":"Reunion","IM001029":"Reunion","IM001030":"Reunion","IM001031":"Reunion","IM001041":"Reunion","IM001042":"Reunion","IM001043":"Reunion","IM001044":"Reunion","IM001056":"Reunion","IM001057":"Reunion","IM001062":"Reunion","IM001088":"Reunion","IM001089":"Reunion","IM001090":"Reunion","IM001091":"Reunion","IM001092":"Reunion","IM001104":"Reunion","IM001105":"Reunion","IM001106":"Reunion","IM001107":"Reunion","IM001108":"Reunion","IM001109":"Reunion","IM001110":"Reunion","IM001111":"Reunion","IM001112":"Reunion","IM001113":"Reunion","IM001114":"Reunion","IM001115":"Reunion","IM001117":"Reunion","IM001119":"Reunion","IM001120":"Reunion","IM001121":"Reunion","IM001122":"Reunion","IM001123":"Mayotte","IM001124":"Mayotte","IM001125":"Mayotte","IM001133":"Reunion","IM001151":"Reunion","IM001161":"Reunion","IM001162":"Reunion","IM000046":"Reunion","IM000058":"Reunion","IM000105":"Reunion","IM000137":"Reunion","IM000146":"Reunion","IM000156":"Reunion","IM000162":"Reunion","IM000194":"Reunion","IM000222":"Reunion","IM000243":"Reunion","IM000245":"Reunion","IM000254":"Reunion","IM000255":"Reunion","IM000269":"Reunion","IM000293":"Mayotte","IM000318":"Reunion","IM000337":"Mayotte","IM000349":"Reunion","IM000357":"Reunion","IM000372":"Mayotte","IM000387":"Reunion","IM000427":"Reunion","IM000431":"Reunion","IM000432":"Reunion","IM000434":"Reunion","IM000436":"Reunion","IM000437":"Reunion","IM000438":"Reunion","IM000440":"Reunion","IM000442":"Reunion","IM000443":"Reunion","IM000456":"Reunion","IM000470":"Reunion","IM000476":"Reunion","IM000485":"Reunion","IM000499":"Reunion","IM000520":"Reunion","IM000523":"Reunion","IM000524":"Reunion","IM000529":"Mayotte","IM000537":"Reunion","IM000538":"Reunion","IM000539":"Reunion","IM000544":"Reunion","IM000551":"Reunion","IM000552":"Reunion","IM000553":"Reunion","IM000554":"Reunion","IM000555":"Reunion","IM000570":"Reunion","IM000608":"Reunion","IM000609":"Reunion","IM000610":"Reunion","IM000636":"Reunion","IM000638":"Reunion","IM000639":"Reunion","IM000647":"Reunion","IM000648":"Reunion","IM000669":"Reunion","IM000670":"Reunion","IM000684":"Reunion","IM000696":"Reunion","IM000722":"Mayotte","IM000727":"Mayotte","IM000728":"Mayotte","IM000737":"Reunion","IM000738":"Reunion","IM000739":"Reunion","IM000742":"Reunion","IM000743":"Reunion","IM000744":"Reunion","IM000745":"Reunion","IM000746":"Reunion","IM000748":"Reunion","IM000749":"Reunion","IM000759":"Reunion","IM000773":"Reunion","IM000778":"Mayotte","IM000779":"Mayotte","IM000780":"Mayotte","IM000801":"Reunion","IM000802":"Reunion","IM000803":"Reunion","IM000804":"Reunion","IM000833":"Reunion","IM000837":"Reunion","IM000864":"Reunion","IM000865":"Reunion","IM000866":"Reunion","IM000867":"Reunion","IM000877":"Mayotte","IM000891":"Reunion","IM000892":"Reunion","IM000893":"Reunion","IM000912":"Reunion","IM000914":"Reunion","IM000915":"Reunion","IM000926":"Reunion","IM000941":"Reunion","IM001026":"Reunion","IM001058":"Reunion","IM001059":"Reunion","IM001152":"Reunion","IM000024":"Reunion","IM000025":"Reunion","IM000029":"Reunion","IM000054":"Reunion","IM000055":"Reunion","IM000060":"Mayotte","IM000062":"Reunion","IM000063":"Reunion","IM000071":"Reunion","IM000113":"Reunion","IM000118":"Reunion","IM000135":"Reunion","IM000139":"Reunion","IM000140":"Reunion","IM000145":"Reunion","IM000166":"Reunion","IM000167":"Reunion","IM000168":"Reunion","IM000186":"Reunion","IM000189":"Reunion","IM000198":"Reunion","IM000203":"Reunion","IM000206":"Reunion","IM000207":"Reunion","IM000208":"Reunion","IM000211":"Reunion","IM000212":"Reunion","IM000213":"Reunion","IM000214":"Reunion","IM000216":"Reunion","IM000217":"Reunion","IM000220":"Reunion","IM000221":"Reunion","IM000257":"Reunion","IM000258":"Reunion","IM000263":"Reunion","IM000264":"Reunion","IM000266":"Reunion","IM000268":"Reunion","IM000270":"Reunion","IM000271":"Reunion","IM000274":"Reunion","IM000275":"Reunion","IM000276":"Reunion","IM000277":"Reunion","IM000278":"Reunion","IM000279":"Reunion","IM000280":"Reunion","IM000282":"Mayotte","IM000283":"Reunion","IM000284":"Reunion","IM000285":"Mayotte","IM000286":"Reunion","IM000289":"Reunion","IM000290":"Reunion","IM000291":"Reunion","IM000292":"Reunion","IM000294":"Reunion","IM000303":"Reunion","IM000304":"Reunion","IM000305":"Reunion","IM000306":"Reunion","IM000308":"Reunion","IM000309":"Reunion","IM000310":"Reunion","IM000311":"Reunion","IM000312":"Mayotte","IM000313":"Reunion","IM000314":"Reunion","IM000320":"Mayotte","IM000321":"Mayotte","IM000325":"Reunion","IM000326":"Reunion","IM000327":"Reunion","IM000328":"Reunion","IM000329":"Reunion","IM000330":"Reunion","IM000334":"Reunion","IM000348":"Reunion","IM000354":"Reunion","IM000355":"Reunion","IM000358":"Reunion","IM000360":"Reunion","IM000366":"Mayotte","IM000373":"Mayotte","IM000374":"Mayotte","IM000375":"Mayotte","IM000377":"Mayotte","IM000391":"Mayotte","IM000392":"Mayotte","IM000393":"Reunion","IM000394":"Mayotte","IM000395":"Mayotte","IM000396":"Mayotte","IM000397":"Mayotte","IM000399":"Reunion","IM000402":"Reunion","IM000417":"Mayotte","IM000418":"Mayotte","IM000419":"Mayotte","IM000420":"Mayotte","IM000421":"Reunion","IM000422":"Reunion","IM000424":"Reunion","IM000425":"Reunion","IM000426":"Reunion","IM000428":"Reunion","IM000429":"Reunion","IM000430":"Reunion","IM000433":"Reunion","IM000435":"Reunion","IM000448":"Reunion","IM000452":"Reunion","IM000457":"Mayotte","IM000458":"Mayotte","IM000469":"Reunion","IM000471":"Reunion","IM000472":"Reunion","IM000474":"Reunion","IM000475":"Mayotte","IM000479":"Reunion","IM000480":"Reunion","IM000481":"Reunion","IM000483":"Reunion","IM000488":"Reunion","IM000489":"Reunion","IM000492":"Reunion","IM000497":"Reunion","IM000498":"Reunion","IM000501":"Reunion","IM000508":"Reunion","IM000509":"Reunion","IM000510":"Reunion","IM000511":"Reunion","IM000512":"Reunion","IM000513":"Reunion","IM000514":"Reunion","IM000521":"Reunion","IM000522":"Reunion","IM000530":"Mayotte","IM000540":"Reunion","IM000545":"Reunion","IM000546":"Reunion","IM000558":"Reunion","IM000559":"Reunion","IM000566":"Mayotte","IM000571":"Mayotte","IM000572":"Mayotte","IM000573":"Mayotte","IM000574":"Mayotte","IM000575":"Reunion","IM000576":"Reunion","IM000586":"Reunion","IM000587":"Reunion","IM000588":"Reunion","IM000594":"Reunion","IM000595":"Reunion","IM000596":"Reunion","IM000597":"Reunion","IM000598":"Reunion","IM000599":"Reunion","IM000604":"Reunion","IM000611":"Mayotte","IM000612":"Mayotte","IM000613":"Mayotte","IM000617":"Mayotte","IM000632":"Reunion","IM000633":"Reunion","IM000634":"Reunion","IM000635":"Reunion","IM000644":"Mayotte","IM000645":"Mayotte","IM000646":"Reunion","IM000649":"Reunion","IM000650":"Reunion","IM000651":"Reunion","IM000662":"Reunion","IM000663":"Reunion","IM000664":"Reunion","IM000665":"Reunion","IM000672":"Reunion","IM000673":"Reunion","IM000674":"Reunion","IM000675":"Reunion","IM000677":"Reunion","IM000678":"Reunion","IM000697":"Reunion","IM000707":"Reunion","IM000708":"Mayotte","IM000710":"Mayotte","IM000711":"Mayotte","IM000712":"Mayotte","IM000713":"Mayotte","IM000714":"Mayotte","IM000715":"Mayotte","IM000716":"Mayotte","IM000717":"Reunion","IM000719":"Reunion","IM000723":"Mayotte","IM000724":"Mayotte","IM000726":"Reunion","IM000729":"Mayotte","IM000730":"Mayotte","IM000731":"Mayotte","IM000732":"Mayotte","IM000733":"Mayotte","IM000736":"Reunion","IM000740":"Reunion","IM000741":"Reunion","IM000750":"Reunion","IM000751":"Reunion","IM000752":"Reunion","IM000753":"Reunion","IM000754":"Reunion","IM000755":"Reunion","IM000756":"Reunion","IM000757":"Reunion","IM000760":"Reunion","IM000761":"Reunion","IM000767":"Reunion","IM000768":"Reunion","IM000769":"Reunion","IM000770":"Reunion","IM000772":"Reunion","IM000774":"Mayotte","IM000789":"Mayotte","IM000790":"Mayotte","IM000791":"Mayotte","IM000792":"Mayotte","IM000793":"Mayotte","IM000794":"Mayotte","IM000795":"Mayotte","IM000796":"Mayotte","IM000797":"Mayotte","IM000798":"Mayotte","IM000805":"Reunion","IM000806":"Mayotte","IM000811":"Reunion","IM000812":"Reunion","IM000813":"Reunion","IM000814":"Reunion","IM000816":"Reunion","IM000819":"Reunion","IM000820":"Reunion","IM000823":"Reunion","IM000825":"Reunion","IM000830":"Reunion","IM000834":"Reunion","IM000838":"Reunion","IM000839":"Reunion","IM000840":"Reunion","IM000843":"Reunion","IM000844":"Reunion","IM000848":"Reunion","IM000849":"Mayotte","IM000850":"Reunion","IM000851":"Reunion","IM000852":"Reunion","IM000853":"Reunion","IM000854":"Reunion","IM000855":"Reunion","IM000856":"Reunion","IM000862":"Reunion","IM000863":"Reunion","IM000868":"Reunion","IM000872":"Reunion","IM000873":"Reunion","IM000874":"Reunion","IM000875":"Mayotte","IM000876":"Mayotte","IM000878":"Reunion","IM000879":"Reunion","IM000880":"Reunion","IM000881":"Reunion","IM000882":"Reunion","IM000885":"Reunion","IM000886":"Reunion","IM000887":"Reunion","IM000888":"Reunion","IM000896":"Reunion","IM000907":"Reunion","IM000908":"Reunion","IM000920":"Reunion","IM000921":"Reunion","IM000922":"Reunion","IM000923":"Reunion","IM000924":"Reunion","IM000925":"Reunion","IM000927":"Reunion","IM000947":"Reunion","IM000948":"Reunion","IM000964":"Reunion","IM000965":"Reunion","IM000966":"Reunion","IM000967":"Reunion","IM000968":"Reunion","IM000969":"Reunion","IM000970":"Reunion","IM000971":"Reunion","IM000972":"Reunion","IM000973":"Reunion","IM000974":"Reunion","IM000975":"Reunion","IM000976":"Reunion","IM000977":"Reunion","IM000978":"Reunion","IM000979":"Reunion","IM000980":"Reunion","IM000981":"Reunion","IM000982":"Reunion","IM000983":"Reunion","IM000984":"Reunion","IM000985":"Reunion","IM000986":"Reunion","IM000987":"Reunion","IM000988":"Reunion","IM000989":"Reunion","IM000990":"Reunion","IM000991":"Reunion","IM000992":"Reunion","IM000993":"Reunion","IM000994":"Reunion","IM000995":"Reunion","IM000996":"Reunion","IM000997":"Reunion","IM000998":"Reunion","IM000999":"Reunion","IM001000":"Reunion","IM001001":"Reunion","IM001002":"Reunion","IM001003":"Reunion","IM001004":"Reunion","IM001005":"Reunion","IM001006":"Reunion","IM001007":"Reunion","IM001008":"Reunion","IM001009":"Reunion","IM001010":"Reunion","IM001011":"Reunion","IM001012":"Reunion","IM001013":"Reunion","IM001014":"Reunion","IM001015":"Reunion","IM001016":"Reunion","IM001017":"Reunion","IM001018":"Reunion","IM001019":"Reunion","IM001020":"Reunion","IM001021":"Reunion","IM001022":"Reunion","IM001023":"Reunion","IM001024":"Reunion","IM001027":"Reunion","IM001028":"Reunion","IM001035":"Reunion","IM001036":"Reunion","IM001037":"Reunion","IM001038":"Reunion","IM001039":"Reunion","IM001048":"Reunion","IM001049":"Reunion","IM001050":"Reunion","IM001051":"Reunion","IM001052":"Reunion","IM001053":"Reunion","IM001054":"Reunion","IM001055":"Reunion","IM001060":"Reunion","IM001061":"Reunion","IM001063":"Mayotte","IM001065":"Reunion","IM001066":"Reunion","IM001067":"Reunion","IM001068":"Reunion","IM001069":"Reunion","IM001070":"Reunion","IM001071":"Reunion","IM001072":"Reunion","IM001073":"Reunion","IM001074":"Reunion","IM001075":"Reunion","IM001076":"Reunion","IM001077":"Reunion","IM001078":"Reunion","IM001079":"Reunion","IM001080":"Reunion","IM001081":"Reunion","IM001082":"Reunion","IM001083":"Reunion","IM001084":"Reunion","IM001085":"Reunion","IM001086":"Reunion","IM001087":"Reunion","IM001093":"Reunion","IM001094":"Reunion","IM001095":"Reunion","IM001096":"Reunion","IM001097":"Reunion","IM001098":"Reunion","IM001099":"Reunion","IM001100":"Reunion","IM001101":"Reunion","IM001102":"Reunion","IM001103":"Reunion","IM001118":"Reunion","IM001131":"Reunion","IM001132":"Reunion","IM001137":"Mayotte","IM001138":"Mayotte","IM001139":"Reunion","IM001140":"Reunion","IM001142":"Reunion","IM001144":"Reunion","IM001147":"Reunion","IM001148":"Reunion","IM001149":"Reunion","IM001150":"Reunion","IM000041":"Reunion","IM000042":"Reunion","IM000091":"Reunion","IM000092":"Reunion","IM000094":"Reunion","IM000095":"Reunion","IM000096":"Reunion","IM000097":"Reunion","IM000098":"Reunion","IM000099":"Reunion","IM000100":"Reunion","IM000101":"Reunion","IM000120":"Reunion","IM000121":"Reunion","IM000122":"Reunion","IM000123":"Reunion","IM000124":"Reunion","IM000125":"Reunion","IM000127":"Reunion","IM000129":"Reunion","IM000130":"Reunion","IM000185":"Reunion","IM000187":"Reunion","IM000188":"Reunion","IM000287":"Reunion","IM000299":"Reunion","IM000300":"Reunion","IM000301":"Reunion","IM000339":"Mayotte","IM000340":"Mayotte","IM000341":"Mayotte","IM000342":"Mayotte","IM000378":"Mayotte","IM000379":"Mayotte","IM000380":"Mayotte","IM000381":"Mayotte","IM000382":"Mayotte","IM000383":"Mayotte","IM000384":"Mayotte","IM000385":"Mayotte","IM000386":"Mayotte","IM000618":"Mayotte","IM000619":"Mayotte","IM000620":"Mayotte","IM000621":"Mayotte","IM000622":"Mayotte","IM000623":"Mayotte","IM000624":"Mayotte","IM000625":"Mayotte","IM000626":"Mayotte","IM000627":"Mayotte","IM000628":"Mayotte","IM000629":"Mayotte","IM000630":"Mayotte","IM000631":"Mayotte","IM000653":"Reunion","IM000654":"Reunion","IM000108":"Reunion","IM000119":"Reunion","IM000133":"Reunion","IM000136":"Reunion","IM000138":"Reunion","IM000143":"Reunion","IM000169":"Reunion","IM000171":"Reunion","IM000176":"Reunion","IM000183":"Reunion","IM000262":"Reunion","IM000361":"Reunion","IM000376":"Mayotte","IM000389":"Reunion","IM000423":"Reunion","IM000451":"Reunion","IM000453":"Mayotte","IM000454":"Mayotte","IM000473":"Reunion","IM000493":"Reunion","IM000671":"Reunion","IM000679":"Reunion","IM000680":"Reunion","IM000681":"Reunion","IM000682":"Reunion","IM000695":"Reunion","IM000721":"Mayotte","IM000735":"Reunion","IM000765":"Reunion","IM000799":"Reunion","IM000800":"Reunion","IM000836":"Reunion","IM000845":"Reunion","IM000883":"Reunion","IM000884":"Reunion","IM000906":"Reunion","IM000940":"Reunion","IM000958":"Reunion","IM000959":"Reunion","IM000960":"Reunion","IM000961":"Reunion","IM000962":"Reunion","IM000963":"Reunion","IM001116":"Reunion","IM001129":"Reunion","IM001130":"Reunion","IM001141":"Reunion","IM001164":"Reunion","IM001166":"Reunion","IM001168":"Reunion","IM001169":"Reunion","IM000526":"Reunion","IM000589":"Reunion","IM000592":"Reunion","IM000747":"Reunion","IM000870":"Reunion","IM000019":"Reunion","IM000020":"Reunion","IM000106":"Reunion","IM000109":"Reunion","IM000177":"Reunion","IM000184":"Reunion","IM000272":"Reunion","IM000273":"Reunion","IM000343":"Reunion","IM000344":"Reunion","IM000345":"Reunion","IM000346":"Reunion","IM000347":"Reunion","IM000390":"Reunion","IM000412":"Reunion","IM000413":"Reunion","IM000414":"Reunion","IM000449":"Reunion","IM000450":"Reunion","IM000477":"Reunion","IM000478":"Reunion","IM000495":"Reunion","IM000496":"Reunion","IM000525":"Reunion","IM000547":"Reunion","IM000548":"Reunion","IM000550":"Reunion","IM000577":"Reunion","IM000578":"Reunion","IM000579":"Reunion","IM000580":"Reunion","IM000581":"Reunion","IM000605":"Reunion","IM000606":"Reunion","IM000607":"Reunion","IM000643":"Reunion","IM000655":"Reunion","IM000656":"Reunion","IM000657":"Reunion","IM000658":"Reunion","IM000659":"Reunion","IM000666":"Reunion","IM000667":"Reunion","IM000668":"Reunion","IM000685":"Reunion","IM000686":"Reunion","IM000689":"Reunion","IM000690":"Reunion","IM000691":"Reunion","IM000692":"Reunion","IM000693":"Reunion","IM000694":"Reunion","IM000734":"Reunion","IM000763":"Reunion","IM000764":"Reunion","IM000771":"Mayotte","IM000807":"Reunion","IM000808":"Reunion","IM000826":"Reunion","IM000827":"Reunion","IM000828":"Reunion","IM000829":"Reunion","IM000831":"Reunion","IM000871":"Reunion","IM000889":"Reunion","IM000897":"Reunion","IM000898":"Reunion","IM000899":"Reunion","IM000900":"Reunion","IM000901":"Reunion","IM000902":"Reunion","IM000903":"Reunion","IM000904":"Reunion","IM000930":"Reunion","IM000949":"Reunion","IM001032":"Reunion","IM001033":"Reunion","IM001034":"Reunion","IM001040":"Reunion","IM001045":"Reunion","IM001046":"Reunion","IM001128":"Reunion","IM001145":"Reunion","IM001146":"Reunion","IM001165":"Reunion","IM000032":"Reunion","IM000107":"Reunion","IM000114":"Reunion","IM000202":"Reunion","IM000267":"Reunion","IM000302":"Reunion","IM000388":"Reunion","IM000444":"Reunion","IM000447":"Reunion","IM000491":"Reunion","IM000504":"Reunion","IM000505":"Reunion","IM000506":"Reunion","IM000549":"Reunion","IM000593":"Reunion","IM000683":"Reunion","IM000709":"Reunion","IM000817":"Reunion","IM000818":"Reunion","IM000824":"Reunion","IM000858":"Reunion","IM000859":"Reunion","IM000860":"Reunion","IM000861":"Reunion","IM000910":"Reunion","IM000911":"Reunion","IM001127":"Reunion","IM001134":"Reunion","IM001135":"Reunion","IM001136":"Reunion","IM001163":"Reunion","IM001167":"Reunion","IM000111":"Reunion","IM000142":"Reunion","IM000181":"Reunion","IM000246":"Reunion","IM000368":"Reunion","IM000369":"Reunion","IM000461":"Reunion","IM000601":"Reunion","IM000602":"Reunion","IM000821":"Reunion","IM001143":"Reunion","IM000004":"Reunion","IM000005":"Reunion","IM000008":"Reunion","IM000016":"Reunion","IM000110":"Reunion","IM000141":"Reunion","IM000201":"Reunion","IM000205":"Reunion","IM000248":"Reunion","IM000249":"Reunion","IM000261":"Reunion","IM000336":"Reunion","IM000356":"Reunion","IM000359":"Reunion","IM000370":"Reunion","IM000490":"Reunion","IM000494":"Reunion","IM000590":"Reunion","IM000641":"Reunion","IM000762":"Reunion","IM000822":"Reunion","IM000842":"Reunion","IM001047":"Reunion","IM001064":"Reunion","IM001126":"Reunion","IM001160":"Reunion"};
       const items = await paginate(GL + '/Immos/items?$expand=fields&$top=500', 10);
       const idsByCode = {};
@@ -876,7 +959,8 @@ async function handleRequest(request) {
     }
 
     if (action === 'seed_roles_sites') {
-      if (body.confirm !== 'ESPACE-SOLEIL') return json({ success: false, error: 'confirmation_requise' });
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      if (body.confirm !== 'ESR-CONFIRME') return json({ success: false, error: 'confirmation_requise' });
       const SEED = {"CANI":["CT_Specialise","Reunion"],"PALO":["Ouvrier","Reunion"],"BOMA":["RA","Reunion"],"BAKA":["Admin","Reunion"],"ROJO":["RA","Reunion"],"GRWI":["Ouvrier","Reunion"],"BADA":["Ouvrier","Reunion"],"LAHU":["CT","Reunion"],"POGU":["Ouvrier","Reunion"],"NAJE":["Ouvrier","Reunion"],"MEJO":["CT","Reunion"],"PACH":["Ouvrier","Reunion"],"IADA":["Ouvrier","Reunion"],"BLFA":["Ouvrier","Reunion"],"LAJC":["Ouvrier","Reunion"],"FLDA":["Ouvrier","Reunion"],"REST":["Ouvrier","Reunion"],"RIJB":["CT","Reunion"],"PIBE":["Ouvrier_Specialise","Reunion"],"SEJU":["Ouvrier_Specialise","Reunion"],"PACA":["RA","Reunion"],"LEMI":["Ouvrier","Reunion"],"JADI":["Ouvrier","Reunion"],"LEWI":["Ouvrier","Reunion"],"AIWI":["Admin","Reunion"],"SAMA":["Ouvrier","Reunion"],"BIFL":["Ouvrier","Reunion"],"ROCH":["Ouvrier","Reunion"],"TUJM":["Ouvrier","Reunion"],"SCST":["CT","Reunion"],"MAMA":["Ouvrier","Reunion"],"MASA":["Ouvrier","Reunion"],"LEDI":["Ouvrier","Reunion"],"ROJY":["Ouvrier","Reunion"],"SIDE":["Ouvrier","Reunion"],"BENO":["Ouvrier","Reunion"],"AUAR":["Admin","Reunion"],"GASE":["Ouvrier","Reunion"],"SOBE":["Ouvrier","Reunion"],"PAYV":["Ouvrier","Reunion"],"CALU":["Ouvrier","Reunion"],"LAJD":["Ouvrier","Reunion"],"GOLU":["CT","Reunion"],"NAXA":["RA","Reunion"],"NALU":["Ouvrier","Reunion"],"COSY":["Ouvrier","Reunion"],"ORFA":["Ouvrier","Reunion"],"DUDE":["Ouvrier","Reunion"],"ANFL":["Ouvrier","Reunion"],"VILO":["Ouvrier","Reunion"],"ATMA":["Ouvrier","Reunion"],"MILU":["Ouvrier","Reunion"],"JEDA":["RA","Reunion"],"DEFR":["Ouvrier","Reunion"],"ZEYO":["Ouvrier","Reunion"],"VIMT":["Ouvrier","Reunion"],"RAJE":["Ouvrier","Reunion"],"IATH":["Ouvrier","Reunion"],"TASE":["Ouvrier","Reunion"],"LEPR":["Ouvrier","Reunion"],"DOYO":["RA","Reunion"],"BUAN":["Ouvrier","Reunion"],"MASE":["Ouvrier","Reunion"],"DUJU":["Ouvrier","Reunion"],"LAME":["Ouvrier","Reunion"],"ABLU":["Ouvrier","Reunion"],"COTA":["Ouvrier","Reunion"],"MIJE":["Ouvrier","Reunion"],"MOIB":["Ouvrier","Reunion"],"GAAN":["Ouvrier","Reunion"],"CONI":["Admin","Reunion"],"ELSL":["Ouvrier","Reunion"],"PARO":["Ouvrier","Reunion"],"ICPH":["Ouvrier","Reunion"],"FRLU":["Ouvrier","Reunion"],"DACH":["CT","Mayotte"],"FAZI":["Ouvrier","Mayotte"],"TOHO":["CT","Mayotte"],"CHMO":["Ouvrier","Mayotte"],"MIAN":["Ouvrier","Mayotte"],"ATAB":["Ouvrier","Mayotte"],"SOMO":["Ouvrier","Mayotte"],"SAAL":["Ouvrier","Mayotte"],"BOFA":["Ouvrier","Mayotte"],"MKSA":["Ouvrier","Mayotte"],"ELSA":["Ouvrier","Mayotte"],"MOEL":["Ouvrier","Mayotte"],"ABNA":["Ouvrier","Mayotte"],"AHAB":["Ouvrier","Mayotte"],"NAIR":["Ouvrier","Mayotte"],"SAEL":["Logistique_Mayotte","Mayotte"],"MOAS":["Ouvrier","Mayotte"],"MACH":["Ouvrier","Mayotte"],"SAAB":["Ouvrier","Mayotte"],"TOAO":["Ouvrier","Mayotte"],"YOAN":["Ouvrier","Mayotte"],"ALMH":["Ouvrier","Mayotte"]};
       // Charger tous les employés une fois. Gérer les DOUBLONS : un code peut avoir plusieurs itemId.
       const emp = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
@@ -966,6 +1050,7 @@ async function handleRequest(request) {
 
     // ── Marquer statut immo (HS définitive / Perdu / En panne) ──
     if (action === 'marquer_statut_immo') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const fields = { Etat: body.etat };
       if (body.actif !== undefined) fields.Actif = body.actif;
       // Stocker le motif dans Note si dispo, sinon dans Commentaire
@@ -982,6 +1067,7 @@ async function handleRequest(request) {
 
     // ── Mettre à jour le suivi d'une panne (prestataire, coût, note) ──
     if (action === 'maj_panne') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       // Créer un mouvement de suivi — marqueur ##PRESTA:Nom## non-ambigu pour la localisation
       const note = '[SUIVI ' + new Date().toLocaleDateString('fr-FR') + ']' +
         (body.prestataire ? ' ##PRESTA:' + body.prestataire + '## Prestataire: ' + body.prestataire : '') +
@@ -1035,6 +1121,7 @@ async function handleRequest(request) {
     // Mouvement de type "Entretien" : coût structuré compté dans le seuil de réforme du dashboard,
     // mais SANS impact sur la localisation actuelle de l'immo (contrairement à "Réparation").
     if (action === 'enregistrer_reparation') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const coutNum = parseFloat((body.cout_reparation || '').toString().replace(',', '.')) || 0;
       if (!body.code_im || coutNum <= 0) return json({ success: false, error: 'donnees_invalides' });
       let horodatage;
@@ -1068,6 +1155,7 @@ async function handleRequest(request) {
 
     // ── Campagne d'inventaire de stock (articles/consommables — distinct des immobilisations) ──
     if (action === 'creer_campagne_inventaire') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const nom = (body.nom || '').trim();
       if (!nom) return json({ success: false, error: 'nom_manquant' });
       try {
@@ -1082,6 +1170,7 @@ async function handleRequest(request) {
     }
 
     if (action === 'cloturer_campagne_inventaire') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const nom = (body.nom || '').trim();
       if (!nom) return json({ success: false, error: 'nom_manquant' });
       try {
@@ -1144,6 +1233,7 @@ async function handleRequest(request) {
 
     // Migration one-shot d'un comptage historique (ex: décembre 2025) par lots de 20 — même pattern que bulk_patch_immos
     if (action === 'bulk_import_lignes_inventaire') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const campagne = (body.campagne || '').trim();
       const lignes = body.lignes || [];
       if (!campagne || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
@@ -1196,6 +1286,7 @@ async function handleRequest(request) {
 
     // Mise à jour de l'affectation EPI + des 5 tailles d'un employé (édition individuelle)
     if (action === 'maj_taille_employe') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       let itemId = body.item_id;
       if (!itemId) {
         const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + (body.code || '').replace(/'/g, "''") + "'&$top=1", { headers: H });
@@ -1214,6 +1305,7 @@ async function handleRequest(request) {
 
     // Import initial en masse des tailles/affectation (74 salariés, par lots de 20 — item_id déjà résolu côté client)
     if (action === 'bulk_import_tailles_epi') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = (body.rows || []).filter(x => x.item_id);
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
@@ -1228,6 +1320,7 @@ async function handleRequest(request) {
 
     // Import initial du catalogue articles/tailles/références (par lots de 20)
     if (action === 'bulk_import_catalogue_epi') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = body.rows || [];
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
@@ -1243,6 +1336,7 @@ async function handleRequest(request) {
 
     // Import initial de la grille de dotation standard (4 profils × ~10 types, par lots de 20)
     if (action === 'bulk_import_grille_dotation_epi') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = body.rows || [];
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
@@ -1254,6 +1348,7 @@ async function handleRequest(request) {
 
     // Upsert d'une ligne de la grille de dotation (édition depuis le dashboard, Admin/Logistique)
     if (action === 'maj_grille_dotation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const affectation = (body.affectation || '').trim();
       const typeArticle = (body.type_article || '').trim();
       const quantite = parseFloat(body.quantite);
@@ -1275,6 +1370,7 @@ async function handleRequest(request) {
     // Supprime une ligne de la grille de dotation (ex : type d'article retiré de la grille, ou correction
     // d'une ligne mal orthographiée) — Admin/Logistique
     if (action === 'supprimer_grille_dotation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const id = body.id;
       if (!id) return json({ success: false, error: 'id_manquant' });
       const r = await fetch(GL + '/Grille_Dotation_EPI/items/' + id, { method: 'DELETE', headers: H });
@@ -1283,6 +1379,7 @@ async function handleRequest(request) {
 
     // Ajoute un nouvel article au catalogue EPI (ex : nouveau modèle de chaussures acheté en promotion)
     if (action === 'ajouter_article_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const typeArticle = (body.type_article || '').trim();
       const reference = (body.reference || '').trim();
       if (!typeArticle || !reference) return json({ success: false, error: 'donnees_invalides' });
@@ -1299,6 +1396,7 @@ async function handleRequest(request) {
     // Inventaire physique du stock EPI : fixe (et non incrémente) le Stock_Actuel de plusieurs lignes
     // catalogue d'un coup, par lots de 20 — utilisé par l'import Excel du comptage stock dans le dashboard.
     if (action === 'bulk_maj_stock_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = body.rows || []; // [{id, quantite}]
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
@@ -1310,6 +1408,7 @@ async function handleRequest(request) {
 
     // Réception d'une commande fournisseur : incrémente le stock d'une ligne catalogue
     if (action === 'reception_commande_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const catId = body.id;
       const qte = parseFloat(body.quantite);
       if (!catId || !qte || qte <= 0) return json({ success: false, error: 'donnees_invalides' });
@@ -1327,6 +1426,7 @@ async function handleRequest(request) {
     // et ses tailles. Ne touche pas au stock (seulement à l'émargement, pour ne pas fausser le stock avec
     // des fiches générées mais jamais signées).
     if (action === 'generer_dotation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const code = (body.code || '').trim().toUpperCase();
       const annee = parseInt(body.annee, 10);
       const typeDotation = body.type_dotation === 'Entree' ? 'Entree' : 'Annuelle';
@@ -1385,6 +1485,7 @@ async function handleRequest(request) {
     // Remise ponctuelle (ex. "30 gants pour l'équipe de untel") : destinataire libre, lignes choisies à la
     // volée depuis le catalogue. Ne compte pas dans le suivi de dotation annuelle individuelle.
     if (action === 'generer_remise_ponctuelle_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const destinataire = (body.destinataire || '').trim();
       const lignes = body.lignes || [];
       if (!destinataire || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
@@ -1411,6 +1512,7 @@ async function handleRequest(request) {
 
     // Émargement d'une fiche (photo déjà uploadée via upload_fiche_epi) : décrémente le stock des lignes
     if (action === 'emarger_dotation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const dotId = body.id;
       if (!dotId) return json({ success: false, error: 'id_manquant' });
       try {
@@ -1447,6 +1549,7 @@ async function handleRequest(request) {
 
     // Upload de la photo/scan de la fiche signée (même pattern que upload_photo, dossier dédié)
     if (action === 'upload_fiche_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       try {
         const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
         const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -1458,6 +1561,7 @@ async function handleRequest(request) {
     // Annule une fiche générée par erreur — uniquement tant qu'elle n'est pas émargée (le stock n'a alors
     // pas encore été touché, donc rien à recréditer)
     if (action === 'annuler_dotation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const dotId = body.id;
       if (!dotId) return json({ success: false, error: 'id_manquant' });
       try {
@@ -1478,6 +1582,7 @@ async function handleRequest(request) {
 
     // Assigne le service outillage d'un employé (Travaux Neufs / Maintenance / vide) — indépendant de l'affectation EPI
     if (action === 'maj_service_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       let itemId = body.item_id;
       if (!itemId) {
         const cur = await fetch(GL + "/Employes/items?$expand=fields&$filter=fields/Title eq '" + (body.code || '').replace(/'/g, "''") + "'&$top=1", { headers: H });
@@ -1493,6 +1598,7 @@ async function handleRequest(request) {
 
     // Import initial du catalogue (par lots de 20)
     if (action === 'bulk_import_catalogue_outillage') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = body.rows || [];
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
@@ -1508,6 +1614,7 @@ async function handleRequest(request) {
     // Backfill de la durée d'amortissement sur des articles catalogue existants (par désignation), par lots de 20.
     // Sert au calcul de la prime annuelle (Prix_Unitaire × 12 / Duree_Amortissement_Mois) versée en paie.
     if (action === 'bulk_maj_duree_outillage') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = body.rows || []; // [{type_article, duree_mois}]
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       try {
@@ -1533,6 +1640,7 @@ async function handleRequest(request) {
 
     // Import initial de la grille (par lots de 20)
     if (action === 'bulk_import_grille_outillage') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = body.rows || [];
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
@@ -1544,6 +1652,7 @@ async function handleRequest(request) {
 
     // Import initial des lignes de distribution historiques (par lots de 20)
     if (action === 'bulk_import_lignes_outillage') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const rows = body.rows || [];
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
@@ -1558,6 +1667,7 @@ async function handleRequest(request) {
 
     // Upsert d'une ligne de la grille (édition depuis le dashboard, Admin/Logistique)
     if (action === 'maj_grille_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const service = (body.service || '').trim();
       const typeArticle = (body.type_article || '').trim();
       const quantite = parseFloat(body.quantite);
@@ -1578,6 +1688,7 @@ async function handleRequest(request) {
 
     // Supprime une ligne de la grille (type d'article retiré du kit standard)
     if (action === 'supprimer_grille_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const id = body.id;
       if (!id) return json({ success: false, error: 'id_manquant' });
       const r = await fetch(GL + '/Grille_Outillage/items/' + id, { method: 'DELETE', headers: H });
@@ -1586,6 +1697,7 @@ async function handleRequest(request) {
 
     // Réception d'une commande fournisseur : incrémente le stock d'un article
     if (action === 'reception_commande_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const catId = body.id;
       const qte = parseFloat(body.quantite);
       if (!catId || !qte || qte <= 0) return json({ success: false, error: 'donnees_invalides' });
@@ -1603,6 +1715,7 @@ async function handleRequest(request) {
     // uploadée via upload_fiche_outillage) : crée les lignes de distribution et décrémente le stock. Pas
     // d'étape "générée en attente" intermédiaire comme les EPI — la distribution est actée directement.
     if (action === 'distribuer_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const code = (body.code || '').trim().toUpperCase();
       const lignes = body.lignes || []; // [{type_article}]
       if (!code || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
@@ -1634,6 +1747,7 @@ async function handleRequest(request) {
 
     // Upload de la photo/scan de la fiche de remise signée (même pattern que upload_fiche_epi)
     if (action === 'upload_fiche_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       try {
         const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
         const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -1644,6 +1758,7 @@ async function handleRequest(request) {
 
     // Annule une ligne de distribution (erreur de saisie) : recrédite le stock de l'article
     if (action === 'annuler_ligne_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const ligneId = body.id;
       if (!ligneId) return json({ success: false, error: 'id_manquant' });
       try {
@@ -1681,12 +1796,14 @@ async function handleRequest(request) {
 
     // ── Annuler un transfert en attente ──
     if (action === 'annuler_transfert') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const r = await fetch(GL + '/Transferts_En_Attente/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Statut: 'Annulé' }) });
       return json({ success: r.ok });
     }
 
     // ── Modifier le receveur d'un transfert en attente ──
     if (action === 'maj_transfert') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const fields = {};
       if (body.code_employe_receveur) fields.Code_Employe_Receveur = body.code_employe_receveur;
       if (body.nom_receveur)          fields.Nom_Receveur = body.nom_receveur;

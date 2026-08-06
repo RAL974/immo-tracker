@@ -671,6 +671,12 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - **"Documents"** : bouton "➕ Ajouter FDS" (upload PDF/image vers `FDS_Immos/{code}/`, `FDS_URL` = repère `FDS:code/fichier`) — les FDS déjà saisies en lien de partage SharePoint continuent de fonctionner (`?fds=code` sert les deux formats).
 - Aucune nouvelle liste/colonne SharePoint nécessaire pour ces trois ajouts.
 
+## Autorisation côté serveur des actions sensibles du Worker (août 2026)
+- **Faille identifiée** : le Worker exécutait n'importe quelle action reçue sans vérifier qui appelait — seule l'interface cachait les boutons selon le rôle. `worker.js` étant commité sur GitHub (public), les noms d'actions étaient visibles de tous.
+- **Correction** : jeton de session signé (HMAC-SHA256, secret Cloudflare `SESSION_SECRET_ENV` distinct de `CLIENT_SECRET_ENV`, **à ajouter par William avant que la protection soit active**) émis à la connexion dashboard, vérifié côté Worker (`requireAdmin`/`requireGarant`) avant les **46 actions exclusivement dashboard** (création de comptes, rôles, migrations, EPI/Outillage/inventaire, FDS...). Injecté côté client via une interception unique de `window.fetch` (liste `GATED_ACTIONS`), pas de modification des ~46 points d'appel individuels.
+- **Portée volontairement limitée** : les actions partagées avec la PWA terrain (`reserver`, `transfert`, `declarer_panne`...) restent non protégées par ce mécanisme — les 97 collaborateurs s'identifient par scan de badge sans mot de passe, un choix de conception assumé, pas la faille visée.
+- Détail complet dans `03_REGLES_METIER_ET_ROLES.md` § Autorisation côté serveur et `01_ARCHITECTURE_TECHNIQUE.md` (variable `SESSION_SECRET_ENV`).
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
 

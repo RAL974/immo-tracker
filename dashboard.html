@@ -529,6 +529,32 @@ tr:hover td{background:#FAFBFC;}
 
 <script>
 var W='https://immo-proxy.ral-85d.workers.dev/';
+
+// ── Jeton de session : injecté automatiquement sur les actions sensibles (admin / gestion dépôt) ──
+// Un seul point d'interception plutôt que de modifier chacun des appels fetch dispersés dans le
+// fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe'];
+(function(){
+  var origFetch=window.fetch.bind(window);
+  window.fetch=function(input,init){
+    try{
+      var urlStr=typeof input==='string'?input:(input&&input.url)||'';
+      if(init&&init.method==='POST'&&urlStr.indexOf(W)===0&&init.body){
+        var actionName=(urlStr.split('?action=')[1]||'').split('&')[0];
+        if(GATED_ACTIONS.indexOf(actionName)!==-1){
+          var payload=null;
+          try{payload=JSON.parse(init.body);}catch(e){}
+          if(payload&&typeof payload==='object'){
+            payload.token=(typeof ADMIN_SESSION!=='undefined'&&ADMIN_SESSION.token)||'';
+            init=Object.assign({},init,{body:JSON.stringify(payload)});
+          }
+        }
+      }
+    }catch(e){}
+    return origFetch(input,init);
+  };
+})();
+
 var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
 var employesList=[]; // [{Code, Nom, Poste}]
 var employesByCode={}; // { CODE: {Nom, Poste} }
@@ -586,7 +612,7 @@ async function loadImmoMeta(){
 }
 var TZ='Indian/Reunion';
 var PIN='ES974';
-var ADMIN_SESSION={code:null,nom:null}; // identité de l'admin connecté (traçabilité des actions)
+var ADMIN_SESSION={code:null,nom:null,token:null}; // identité de l'admin connecté + jeton de session (actions sensibles)
 var ADMINS_CODES=['CONI','AIWI','NAXA','BAKA'];
 // Super-administrateurs PERMANENTS : gardent tous les droits quel que soit leur rôle SharePoint.
 // Ne peuvent être rétrogradés depuis l'interface — seule une modification du code le permettrait.
@@ -781,7 +807,7 @@ async function validerMotDePasse(){
     try{
       var r=await fetch(W+'?action=set_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:LOGIN_CODE,password:pwd})});
       var res=await r.json();
-      if(res.success){finaliserConnexion(LOGIN_CODE);}
+      if(res.success){finaliserConnexion(LOGIN_CODE,res.token);}
       else{err.textContent='Échec de la création. Réessayez.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
     }catch(e){err.textContent='Erreur réseau.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
   }else{
@@ -789,7 +815,7 @@ async function validerMotDePasse(){
     try{
       var r=await fetch(W+'?action=verify_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:LOGIN_CODE,password:pwd})});
       var res=await r.json();
-      if(res.success){finaliserConnexion(LOGIN_CODE);}
+      if(res.success){finaliserConnexion(LOGIN_CODE,res.token);}
       else if(res.needs_setup){LOGIN_NEEDS_SETUP=true;etapeMotDePasse();}
       else{err.textContent='Mot de passe incorrect.';btn.disabled=false;btn.textContent='Se connecter →';document.getElementById('pwd-input').value='';}
     }catch(e){err.textContent='Erreur réseau.';btn.disabled=false;btn.textContent='Se connecter →';}
@@ -797,11 +823,12 @@ async function validerMotDePasse(){
 }
 
 // Connexion finalisée : ouvrir la session
-function finaliserConnexion(code){
-  ADMIN_SESSION={code:code,nom:nomEmploye(code)};
+function finaliserConnexion(code,token){
+  ADMIN_SESSION={code:code,nom:nomEmploye(code),token:token||null};
   sessionStorage.setItem('auth','1');
   sessionStorage.setItem('admin_code',code);
   sessionStorage.setItem('admin_nom',ADMIN_SESSION.nom);
+  if(token)sessionStorage.setItem('admin_token',token);else sessionStorage.removeItem('admin_token');
   localStorage.setItem('admin_identite',code);
   document.getElementById('pin-overlay').style.display='none';
   document.getElementById('pin-step3').style.display='none';
@@ -828,7 +855,7 @@ function changerIdentite(){
 document.getElementById('pin-input').addEventListener('keydown',function(e){if(e.key==='Enter')checkPin();});
 // Reprise de session existante (sessionStorage = effacé à la fermeture de l'onglet)
 if(sessionStorage.getItem('auth')==='1'&&sessionStorage.getItem('admin_code')){
-  ADMIN_SESSION={code:sessionStorage.getItem('admin_code'),nom:sessionStorage.getItem('admin_nom')||sessionStorage.getItem('admin_code')};
+  ADMIN_SESSION={code:sessionStorage.getItem('admin_code'),nom:sessionStorage.getItem('admin_nom')||sessionStorage.getItem('admin_code'),token:sessionStorage.getItem('admin_token')||null};
   document.getElementById('pin-overlay').style.display='none';
   loadEmployes().then(function(){
     if(!ADMIN_SESSION.nom||ADMIN_SESSION.nom===ADMIN_SESSION.code)ADMIN_SESSION.nom=nomEmploye(ADMIN_SESSION.code);
@@ -3815,7 +3842,7 @@ async function lancerSeedRolesSites(){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   if(!confirm('⚙️ Appliquer les rôles et sites de référence à TOUS les employés ?\n\nCela écrase les valeurs actuelles des colonnes Rôle (Code_CT) et Site avec le mapping validé. À faire une seule fois au démarrage.\n\nContinuer ?'))return;
   try{
-    var r=await fetch(W+'?action=seed_roles_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
+    var r=await fetch(W+'?action=seed_roles_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESR-CONFIRME'})});
     var res=await r.json();
     if(res.success){
       var msg='✅ Initialisation terminée !\n\n'+res.appliques+' / '+res.total_seed+' employés mis à jour.';
@@ -3834,7 +3861,7 @@ async function lancerSeedImmoSites(){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   if(!confirm('🌍 Appliquer les sites (Réunion/Mayotte) à toutes les immos ?\n\nÀ faire une fois au démarrage. Continuer ?'))return;
   try{
-    var r=await fetch(W+'?action=seed_immo_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
+    var r=await fetch(W+'?action=seed_immo_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESR-CONFIRME'})});
     var res=await r.json();
     if(res.success){
       var msg='✅ Sites appliqués !\n\n'+res.appliques+' / '+res.operations+' immos mises à jour.';
@@ -3851,7 +3878,7 @@ async function lancerDedupeEmployes(){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   if(!confirm('🧹 Supprimer les lignes en double dans la liste Employés ?\n\nUne seule ligne par employé sera conservée (la plus complète). Cette action est définitive.\n\nContinuer ?'))return;
   try{
-    var r=await fetch(W+'?action=dedupe_employes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESPACE-SOLEIL'})});
+    var r=await fetch(W+'?action=dedupe_employes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESR-CONFIRME'})});
     var res=await r.json();
     if(res.success){
       var msg='✅ Nettoyage terminé !\n\n'+res.supprimes+' doublon(s) supprimé(s) sur '+res.doublons_trouves+' trouvé(s).';
@@ -3866,7 +3893,7 @@ async function resetPasswordUtilisateur(code){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   if(!confirm('Réinitialiser le mot de passe de '+nomEmploye(code)+' ?\n\nIl devra en créer un nouveau à sa prochaine connexion.'))return;
   try{
-    var r=await fetch(W+'?action=reset_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,confirm:'ESPACE-SOLEIL'})});
+    var r=await fetch(W+'?action=reset_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,confirm:'ESR-CONFIRME'})});
     var res=await r.json();
     if(res.success){
       var u=USERS_CACHE.find(function(x){return x.code===code;});if(u)u.hasPwd=false;
