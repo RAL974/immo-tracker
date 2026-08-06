@@ -1,0 +1,282 @@
+[
+  {
+    "code": "TEL000001",
+    "code_employe": "PACA",
+    "nom_detenteur": "PAYET Caroline",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000002",
+    "code_employe": "RESERVE",
+    "nom_detenteur": "RESERVE",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000003",
+    "code_employe": "ZEYO",
+    "nom_detenteur": "ZEMIA Marie Yolaine",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000004",
+    "code_employe": "SCST",
+    "nom_detenteur": "SCHOCH Stéphane",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000005",
+    "code_employe": "AIWI",
+    "nom_detenteur": "AIMAR William Antoine Louis",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000006",
+    "code_employe": "DACH",
+    "nom_detenteur": "DANIEL Chahissou",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000007",
+    "code_employe": "ASTREINTE",
+    "nom_detenteur": "ASTREINTE",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000008",
+    "code_employe": "TOHO",
+    "nom_detenteur": "TOILIHA Housseine",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000009",
+    "code_employe": "BIFL",
+    "nom_detenteur": "BILAIN Florian, Jean-Cédric, Moise",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000010",
+    "code_employe": "DUDE",
+    "nom_detenteur": "DUCREUX Delphine",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000011",
+    "code_employe": "RESERVE",
+    "nom_detenteur": "RESERVE",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000012",
+    "code_employe": "GRWI",
+    "nom_detenteur": "GRONDIN Wilson",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000013",
+    "code_employe": "HOAL",
+    "nom_detenteur": "HOAL",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000014",
+    "code_employe": "IADA",
+    "nom_detenteur": "IAFARE David",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000015",
+    "code_employe": "LEDI",
+    "nom_detenteur": "LEPINAY Jean, Dimitri",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000016",
+    "code_employe": "LEMI",
+    "nom_detenteur": "LEDOUX Michel",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000017",
+    "code_employe": "LEWI",
+    "nom_detenteur": "LEPERLIER Wilfrid",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000018",
+    "code_employe": "PALO",
+    "nom_detenteur": "PAYET Louis Joseph Pierrot",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000019",
+    "code_employe": "PIBE",
+    "nom_detenteur": "PICARD Benjamin",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000020",
+    "code_employe": "POGU",
+    "nom_detenteur": "PONTIAC Guy",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000021",
+    "code_employe": "RIJB",
+    "nom_detenteur": "RIVIERE Jean-Bernard",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000022",
+    "code_employe": "ROCH",
+    "nom_detenteur": "ROBERT Jean, Christophe",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000023",
+    "code_employe": "ROJY",
+    "nom_detenteur": "ROIX Johnny, Martial",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000024",
+    "code_employe": "TUJM",
+    "nom_detenteur": "TURBAN Jean-Mickael",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000025",
+    "code_employe": "ALARME",
+    "nom_detenteur": "ALARME",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000026",
+    "code_employe": "VIMA",
+    "nom_detenteur": "VIMA",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2025-10-28T00:00:00Z"
+  },
+  {
+    "code": "TEL000027",
+    "code_employe": "GOLU",
+    "nom_detenteur": "GOVIN Ludovic",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000028",
+    "code_employe": "IADA",
+    "nom_detenteur": "IAFARE David",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2024-02-29T00:00:00Z"
+  },
+  {
+    "code": "TEL000029",
+    "code_employe": "MEJO",
+    "nom_detenteur": "MERCHER Jonathan",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000030",
+    "code_employe": "PALO",
+    "nom_detenteur": "PAYET Louis Joseph Pierrot",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000031",
+    "code_employe": "SANS AFFECTATION",
+    "nom_detenteur": "SANS AFFECTATION",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000032",
+    "code_employe": "DUJU",
+    "nom_detenteur": "DUMONT Julien",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2025-12-03T00:00:00Z"
+  },
+  {
+    "code": "TEL000033",
+    "code_employe": "NAXA",
+    "nom_detenteur": "NANGY Xavier",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2025-12-23T00:00:00Z"
+  },
+  {
+    "code": "TEL000034",
+    "code_employe": "POGU",
+    "nom_detenteur": "PONTIAC Guy",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-01-27T00:00:00Z"
+  },
+  {
+    "code": "TEL000035",
+    "code_employe": "TOHO",
+    "nom_detenteur": "TOILIHA Housseine",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-01-27T00:00:00Z"
+  },
+  {
+    "code": "TEL000036",
+    "code_employe": "BENO",
+    "nom_detenteur": "BEAUPATRE Marie Noémie",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-03-02T00:00:00Z"
+  },
+  {
+    "code": "TEL000037",
+    "code_employe": "AIWI",
+    "nom_detenteur": "AIMAR William Antoine Louis",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-03-02T00:00:00Z"
+  },
+  {
+    "code": "TEL000038",
+    "code_employe": "ROJY",
+    "nom_detenteur": "ROIX Johnny, Martial",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-03-02T00:00:00Z"
+  },
+  {
+    "code": "TEL000039",
+    "code_employe": "RESERVE",
+    "nom_detenteur": "RESERVE",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-03-02T00:00:00Z"
+  },
+  {
+    "code": "TEL000040",
+    "code_employe": "ADWI",
+    "nom_detenteur": "ADWI",
+    "note": "Import initial depuis le fichier de suivi Excel (2026.05.23)",
+    "horodatage": "2026-05-23T00:00:00Z"
+  }
+]

@@ -264,6 +264,7 @@ tr:hover td{background:#FAFBFC;}
   <div class="nav-group">ÉQUIPEMENTS</div>
   <div class="nav-item" data-tab="documents"><span class="nav-icon">📄</span><span class="nav-label">Documents FDS</span><span class="nav-badge orange" id="nb-docs">—</span></div>
   <div class="nav-item" data-tab="maintenance"><span class="nav-icon">🔧</span><span class="nav-label">Maintenance</span><span class="nav-badge" id="nb-maint">—</span></div>
+  <div class="nav-item" data-tab="materiel-it"><span class="nav-icon">📱</span><span class="nav-label">Matériel IT</span></div>
 
   <div class="nav-group">PERSONNEL</div>
   <div class="nav-item" data-tab="absences"><span class="nav-icon">🧑‍💼</span><span class="nav-label">Absences</span><span class="nav-badge" id="nb-absences">—</span></div>
@@ -494,6 +495,11 @@ tr:hover td{background:#FAFBFC;}
       <div id="outillage-content"></div>
     </div>
 
+    <!-- Matériel IT (téléphones, ordinateurs) -->
+    <div id="pane-materiel-it" class="tab-pane">
+      <div id="materiel-it-content"></div>
+    </div>
+
     <!-- Alertes -->
     <div id="pane-alertes" class="tab-pane"><div id="alertes-content"></div></div>
 
@@ -533,7 +539,7 @@ var W='https://immo-proxy.ral-85d.workers.dev/';
 // ── Jeton de session : injecté automatiquement sur les actions sensibles (admin / gestion dépôt) ──
 // Un seul point d'interception plutôt que de modifier chacun des appels fetch dispersés dans le
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it'];
 (function(){
   var origFetch=window.fetch.bind(window);
   window.fetch=function(input,init){
@@ -939,6 +945,7 @@ function renderTab(name){
     case 'inventaire-stock': if(!dataLoaded.invStock)loadInventaireStock(); else renderInventaireStock(); break;
     case 'epi':             if(!dataLoaded.epi)loadEPI(); else renderEPI(); break;
     case 'outillage':       if(!dataLoaded.outillage)loadOutillage(); else renderOutillage(); break;
+    case 'materiel-it':     if(!dataLoaded.materielIt)loadMaterielIT(); else renderMaterielIT(); break;
     case 'alertes':        renderAlertes(); break;
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
@@ -2750,6 +2757,315 @@ async function confirmerImportImmos(){
   setStatut('✅ '+okC+'/'+creations.length+' immo(s) créée(s), '+okA+'/'+affectations.length+' affectation(s) enregistrée(s).'+((koC.length||koA.length)?' ⚠️ Échecs : '+koC.concat(koA).join(', '):''));
   loadAll();
   setTimeout(function(){var p=document.getElementById('depot-import-preview');if(p)p.innerHTML='';},3000);
+}
+
+// ══════════════ MODULE MATÉRIEL IT (téléphones, ordinateurs — hors circuit immobilisations) ══════════════
+var materielItList=[];
+var MATERIEL_IT_SPECIAUX=['RESERVE','ASTREINTE','ALARME','SANS AFFECTATION','STAGIAIRE'];
+var materielItSelected=null, materielItHistorique=[];
+
+async function loadMaterielIT(){
+  dataLoaded.materielIt=true;
+  try{
+    var r=await fetch(W+'?materiel_it=1');
+    materielItList=await r.json();
+  }catch(e){materielItList=[];}
+  renderMaterielIT();
+}
+function nomDetenteurMaterielIT(item){
+  if(!item.detenteur_code&&!item.detenteur_nom)return'—';
+  if(employesByCode[item.detenteur_code])return employesByCode[item.detenteur_code].Nom;
+  return item.detenteur_nom||item.detenteur_code||'—';
+}
+function renderMaterielIT(){
+  var div=document.getElementById('materiel-it-content');
+  if(!div)return;
+  if(materielItSelected){renderMaterielITDetail();return;}
+  var canEdit=peutGererEPI(ADMIN_SESSION.code); // même population que EPI/Outillage (Admin+Logistique+Logistique_Mayotte)
+  var html='';
+  if(estAdmin(ADMIN_SESSION.code)&&!materielItList.length){
+    html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : parc téléphonie</h3></div>'+
+      '<div style="padding:14px"><p style="font-size:12px;color:var(--grey);margin-bottom:10px">Importe les appareils suivis dans le fichier Excel de suivi (téléphones), avec leur détenteur actuel. À faire une seule fois.</p>'+
+      '<button onclick="importerDonneesMaterielIT()" style="padding:8px 16px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Importer maintenant</button>'+
+      '<div id="materiel-it-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
+  }
+  html+='<div class="card"><div class="card-head"><h3>📱 Matériel IT</h3>'+
+    (canEdit?'<button onclick="ouvrirAjoutMaterielIT()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter un appareil</button>':'')+
+    '</div>'+
+    '<div class="filters" style="padding:10px 14px">'+
+    '<input type="text" id="mit-q" oninput="refreshMaterielITResults()" placeholder="🔍 Code, marque, modèle, détenteur, n° tél..." style="flex:2;min-width:220px">'+
+    '<select id="mit-type" onchange="refreshMaterielITResults()"><option value="">Tous types</option></select>'+
+    '<select id="mit-statut" onchange="refreshMaterielITResults()"><option value="">Tous statuts</option><option>En service</option><option>Hors service</option><option>Perdu</option><option>Volé</option></select>'+
+    '<button class="filter-btn" onclick="document.getElementById(\'mit-q\').value=\'\';document.getElementById(\'mit-type\').value=\'\';document.getElementById(\'mit-statut\').value=\'\';refreshMaterielITResults();">🔄 Réinitialiser</button>'+
+    '<button onclick="exporterMaterielIT()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
+    '</div>'+
+    '<span class="card-cnt" id="mit-cnt" style="margin-left:14px"></span>'+
+    '<div id="mit-results"></div></div>';
+  div.innerHTML=html;
+  var types=[];materielItList.forEach(function(m){if(m.type_materiel&&types.indexOf(m.type_materiel)===-1)types.push(m.type_materiel);});
+  types.sort();
+  var sel=document.getElementById('mit-type');
+  if(sel)sel.innerHTML='<option value="">Tous types</option>'+types.map(function(t){return'<option>'+t+'</option>';}).join('');
+  refreshMaterielITResults();
+}
+function refreshMaterielITResults(){
+  var res=document.getElementById('mit-results');
+  if(!res)return;
+  var q=((document.getElementById('mit-q')||{}).value||'').trim().toUpperCase();
+  var ft=(document.getElementById('mit-type')||{}).value||'';
+  var fs=(document.getElementById('mit-statut')||{}).value||'';
+  var rows=materielItList.filter(function(m){
+    var detNom=nomDetenteurMaterielIT(m);
+    if(ft&&m.type_materiel!==ft)return false;
+    if(fs&&m.statut!==fs)return false;
+    if(q&&!(m.code.toUpperCase().includes(q)||(m.marque||'').toUpperCase().includes(q)||(m.modele||'').toUpperCase().includes(q)||detNom.toUpperCase().includes(q)||(m.n_telephone||'').includes(q)||(m.detenteur_code||'').toUpperCase().includes(q)))return false;
+    return true;
+  }).sort(function(a,b){return a.code.localeCompare(b.code);});
+  var cnt=document.getElementById('mit-cnt');if(cnt)cnt.textContent=rows.length+' appareil'+(rows.length>1?'s':'');
+  if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun appareil'+(q||ft||fs?' pour ce filtre':'')+'.</p>';return;}
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Type</th><th>Marque / Modèle</th><th>N° série</th><th>Détenteur</th><th>Depuis</th><th>Statut</th><th>Coût/mois</th></tr></thead><tbody>';
+  rows.forEach(function(m){
+    var statutColor=m.statut==='En service'?'var(--green)':(m.statut==='Hors service'?'var(--grey)':'var(--red)');
+    html+='<tr style="cursor:pointer" onclick="voirDetailMaterielIT(\''+m.code+'\')"><td style="font-weight:700">'+m.code+' '+drapeauSiteD(m.site)+'</td>'+
+      '<td style="font-size:11px;color:var(--grey)">'+(m.type_materiel||'—')+'</td>'+
+      '<td style="font-size:12px">'+(m.marque||'')+' '+(m.modele||'')+'</td>'+
+      '<td style="font-size:11px;color:var(--grey)">'+(m.n_serie||'—')+'</td>'+
+      '<td style="font-size:12px;font-weight:600">'+nomDetenteurMaterielIT(m)+'</td>'+
+      '<td style="font-size:11px;color:var(--grey)">'+(m.depuis?fmtD(m.depuis):'—')+'</td>'+
+      '<td><span style="font-size:11px;font-weight:700;color:'+statutColor+'">'+(m.statut||'—')+'</span></td>'+
+      '<td style="font-size:12px">'+(m.cout_mensuel?nbFr(m.cout_mensuel)+'€':'—')+'</td>'+
+    '</tr>';
+  });
+  html+='</tbody></table></div>';
+  res.innerHTML=html;
+}
+
+// ── Fiche détail d'un appareil (historique de détention) ──
+async function voirDetailMaterielIT(code){
+  materielItSelected=code;
+  materielItHistorique=[];
+  renderMaterielIT();
+  try{
+    var r=await fetch(W+'?mouvements_materiel_it='+encodeURIComponent(code));
+    materielItHistorique=await r.json();
+  }catch(e){materielItHistorique=[];}
+  renderMaterielIT();
+}
+function fermerDetailMaterielIT(){materielItSelected=null;renderMaterielIT();}
+function renderMaterielITDetail(){
+  var div=document.getElementById('materiel-it-content');
+  if(!div)return;
+  var m=materielItList.find(function(x){return x.code===materielItSelected;});
+  if(!m){div.innerHTML='<p class="es" style="padding:20px">Appareil introuvable.</p><button onclick="fermerDetailMaterielIT()" class="filter-btn">← Retour</button>';return;}
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<button onclick="fermerDetailMaterielIT()" class="filter-btn" style="margin-bottom:12px">← Retour à la liste</button>'+
+    '<div class="card"><div class="card-head"><h3>'+m.code+' — '+(m.marque||'')+' '+(m.modele||'')+'</h3>'+
+    (canEdit?'<div style="display:flex;gap:8px"><button onclick="ouvrirAffectationMaterielIT(\''+m.code+'\')" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Affecter</button>'+
+      '<button onclick="ouvrirModifMaterielIT(\''+m.code+'\')" style="padding:6px 14px;background:#eee;color:#444;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✏️ Modifier</button></div>':'')+
+    '</div>'+
+    '<div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">'+
+      '<div><b style="font-size:11px;color:var(--grey)">TYPE</b><div>'+(m.type_materiel||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">N° SÉRIE</b><div>'+(m.n_serie||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">DÉTENTEUR ACTUEL</b><div style="font-weight:700">'+nomDetenteurMaterielIT(m)+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">DEPUIS</b><div>'+(m.depuis?fmtD(m.depuis):'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">STATUT</b><div>'+(m.statut||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">SITE</b><div>'+(m.site||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">COÛT MENSUEL</b><div>'+(m.cout_mensuel?nbFr(m.cout_mensuel)+'€':'—')+'</div></div>'+
+    '</div>';
+  if(m.n_telephone||m.n_carte_sim||m.type_materiel==='Téléphone'){
+    html+='<div style="padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;border-top:1px solid #f0f0f0;padding-top:14px">'+
+      '<div><b style="font-size:11px;color:var(--grey)">N° TÉLÉPHONE</b><div>'+(m.n_telephone||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">OPÉRATEUR</b><div>'+(m.operateur||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">N° CARTE SIM</b><div style="font-size:11px">'+(m.n_carte_sim||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">CODE PIN</b><div>'+(m.code_pin||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">CODE PUK</b><div>'+(m.code_puk||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">CODE RIO</b><div>'+(m.code_rio||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">DÉVERROUILLAGE</b><div>'+(m.code_deverrouillage||'—')+'</div></div>'+
+    '</div>';
+  }
+  if(m.commentaire)html+='<div style="padding:0 14px 14px;font-size:12px;color:var(--grey)"><b>Commentaire :</b> '+m.commentaire+'</div>';
+  html+='</div>';
+  html+='<div class="card" style="margin-top:14px"><div class="card-head"><h3>Historique de détention</h3></div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Détenteur</th><th>Depuis</th><th>Note</th></tr></thead><tbody>'+
+    (materielItHistorique.length?materielItHistorique.map(function(h){
+      var nom=employesByCode[h.code_employe]?employesByCode[h.code_employe].Nom:(h.nom_detenteur||h.code_employe||'—');
+      return '<tr><td style="font-weight:600">'+nom+'</td><td style="font-size:11px;color:var(--grey)">'+fmtDT(h.horodatage)+'</td><td style="font-size:11px">'+(h.note||'—')+'</td></tr>';
+    }).join(''):'<tr><td colspan="3" class="es">Aucun historique.</td></tr>')+
+    '</tbody></table></div></div>';
+  div.innerHTML=html;
+}
+
+// ── Ajout d'un appareil ──
+async function ouvrirAjoutMaterielIT(){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter un appareil';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Type *</label><select id="mit-add-type" style="'+addFieldStyle+'"><option>Téléphone</option><option>Ordinateur</option></select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code *</label><div style="display:flex;gap:8px;align-items:center"><input id="mit-add-code" style="'+addFieldStyle+'" placeholder="Chargement..."><span id="mit-add-code-check" style="font-size:18px"></span></div></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Marque</label><input id="mit-add-marque" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Modèle</label><input id="mit-add-modele" style="'+addFieldStyle+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">N° de série</label><input id="mit-add-serie" style="'+addFieldStyle+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="mit-add-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Coût mensuel (€)</label><input id="mit-add-cout" type="number" step="0.01" style="'+addFieldStyle+'" placeholder="Optionnel"></div></div>'+
+    '<p style="font-size:12px;font-weight:700;color:var(--blue);margin-top:6px">📞 Champs téléphonie (si applicable)</p>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">N° téléphone</label><input id="mit-add-tel" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Opérateur</label><input id="mit-add-op" style="'+addFieldStyle+'" value="FREE"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">N° carte SIM</label><input id="mit-add-sim" style="'+addFieldStyle+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PIN</label><input id="mit-add-pin" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PUK</label><input id="mit-add-puk" style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code RIO</label><input id="mit-add-rio" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Déverrouillage</label><input id="mit-add-deverr" style="'+addFieldStyle+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Commentaire</label><input id="mit-add-comment" style="'+addFieldStyle+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=enregistrerMaterielIT;
+  var typeSel=document.getElementById('mit-add-type');
+  var refreshCode=async function(){
+    var prefixe=typeSel.value==='Ordinateur'?'PC':'TEL';
+    try{var r=await fetch(W+'?next_code_materiel_it='+prefixe);var res=await r.json();document.getElementById('mit-add-code').value=res.next_code||'';}catch(e){}
+  };
+  typeSel.onchange=refreshCode;
+  refreshCode();
+}
+async function enregistrerMaterielIT(){
+  var code=(document.getElementById('mit-add-code').value||'').trim().toUpperCase();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!/^[A-Z]{2,4}\d{6}$/.test(code)){msg.textContent='Code invalide (format préfixe + 6 chiffres, ex: TEL000001).';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={code:code,type_materiel:document.getElementById('mit-add-type').value,marque:document.getElementById('mit-add-marque').value.trim(),
+    modele:document.getElementById('mit-add-modele').value.trim(),n_serie:document.getElementById('mit-add-serie').value.trim(),
+    site:document.getElementById('mit-add-site').value,cout_mensuel:document.getElementById('mit-add-cout').value,
+    n_telephone:document.getElementById('mit-add-tel').value.trim(),operateur:document.getElementById('mit-add-op').value.trim(),
+    n_carte_sim:document.getElementById('mit-add-sim').value.trim(),code_pin:document.getElementById('mit-add-pin').value.trim(),
+    code_puk:document.getElementById('mit-add-puk').value.trim(),code_rio:document.getElementById('mit-add-rio').value.trim(),
+    code_deverrouillage:document.getElementById('mit-add-deverr').value.trim(),commentaire:document.getElementById('mit-add-comment').value.trim()};
+  try{
+    var r=await fetch(W+'?action=ajouter_materiel_it',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Appareil ajouté !';
+      setTimeout(function(){fermerAjout();dataLoaded.materielIt=false;loadMaterielIT();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+// ── Affectation (nouveau détenteur) ──
+function ouvrirAffectationMaterielIT(code){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires.');return;}
+  document.getElementById('add-titre').textContent='🔄 Affecter '+code;
+  document.getElementById('add-msg').textContent='';
+  var actifs=employesList.filter(function(e){return e.Actif!==false;}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+  var empOpts=actifs.map(function(e){return '<option value="'+e.Code+'">'+e.Code+' — '+(e.Nom||e.Code)+'</option>';}).join('');
+  var specOpts=MATERIEL_IT_SPECIAUX.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Nouveau détenteur *</label><select id="mit-aff-det" style="'+addFieldStyle+'"><option value="">— Sélectionner —</option><optgroup label="Employés">'+empOpts+'</optgroup><optgroup label="Cas particuliers">'+specOpts+'</optgroup></select></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Note</label><input id="mit-aff-note" style="'+addFieldStyle+'" placeholder="Optionnel"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=function(){confirmerAffectationMaterielIT(code);};
+}
+async function confirmerAffectationMaterielIT(code){
+  var sel=document.getElementById('mit-aff-det');
+  var det=sel.value;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!det){msg.textContent='Sélectionne le nouveau détenteur.';return;}
+  var nom=MATERIEL_IT_SPECIAUX.indexOf(det)!==-1?det:(sel.options[sel.selectedIndex].textContent.split(' — ')[1]||det);
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=affecter_materiel_it',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,code_employe:det,nom_detenteur:nom,note:(document.getElementById('mit-aff-note').value||'').trim()})});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Affectation enregistrée !';
+      setTimeout(function(){fermerAjout();dataLoaded.materielIt=false;loadMaterielIT().then(function(){voirDetailMaterielIT(code);});},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+// ── Modification d'un appareil ──
+function ouvrirModifMaterielIT(code){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires.');return;}
+  var m=materielItList.find(function(x){return x.code===code;});
+  if(!m)return;
+  document.getElementById('add-titre').textContent='✏️ Modifier '+code;
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Marque</label><input id="mit-ed-marque" style="'+addFieldStyle+'" value="'+(m.marque||'').replace(/"/g,'')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Modèle</label><input id="mit-ed-modele" style="'+addFieldStyle+'" value="'+(m.modele||'').replace(/"/g,'')+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">N° de série</label><input id="mit-ed-serie" style="'+addFieldStyle+'" value="'+(m.n_serie||'').replace(/"/g,'')+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Statut</label><select id="mit-ed-statut" style="'+addFieldStyle+'"><option'+(m.statut==='En service'?' selected':'')+'>En service</option><option'+(m.statut==='Hors service'?' selected':'')+'>Hors service</option><option'+(m.statut==='Perdu'?' selected':'')+'>Perdu</option><option'+(m.statut==='Volé'?' selected':'')+'>Volé</option></select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Coût mensuel (€)</label><input id="mit-ed-cout" type="number" step="0.01" style="'+addFieldStyle+'" value="'+(m.cout_mensuel||'')+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Date de sortie de service</label><input id="mit-ed-sortie" type="date" style="'+addFieldStyle+'" value="'+(m.date_sortie_service?m.date_sortie_service.slice(0,10):'')+'"></div>'+
+    '<p style="font-size:12px;font-weight:700;color:var(--blue);margin-top:6px">📞 Champs téléphonie</p>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">N° téléphone</label><input id="mit-ed-tel" style="'+addFieldStyle+'" value="'+(m.n_telephone||'').replace(/"/g,'')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Opérateur</label><input id="mit-ed-op" style="'+addFieldStyle+'" value="'+(m.operateur||'').replace(/"/g,'')+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">N° carte SIM</label><input id="mit-ed-sim" style="'+addFieldStyle+'" value="'+(m.n_carte_sim||'').replace(/"/g,'')+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PIN</label><input id="mit-ed-pin" style="'+addFieldStyle+'" value="'+(m.code_pin||'').replace(/"/g,'')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PUK</label><input id="mit-ed-puk" style="'+addFieldStyle+'" value="'+(m.code_puk||'').replace(/"/g,'')+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code RIO</label><input id="mit-ed-rio" style="'+addFieldStyle+'" value="'+(m.code_rio||'').replace(/"/g,'')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Déverrouillage</label><input id="mit-ed-deverr" style="'+addFieldStyle+'" value="'+(m.code_deverrouillage||'').replace(/"/g,'')+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Commentaire</label><input id="mit-ed-comment" style="'+addFieldStyle+'" value="'+(m.commentaire||'').replace(/"/g,'')+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=function(){enregistrerModifMaterielIT(m.id,code);};
+}
+async function enregistrerModifMaterielIT(id,code){
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={id:id,marque:document.getElementById('mit-ed-marque').value.trim(),modele:document.getElementById('mit-ed-modele').value.trim(),
+    n_serie:document.getElementById('mit-ed-serie').value.trim(),statut:document.getElementById('mit-ed-statut').value,
+    cout_mensuel:document.getElementById('mit-ed-cout').value,date_sortie_service:document.getElementById('mit-ed-sortie').value?document.getElementById('mit-ed-sortie').value+'T00:00:00Z':'',
+    n_telephone:document.getElementById('mit-ed-tel').value.trim(),operateur:document.getElementById('mit-ed-op').value.trim(),
+    n_carte_sim:document.getElementById('mit-ed-sim').value.trim(),code_pin:document.getElementById('mit-ed-pin').value.trim(),
+    code_puk:document.getElementById('mit-ed-puk').value.trim(),code_rio:document.getElementById('mit-ed-rio').value.trim(),
+    code_deverrouillage:document.getElementById('mit-ed-deverr').value.trim(),commentaire:document.getElementById('mit-ed-comment').value.trim()};
+  try{
+    var r=await fetch(W+'?action=maj_materiel_it',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Modifié !';
+      setTimeout(function(){fermerAjout();dataLoaded.materielIt=false;loadMaterielIT().then(function(){voirDetailMaterielIT(code);});},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+function exporterMaterielIT(){
+  var entetes=['Code','Type','Marque','Modèle','N° série','Détenteur','Depuis','Statut','Site','Coût mensuel','N° téléphone','Opérateur'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  materielItList.forEach(function(m){lignesCsv.push([m.code,m.type_materiel,m.marque,m.modele,m.n_serie,nomDetenteurMaterielIT(m),m.depuis?fmtD(m.depuis):'',m.statut,m.site,m.cout_mensuel?nbFr(m.cout_mensuel):'',m.n_telephone,m.operateur].map(csvCell).join(';'));});
+  var csv='﻿'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Materiel_IT.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
+}
+
+// ── Migration initiale depuis le fichier Excel de suivi (admin, une seule fois) ──
+async function importerDonneesMaterielIT(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!confirm('Importer les appareils du fichier Excel de suivi (catalogue + détenteur actuel) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  var statutEl=document.getElementById('materiel-it-migration-statut');
+  var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
+  setStatut('⏳ Chargement du catalogue…');
+  var catalogue;
+  try{var r=await fetch('materiel_it_catalogue.json?t='+Date.now());catalogue=await r.json();}catch(e){setStatut('❌ Impossible de charger materiel_it_catalogue.json : '+e.message);return;}
+  var ok1=0,ko1=0;
+  for(var i=0;i<catalogue.length;i+=20){
+    setStatut('⏳ Catalogue '+Math.min(i+20,catalogue.length)+' / '+catalogue.length+'…');
+    try{var rc=await fetch(W+'?action=bulk_import_materiel_it',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:catalogue.slice(i,i+20)})});var resc=await rc.json();ok1+=resc.ok||0;ko1+=resc.ko||0;}catch(e){ko1+=20;}
+  }
+  setStatut('⏳ Chargement de l\'historique de détention…');
+  var mouvements;
+  try{var r2=await fetch('materiel_it_mouvements.json?t='+Date.now());mouvements=await r2.json();}catch(e){setStatut('❌ Impossible de charger materiel_it_mouvements.json : '+e.message);return;}
+  var ok2=0,ko2=0;
+  for(var j=0;j<mouvements.length;j+=20){
+    setStatut('⏳ Historique '+Math.min(j+20,mouvements.length)+' / '+mouvements.length+'…');
+    try{var rm=await fetch(W+'?action=bulk_import_mouvements_materiel_it',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:mouvements.slice(j,j+20)})});var resm=await rm.json();ok2+=resm.ok||0;ko2+=resm.ko||0;}catch(e){ko2+=20;}
+  }
+  setStatut('✅ Import terminé : '+ok1+' appareil(s), '+ok2+' ligne(s) d\'historique.'+((ko1+ko2)?' ⚠️ '+(ko1+ko2)+' échec(s).':''));
+  dataLoaded.materielIt=false;
+  await loadMaterielIT();
 }
 
 // ══════════════ AJOUT IMMO / EMPLOYÉ ══════════════
