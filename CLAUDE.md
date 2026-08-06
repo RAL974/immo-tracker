@@ -691,6 +691,7 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - 5 actions Worker protégées dès l'écriture par le mécanisme de jeton de session (pas ajoutées après coup) — validé automatiquement par `security.gated-actions.test.js`.
 - Migration : 40 appareils, coût appliqué aux 28 lignes FREE actives. 3 codes détenteurs (`ADWI`, `HOAL`, `VIMA`) non retrouvés dans `Employes`, importés tels quels — à corriger par William. Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
 - **Étape bloquante côté William** : créer les 2 listes SharePoint avant mise en service.
+- **Incident au premier import** : `Materiel_IT` restée vide malgré un import qui semblait progresser (`Mouvements_Materiel_IT` OK). Cause : colonne créée sous le nom interne `Code_deverouillage` (pas `Code_Deverrouillage`) — un seul champ non reconnu fait échouer toute la ligne. Corrigé dans `worker.js`, diagnostiqué en lecture seule via `?debug_columns=<liste>`. Même leçon que l'incident `Fabricant`/`Fabriquant`.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.

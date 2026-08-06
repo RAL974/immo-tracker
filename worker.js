@@ -458,7 +458,7 @@ async function handleRequest(request) {
         n_serie: f.N_Serie || '', site: f.Site || '', statut: f.Statut || 'En service',
         date_sortie_service: f.Date_Sortie_Service || '', cout_mensuel: f.Cout_Mensuel != null ? f.Cout_Mensuel : 0,
         n_telephone: f.N_Telephone || '', operateur: f.Operateur || '', n_carte_sim: f.N_Carte_SIM || '',
-        code_pin: f.Code_PIN || '', code_puk: f.Code_PUK || '', code_rio: f.Code_RIO || '', code_deverrouillage: f.Code_Deverrouillage || '',
+        code_pin: f.Code_PIN || '', code_puk: f.Code_PUK || '', code_rio: f.Code_RIO || '', code_deverrouillage: f.Code_deverouillage || '',
         commentaire: f.Commentaire || '',
         detenteur_code: det ? det.code_employe : '', detenteur_nom: det ? det.nom_detenteur : '', depuis: det ? det.horodatage : ''
       };
@@ -1872,7 +1872,7 @@ async function handleRequest(request) {
       if (body.code_pin) f.Code_PIN = body.code_pin;
       if (body.code_puk) f.Code_PUK = body.code_puk;
       if (body.code_rio) f.Code_RIO = body.code_rio;
-      if (body.code_deverrouillage) f.Code_Deverrouillage = body.code_deverrouillage;
+      if (body.code_deverrouillage) f.Code_deverouillage = body.code_deverrouillage;
       if (body.commentaire) f.Commentaire = body.commentaire;
       try {
         const r = await fetch(GL + '/Materiel_IT/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: f }) });
@@ -1902,7 +1902,7 @@ async function handleRequest(request) {
       if (body.code_pin != null) f.Code_PIN = body.code_pin;
       if (body.code_puk != null) f.Code_PUK = body.code_puk;
       if (body.code_rio != null) f.Code_RIO = body.code_rio;
-      if (body.code_deverrouillage != null) f.Code_Deverrouillage = body.code_deverrouillage;
+      if (body.code_deverrouillage != null) f.Code_deverouillage = body.code_deverrouillage;
       if (body.commentaire != null) f.Commentaire = body.commentaire;
       try {
         const r = await fetch(GL + '/Materiel_IT/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(f) });
@@ -1937,7 +1937,7 @@ async function handleRequest(request) {
           N_Serie: x.n_serie || '', Site: x.site || 'Reunion', Statut: x.statut || 'En service',
           Date_Sortie_Service: x.date_sortie_service || null, Cout_Mensuel: x.cout_mensuel != null ? x.cout_mensuel : null,
           N_Telephone: x.n_telephone || '', Operateur: x.operateur || '', N_Carte_SIM: x.n_carte_sim || '',
-          Code_PIN: x.code_pin || '', Code_PUK: x.code_puk || '', Code_RIO: x.code_rio || '', Code_Deverrouillage: x.code_deverrouillage || '',
+          Code_PIN: x.code_pin || '', Code_PUK: x.code_puk || '', Code_RIO: x.code_rio || '', Code_deverouillage: x.code_deverrouillage || '',
           Commentaire: x.commentaire || ''
         } }
       }));
