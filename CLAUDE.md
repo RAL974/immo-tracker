@@ -708,6 +708,7 @@ Détail technique dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md`,
 - Signalé par William : `Uncaught Cannot stop, scanner is not running or paused` en testant la saisie manuelle du code au lieu du scan.
 - Cause (identifiée en lisant le code source de `html5-qrcode` depuis le CDN, lecture seule) : `.stop()` lance une exception **synchrone** (chaîne, pas un `Error`) si le scanner n'a jamais fini de démarrer — le `.catch()` existant ne protège que contre une promesse rejetée, inefficace ici.
 - Corrigé : `stopScanner()` encadré d'un `try/catch` classique en plus du `.catch()`. Reproduit et vérifié en navigateur (caméra bloquée → scanner jamais démarré → plus d'erreur).
+- **Second incident au retest** : `sw.js` levait `Failed to execute 'clone' on 'Response': Response body is already used` — `res.clone()` était appelé dans un `.then()` différé (`caches.open().then(...)`) au lieu d'immédiatement à réception de la réponse, laissant le temps au corps d'être déjà en cours de lecture ailleurs. Corrigé en clonant de façon synchrone dès réception.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
