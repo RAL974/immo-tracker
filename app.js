@@ -322,7 +322,16 @@ function startScanner(elId, cb, boxConfig) {
 }
 
 function stopScanner() {
-  if (S.scanner) { S.scanner.stop().catch(() => {}); S.scanner = null; }
+  // .stop() lance une exception SYNCHRONE (pas une promesse rejetée) si le scanner n'est pas
+  // encore en cours de lecture (ex. caméra toujours en cours de démarrage, ou jamais lancée
+  // sur le parcours d'activation manuelle) — le .catch() seul ne suffit pas à l'attraper.
+  if (S.scanner) {
+    try {
+      const p = S.scanner.stop();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (e) {}
+    S.scanner = null;
+  }
 }
 
 // ── Navigation ────────────────────────────────────────────
