@@ -20,8 +20,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- Design system (août 2026) : palette/typo/espacements/ombres centralisés dans un fichier à part
+     (voir 04_HISTORIQUE_DECISIONS.md). Les variables historiques ci-dessous (--blue, --orange...)
+     sont conservées telles quelles — des centaines d'usages dans ce fichier s'y réfèrent — mais
+     pointent désormais vers les nouveaux tokens --ds-* plutôt que des couleurs figées en dur. -->
+<link rel="stylesheet" href="design-system.css">
 <style>
-:root{--blue:#1A3A6B;--orange:#E87722;--green:#27AE60;--red:#E74C3C;--yellow:#F39C12;--grey:#7F8C8D;--bg:#F0F4F8;--card:#fff;--sidebar:220px;--header:54px;}
+:root{--blue:var(--ds-primary);--orange:var(--ds-accent);--green:var(--ds-success);--red:var(--ds-danger);--yellow:var(--ds-warning);--grey:var(--ds-neutral-500);--bg:var(--ds-bg);--card:var(--ds-surface);--sidebar:220px;--header:54px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:#2C3E50;display:flex;flex-direction:column;min-height:100vh;}
 
@@ -38,21 +43,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #pin-error{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
 
 /* ── Header ── */
-#header{background:var(--blue);color:#fff;height:var(--header);display:flex;align-items:center;padding:0 16px;gap:10px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3);}
-#header img{height:32px;}
-#header h1{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#header{background:var(--blue);color:#fff;height:var(--header);display:flex;align-items:center;padding:0 16px;gap:10px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:var(--ds-shadow-sm,0 2px 8px rgba(0,0,0,.3));border-bottom:1px solid rgba(255,255,255,.06);}
+#header img{height:30px;}
+#header h1{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.2px;}
 #header-actions{display:flex;gap:8px;align-items:center;}
-#header-actions button{border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;}
+#header-actions button{border:none;color:#fff;padding:7px 14px;border-radius:var(--ds-radius-sm,6px);cursor:pointer;font-weight:700;font-size:12px;transition:filter var(--ds-transition-fast,.15s ease),transform var(--ds-transition-fast,.15s ease);}
+#header-actions button:hover{filter:brightness(1.08);}
+#header-actions button:active{transform:translateY(1px);}
 #btn-export{background:var(--green);}
 #btn-refresh{background:var(--orange);}
 #last-upd{font-size:11px;opacity:.6;white-space:nowrap;}
 
 /* ── Sidebar ── */
-#sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:var(--blue);overflow-y:auto;z-index:90;padding-bottom:20px;}
-.nav-group{padding:16px 12px 4px;font-size:10px;font-weight:800;color:rgba(255,255,255,.4);letter-spacing:1.5px;text-transform:uppercase;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;color:rgba(255,255,255,.75);border-radius:8px;margin:2px 8px;transition:all .15s;position:relative;}
-.nav-item:hover{background:rgba(255,255,255,.1);color:#fff;}
-.nav-item.active{background:var(--orange);color:#fff;box-shadow:0 2px 8px rgba(232,119,34,.4);}
+#sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:var(--blue);overflow-y:auto;z-index:90;padding:8px 0 20px;border-right:1px solid rgba(255,255,255,.05);}
+.nav-group{padding:18px 16px 6px;font-size:10px;font-weight:800;color:rgba(255,255,255,.35);letter-spacing:1.5px;text-transform:uppercase;}
+.nav-group:first-child{padding-top:8px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 11px;cursor:pointer;color:rgba(255,255,255,.72);border-radius:var(--ds-radius-sm,8px);margin:1px 8px;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease),border-color var(--ds-transition-fast,.15s ease);position:relative;border-left:3px solid transparent;}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-item.active{background:rgba(198,149,42,.18);color:#fff;border-left-color:var(--orange);font-weight:700;}
 .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0;}
 .nav-label{font-size:13px;font-weight:600;}
 .nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:20px;text-align:center;}
@@ -70,51 +78,61 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* ── Main ── */
 #main{margin-left:var(--sidebar);padding:16px;min-height:100vh;}
-#loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;color:var(--grey);}
-#loading-screen .spinner{width:40px;height:40px;border:4px solid #ddd;border-top-color:var(--orange);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px;}
+#loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:8px;min-height:60vh;color:var(--grey);}
+#loading-screen .ds-skel-wrap{width:100%;max-width:900px;}
+#loading-screen .spinner{width:26px;height:26px;border:3px solid #ddd;border-top-color:var(--orange);border-radius:50%;animation:spin 1s linear infinite;margin:22px 0 8px;}
+#loading-screen p{font-size:13px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .tab-pane{display:none;}.tab-pane.active{display:block;}
 
 /* ── KPIs ── */
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
-.kpi{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,.07);cursor:pointer;border-top:4px solid var(--orange);transition:transform .1s;}
-.kpi:hover{transform:translateY(-2px);}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;}
+.kpi{background:var(--card);border-radius:var(--ds-radius-lg,12px);padding:16px 16px 14px;box-shadow:var(--ds-shadow-sm,0 2px 12px rgba(0,0,0,.07));cursor:pointer;border-top:4px solid var(--orange);transition:transform var(--ds-transition-base,.18s ease),box-shadow var(--ds-transition-base,.18s ease);}
+.kpi:hover{transform:translateY(-3px);box-shadow:var(--ds-shadow-md,0 2px 12px rgba(0,0,0,.07));}
+.kpi-icon{width:34px;height:34px;border-radius:var(--ds-radius-md,10px);display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:10px;background:#FFF8E1;color:#E65100;}
 .kpi.blue{border-top-color:var(--blue);}
+.kpi.blue .kpi-icon{background:#E3F2FD;color:#0D47A1;}
 .kpi.green{border-top-color:var(--green);}
+.kpi.green .kpi-icon{background:#E8F5E9;color:#1B5E20;}
 .kpi.red{border-top-color:var(--red);}
+.kpi.red .kpi-icon{background:#FBE9E7;color:#B71C1C;}
 .kpi.grey{border-top-color:var(--grey);}
+.kpi.grey .kpi-icon{background:#ECEFF1;color:#37474F;}
 .kpi.yellow{border-top-color:var(--yellow);}
-.kv{font-size:30px;font-weight:800;color:var(--blue);line-height:1;}
-.kl{font-size:11px;color:var(--grey);margin-top:4px;}
+.kpi.yellow .kpi-icon{background:#FFF3E0;color:#E65100;}
+.kv{font-size:28px;font-weight:800;color:var(--blue);line-height:1.05;letter-spacing:-.3px;}
+.kl{font-size:11.5px;color:var(--grey);margin-top:5px;font-weight:600;}
 
 /* ── Cards & Tables ── */
-.card{background:var(--card);border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;margin-bottom:14px;}
-.card-head{padding:12px 18px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;}
-.card-head h3{font-size:14px;font-weight:700;color:var(--blue);}
-.card-cnt{background:var(--bg);padding:3px 10px;border-radius:8px;font-size:12px;color:var(--grey);font-weight:600;}
+.card{background:var(--card);border-radius:var(--ds-radius-lg,12px);box-shadow:var(--ds-shadow-sm,0 2px 12px rgba(0,0,0,.07));overflow:hidden;margin-bottom:14px;border:1px solid var(--ds-border,transparent);}
+.card-head{padding:13px 18px;background:var(--ds-surface-alt,#fff);border-bottom:1px solid var(--ds-border,#f0f0f0);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.card-head h3{font-size:13.5px;font-weight:700;color:var(--blue);letter-spacing:.2px;}
+.card-cnt{background:var(--bg);padding:3px 10px;border-radius:var(--ds-radius-full,8px);font-size:12px;color:var(--grey);font-weight:700;}
 .card-body{padding:14px;}
 table{width:100%;border-collapse:collapse;}
-th{background:#F8FAFC;padding:9px 12px;text-align:left;font-size:11px;color:var(--grey);text-transform:uppercase;letter-spacing:.5px;font-weight:700;border-bottom:2px solid #eee;}
-td{padding:9px 12px;border-bottom:1px solid #f5f5f5;font-size:13px;vertical-align:middle;}
+th{position:sticky;top:0;background:var(--ds-surface-alt,#F8FAFC);padding:10px 12px;text-align:left;font-size:11px;color:var(--grey);text-transform:uppercase;letter-spacing:.5px;font-weight:700;border-bottom:2px solid var(--ds-border,#eee);box-shadow:0 1px 0 var(--ds-border,#eee);z-index:1;}
+td{padding:10px 12px;border-bottom:1px solid var(--ds-border,#f5f5f5);font-size:13px;vertical-align:middle;line-height:1.4;}
 tr:last-child td{border-bottom:none;}
-tr:hover td{background:#FAFBFC;}
-.tbl-wrap{overflow-x:auto;}
-.icode{font-weight:700;color:var(--blue);font-family:monospace;font-size:12px;}
-.badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;}
-.bn{background:#E8F5E9;color:#1B5E20;}
-.bb{background:#E3F2FD;color:#0D47A1;}
-.bu{background:#FFF8E1;color:#E65100;}
-.ba{background:#FBE9E7;color:#B71C1C;}
-.bh{background:#ECEFF1;color:#37474F;}
-.bpanne{background:#FFF3E0;color:#E65100;}
-.bi{background:#F5F5F5;color:#9E9E9E;}
-.bret{background:#FFEBEE;color:var(--red);font-weight:700;}
-.batt{background:#FFF3E0;color:#E65100;}
-.urgent-row td{background:#FFEBEE!important;}
+tbody tr:nth-child(even) td{background:var(--ds-surface-alt,#FAFAF8);}
+tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
+.tbl-wrap{overflow:auto;max-height:65vh;}
+.icode{font-weight:700;color:var(--blue);font-family:var(--ds-font-mono,monospace);font-size:12px;}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:var(--ds-radius-full,8px);font-size:11px;font-weight:700;line-height:1.3;white-space:nowrap;}
+.bn{background:var(--ds-success-bg,#E8F5E9);color:var(--ds-success-dark,#1B5E20);}
+.bb{background:var(--ds-info-bg,#E3F2FD);color:#0D47A1;}
+.bu{background:var(--ds-warning-bg,#FFF8E1);color:var(--ds-warning-dark,#E65100);}
+.ba{background:var(--ds-danger-bg,#FBE9E7);color:var(--ds-danger-dark,#B71C1C);}
+.bh{background:var(--ds-neutral-100,#ECEFF1);color:var(--ds-neutral-600,#37474F);}
+.bpanne{background:var(--ds-warning-bg,#FFF3E0);color:var(--ds-warning-dark,#E65100);}
+.bi{background:var(--ds-neutral-100,#F5F5F5);color:var(--ds-neutral-400,#9E9E9E);}
+.bret{background:var(--ds-danger-bg,#FFEBEE);color:var(--red);font-weight:700;}
+.batt{background:var(--ds-warning-bg,#FFF3E0);color:var(--ds-warning-dark,#E65100);}
+.urgent-row td{background:var(--ds-danger-bg,#FFEBEE)!important;}
 .urgent-row td:first-child{border-left:3px solid var(--red);}
-.warn-row td{background:#FFF8E1!important;}
+.warn-row td{background:var(--ds-warning-bg,#FFF8E1)!important;}
 .warn-row td:first-child{border-left:3px solid var(--yellow);}
-.es{text-align:center;padding:30px;color:var(--grey);font-style:italic;}
+.es{text-align:center;padding:36px 20px;color:var(--ds-text-muted,var(--grey));font-size:13px;line-height:1.5;}
+.es::before{content:'🗂️';display:block;font-size:26px;margin-bottom:8px;opacity:.55;}
 
 /* ── Liens cliquables ── */
 .link-im,.link-emp{cursor:pointer;text-decoration:underline;font-weight:600;}
@@ -123,10 +141,11 @@ tr:hover td{background:#FAFBFC;}
 
 /* ── Filtres ── */
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-.filters input,.filters select{padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff;}
+.filters input,.filters select{padding:8px 12px;border:1.5px solid var(--ds-border-strong,#ddd);border-radius:var(--ds-radius-sm,8px);font-size:13px;background:#fff;transition:border-color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);}
 .filters input{flex:1;min-width:180px;}
-.filters input:focus,.filters select:focus{outline:none;border-color:var(--orange);}
-.filter-btn{padding:8px 16px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;}
+.filters input:focus,.filters select:focus{outline:none;border-color:var(--orange);box-shadow:var(--ds-shadow-focus);}
+.filter-btn{padding:8px 16px;background:var(--blue);color:#fff;border:none;border-radius:var(--ds-radius-sm,8px);font-weight:600;cursor:pointer;font-size:13px;transition:filter var(--ds-transition-fast,.15s ease);}
+.filter-btn:hover{filter:brightness(1.1);}
 
 /* ── Charts ── */
 .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px;}
@@ -187,24 +206,40 @@ tr:hover td{background:#FAFBFC;}
 .fiche-btn.green{background:var(--green);color:#fff;}
 
 /* ── Modal action ── */
-#act-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;display:none;align-items:center;justify-content:center;padding:16px;}
+#act-overlay{position:fixed;inset:0;background:rgba(18,21,27,.6);z-index:600;display:none;align-items:center;justify-content:center;padding:16px;}
 #act-overlay.open{display:flex;}
-#act-modal{background:#fff;border-radius:16px;padding:24px;width:min(480px,100%);max-height:90vh;overflow-y:auto;}
+#act-modal{background:#fff;border-radius:var(--ds-radius-xl,16px);padding:24px;width:min(480px,100%);max-height:90vh;overflow-y:auto;box-shadow:var(--ds-shadow-xl);}
 #act-modal h3{color:var(--blue);margin-bottom:16px;font-size:16px;}
-.frow{margin-bottom:12px;}
-.frow label{display:block;font-size:11px;font-weight:700;color:var(--grey);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;}
-.frow input,.frow select,.frow textarea{width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:14px;}
-.frow input:focus,.frow select:focus{outline:none;border-color:var(--orange);}
+.frow{margin-bottom:14px;}
+.frow label{display:block;font-size:11px;font-weight:700;color:var(--grey);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
+.frow input,.frow select,.frow textarea{width:100%;padding:10px 12px;border:1.5px solid var(--ds-border-strong,#ddd);border-radius:var(--ds-radius-sm,8px);font-size:14px;font-family:var(--ds-font-sans);transition:border-color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);}
+.frow input:focus,.frow select:focus,.frow textarea:focus{outline:none;border-color:var(--orange);box-shadow:var(--ds-shadow-focus);}
 .fact-btns{display:flex;gap:8px;margin-top:16px;}
-.fact-btns button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;}
+.fact-btns button{flex:1;padding:12px;border:none;border-radius:var(--ds-radius-sm,8px);font-weight:700;font-size:14px;cursor:pointer;transition:filter var(--ds-transition-fast,.15s ease),transform var(--ds-transition-fast,.15s ease);}
+.fact-btns button:hover{filter:brightness(1.06);}
+.fact-btns button:active{transform:translateY(1px);}
 
 /* ── Responsive ── */
-#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--blue);z-index:200;flex-direction:row;border-top:1px solid rgba(255,255,255,.15);overflow-x:auto;}
-.bnav-item{flex:1;min-width:52px;padding:6px 4px;color:rgba(255,255,255,.65);text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background .15s;}
+#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--blue);z-index:200;flex-direction:row;border-top:1px solid rgba(255,255,255,.08);box-shadow:var(--ds-shadow-md,0 -2px 12px rgba(0,0,0,.15));overflow-x:auto;}
+.bnav-item{flex:1;min-width:52px;padding:7px 4px 6px;color:rgba(255,255,255,.6);text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease);border-top:2px solid transparent;}
 .bnav-item .bi{font-size:18px;line-height:1;}
-.bnav-item span:last-child{font-size:9px;margin-top:2px;white-space:nowrap;}
-.bnav-item.active{color:#fff;background:rgba(255,255,255,.18);}
-.bnav-item:hover{background:rgba(255,255,255,.12);}
+.bnav-item span:last-child{font-size:9px;margin-top:2px;white-space:nowrap;font-weight:600;}
+.bnav-item.active{color:#fff;background:rgba(198,149,42,.16);border-top-color:var(--orange);}
+.bnav-item:hover{background:rgba(255,255,255,.1);}
+/* Tablette : rail d'icônes plutôt que la navigation basse (pensée pour un pouce, pas pour une
+   dalle 768-1024px) — le sidebar reste utilisable en continu, juste condensé. Le point de rupture
+   mobile existant (max-width:768px) prend le relais en dessous, inchangé. */
+@media(min-width:769px) and (max-width:1024px){
+  :root{--sidebar:60px;}
+  .nav-label,.nav-group{display:none;}
+  .nav-item{justify-content:center;padding:12px 0;margin:1px 6px;border-left-width:0;border-top:3px solid transparent;}
+  .nav-item.active{border-left-color:transparent;border-top-color:var(--orange);}
+  .nav-icon{width:auto;font-size:19px;}
+  .nav-badge{position:absolute;top:4px;right:8px;font-size:9px;padding:1px 5px;min-width:auto;}
+  #header h1{font-size:13px;}
+  .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));}
+  .charts-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+}
 @media(max-width:768px){
   :root{--sidebar:0px;}
   #hamburger{display:none!important;}
@@ -333,7 +368,18 @@ tr:hover td{background:#FAFBFC;}
 
 <!-- Main content -->
 <div id="main" style="padding-top:var(--header)">
-  <div id="loading-screen"><div class="spinner"></div><p>Chargement du tableau de bord...</p></div>
+  <div id="loading-screen">
+    <div class="ds-skel-wrap">
+      <div class="ds-skel-kpi-row">
+        <div class="ds-skel ds-skel-kpi"></div><div class="ds-skel ds-skel-kpi"></div><div class="ds-skel ds-skel-kpi"></div><div class="ds-skel ds-skel-kpi"></div>
+      </div>
+      <div class="ds-skel ds-skel-text" style="height:16px;width:200px;margin:22px 0 14px"></div>
+      <div class="ds-skel ds-skel-text"></div>
+      <div class="ds-skel ds-skel-text"></div>
+      <div class="ds-skel ds-skel-text short"></div>
+    </div>
+    <div class="spinner"></div><p>Chargement du tableau de bord...</p>
+  </div>
   <div id="dash-content" style="display:none">
 
     <!-- Vue générale -->
@@ -381,11 +427,11 @@ tr:hover td{background:#FAFBFC;}
         <div id="depot-import-preview"></div>
         <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
           <span style="font-size:12px;color:var(--grey);font-weight:700">Trier par :</span>
-          <button onclick="sortDepot('code')" class="filter-btn" style="padding:4px 10px;font-size:12px">Code IM</button>
-          <button onclick="sortDepot('val')" class="filter-btn" style="padding:4px 10px;font-size:12px">Valeur achat</button>
-          <button onclick="sortDepot('date')" class="filter-btn" style="padding:4px 10px;font-size:12px">Date achat</button>
-          <button onclick="sortDepot('cat')" class="filter-btn" style="padding:4px 10px;font-size:12px">Catégorie</button>
-          <button onclick="sortDepot('since')" class="filter-btn" style="padding:4px 10px;font-size:12px">Durée au dépôt</button>
+          <button id="sortbtn-code" onclick="sortDepot('code')" class="filter-btn ds-sort-btn" style="padding:4px 10px;font-size:12px">Code IM</button>
+          <button id="sortbtn-val" onclick="sortDepot('val')" class="filter-btn ds-sort-btn" style="padding:4px 10px;font-size:12px">Valeur achat</button>
+          <button id="sortbtn-date" onclick="sortDepot('date')" class="filter-btn ds-sort-btn" style="padding:4px 10px;font-size:12px">Date achat</button>
+          <button id="sortbtn-cat" onclick="sortDepot('cat')" class="filter-btn ds-sort-btn" style="padding:4px 10px;font-size:12px">Catégorie</button>
+          <button id="sortbtn-since" onclick="sortDepot('since')" class="filter-btn ds-sort-btn" style="padding:4px 10px;font-size:12px">Durée au dépôt</button>
         </div>
         <div id="depot-admin-toggle" style="margin-bottom:8px"></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Site</th><th>Catégorie</th><th>État</th><th>Valeur achat</th><th>Date achat</th><th>Depuis</th></tr></thead><tbody id="tb-depot"></tbody></table></div>
@@ -581,6 +627,98 @@ var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','ma
     return origFetch(input,init);
   };
 })();
+
+// ── Toasts non bloquants (remplace alert(), voir 04_HISTORIQUE_DECISIONS.md) ──────────────
+// window.alert est surchargé plus bas : les ~144 sites d'appel existants (alert('...')) deviennent
+// des toasts sans qu'aucun n'ait besoin d'être modifié — alert() ne retourne jamais de valeur
+// exploitée par l'appelant, donc rien ne dépend de son comportement bloquant d'origine.
+var DS_TOAST_STACK=null;
+function dsToastStack(){
+  if(!DS_TOAST_STACK||!DS_TOAST_STACK.parentNode){
+    DS_TOAST_STACK=document.createElement('div');
+    DS_TOAST_STACK.id='ds-toast-stack';
+    document.body.appendChild(DS_TOAST_STACK);
+  }
+  return DS_TOAST_STACK;
+}
+function dsToastType(msg){
+  var s=String(msg==null?'':msg);
+  if(/^\s*(✅|👍)/.test(s)||/succès|réussi(e)?\s*!|terminé(e)?\s*!/i.test(s))return'success';
+  if(/^\s*(❌|🔒)/.test(s)||/échec|erreur/i.test(s))return'danger';
+  if(/^\s*⚠️/.test(s))return'warning';
+  return'default';
+}
+function dsToastIcon(type){return({success:'✅',danger:'❌',warning:'⚠️',default:'ℹ️'})[type]||'ℹ️';}
+function showToast(message,type,duration){
+  type=type||dsToastType(message);
+  duration=duration||(type==='danger'?7000:4500);
+  var stack=dsToastStack();
+  var el=document.createElement('div');
+  el.className='ds-toast ds-toast-'+type;
+  var iconSpan=document.createElement('span');iconSpan.className='ds-toast-icon';iconSpan.textContent=dsToastIcon(type);
+  var msgSpan=document.createElement('span');msgSpan.className='ds-toast-msg';msgSpan.textContent=String(message==null?'':message);
+  var closeBtn=document.createElement('button');closeBtn.className='ds-toast-close';closeBtn.setAttribute('aria-label','Fermer');closeBtn.textContent='✕';
+  el.appendChild(iconSpan);el.appendChild(msgSpan);el.appendChild(closeBtn);
+  var dismissed=false;
+  function dismiss(){
+    if(dismissed)return;dismissed=true;
+    el.classList.add('ds-toast-leaving');
+    setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},220);
+  }
+  closeBtn.onclick=dismiss;
+  stack.appendChild(el);
+  setTimeout(dismiss,duration);
+  return el;
+}
+window.alert=function(message){showToast(message);};
+
+// ── Modale de confirmation non bloquante (remplace confirm()) ─────────────────────────────
+// confirm() natif est synchrone ; une modale stylée ne peut pas l'être. confirmModal() retourne
+// donc une Promise<boolean> — chaque site d'appel de confirm() est converti en
+// "await confirmModal(...)" (l'appelant est déjà une fonction async partout où c'est utilisé,
+// puisqu'il enchaîne systématiquement sur un await fetch(...)). Le comportement de gating reste
+// EXACTEMENT le même : le code après "if(!(await confirmModal(...)))return;" ne s'exécute que si
+// l'utilisateur confirme, exactement comme "if(!confirm(...))return;" avant.
+var DS_CONFIRM_OVERLAY=null;
+function dsConfirmOverlay(){
+  if(!DS_CONFIRM_OVERLAY){
+    DS_CONFIRM_OVERLAY=document.createElement('div');
+    DS_CONFIRM_OVERLAY.id='ds-confirm-overlay';
+    DS_CONFIRM_OVERLAY.innerHTML='<div class="ds-confirm-box"><div class="ds-confirm-icon">❓</div>'+
+      '<div class="ds-confirm-title"></div><div class="ds-confirm-msg"></div>'+
+      '<div class="ds-confirm-actions"><button class="ds-btn ds-btn-ghost" data-act="cancel">Annuler</button>'+
+      '<button class="ds-btn ds-btn-primary" data-act="ok">Confirmer</button></div></div>';
+    document.body.appendChild(DS_CONFIRM_OVERLAY);
+  }
+  return DS_CONFIRM_OVERLAY;
+}
+function confirmModal(message,opts){
+  opts=opts||{};
+  var ov=dsConfirmOverlay();
+  ov.querySelector('.ds-confirm-icon').textContent=opts.danger?'⚠️':'❓';
+  ov.querySelector('.ds-confirm-title').textContent=opts.title||(opts.danger?'Confirmer cette action':'Confirmation');
+  ov.querySelector('.ds-confirm-msg').textContent=String(message==null?'':message);
+  var okBtn=ov.querySelector('[data-act="ok"]');
+  var cancelBtn=ov.querySelector('[data-act="cancel"]');
+  okBtn.textContent=opts.okLabel||'Confirmer';
+  cancelBtn.textContent=opts.cancelLabel||'Annuler';
+  okBtn.className='ds-btn '+(opts.danger?'ds-btn-danger':'ds-btn-primary');
+  return new Promise(function(resolve){
+    function close(result){
+      ov.classList.remove('open');
+      document.removeEventListener('keydown',onKey);
+      okBtn.onclick=null;cancelBtn.onclick=null;ov.onclick=null;
+      resolve(result);
+    }
+    function onKey(e){if(e.key==='Escape')close(false);else if(e.key==='Enter')close(true);}
+    okBtn.onclick=function(){close(true);};
+    cancelBtn.onclick=function(){close(false);};
+    ov.onclick=function(e){if(e.target===ov)close(false);};
+    document.addEventListener('keydown',onKey);
+    ov.classList.add('open');
+    setTimeout(function(){okBtn.focus();},10);
+  });
+}
 
 var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
 var employesList=[]; // [{Code, Nom, Poste}]
@@ -784,7 +922,11 @@ function checkPin(){
     document.getElementById('pin-step2').style.display='block';
     // Charger la liste des admins/logistique pour le sélecteur
     peuplerSelecteurIdentite();
-  }else{document.getElementById('pin-error').textContent='Code incorrect.';document.getElementById('pin-input').value='';}
+  }else{
+    document.getElementById('pin-error').textContent='Code incorrect.';
+    document.getElementById('pin-input').value='';
+    var pi=document.getElementById('pin-input');pi.classList.add('ds-has-error-input');setTimeout(function(){pi.classList.remove('ds-has-error-input');},1500);
+  }
 }
 
 // Remplit le sélecteur d'identité avec les admins + logistique
@@ -1212,7 +1354,7 @@ async function lancerCampagneInventaire(){
 }
 
 async function cloturerCampagneInventaireDash(nom){
-  if(!confirm('Clôturer la campagne "'+nom+'" ? Les lignes seront figées définitivement.'))return;
+  if(!(await confirmModal('Clôturer la campagne "'+nom+'" ? Les lignes seront figées définitivement.')))return;
   try{
     var r=await fetch(W+'?action=cloturer_campagne_inventaire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom:nom,par_code:ADMIN_SESSION.code})});
     var d=await r.json();
@@ -1401,7 +1543,7 @@ function filtrerLignesSansRef(lignes){
 
 async function importerInventaireDec2025(){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('Importer le comptage de décembre 2025 comme campagne de référence clôturée ?\n\nCette opération est destinée à être faite UNE SEULE FOIS.'))return;
+  if(!(await confirmModal('Importer le comptage de décembre 2025 comme campagne de référence clôturée ?\n\nCette opération est destinée à être faite UNE SEULE FOIS.')))return;
   var statutEl=document.getElementById('inv-migration-statut');
   var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
   setStatut('⏳ Chargement du fichier…');
@@ -1479,7 +1621,7 @@ function renderEPI(){
 
 async function importerDonneesEPI(){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('Importer les données EPI initiales (tailles salariés, catalogue articles, grille de dotation) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  if(!(await confirmModal('Importer les données EPI initiales (tailles salariés, catalogue articles, grille de dotation) ?\n\nÀ faire UNE SEULE FOIS.')))return;
   var statutEl=document.getElementById('epi-migration-statut');
   var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
   await loadEmployes();
@@ -1564,7 +1706,7 @@ async function enregistrerArticleEPI(){
   if(!typeArticle){msg.textContent='Le type d\'article est obligatoire.';return;}
   if(!reference){msg.textContent='La référence est obligatoire.';return;}
   var typeExiste=epiCatalogue.some(function(a){return (a.type_article||'').trim().toLowerCase()===typeArticle.toLowerCase();});
-  if(!typeExiste&&!confirm('« '+typeArticle+' » n\'existe pas encore dans le catalogue EPI. Êtes-vous sûr de vouloir créer cette nouvelle catégorie d\'articles ?')){return;}
+  if(!typeExiste&&!(await confirmModal('« '+typeArticle+' » n\'existe pas encore dans le catalogue EPI. Êtes-vous sûr de vouloir créer cette nouvelle catégorie d\'articles ?'))){return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
   var payload={type_article:typeArticle,taille_salarie:(document.getElementById('ax-taille-sal').value||'').trim(),
     taille_affichage:(document.getElementById('ax-taille-aff').value||'').trim(),reference:reference,
@@ -1665,9 +1807,9 @@ function refreshEPIStockResults(){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var html='<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Référence</th><th>Désignation</th><th>Stock actuel</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
   rows.forEach(function(a){
-    var stockColor=a.stock_actuel<=0?'var(--red)':(a.stock_actuel<5?'var(--orange)':'var(--green)');
+    var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<5?'bu':'bn');
     html+='<tr><td>'+a.type_article+'</td><td>'+a.taille_affichage+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.designation||'—')+'</td>'+
-      '<td style="font-weight:700;color:'+stockColor+'">'+a.stock_actuel+'</td>'+
+      '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
       (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
         '<button onclick="editerStockEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button></td>':'')+
     '</tr>';
@@ -1743,7 +1885,7 @@ function renderEPIGrille(container){
   container.innerHTML=html;
 }
 async function supprimerTypeGrilleEPI(typeArticle){
-  if(!confirm('Retirer "'+typeArticle+'" de la grille de dotation pour les 4 profils ?'))return;
+  if(!(await confirmModal('Retirer "'+typeArticle+'" de la grille de dotation pour les 4 profils ?')))return;
   var lignes=epiGrille.filter(function(g){return g.type_article===typeArticle;});
   for(var i=0;i<lignes.length;i++){
     try{await fetch(W+'?action=supprimer_grille_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:lignes[i].id})});}catch(e){}
@@ -2018,8 +2160,8 @@ async function genererDotationAnnuelleComplete(){
   // Garde-fou : la dotation annuelle ne doit normalement se générer qu'une fois par année — avertir
   // explicitement avant de continuer si ce n'est visiblement pas la première fois pour cette année.
   if(nbDejaGeneres>0){
-    if(!confirm('La dotation annuelle '+annee+' a déjà été générée pour '+nbDejaGeneres+'/'+eligibles.length+' employé(s) actif(s). '+
-      'Continuer va créer les '+aGenerer.length+' fiche(s) manquante(s) puis régénérer TOUS les PDF de '+annee+' (y compris ceux déjà émargés). Continuer ?'))return;
+    if(!(await confirmModal('La dotation annuelle '+annee+' a déjà été générée pour '+nbDejaGeneres+'/'+eligibles.length+' employé(s) actif(s). '+
+      'Continuer va créer les '+aGenerer.length+' fiche(s) manquante(s) puis régénérer TOUS les PDF de '+annee+' (y compris ceux déjà émargés). Continuer ?')))return;
   }
   if(aGenerer.length){
     var ok=0,ko=0;
@@ -2063,7 +2205,7 @@ async function genererDotationAnnuelleComplete(){
 }
 
 async function annulerDotationEPI(id){
-  if(!confirm('Annuler cette fiche générée par erreur ?'))return;
+  if(!(await confirmModal('Annuler cette fiche générée par erreur ?')))return;
   try{
     var r=await fetch(W+'?action=annuler_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
     var res=await r.json();
@@ -2144,7 +2286,7 @@ async function confirmerEmargementEPI(){
   try{
     var b64=await fichierVersJPEGBase64(input.files[0]);
     var sig=await detecterSignatureDataURL(b64);
-    if(sig===false&&!confirm('Aucune signature détectée dans la case prévue à cet effet (fiche vierge ?). Continuer quand même ?')){
+    if(sig===false&&!(await confirmModal('Aucune signature détectée dans la case prévue à cet effet (fiche vierge ?). Continuer quand même ?'))){
       btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Émargement annulé : signature non détectée.';return;
     }
     var fn=nomFichierEmargement();
@@ -2567,7 +2709,7 @@ async function sauvegarderTaillesEPI(code){
 async function genererDotationIndividuelleEPI(code){
   var annee=prompt('Année civile de la dotation :',new Date().getFullYear());
   if(!annee)return;
-  var type=confirm('Nouvelle entrée (première dotation de cet employé) ?\n\nOK = Entrée · Annuler = dotation annuelle standard.')?'Entree':'Annuelle';
+  var type=(await confirmModal('Nouvelle entrée (première dotation de cet employé), ou dotation annuelle standard ?',{title:'Type de dotation',okLabel:'Entrée (nouvel employé)',cancelLabel:'Dotation annuelle standard'}))?'Entree':'Annuelle';
   try{
     var r=await fetch(W+'?action=generer_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,annee:parseInt(annee,10),type_dotation:type,par_code:ADMIN_SESSION.code})});
     var res=await r.json();
@@ -2774,7 +2916,7 @@ function exporterPrimeOutillage(){
 
 async function importerDonneesOutillage(){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('Importer les données prime d\'outillage initiales (catalogue, grille, historique de distribution) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  if(!(await confirmModal('Importer les données prime d\'outillage initiales (catalogue, grille, historique de distribution) ?\n\nÀ faire UNE SEULE FOIS.')))return;
   var statutEl=document.getElementById('outil-migration-statut');
   var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
   await loadEmployes();
@@ -2843,9 +2985,9 @@ function refreshOutilStockResults(){
   var html='<div style="padding:0 14px 8px;font-size:12px;color:var(--grey)">Valeur totale du stock : <strong style="color:var(--blue)">'+valeurTotale.toFixed(2)+' €</strong></div>';
   html+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Référence</th><th>Marque</th><th>Prix unitaire</th><th>Stock actuel</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
   rows.forEach(function(a){
-    var stockColor=a.stock_actuel<=0?'var(--red)':(a.stock_actuel<3?'var(--orange)':'var(--green)');
+    var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<3?'bu':'bn');
     html+='<tr><td>'+a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.marque||'—')+'</td><td>'+a.prix_unitaire.toFixed(2)+' €</td>'+
-      '<td style="font-weight:700;color:'+stockColor+'">'+a.stock_actuel+'</td>'+
+      '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
       (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
         '<button onclick="editerStockOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button></td>':'')+
     '</tr>';
@@ -2931,7 +3073,7 @@ async function majGrilleOutillage(service,typeArticle,valeur){
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
 async function supprimerTypeGrilleOutillage(typeArticle){
-  if(!confirm('Retirer "'+typeArticle+'" de la grille pour les 2 services ?'))return;
+  if(!(await confirmModal('Retirer "'+typeArticle+'" de la grille pour les 2 services ?')))return;
   var lignes=outilGrille.filter(function(g){return g.type_article===typeArticle;});
   for(var i=0;i<lignes.length;i++){
     try{await fetch(W+'?action=supprimer_grille_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:lignes[i].id})});}catch(e){}
@@ -3079,7 +3221,7 @@ async function confirmerDistributionOutillage(){
   try{
     var b64=await fichierVersJPEGBase64(input.files[0]);
     var sig=await detecterSignatureDataURL(b64);
-    if(sig===false&&!confirm('Aucune signature détectée dans la case prévue à cet effet (fiche vierge ?). Continuer quand même ?')){
+    if(sig===false&&!(await confirmModal('Aucune signature détectée dans la case prévue à cet effet (fiche vierge ?). Continuer quand même ?'))){
       btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Distribution annulée : signature non détectée.';return;
     }
     var fn=nomFichierEmargement();
@@ -3196,15 +3338,15 @@ function renderVueGenerale(){
     {ic:'❌',v:nbPerdus,l:'Perdues',cl:nbPerdus>0?'red':'green',tab:'analyses'},
     {ic:'🚨',v:countCandidatsReforme(),l:'À réformer',cl:countCandidatsReforme()>0?'red':'green',tab:'analyses'},
   ];
-  document.getElementById('kpi-grid').innerHTML=kpis.map(function(k){return'<div class="kpi '+k.cl+'" onclick="goTab(\''+k.tab+'\')"><div style="font-size:18px;margin-bottom:6px">'+k.ic+'</div><div class="kv">'+k.v+'</div><div class="kl">'+k.l+'</div></div>';}).join('');
+  document.getElementById('kpi-grid').innerHTML=kpis.map(function(k){return'<div class="kpi '+k.cl+'" onclick="goTab(\''+k.tab+'\')"><div class="kpi-icon">'+k.ic+'</div><div class="kv">'+k.v+'</div><div class="kl">'+k.l+'</div></div>';}).join('');
   var eList=[{k:'Neuf',c:'neuf',i:'⭐'},{k:'Bon état',c:'bon',i:'✅'},{k:'Usé',c:'use',i:'🔶'},{k:'Abîmé',c:'abime',i:'⚠️'},{k:'Hors service',c:'hs',i:'🔴'},{k:'Inconnu',c:'inc',i:'❓'}];
   document.getElementById('etat-grid').innerHTML=eList.map(function(e){return'<div class="ec '+e.c+'"><div class="ev">'+(s.par_etat[e.k]||0)+'</div><div class="el">'+e.i+' '+e.k+'</div></div>';}).join('');
   ['rep','etat','det'].forEach(function(k){if(charts[k]){charts[k].destroy();}});
-  charts.rep=new Chart(document.getElementById('ch-rep'),{type:'doughnut',data:{labels:['Circulation','Dépôt'],datasets:[{data:[s.en_circulation,s.au_depot],backgroundColor:['#E87722','#27AE60'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
-  var ek=['Neuf','Bon état','Usé','Abîmé','Hors service','Inconnu'],ec=['#27AE60','#2980B9','#F39C12','#E74C3C','#7F8C8D','#BDC3C7'];
+  charts.rep=new Chart(document.getElementById('ch-rep'),{type:'doughnut',data:{labels:['Circulation','Dépôt'],datasets:[{data:[s.en_circulation,s.au_depot],backgroundColor:['#A67A1E','#1E9E5A'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  var ek=['Neuf','Bon état','Usé','Abîmé','Hors service','Inconnu'],ec=['#1E9E5A','#2980B9','#E8912C','#DC3545','#4B5261','#BDC3C7'];
   charts.etat=new Chart(document.getElementById('ch-etat'),{type:'bar',data:{labels:ek,datasets:[{data:ek.map(function(k){return s.par_etat[k]||0;}),backgroundColor:ec,borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}});
   var top=(d.top_detenteurs||[]).slice(0,8);
-  charts.det=new Chart(document.getElementById('ch-det'),{type:'bar',data:{labels:top.map(function(x){return x.nom.split(' ')[0];}),datasets:[{data:top.map(function(x){return x.count;}),backgroundColor:'#1A3A6B',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});
+  charts.det=new Chart(document.getElementById('ch-det'),{type:'bar',data:{labels:top.map(function(x){return x.nom.split(' ')[0];}),datasets:[{data:top.map(function(x){return x.count;}),backgroundColor:'#A67A1E',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}});
 }
 
 // ── Rendu — En circulation ───────────────────────────────
@@ -3238,6 +3380,13 @@ function renderDepot(){
   if(!d)return;
   var tbEl=document.getElementById('tb-depot');
   if(!tbEl)return; // panneau pas encore prêt (évite le crash si appelé trop tôt)
+  // Indicateur visuel du tri actif (purement cosmétique, ne change rien au tri lui-même)
+  ['code','val','date','cat','since'].forEach(function(k){
+    var b=document.getElementById('sortbtn-'+k);if(!b)return;
+    var base=b.textContent.replace(/[▲▼]$/,'');
+    if(k===depotSortKey){b.classList.add('ds-sort-active');b.innerHTML=base+'<span class="ds-sort-arrow">'+(depotSortDir>0?'▲':'▼')+'</span>';}
+    else{b.classList.remove('ds-sort-active');b.textContent=base;}
+  });
   var addBtn=document.getElementById('depot-add-btn'),impBtn=document.getElementById('depot-import-btn');
   if(addBtn)addBtn.style.display=estAdmin(ADMIN_SESSION.code)?'inline-block':'none';
   if(impBtn)impBtn.style.display=estAdmin(ADMIN_SESSION.code)?'inline-block':'none';
@@ -3527,14 +3676,14 @@ function refreshMaterielITResults(){
   if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun appareil'+(q||ft||fs?' pour ce filtre':'')+'.</p>';return;}
   var html='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Type</th><th>Marque / Modèle</th><th>N° série</th><th>Détenteur</th><th>Depuis</th><th>Statut</th><th>Coût/mois</th></tr></thead><tbody>';
   rows.forEach(function(m){
-    var statutColor=m.statut==='En service'?'var(--green)':(m.statut==='Hors service'?'var(--grey)':'var(--red)');
+    var statutClass=m.statut==='En service'?'bn':(m.statut==='Hors service'?'bh':'ba');
     html+='<tr style="cursor:pointer" onclick="voirDetailMaterielIT(\''+m.code+'\')"><td style="font-weight:700">'+m.code+' '+drapeauSiteD(m.site)+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+(m.type_materiel||'—')+'</td>'+
       '<td style="font-size:12px">'+(m.marque||'')+' '+(m.modele||'')+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+(m.n_serie||'—')+'</td>'+
       '<td style="font-size:12px;font-weight:600">'+nomDetenteurMaterielIT(m)+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+(m.depuis?fmtD(m.depuis):'—')+'</td>'+
-      '<td><span style="font-size:11px;font-weight:700;color:'+statutColor+'">'+(m.statut||'—')+'</span></td>'+
+      '<td><span class="badge '+statutClass+'">'+(m.statut||'—')+'</span></td>'+
       '<td style="font-size:12px">'+(m.cout_mensuel?nbFr(m.cout_mensuel)+'€':'—')+'</td>'+
     '</tr>';
   });
@@ -3746,7 +3895,7 @@ function exporterMaterielIT(){
 // ── Migration initiale depuis le fichier Excel de suivi (admin, une seule fois) ──
 async function importerDonneesMaterielIT(){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('Importer les appareils du fichier Excel de suivi (catalogue + détenteur actuel) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  if(!(await confirmModal('Importer les appareils du fichier Excel de suivi (catalogue + détenteur actuel) ?\n\nÀ faire UNE SEULE FOIS.')))return;
   var statutEl=document.getElementById('materiel-it-migration-statut');
   var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
   setStatut('⏳ Chargement du catalogue…');
@@ -3818,13 +3967,13 @@ function refreshLignesTelResults(){
   if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucune ligne'+(q||fs?' pour ce filtre':'')+'.</p>';return;}
   var html='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>N° téléphone</th><th>Opérateur</th><th>Détenteur</th><th>Depuis</th><th>Statut</th></tr></thead><tbody>';
   rows.forEach(function(l){
-    var statutColor=l.statut==='Active'?'var(--green)':'var(--grey)';
+    var statutClass=l.statut==='Active'?'bn':'bh';
     html+='<tr style="cursor:pointer" onclick="voirDetailLigneTel(\''+l.code+'\')"><td style="font-weight:700">'+l.code+' '+drapeauSiteD(l.site)+'</td>'+
       '<td style="font-size:12px">'+(l.n_telephone||'—')+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+(l.operateur||'—')+'</td>'+
       '<td style="font-size:12px;font-weight:600">'+nomDetenteurLigneTel(l)+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+(l.depuis?fmtD(l.depuis):'—')+'</td>'+
-      '<td><span style="font-size:11px;font-weight:700;color:'+statutColor+'">'+(l.statut||'—')+'</span></td>'+
+      '<td><span class="badge '+statutClass+'">'+(l.statut||'—')+'</span></td>'+
     '</tr>';
   });
   html+='</tbody></table></div>';
@@ -3994,7 +4143,7 @@ async function migrerLignesTelephoniques(){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
   var source=materielItList.filter(function(m){return m.n_telephone;});
   if(!source.length){alert('Aucun téléphone avec un numéro de ligne à migrer.');return;}
-  if(!confirm('Créer '+source.length+' ligne(s) téléphonique(s) à partir des téléphones existants (reprend le détenteur actuel de chaque téléphone comme point de départ de l\'historique) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  if(!(await confirmModal('Créer '+source.length+' ligne(s) téléphonique(s) à partir des téléphones existants (reprend le détenteur actuel de chaque téléphone comme point de départ de l\'historique) ?\n\nÀ faire UNE SEULE FOIS.')))return;
   var statutEl=document.getElementById('lignes-tel-migration-statut');
   var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
   setStatut('⏳ Préparation…');
@@ -4184,7 +4333,7 @@ async function enregistrerEmploye(){
 // Modifie l'emplacement (site) d'une immo — admins et Gestionnaire Dépôt RUN
 async function majSiteImmo(codeIM,site){
   if(!peutEditerEmplacement(ADMIN_SESSION.code)){alert('Réservé aux administrateurs et au gestionnaire de dépôt.');renderDepot();return;}
-  if(!confirm('Déplacer '+codeIM+' ('+getLib(codeIM)+') vers '+(site==='Mayotte'?'Mayotte':'La Réunion')+' ?'))return renderDepot();
+  if(!(await confirmModal('Déplacer '+codeIM+' ('+getLib(codeIM)+') vers '+(site==='Mayotte'?'Mayotte':'La Réunion')+' ?')))return renderDepot();
   try{
     var r=await fetch(W+'?action=maj_site_immo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code_im:codeIM,site:site})});
     var res=await r.json();
@@ -4280,9 +4429,9 @@ function renderTransferts(){
     };
   });
   tbody.querySelectorAll('.btn-ann-t').forEach(function(btn){
-    btn.onclick=function(){
+    btn.onclick=async function(){
       var cim=this.dataset.cim,tid=this.dataset.tid;
-      if(!confirm('Annuler le transfert de '+getLib(cim)+' ?'))return;
+      if(!(await confirmModal('Annuler le transfert de '+getLib(cim)+' ?')))return;
       annulerTransfert(tid);
     };
   });
@@ -4296,7 +4445,7 @@ function renderTransferts(){
 async function validerTransfertDash(btn,tid,cim,rec,recNom,etat){
   var lib=getLib(cim);
   var estRetour=(rec==='DEPOT');
-  if(!confirm(estRetour?('Valider le retour au dépôt de '+lib+' ('+etat+') ?'):('Valider : '+lib+' → '+recNom+' ('+etat+') ?')))return;
+  if(!(await confirmModal(estRetour?('Valider le retour au dépôt de '+lib+' ('+etat+') ?'):('Valider : '+lib+' → '+recNom+' ('+etat+') ?'))))return;
   // Pour un retour, on trace le garant qui valide ; pour un transfert, on garde le receveur
   var codeVal=estRetour?ADMIN_SESSION.code:rec;
   var nomVal=estRetour?ADMIN_SESSION.nom:recNom;
@@ -4358,11 +4507,11 @@ function renderResa(){
   // Attacher les handlers sans inline onclick
   setTimeout(function(){
     document.querySelectorAll('.resa-action-sel').forEach(function(sel){
-      sel.onchange=function(){
+      sel.onchange=async function(){
         var val=this.value; if(!val)return; this.value='';
         var id=this.dataset.rid,cim=this.dataset.cim,nom=this.dataset.nom,deb=this.dataset.deb,fin=this.dataset.fin;
         if(val==='Confirmee'||val==='Annulee'){
-          if(!confirm((val==='Confirmee'?'Confirmer':'Annuler')+' la réservation de '+nom+' pour '+getLib(cim)+' ?'))return;
+          if(!(await confirmModal((val==='Confirmee'?'Confirmer':'Annuler')+' la réservation de '+nom+' pour '+getLib(cim)+' ?')))return;
           majStatutResa(id,val,this);
         } else if(val==='contre_prop'){
           ouvrirContreProposition(id,cim,nom,deb,fin);
@@ -4452,7 +4601,7 @@ async function enregistrerReservationAdmin(){
   if(!debut||!fin){msg.textContent='Indique les deux dates.';return;}
   if(new Date(fin)<new Date(debut)){msg.textContent='La date de retour doit être après le départ.';return;}
   var conflits=reservations.filter(function(r){return r.code_im===codeIm&&r.statut!=='Annulee'&&r.statut!=='Rendue'&&!(new Date(fin)<new Date(r.date_debut)||new Date(debut)>new Date(r.date_fin));});
-  if(conflits.length&&!confirm('Cette immo est déjà réservée : '+conflits.map(function(c){return c.nom_employe+' ('+fmtD(c.date_debut)+' → '+fmtD(c.date_fin)+')';}).join(' | ')+'. Enregistrer quand même ?'))return;
+  if(conflits.length&&!(await confirmModal('Cette immo est déjà réservée : '+conflits.map(function(c){return c.nom_employe+' ('+fmtD(c.date_debut)+' → '+fmtD(c.date_fin)+')';}).join(' | ')+'. Enregistrer quand même ?')))return;
   var empSel=document.getElementById('ar-employe');
   var nomEmp=empSel.options[empSel.selectedIndex].textContent.split(' — ')[1]||empCode;
   var chantier=(document.getElementById('ar-chantier').value||'').trim();
@@ -4912,9 +5061,9 @@ function exporterComptable(){
 // ══════════════ MIGRATION : enrichir les immos depuis l'export EBP ══════════════
 async function enrichirImmosEBP(){
   if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('Enrichir les immobilisations dans SharePoint à partir des données comptables EBP ?\n\n'+
+  if(!(await confirmModal('Enrichir les immobilisations dans SharePoint à partir des données comptables EBP ?\n\n'+
     'Cela met à jour, pour chaque immo : libellé, date d\'achat, date de mise en service, valeur d\'achat HT, comptes (immobilisation, amortissement, dotation), site et statut actif.\n\n'+
-    'Les données du fichier EBP font foi et remplaceront les valeurs actuelles.'))return;
+    'Les données du fichier EBP font foi et remplaceront les valeurs actuelles.')))return;
   var statut=document.getElementById('ebp-statut');
   var setStatut=function(txt){if(statut)statut.innerHTML=txt;};
   setStatut('⏳ Chargement du fichier EBP…');
@@ -5138,7 +5287,7 @@ function filterUsers(){
       '<td style="font-family:monospace;font-size:12px;color:var(--grey)">'+u.code+'</td>'+
       '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span>'+(u.explicite?'':' <span style="font-size:9px;color:#bbb" title="Rôle déduit automatiquement">(auto)</span>')+'</td>'+
       '<td>'+badgeSiteD(u.site)+'<select class="site-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid #eee;border-radius:5px">'+siteOpts+'</select></td>'+
-      '<td style="text-align:center"><button class="actif-toggle" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" data-actif="'+(u.actif?'1':'0')+'" style="border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;background:'+(u.actif?'#E8F5E9':'#FFEBEE')+';color:'+(u.actif?'#1B5E20':'#B71C1C')+'">'+(u.actif?'✓ Actif':'✕ Inactif')+'</button></td>'+
+      '<td style="text-align:center"><button class="actif-toggle" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" data-actif="'+(u.actif?'1':'0')+'" style="border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;background:'+(u.actif?'var(--ds-success-bg,#E8F5E9)':'var(--ds-danger-bg,#FFEBEE)')+';color:'+(u.actif?'var(--ds-success-dark,#1B5E20)':'var(--ds-danger-dark,#B71C1C)')+'">'+(u.actif?'✓ Actif':'✕ Inactif')+'</button></td>'+
       '<td style="text-align:center">'+(u.hasPwd?'<span title="Mot de passe défini" style="color:#1B5E20;font-size:13px">🔒 Défini</span><br><button class="pwd-reset" data-code="'+u.code+'" style="margin-top:3px;border:none;background:#FFF3E0;color:#E65100;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">Réinitialiser</button>':'<span title="Aucun mot de passe" style="color:#B71C1C;font-size:12px">🔓 Non défini</span>')+'</td>'+
       '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
       '<td><select class="role-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">'+opts+'</select></td>'+
@@ -5163,7 +5312,7 @@ function filterUsers(){
 // Initialisation en masse des rôles + sites (one-shot)
 async function lancerSeedRolesSites(){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('⚙️ Appliquer les rôles et sites de référence à TOUS les employés ?\n\nCela écrase les valeurs actuelles des colonnes Rôle (Code_CT) et Site avec le mapping validé. À faire une seule fois au démarrage.\n\nContinuer ?'))return;
+  if(!(await confirmModal('⚙️ Appliquer les rôles et sites de référence à TOUS les employés ?\n\nCela écrase les valeurs actuelles des colonnes Rôle (Code_CT) et Site avec le mapping validé. À faire une seule fois au démarrage.\n\nContinuer ?')))return;
   try{
     var r=await fetch(W+'?action=seed_roles_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESR-CONFIRME'})});
     var res=await r.json();
@@ -5182,7 +5331,7 @@ async function lancerSeedRolesSites(){
 // Applique les sites de référence aux immos
 async function lancerSeedImmoSites(){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('🌍 Appliquer les sites (Réunion/Mayotte) à toutes les immos ?\n\nÀ faire une fois au démarrage. Continuer ?'))return;
+  if(!(await confirmModal('🌍 Appliquer les sites (Réunion/Mayotte) à toutes les immos ?\n\nÀ faire une fois au démarrage. Continuer ?')))return;
   try{
     var r=await fetch(W+'?action=seed_immo_sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESR-CONFIRME'})});
     var res=await r.json();
@@ -5199,7 +5348,7 @@ async function lancerSeedImmoSites(){
 // Supprime les doublons d'employés dans SharePoint
 async function lancerDedupeEmployes(){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('🧹 Supprimer les lignes en double dans la liste Employés ?\n\nUne seule ligne par employé sera conservée (la plus complète). Cette action est définitive.\n\nContinuer ?'))return;
+  if(!(await confirmModal('🧹 Supprimer les lignes en double dans la liste Employés ?\n\nUne seule ligne par employé sera conservée (la plus complète). Cette action est définitive.\n\nContinuer ?')))return;
   try{
     var r=await fetch(W+'?action=dedupe_employes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:'ESR-CONFIRME'})});
     var res=await r.json();
@@ -5233,7 +5382,7 @@ async function exporterListeSauvegarde(){
 
 async function resetPasswordUtilisateur(code){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
-  if(!confirm('Réinitialiser le mot de passe de '+nomEmploye(code)+' ?\n\nIl devra en créer un nouveau à sa prochaine connexion.'))return;
+  if(!(await confirmModal('Réinitialiser le mot de passe de '+nomEmploye(code)+' ?\n\nIl devra en créer un nouveau à sa prochaine connexion.')))return;
   try{
     var r=await fetch(W+'?action=reset_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,confirm:'ESR-CONFIRME'})});
     var res=await r.json();
@@ -5248,7 +5397,7 @@ async function resetPasswordUtilisateur(code){
 
 async function majActifUtilisateur(code,actif,itemId){
   if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Seul un administrateur peut modifier ce statut.');filterUsers();return;}
-  if(!confirm((actif?'Réactiver ':'Sortir ')+nomEmploye(code)+(actif?' ?':' de l\'entreprise ?')+(actif?'':'\n\nIl passera en INACTIF : plus de connexion, ni réservation, ni réception de matériel.\nTout son historique de mouvements est conservé.')))return;
+  if(!(await confirmModal((actif?'Réactiver ':'Sortir ')+nomEmploye(code)+(actif?' ?':' de l\'entreprise ?')+(actif?'':'\n\nIl passera en INACTIF : plus de connexion, ni réservation, ni réception de matériel.\nTout son historique de mouvements est conservé.'))))return;
   try{
     var body={code:code,actif:actif};if(itemId)body.item_id=itemId;
     var r=await fetch(W+'?action=maj_actif',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -5286,7 +5435,7 @@ async function majDroitsUtilisateur(code,role,itemId){
   if(estSuperAdmin(code)&&role!=='Admin'){
     alert(nomEmploye(code)+' est administrateur permanent de la solution et ne peut pas être rétrogradé ici.');filterUsers();return;
   }
-  if(!confirm('Attribuer le rôle « '+role.replace('_',' ')+' » à '+nomEmploye(code)+' ?')){filterUsers();return;}
+  if(!(await confirmModal('Attribuer le rôle « '+role.replace('_',' ')+' » à '+nomEmploye(code)+' ?'))){filterUsers();return;}
   try{
     var body={code:code,role:role};
     if(itemId)body.item_id=itemId;
@@ -5660,7 +5809,7 @@ async function chargerFicheImmo(codeIM){
 // possession et recrédite le stock — réutilise annuler_ligne_outillage (même opération que
 // corriger une erreur de saisie, ici employée pour un vrai retour).
 async function validerRetourOutillage(ligneId,code){
-  if(!confirm('Confirmer que cet outil a été rendu et le remettre en stock ?'))return;
+  if(!(await confirmModal('Confirmer que cet outil a été rendu et le remettre en stock ?')))return;
   try{
     var r=await fetch(W+'?action=annuler_ligne_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:ligneId})});
     var res=await r.json();
@@ -6095,11 +6244,11 @@ function soumettreContreProposition(){
     .catch(function(e){alert('Erreur : '+e.message);});
 }
 
-function declarerVol(codeIM,libelle,type){
+async function declarerVol(codeIM,libelle,type){
   var motif=prompt('MOTIF OBLIGATOIRE - Declarer ' + codeIM + ' comme [' + type + '] - min 10 car. :');
   if(!motif||motif.trim().length<10){alert('Motif obligatoire, 10 car. minimum.');return;}
-  if(!confirm('1ere CONFIRMATION : Declarer ' + codeIM + ' [' + type + '] ? Immo retirée définitivement du parc.'))return;
-  if(!confirm('CONFIRMATION FINALE : Cette action est irreversible. Confirmer [' + type + '] pour ' + codeIM + ' ?'))return;
+  if(!(await confirmModal('1ere CONFIRMATION : Declarer ' + codeIM + ' [' + type + '] ? Immo retirée définitivement du parc.')))return;
+  if(!(await confirmModal('CONFIRMATION FINALE : Cette action est irreversible. Confirmer [' + type + '] pour ' + codeIM + ' ?',{danger:true})))return;
   fetch(W+'?action=declarer_vol',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo ' + codeIM + ' déclarée [' + type + ']. Retirée du parc.');})
@@ -6125,14 +6274,14 @@ function ouvrirModalSortie(codeIM,libelle){
   if(btn) btn.onclick=validerSortieDefinitive;
 }
 
-function validerSortieDefinitive(){
+async function validerSortieDefinitive(){
   var type=(document.getElementById('sd-type')||{}).value||'Hors service définitif';
   var motif=(document.getElementById('sd-motif')||{}).value||'';
   if(!motif||motif.trim().length<10){alert('Justification obligatoire (10 car. min.)');return;}
   var codeIM=window._sdCim;
   var lib2=window._sdLib;
   // Deuxième confirmation intégrée dans la modale
-  if(!confirm('CONFIRMATION FINALE : Sortir définitivement '+codeIM+' du parc comme ['+type+'] ?'))return;
+  if(!(await confirmModal('CONFIRMATION FINALE : Sortir définitivement '+codeIM+' du parc comme ['+type+'] ?',{danger:true})))return;
   var endpoint=type==='Volé'||type==='Disparu'?'declarer_vol':'marquer_statut_immo';
   var payload=endpoint==='declarer_vol'
     ?{code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom}
@@ -6142,32 +6291,32 @@ function validerSortieDefinitive(){
     .catch(function(e){alert('Erreur : '+e.message);});
 }
 
-function declarerPanneDash(codeIM){
+async function declarerPanneDash(codeIM){
   var motif=prompt('Motif de la panne pour ' + getLib(codeIM) + ' :');
   if(!motif||motif.trim().length<5){alert('Le motif est obligatoire (5 caractères min.)');return;}
-  if(!confirm('Déclarer une panne sur ' + codeIM + ' ? Motif : "' + motif + '"'))return;
+  if(!(await confirmModal('Déclarer une panne sur ' + codeIM + ' ? Motif : "' + motif + '"')))return;
   fetch(W+'?action=declarer_panne',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({code_im:codeIM,code_employe:ADMIN_SESSION.code,nom_employe:ADMIN_SESSION.nom,motif:motif})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne déclarée. Immo marquée "En panne".');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
 
-function marquerImmoInactive(codeIM,libelle,type){
+async function marquerImmoInactive(codeIM,libelle,type){
   var motif=prompt('Motif pour ' + codeIM + ' [' + type + '] - min 10 car. :');
   if(!motif||motif.trim().length<10){alert('Motif obligatoire, 10 car. minimum.');return;}
-  if(!confirm('1ere CONFIRMATION : Marquer ' + codeIM + ' comme [' + type + '] ? Cette action exclut l immo des reservations.'))return;
-  if(!confirm('CONFIRMATION FINALE IRREVERSIBLE : Confirmer definitvement le statut [' + type + '] pour ' + codeIM + ' ?'))return;
+  if(!(await confirmModal('1ere CONFIRMATION : Marquer ' + codeIM + ' comme [' + type + '] ? Cette action exclut l immo des reservations.')))return;
+  if(!(await confirmModal('CONFIRMATION FINALE IRREVERSIBLE : Confirmer definitvement le statut [' + type + '] pour ' + codeIM + ' ?',{danger:true})))return;
   fetch(W+'?action=marquer_statut_immo',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo marquée comme ' + type + '.');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
 
-function resoudrePanne(codeIM){
+async function resoudrePanne(codeIM){
   var etat=prompt('Etat de l immo ' + codeIM + ' apres reparation :', 'Bon état');
   if(!etat)return;
   var note=prompt('Note de resolution (optionnel) :', '') || '';
-  if(!confirm('Panne resolue sur ' + codeIM + ' ? Nouvel etat : ' + etat))return;
+  if(!(await confirmModal('Panne resolue sur ' + codeIM + ' ? Nouvel etat : ' + etat)))return;
   fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne résolue !');})

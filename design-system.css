@@ -1,0 +1,288 @@
+/* ============================================================================
+   Immo Tracker — Design System
+   ----------------------------------------------------------------------------
+   Fichier CSS autonome, chargé par <link> depuis dashboard.html (zéro build,
+   zéro framework — cohérent avec le reste du projet, voir CLAUDE.md).
+
+   Palette dérivée de l'identité visuelle Espace Soleil (logo.jpg / logo-dark.jpg
+   à la racine du dépôt) : dégradé or/bronze sur fond noir/charbon, texte noir.
+   Plutôt que d'étaler l'or en aplat sur toute l'interface (peu lisible en
+   grande surface), il sert d'accent de marque (CTA, indicateur actif, focus,
+   liens) sur un habillage neutre charbon/blanc — usage courant dans les
+   interfaces professionnelles (une couleur de marque, utilisée avec intention).
+
+   dashboard.html continue de consommer les anciennes variables historiques
+   (--blue, --orange, --green, --red, --yellow, --grey, --bg, --card, utilisées
+   des centaines de fois dans tout le fichier) : ce fichier ne les redéfinit
+   PAS lui-même. C'est dashboard.html qui les fait pointer vers les tokens
+   --ds-* ci-dessous (un seul alias dans son propre :root, voir le commentaire
+   à cet endroit) — aucun nom de variable existant n'est renommé, zéro risque
+   de régression sur les centaines d'usages déjà en place.
+   ============================================================================ */
+
+:root{
+  /* ── Couleurs de marque (dérivées du logo) ── */
+  --ds-gold-50:#FDF8EC;
+  --ds-gold-100:#FAEEC9;
+  --ds-gold-200:#F3DD8F;
+  --ds-gold-300:#E9C55C;
+  --ds-gold-400:#DCAB2E;
+  --ds-gold-500:#C6952A;   /* or "logo", ton dominant du dégradé ES */
+  --ds-gold-600:#A67A1E;
+  --ds-gold-700:#805E17;
+  --ds-gold-800:#5C4310;
+  --ds-gold-900:#3A2A09;
+
+  --ds-ink-50:#F4F5F7;
+  --ds-ink-100:#E7E9EC;
+  --ds-ink-200:#CBD0D8;
+  --ds-ink-300:#9AA3B1;
+  --ds-ink-400:#6B7383;
+  --ds-ink-500:#4B5261;
+  --ds-ink-600:#343B49;
+  --ds-ink-700:#242A36;
+  --ds-ink-800:#1B2028;   /* charbon "logo sombre" — habillage principal (header/sidebar) */
+  --ds-ink-900:#12151B;
+
+  /* ── Rôles sémantiques (ce que consomme le reste de ce fichier + les alias dashboard.html) ── */
+  --ds-primary:#1B2634;         /* remplace l'ancien --blue générique par un charbon de marque */
+  --ds-primary-dark:#12151B;
+  --ds-primary-contrast:#FFFFFF;
+  /* gold-600 plutôt que gold-500 : le reste du fichier associe déjà largement
+     var(--orange) à du texte blanc (bouton "Actualiser", boutons d'action...) —
+     un or trop clair tomberait sous le ratio de contraste lisible en blanc.
+     gold-600 reste clairement "or" tout en gardant le texte blanc lisible. */
+  --ds-accent:var(--ds-gold-600);       /* remplace l'ancien --orange : CTA, actif, focus, liens */
+  --ds-accent-dark:var(--ds-gold-700);
+  --ds-accent-contrast:#FFFFFF;
+
+  --ds-success:#1E9E5A;
+  --ds-success-bg:#E7F7EE;
+  --ds-success-dark:#157A46;
+  --ds-warning:#E8912C;         /* distinct de l'accent doré : plus orangé, moins doré */
+  --ds-warning-bg:#FFF4E5;
+  --ds-warning-dark:#B96F1A;
+  --ds-danger:#DC3545;
+  --ds-danger-bg:#FDECEE;
+  --ds-danger-dark:#B02333;
+  --ds-info:#2F80C9;
+  --ds-info-bg:#EAF3FB;
+
+  --ds-neutral-50:var(--ds-ink-50);
+  --ds-neutral-100:var(--ds-ink-100);
+  --ds-neutral-200:var(--ds-ink-200);
+  --ds-neutral-300:var(--ds-ink-300);
+  --ds-neutral-400:var(--ds-ink-400);
+  --ds-neutral-500:var(--ds-ink-500);
+  --ds-neutral-600:var(--ds-ink-600);
+  --ds-neutral-700:var(--ds-ink-700);
+  --ds-neutral-800:var(--ds-ink-800);
+  --ds-neutral-900:var(--ds-ink-900);
+
+  --ds-bg:#F6F5F2;               /* fond de page, neutre chaud (s'accorde avec l'or) */
+  --ds-surface:#FFFFFF;          /* cartes, panneaux */
+  --ds-surface-alt:#FAFAF8;      /* lignes zébrées, en-têtes de tableau */
+  --ds-border:#E7E4DD;
+  --ds-border-strong:#D8D4CA;
+  --ds-text:#22262E;
+  --ds-text-muted:#6B7280;
+  --ds-text-inverse:#FFFFFF;
+
+  /* ── Typographie ── */
+  --ds-font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --ds-font-mono:ui-monospace,SFMono-Regular,'Cascadia Code','Consolas',monospace;
+  --ds-text-2xs:10px;
+  --ds-text-xs:11px;
+  --ds-text-sm:12.5px;
+  --ds-text-base:14px;
+  --ds-text-md:15px;
+  --ds-text-lg:18px;
+  --ds-text-xl:22px;
+  --ds-text-2xl:28px;
+  --ds-text-3xl:34px;
+  --ds-weight-regular:400;
+  --ds-weight-medium:600;
+  --ds-weight-bold:700;
+  --ds-weight-black:800;
+  --ds-leading-tight:1.2;
+  --ds-leading-normal:1.5;
+
+  /* ── Espacements (base 4px) ── */
+  --ds-space-1:4px;
+  --ds-space-2:8px;
+  --ds-space-3:12px;
+  --ds-space-4:16px;
+  --ds-space-5:20px;
+  --ds-space-6:24px;
+  --ds-space-8:32px;
+  --ds-space-10:40px;
+  --ds-space-12:48px;
+
+  /* ── Rayons ── */
+  --ds-radius-sm:6px;
+  --ds-radius-md:10px;
+  --ds-radius-lg:14px;
+  --ds-radius-xl:20px;
+  --ds-radius-full:999px;
+
+  /* ── Ombres (échelle d'élévation cohérente) ── */
+  --ds-shadow-xs:0 1px 2px rgba(18,21,27,.06);
+  --ds-shadow-sm:0 1px 4px rgba(18,21,27,.08);
+  --ds-shadow-md:0 4px 16px rgba(18,21,27,.09);
+  --ds-shadow-lg:0 10px 32px rgba(18,21,27,.14);
+  --ds-shadow-xl:0 20px 60px rgba(18,21,27,.22);
+  --ds-shadow-focus:0 0 0 3px rgba(198,149,42,.28);   /* halo de focus, ton accent */
+  --ds-shadow-focus-danger:0 0 0 3px rgba(220,53,69,.22);
+
+  /* ── Transitions ── */
+  --ds-ease:cubic-bezier(.4,0,.2,1);
+  --ds-transition-fast:120ms var(--ds-ease);
+  --ds-transition-base:180ms var(--ds-ease);
+  --ds-transition-slow:280ms var(--ds-ease);
+
+  /* ── Z-index (nouveaux composants uniquement — n'affecte pas les z-index déjà en place) ── */
+  --ds-z-skeleton:1;
+  --ds-z-toast:1100;
+  --ds-z-confirm:1150;
+}
+
+/* ── Mode sombre : variables prêtes, non activées (aucun sélecteur ne pose
+   data-theme="dark" pour l'instant — implémentation future d'un bouton de
+   bascule, hors périmètre de cette session). ── */
+:root[data-theme="dark"]{
+  --ds-bg:#15181E;
+  --ds-surface:#1E222A;
+  --ds-surface-alt:#242830;
+  --ds-border:#2E333D;
+  --ds-border-strong:#3A4049;
+  --ds-text:#EDEFF2;
+  --ds-text-muted:#9AA3B1;
+  --ds-primary:#0D1015;
+  --ds-primary-dark:#000000;
+  --ds-accent:var(--ds-gold-400);
+  --ds-accent-contrast:#1B2028;
+  --ds-success-bg:#12281C;
+  --ds-warning-bg:#2E2210;
+  --ds-danger-bg:#2E1416;
+  --ds-info-bg:#122536;
+}
+@media (prefers-color-scheme: dark){
+  /* Volontairement vide pour l'instant : le thème sombre ne s'active que si
+     data-theme="dark" est explicitement posé sur <html> (voir bloc ci-dessus).
+     On ne bascule pas automatiquement sur la préférence système tant que le
+     rendu sombre complet du dashboard n'a pas été validé visuellement. */
+}
+
+/* ============================================================================
+   Composants nouveaux / harmonisés — s'appuient sur les classes déjà utilisées
+   dans dashboard.html (aucune classe renommée). Les règles ci-dessous étendent
+   ou affinent des sélecteurs déjà existants (nav-item, kpi, card, badge, frow,
+   act-modal…) ; dashboard.html garde son <style> inline pour la mise en page
+   structurelle, ce fichier affine l'habillage visuel par-dessus.
+   ============================================================================ */
+
+/* ── Focus clavier cohérent partout, y compris sur les éléments sans style
+   dédié — accessibilité, sans changer aucun comportement. ── */
+button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
+  outline:none;box-shadow:var(--ds-shadow-focus);border-radius:var(--ds-radius-sm);
+}
+
+/* ── Scrollbar fine (habillage seulement, dégrade proprement si non supporté) ── */
+*{scrollbar-width:thin;scrollbar-color:var(--ds-neutral-300) transparent;}
+*::-webkit-scrollbar{width:8px;height:8px;}
+*::-webkit-scrollbar-thumb{background:var(--ds-neutral-300);border-radius:var(--ds-radius-full);}
+*::-webkit-scrollbar-thumb:hover{background:var(--ds-neutral-400);}
+
+/* ── Squelettes de chargement (voir aussi #loading-screen dans dashboard.html) ── */
+@keyframes ds-shimmer{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
+.ds-skel{
+  position:relative;overflow:hidden;background:var(--ds-neutral-100);
+  border-radius:var(--ds-radius-sm);
+  background-image:linear-gradient(90deg,var(--ds-neutral-100) 0px,var(--ds-neutral-50) 40px,var(--ds-neutral-100) 80px);
+  background-size:200px 100%;background-repeat:no-repeat;
+  animation:ds-shimmer 1.2s ease-in-out infinite;
+}
+.ds-skel-text{height:12px;margin:6px 0;width:100%;}
+.ds-skel-text.short{width:55%;}
+.ds-skel-text.tiny{width:30%;height:9px;}
+.ds-skel-row{display:flex;align-items:center;gap:var(--ds-space-3);padding:10px 12px;}
+.ds-skel-card{padding:var(--ds-space-4);}
+.ds-skel-kpi{height:76px;border-radius:var(--ds-radius-md);}
+.ds-skel-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
+
+/* ── État vide (étend .es déjà présent dans dashboard.html) ── */
+.ds-empty{text-align:center;padding:var(--ds-space-8) var(--ds-space-4);color:var(--ds-text-muted);}
+.ds-empty .ds-empty-icon{font-size:32px;margin-bottom:var(--ds-space-2);opacity:.55;}
+.ds-empty .ds-empty-title{font-weight:var(--ds-weight-bold);color:var(--ds-neutral-600);font-size:var(--ds-text-base);margin-bottom:4px;}
+.ds-empty .ds-empty-hint{font-size:var(--ds-text-sm);max-width:360px;margin:0 auto;line-height:var(--ds-leading-normal);}
+
+/* ── Toasts (non bloquants — remplacent alert(), voir window.alert overridé
+   dans dashboard.html) ── */
+#ds-toast-stack{
+  position:fixed;top:calc(var(--header,54px) + 12px);right:16px;z-index:var(--ds-z-toast);
+  display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px));
+  pointer-events:none;
+}
+.ds-toast{
+  pointer-events:auto;background:var(--ds-neutral-800);color:#fff;border-radius:var(--ds-radius-md);
+  padding:12px 14px;box-shadow:var(--ds-shadow-lg);font-size:var(--ds-text-base);line-height:var(--ds-leading-normal);
+  display:flex;align-items:flex-start;gap:10px;
+  animation:ds-toast-in var(--ds-transition-base);
+  border-left:4px solid var(--ds-accent);
+}
+.ds-toast.ds-toast-success{border-left-color:var(--ds-success);}
+.ds-toast.ds-toast-danger{border-left-color:var(--ds-danger);}
+.ds-toast.ds-toast-warning{border-left-color:var(--ds-warning);}
+.ds-toast .ds-toast-icon{font-size:16px;flex-shrink:0;line-height:1.3;}
+.ds-toast .ds-toast-msg{flex:1;white-space:pre-line;word-break:break-word;}
+.ds-toast .ds-toast-close{background:none;border:none;color:rgba(255,255,255,.55);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;}
+.ds-toast .ds-toast-close:hover{color:#fff;}
+.ds-toast.ds-toast-leaving{animation:ds-toast-out var(--ds-transition-base) forwards;}
+@keyframes ds-toast-in{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
+@keyframes ds-toast-out{from{opacity:1;transform:translateX(0);max-height:200px;}to{opacity:0;transform:translateX(16px);max-height:0;margin:0;padding-top:0;padding-bottom:0;}}
+
+/* ── Modale de confirmation stylée (remplace confirm(), voir confirmModal()
+   dans dashboard.html) — visuellement alignée sur #act-modal déjà existant,
+   sans réutiliser son id pour ne jamais interférer avec le flux d'action. ── */
+#ds-confirm-overlay{
+  position:fixed;inset:0;background:rgba(18,21,27,.55);z-index:var(--ds-z-confirm);
+  display:none;align-items:center;justify-content:center;padding:16px;
+  animation:ds-fade-in var(--ds-transition-fast);
+}
+#ds-confirm-overlay.open{display:flex;}
+@keyframes ds-fade-in{from{opacity:0;}to{opacity:1;}}
+.ds-confirm-box{
+  background:var(--ds-surface);border-radius:var(--ds-radius-lg);box-shadow:var(--ds-shadow-xl);
+  width:min(420px,100%);padding:var(--ds-space-6);
+  animation:ds-pop-in var(--ds-transition-base);
+}
+@keyframes ds-pop-in{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+.ds-confirm-icon{font-size:26px;margin-bottom:var(--ds-space-2);}
+.ds-confirm-title{font-size:var(--ds-text-lg);font-weight:var(--ds-weight-bold);color:var(--ds-neutral-800);margin-bottom:6px;}
+.ds-confirm-msg{font-size:var(--ds-text-base);color:var(--ds-text-muted);line-height:var(--ds-leading-normal);white-space:pre-line;margin-bottom:var(--ds-space-5);}
+.ds-confirm-actions{display:flex;gap:10px;justify-content:flex-end;}
+.ds-btn{
+  border:none;border-radius:var(--ds-radius-md);padding:10px 18px;font-weight:var(--ds-weight-bold);
+  font-size:var(--ds-text-base);cursor:pointer;transition:filter var(--ds-transition-fast),transform var(--ds-transition-fast);
+  font-family:var(--ds-font-sans);
+}
+.ds-btn:hover{filter:brightness(1.06);}
+.ds-btn:active{transform:translateY(1px);}
+.ds-btn-ghost{background:var(--ds-neutral-100);color:var(--ds-neutral-700);}
+.ds-btn-primary{background:var(--ds-accent);color:var(--ds-accent-contrast);}
+.ds-btn-danger{background:var(--ds-danger);color:#fff;}
+
+/* ── États d'erreur de formulaire (utilitaire prêt à l'emploi) ── */
+.frow.ds-has-error input,.frow.ds-has-error select,.frow.ds-has-error textarea,
+.ds-has-error-input{
+  border-color:var(--ds-danger)!important;box-shadow:var(--ds-shadow-focus-danger);
+  animation:ds-shake .32s var(--ds-ease);
+}
+.frow .ds-field-error{color:var(--ds-danger);font-size:var(--ds-text-xs);margin-top:4px;font-weight:var(--ds-weight-medium);}
+@keyframes ds-shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+
+/* ── Indicateur de tri actif sur les boutons de tri déjà en place (sortDepot
+   & équivalents) — purement visuel, ne change aucun comportement de tri. ── */
+.ds-sort-btn{position:relative;}
+.ds-sort-btn.ds-sort-active{background:var(--ds-accent)!important;color:var(--ds-accent-contrast)!important;}
+.ds-sort-btn .ds-sort-arrow{margin-left:4px;font-size:10px;}
