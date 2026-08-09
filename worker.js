@@ -515,6 +515,57 @@ async function handleRequest(request) {
     return json({ next_code: next, max_num: maxNum });
   }
 
+  // ── Lignes téléphoniques (ajouté août 2026) — entité indépendante du téléphone (Materiel_IT) :
+  // un employé peut garder sa ligne en changeant d'appareil, ou l'inverse. Même principe de
+  // détenteur courant dérivé du dernier mouvement, calqué sur Materiel_IT/Mouvements_Materiel_IT.
+  if (p.get('lignes_telephoniques') === '1') {
+    const [items, mouvements] = await Promise.all([
+      paginate(GL + '/Lignes_Telephoniques/items?$expand=fields&$top=500', 8),
+      paginate(GL + '/Mouvements_Lignes_Telephoniques/items?$expand=fields&$top=2000', 10)
+    ]);
+    const mvByCode = {};
+    mouvements.forEach(i => {
+      const f = i.fields || {};
+      const code = f.Title || '';
+      const h = f.Horodatage || f.Created || '';
+      if (!mvByCode[code] || new Date(h) > new Date(mvByCode[code].horodatage)) {
+        mvByCode[code] = { code_employe: f.Code_Employe || '', nom_detenteur: f.Nom_Detenteur || '', horodatage: h };
+      }
+    });
+    return json(items.map(i => {
+      const f = i.fields || {};
+      const code = f.Title || '';
+      const det = mvByCode[code] || null;
+      return {
+        id: i.id, code, n_telephone: f.N_Telephone || '', operateur: f.Operateur || '', n_carte_sim: f.N_Carte_SIM || '',
+        code_pin: f.Code_PIN || '', code_puk: f.Code_PUK || '', code_rio: f.Code_RIO || '',
+        site: f.Site || '', statut: f.Statut || 'Active', commentaire: f.Commentaire || '',
+        detenteur_code: det ? det.code_employe : '', detenteur_nom: det ? det.nom_detenteur : '', depuis: det ? det.horodatage : ''
+      };
+    }));
+  }
+
+  if (p.get('mouvements_lignes_telephoniques')) {
+    const code = p.get('mouvements_lignes_telephoniques');
+    const items = await paginate(GL + "/Mouvements_Lignes_Telephoniques/items?$expand=fields&$top=2000", 10);
+    const mapped = items.filter(i => (i.fields || {}).Title === code).map(i => {
+      const f = i.fields || {};
+      return { id: i.id, code_employe: f.Code_Employe || '', nom_detenteur: f.Nom_Detenteur || '', note: f.Note || '', horodatage: f.Horodatage || f.Created || '' };
+    }).sort((a, b) => new Date(b.horodatage) - new Date(a.horodatage));
+    return json(mapped);
+  }
+
+  if (p.get('next_code_ligne_tel')) {
+    let maxNum = 0;
+    const items = await paginate(GL + "/Lignes_Telephoniques/items?$expand=fields($select=Title)&$top=500", 10);
+    items.forEach(it => {
+      const t = (it.fields && it.fields.Title) || '';
+      const m = /^LIG(\d{1,6})$/.exec(t);
+      if (m) { const n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+    });
+    return json({ next_code: 'LIG' + String(maxNum + 1).padStart(6, '0'), max_num: maxNum });
+  }
+
   // ── Réservations par employé ──────────────────────────────────────────────────
   if (p.get('mes_reservations')) {
     const code = p.get('mes_reservations');
@@ -2013,6 +2064,90 @@ async function handleRequest(request) {
       if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
       const requests = rows.slice(0, 20).map((x, idx) => ({
         id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Mouvements_Materiel_IT/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: {
+          Title: x.code || '', Code_Employe: x.code_employe || '', Nom_Detenteur: x.nom_detenteur || '', Note: x.note || '', Horodatage: x.horodatage || new Date().toISOString()
+        } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Lignes téléphoniques : ajouter/modifier/affecter/importer (miroir exact de Materiel_IT) ──
+    if (action === 'ajouter_ligne_telephonique') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const code = (body.code || '').trim().toUpperCase();
+      if (!/^LIG\d{6}$/.test(code)) return json({ success: false, error: 'code_invalide', message: 'Le code doit être au format LIG + 6 chiffres (ex: LIG000001).' });
+      const dup = await fetch(GL + "/Lignes_Telephoniques/items?$filter=fields/Title eq '" + code + "'&$top=1", { headers: H });
+      const dupData = await dup.json();
+      if ((dupData.value || []).length > 0) return json({ success: false, error: 'doublon', message: 'Le code ' + code + ' existe déjà.' });
+      const f = { Title: code, Site: (body.site === 'Mayotte') ? 'Mayotte' : 'Reunion', Statut: 'Active' };
+      if (body.n_telephone) f.N_Telephone = body.n_telephone;
+      if (body.operateur) f.Operateur = body.operateur;
+      if (body.n_carte_sim) f.N_Carte_SIM = body.n_carte_sim;
+      if (body.code_pin) f.Code_PIN = body.code_pin;
+      if (body.code_puk) f.Code_PUK = body.code_puk;
+      if (body.code_rio) f.Code_RIO = body.code_rio;
+      if (body.commentaire) f.Commentaire = body.commentaire;
+      try {
+        const r = await fetch(GL + '/Lignes_Telephoniques/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: f }) });
+        const rd = await r.json();
+        if (r.ok) return json({ success: true, code: code, id: rd.id });
+        return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    if (action === 'maj_ligne_telephonique') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const f = {};
+      if (body.site) f.Site = body.site === 'Mayotte' ? 'Mayotte' : 'Reunion';
+      if (body.statut != null) f.Statut = body.statut;
+      if (body.n_telephone != null) f.N_Telephone = body.n_telephone;
+      if (body.operateur != null) f.Operateur = body.operateur;
+      if (body.n_carte_sim != null) f.N_Carte_SIM = body.n_carte_sim;
+      if (body.code_pin != null) f.Code_PIN = body.code_pin;
+      if (body.code_puk != null) f.Code_PUK = body.code_puk;
+      if (body.code_rio != null) f.Code_RIO = body.code_rio;
+      if (body.commentaire != null) f.Commentaire = body.commentaire;
+      try {
+        const r = await fetch(GL + '/Lignes_Telephoniques/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(f) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    if (action === 'affecter_ligne_telephonique') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const code = (body.code || '').trim().toUpperCase();
+      if (!code) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Mouvements_Lignes_Telephoniques/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: code, Code_Employe: body.code_employe || '', Nom_Detenteur: body.nom_detenteur || '', Note: body.note || '', Horodatage: new Date().toISOString()
+        } }) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    if (action === 'bulk_import_lignes_telephoniques') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Lignes_Telephoniques/items",
+        headers: { 'Content-Type': 'application/json' }, body: { fields: {
+          Title: x.code || '', Site: x.site || 'Reunion', Statut: x.statut || 'Active',
+          N_Telephone: x.n_telephone || '', Operateur: x.operateur || '', N_Carte_SIM: x.n_carte_sim || '',
+          Code_PIN: x.code_pin || '', Code_PUK: x.code_puk || '', Code_RIO: x.code_rio || '', Commentaire: x.commentaire || ''
+        } }
+      }));
+      try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    if (action === 'bulk_import_mouvements_lignes_telephoniques') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const rows = body.rows || [];
+      if (!rows.length) return json({ success: false, error: 'donnees_invalides' });
+      const requests = rows.slice(0, 20).map((x, idx) => ({
+        id: String(idx), method: 'POST', url: "/sites/" + SITE_ID + "/lists/Mouvements_Lignes_Telephoniques/items",
         headers: { 'Content-Type': 'application/json' }, body: { fields: {
           Title: x.code || '', Code_Employe: x.code_employe || '', Nom_Detenteur: x.nom_detenteur || '', Note: x.note || '', Horodatage: x.horodatage || new Date().toISOString()
         } }

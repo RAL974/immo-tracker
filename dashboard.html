@@ -557,7 +557,7 @@ var W='https://immo-proxy.ral-85d.workers.dev/';
 // ── Jeton de session : injecté automatiquement sur les actions sensibles (admin / gestion dépôt) ──
 // Un seul point d'interception plutôt que de modifier chacun des appels fetch dispersés dans le
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques'];
 (function(){
   var origFetch=window.fetch.bind(window);
   window.fetch=function(input,init){
@@ -691,6 +691,14 @@ function attacherRechercheEmploye(inputId,suggestId,candidats,onChoix){
     box.style.display='none';
     if(onChoix)onChoix(code,nom);
   };
+}
+// Rend un code employé cliquable (ouvre sa fiche, pattern .link-emp déjà utilisé partout ailleurs)
+// UNIQUEMENT si ce code correspond à un employé réel — les identifiants synthétiques (ex. remises
+// ponctuelles EPI de groupe, "PONCTUEL-...") restent du texte brut, ce ne sont pas des employés.
+function lienEmpSiConnu(code,texteAffiche){
+  var t=(texteAffiche!=null?texteAffiche:code)||'—';
+  if(code&&employesByCode[code])return '<span class="link-emp" data-emp="'+code+'" data-nom="'+String(t).replace(/"/g,'&quot;')+'">'+t+'</span>';
+  return t;
 }
 // Peut voir les données comptables (dates, comptes) sur les fiches : Admin, Gestionnaire Dépôt RUN (Logistique), Encadrement
 function peutVoirCompta(code){
@@ -1775,7 +1783,29 @@ function renderEPIDotations(container){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var dotAnneeToutes=epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(EPI_ANNEE_SELECTIONNEE);});
   var nbEnAttente=dotAnneeToutes.filter(function(dd){return dd.statut!=='Emargee';}).length;
-  var html='<div class="card"><div class="card-head"><h3>🧾 Dotations employés</h3>'+
+  var html='';
+  // Nouveaux entrants : tout employé actif d'un service concerné par la dotation doit recevoir sa
+  // fiche dès son embauche, peu importe la date — vue dédiée pour ne pas les perdre de vue, avec le
+  // besoin en articles vs le stock disponible pour anticiper une commande si besoin.
+  var sansFiche=epiEmployesSansFiche(anneeCourante);
+  if(sansFiche.length){
+    html+='<div class="card" style="border-top:3px solid var(--orange);margin-bottom:14px"><div class="card-head"><h3>🆕 Nouveaux entrants sans dotation '+anneeCourante+' ('+sansFiche.length+')</h3></div>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Nom</th><th>Affectation</th><th>Besoin vs stock</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>'+
+      sansFiche.sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');}).map(function(e){
+        var emp=employesByCode[e.Code]||{};
+        var tailles={taillePantalon:emp.taillePantalon,tailleTshirt:emp.tailleTshirt,tailleVeste:emp.tailleVeste,pointureChaussures:emp.pointureChaussures,tailleGants:emp.tailleGants};
+        var besoin=epiCalculerBesoinStock(e.AffectationEPI,tailles);
+        var manquants=besoin.filter(function(b){return !b.suffisant;});
+        var resume=!besoin.length?'<span style="color:var(--grey)">Grille vide</span>':
+          !manquants.length?'<span style="color:var(--green)">✅ Stock suffisant</span>':
+          '<span style="color:var(--red)">⚠️ '+manquants.map(function(m){return m.type_article+(m.article_trouve?' ('+m.stock_disponible+'/'+m.quantite_requise+')':' (article introuvable)');}).join(', ')+'</span>';
+        return '<tr><td>'+lienEmpSiConnu(e.Code)+'</td><td>'+lienEmpSiConnu(e.Code,e.Nom||e.Code)+'</td><td>'+(EPI_AFF_LABELS[e.AffectationEPI]||e.AffectationEPI)+'</td><td style="font-size:11px">'+resume+'</td>'+
+          (canEdit?'<td><button onclick="genererDotationIndividuelleEPI(\''+e.Code+'\')" style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🚀 Générer sa fiche</button></td>':'')+
+          '</tr>';
+      }).join('')+
+      '</tbody></table></div></div>';
+  }
+  html+='<div class="card"><div class="card-head"><h3>🧾 Dotations employés</h3>'+
     '<div style="display:flex;gap:8px;align-items:center">'+
     '<select id="epi-annee-sel" onchange="changerAnneeEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(y){return '<option value="'+y+'"'+(y===EPI_ANNEE_SELECTIONNEE?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
     '<select id="epi-dot-statut" onchange="filtrerStatutDotationsEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+
@@ -1795,7 +1825,7 @@ function renderEPIDotations(container){
   else{
     html+='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Nom</th><th>Site</th><th>Type</th><th>Statut</th><th>Actions</th></tr></thead><tbody>';
     dotAnnee.sort(function(a,b){return (a.nom_destinataire||'').localeCompare(b.nom_destinataire||'');}).forEach(function(dd){
-      html+='<tr><td>'+dd.code+'</td><td>'+dd.nom_destinataire+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dd.type_dotation+'</td>'+
+      html+='<tr><td>'+lienEmpSiConnu(dd.code)+'</td><td>'+lienEmpSiConnu(dd.code,dd.nom_destinataire)+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dd.type_dotation+'</td>'+
         '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
         '<td style="white-space:nowrap">'+
         '<button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
@@ -1819,6 +1849,38 @@ var EPI_HIST_CONSO_TYPE='';
 var EPI_HIST_CONSO_ROWS=[];
 var epiLignesToutes=null; // cache, chargé à la demande (vue consommation uniquement)
 
+// Miroir client de TAILLE_FIELD_PAR_TYPE/trouverArticleCatalogue (worker.js) — permet de calculer le
+// besoin en articles sans appel serveur (aperçu avant génération, alerte à l'ajout d'un employé).
+var EPI_TAILLE_FIELD_PAR_TYPE={
+  'Pantalon':'taillePantalon','T-Shirts':'tailleTshirt','T-Shirts manches longues':'tailleTshirt',
+  'Polos':'tailleTshirt','Veste':'tailleVeste','Ensemble pluie':'tailleTshirt',
+  'Chaussures hautes':'pointureChaussures','Chaussures basses':'pointureChaussures',
+  'Gants à picot':'tailleGants','Gants gros œuvre':'tailleGants'
+};
+function epiTrouverArticleCatalogue(typeArticle,tailleValeur){
+  if(!EPI_TAILLE_FIELD_PAR_TYPE[typeArticle])return epiCatalogue.find(function(c){return c.type_article===typeArticle;})||null;
+  var v=(tailleValeur||'').toString().trim().toLowerCase();
+  if(!v)return null;
+  return epiCatalogue.find(function(c){return c.type_article===typeArticle&&((c.taille_salarie||'').toString().trim().toLowerCase()===v||(c.taille_affichage||'').toString().trim().toLowerCase()===v);})||null;
+}
+// tailles: {taillePantalon,tailleTshirt,tailleVeste,pointureChaussures,tailleGants}
+function epiCalculerBesoinStock(affectation,tailles){
+  var grille=epiGrille.filter(function(g){return g.affectation===affectation&&g.quantite>0;});
+  return grille.map(function(g){
+    var champTaille=EPI_TAILLE_FIELD_PAR_TYPE[g.type_article];
+    var tailleEmp=champTaille?(tailles[champTaille]||''):'';
+    var art=epiTrouverArticleCatalogue(g.type_article,tailleEmp);
+    var stockDispo=art?art.stock_actuel:0;
+    return {type_article:g.type_article,taille:tailleEmp,quantite_requise:g.quantite,article_trouve:!!art,stock_disponible:stockDispo,suffisant:!!art&&stockDispo>=g.quantite};
+  });
+}
+// Employés actifs éligibles à une dotation EPI mais sans fiche Annuelle/Entree pour l'année donnée.
+function epiEmployesSansFiche(annee){
+  var eligibles=employesList.filter(function(e){return e.Actif&&e.AffectationEPI;});
+  var dejaGeneres={};
+  epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);}).forEach(function(dd){dejaGeneres[dd.code]=true;});
+  return eligibles.filter(function(e){return !dejaGeneres[e.Code];});
+}
 function epiAnneesDisponibles(){
   var set={};
   epiDotations.forEach(function(dd){
@@ -1850,7 +1912,7 @@ function renderEPIHistMatrice(container){
     annees.map(function(a){return '<th style="text-align:center">Dotation '+a+'</th><th style="text-align:center">Ponctuelles '+a+'</th>';}).join('')+
     '</tr></thead><tbody>';
   employes.forEach(function(e){
-    html+='<tr><td>'+e.Code+'</td><td>'+(e.Nom||e.Code)+'</td>';
+    html+='<tr><td>'+lienEmpSiConnu(e.Code)+'</td><td>'+lienEmpSiConnu(e.Code,e.Nom||e.Code)+'</td>';
     annees.forEach(function(annee){
       var dot=epiDotations.find(function(dd){return dd.code===e.Code&&(dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);});
       if(!dot)html+='<td style="text-align:center;color:var(--grey)">—</td>';
@@ -1947,10 +2009,8 @@ async function genererDotationAnnuelleComplete(){
   var statut=document.getElementById('epi-gen-statut');
 
   // Étape 1 : créer les fiches manquantes pour tous les employés actifs éligibles (SharePoint)
+  var aGenerer=epiEmployesSansFiche(annee);
   var eligibles=employesList.filter(function(e){return e.Actif&&e.AffectationEPI;});
-  var dejaGeneres={};
-  epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);}).forEach(function(dd){dejaGeneres[dd.code]=true;});
-  var aGenerer=eligibles.filter(function(e){return !dejaGeneres[e.Code];});
   var nbDejaGeneres=eligibles.length-aGenerer.length;
   // Garde-fou : la dotation annuelle ne doit normalement se générer qu'une fois par année — avertir
   // explicitement avant de continuer si ce n'est visiblement pas la première fois pour cette année.
@@ -2080,6 +2140,10 @@ async function confirmerEmargementEPI(){
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{
     var b64=await fichierVersJPEGBase64(input.files[0]);
+    var sig=await detecterSignatureDataURL(b64);
+    if(sig===false&&!confirm('Aucune signature détectée dans la case prévue à cet effet (fiche vierge ?). Continuer quand même ?')){
+      btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Émargement annulé : signature non détectée.';return;
+    }
     var fn=nomFichierEmargement();
     await fetch(W+'?action=upload_fiche_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dotation_id:EPI_EMARGEMENT_ID,data:b64,filename:fn})});
     var r=await fetch(W+'?action=emarger_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:EPI_EMARGEMENT_ID,par_code:ADMIN_SESSION.code,filename:fn})});
@@ -2253,6 +2317,34 @@ function ouvrirImportLotEPI(){
   btn.disabled=true;btn.textContent='✅ Valider le lot';btn.onclick=confirmerImportLotEPI;
   document.getElementById('epi-lot-files').onchange=function(e){analyserLotEPI(e.target.files);};
 }
+// Analyse pixel de la case "Signature" (3ᵉ case de .sign-row, en bas de la fiche) : détecte une
+// présence de marque non-blanche. Best-effort — la position verticale exacte varie selon le nombre
+// de lignes d'articles, d'où une bande de recherche large plutôt que des coordonnées fixes.
+function detecterSignatureDataURL(dataUrl){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var canvas=document.createElement('canvas');
+        canvas.width=img.width;canvas.height=img.height;
+        var ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0);
+        var zx=Math.round(img.width*0.68),zy=Math.round(img.height*0.78);
+        var zw=Math.round(img.width*0.28),zh=Math.round(img.height*0.16);
+        var mx=Math.round(zw*0.1),my=Math.round(zh*0.1); // marge pour éviter la bordure de la case
+        var data=ctx.getImageData(zx+mx,zy+my,Math.max(1,zw-2*mx),Math.max(1,zh-2*my)).data;
+        var total=data.length/4,sombre=0;
+        for(var i=0;i<data.length;i+=4){
+          var lum=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+          if(lum<200)sombre++;
+        }
+        resolve((sombre/total)>0.01);
+      }catch(e){resolve(null);}
+    };
+    img.onerror=function(){resolve(null);};
+    img.src=dataUrl;
+  });
+}
 async function analyserLotEPI(fileList){
   var files=Array.prototype.slice.call(fileList);
   if(!files.length)return;
@@ -2263,12 +2355,19 @@ async function analyserLotEPI(fileList){
   var pendantes=epiDotations.filter(function(dd){return dd.statut!=='Emargee';});
   var codesPendants={};pendantes.forEach(function(dd){if(dd.code)codesPendants[dd.code.toUpperCase()]=true;});
   EPI_IMPORT_LOT=[];
+  // Un seul worker Tesseract réutilisé pour tout le lot — créer un worker par image est l'anti-pattern
+  // documenté par Tesseract.js lui-même, c'était la cause de la dégradation après quelques fichiers.
+  var worker=null;
+  try{
+    worker=await Tesseract.createWorker('eng');
+    await worker.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ'});
+  }catch(e){resDiv.innerHTML='<p style="color:var(--red)">Erreur d\'initialisation du moteur de lecture : '+e.message+'</p>';return;}
   for(var i=0;i<files.length;i++){
     resDiv.innerHTML='<p style="color:var(--grey)">⏳ Analyse '+(i+1)+' / '+files.length+'…</p>';
-    var entry={filename:files[i].name,b64:null,matches:[],selectedDotId:'',erreur:''};
+    var entry={filename:files[i].name,b64:null,matches:[],selectedDotId:'',erreur:'',signatureDetectee:null,forcerSansSignature:false};
     try{
       entry.b64=await fichierVersJPEGBase64(files[i]);
-      var ocrRes=await Tesseract.recognize(entry.b64,'eng',{tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ'});
+      var ocrRes=await worker.recognize(entry.b64);
       var texteOCR=((ocrRes.data&&ocrRes.data.text)||'').toUpperCase().replace(/[^A-Z]/g,'');
       var matches=[];
       for(var c=0;c<texteOCR.length-3;c++){
@@ -2280,36 +2379,42 @@ async function analyserLotEPI(fileList){
         var dot=pendantes.find(function(dd){return dd.code===matches[0];});
         if(dot)entry.selectedDotId=dot.id;
       }
+      entry.signatureDetectee=await detecterSignatureDataURL(entry.b64);
     }catch(e){entry.erreur=e.message;}
     EPI_IMPORT_LOT.push(entry);
   }
+  try{await worker.terminate();}catch(e){}
   afficherResultatsLotEPI(pendantes);
 }
 function afficherResultatsLotEPI(pendantes){
   var resDiv=document.getElementById('epi-lot-resultats');
-  resDiv.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Fichier</th><th>Aperçu</th><th>Détecté</th><th>Fiche à émarger</th></tr></thead><tbody>'+
+  resDiv.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Fichier</th><th>Aperçu</th><th>Détecté</th><th>Signature</th><th>Fiche à émarger</th></tr></thead><tbody>'+
     EPI_IMPORT_LOT.map(function(entry,idx){
       var detecte=entry.erreur?'<span style="color:var(--red)">Erreur lecture</span>':(entry.matches.length===1?'✅ '+entry.matches[0]:(entry.matches.length>1?'⚠️ ambigu : '+entry.matches.join(', '):'❌ non détecté'));
+      var sig=entry.signatureDetectee===true?'<span style="color:var(--green)">✍️ Détectée</span>':
+        entry.signatureDetectee===false?'<span style="color:var(--red)">⚠️ Case vide</span><br><label style="font-size:10px;font-weight:400"><input type="checkbox" onchange="EPI_IMPORT_LOT['+idx+'].forcerSansSignature=this.checked;majBoutonLotEPI()"> Forcer malgré tout</label>':
+        '<span style="color:var(--grey)">Non vérifiable</span>';
       var opts='<option value="">— Non résolu, choisir —</option>'+pendantes.map(function(dd){return '<option value="'+dd.id+'"'+(dd.id===entry.selectedDotId?' selected':'')+'>'+dd.code+' — '+dd.nom_destinataire+' ('+dd.type_dotation+(dd.annee_civile?' '+dd.annee_civile:'')+')</option>';}).join('');
       return '<tr><td style="font-size:11px">'+entry.filename+'</td>'+
         '<td>'+(entry.b64?'<img src="'+entry.b64+'" style="width:60px;height:auto;border:1px solid #ddd;border-radius:4px">':'—')+'</td>'+
         '<td style="font-size:12px">'+detecte+'</td>'+
+        '<td style="font-size:11px">'+sig+'</td>'+
         '<td><select onchange="EPI_IMPORT_LOT['+idx+'].selectedDotId=this.value;majBoutonLotEPI()" style="padding:4px 6px;border:1px solid #ddd;border-radius:6px;font-size:11px;max-width:220px">'+opts+'</select></td></tr>';
     }).join('')+
     '</tbody></table></div>'+
-    '<p style="font-size:11px;color:var(--grey);margin-top:8px">⚠️ La lecture automatique est une aide, pas une garantie (qualité du scan, luminosité...). Vérifie chaque ligne avant de valider.</p>';
+    '<p style="font-size:11px;color:var(--grey);margin-top:8px">⚠️ La lecture automatique et la détection de signature sont une aide, pas une garantie. Une fiche sans signature détectée est bloquée par défaut — coche "Forcer" seulement après vérification visuelle de l\'aperçu.</p>';
   majBoutonLotEPI();
 }
 function majBoutonLotEPI(){
-  var nbResolus=EPI_IMPORT_LOT.filter(function(e){return e.selectedDotId;}).length;
+  var resolus=EPI_IMPORT_LOT.filter(function(e){return e.selectedDotId&&(e.signatureDetectee===true||e.forcerSansSignature);});
   var btn=document.getElementById('add-confirm-btn');
-  btn.disabled=nbResolus===0;
-  btn.textContent='✅ Valider le lot ('+nbResolus+'/'+EPI_IMPORT_LOT.length+')';
+  btn.disabled=resolus.length===0;
+  btn.textContent='✅ Valider le lot ('+resolus.length+'/'+EPI_IMPORT_LOT.length+')';
 }
 async function confirmerImportLotEPI(){
   var msg=document.getElementById('add-msg');
   var btn=document.getElementById('add-confirm-btn');
-  var aTraiter=EPI_IMPORT_LOT.filter(function(e){return e.selectedDotId;});
+  var aTraiter=EPI_IMPORT_LOT.filter(function(e){return e.selectedDotId&&(e.signatureDetectee===true||e.forcerSansSignature);});
   if(!aTraiter.length)return;
   btn.disabled=true;
   var ok=0,ko=0;
@@ -2348,7 +2453,7 @@ function renderEPIPonctuelle(container){
   else{
     html+='<div class="tbl-wrap"><table><thead><tr><th>Destinataire</th><th>Site</th><th>Générée le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>';
     ponct.sort(function(a,b){return new Date(b.genere_le)-new Date(a.genere_le);}).forEach(function(dd){
-      html+='<tr><td>'+dd.nom_destinataire+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dateFr(dd.genere_le)+'</td>'+
+      html+='<tr><td>'+lienEmpSiConnu(dd.code,dd.nom_destinataire)+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dateFr(dd.genere_le)+'</td>'+
         '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
         '<td style="white-space:nowrap"><button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
         (dd.statut==='Emargee'&&dd.photo_fiche?'<button onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">📷 Fiche émargée</button>':'')+
@@ -2552,7 +2657,7 @@ function renderOutilHistMatrice(container){
     annees.map(function(a){return '<th style="text-align:center">Outils reçus '+a+'</th>';}).join('')+
     '</tr></thead><tbody>';
   employes.forEach(function(e){
-    html+='<tr><td>'+e.Code+'</td><td>'+(e.Nom||e.Code)+'</td>';
+    html+='<tr><td>'+lienEmpSiConnu(e.Code)+'</td><td>'+lienEmpSiConnu(e.Code,e.Nom||e.Code)+'</td>';
     annees.forEach(function(annee){
       var lignes=outilLignes.filter(function(l){return l.code===e.Code&&l.date_remise&&new Date(l.date_remise).getFullYear()===annee;});
       if(!lignes.length)html+='<td style="text-align:center;color:var(--grey)">—</td>';
@@ -2642,7 +2747,7 @@ function renderOutilPrime(container){
   eligibles.forEach(function(e){
     var info=parEmploye[e.Code]||{nbOutils:0,montant:0};
     total+=info.montant;
-    html+='<tr><td>'+e.Code+'</td><td>'+e.Nom+'</td><td>'+e.ServiceOutillage+'</td><td>'+info.nbOutils+'</td><td style="font-weight:700;color:var(--blue)">'+info.montant.toFixed(2)+' €</td></tr>';
+    html+='<tr><td>'+lienEmpSiConnu(e.Code)+'</td><td>'+lienEmpSiConnu(e.Code,e.Nom)+'</td><td>'+e.ServiceOutillage+'</td><td>'+info.nbOutils+'</td><td style="font-weight:700;color:var(--blue)">'+info.montant.toFixed(2)+' €</td></tr>';
   });
   html+='</tbody><tfoot><tr style="font-weight:700"><td colspan="4">Total général</td><td style="color:var(--blue)">'+total.toFixed(2)+' €</td></tr></tfoot></table></div></div>';
   container.innerHTML=html;
@@ -2867,7 +2972,7 @@ function renderOutilManquant(container){
     var detailId='outil-detail-'+a.replace(/[^a-zA-Z0-9]/g,'_');
     html+='<tr><td>'+a+'</td><td style="font-weight:700;color:var(--red)">'+info.total+'</td>'+
       '<td><a href="javascript:void(0)" onclick="var el=document.getElementById(\''+detailId+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';" style="color:var(--blue)">Voir</a>'+
-      '<div id="'+detailId+'" style="display:none;font-size:11px;color:var(--grey);margin-top:4px">'+info.detail.map(function(d){return nomEmploye(d.code)+' ('+d.code+', '+d.service+')';}).join(', ')+'</div></td></tr>';
+      '<div id="'+detailId+'" style="display:none;font-size:11px;color:var(--grey);margin-top:4px">'+info.detail.map(function(d){return lienEmpSiConnu(d.code,nomEmploye(d.code))+' ('+d.code+', '+d.service+')';}).join(', ')+'</div></td></tr>';
   });
   html+='</tbody></table></div></div>';
   container.innerHTML=html;
@@ -2970,6 +3075,10 @@ async function confirmerDistributionOutillage(){
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{
     var b64=await fichierVersJPEGBase64(input.files[0]);
+    var sig=await detecterSignatureDataURL(b64);
+    if(sig===false&&!confirm('Aucune signature détectée dans la case prévue à cet effet (fiche vierge ?). Continuer quand même ?')){
+      btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Distribution annulée : signature non détectée.';return;
+    }
     var fn=nomFichierEmargement();
     await fetch(W+'?action=upload_fiche_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:OUTIL_EMPLOYE_SELECTIONNE,data:b64,filename:fn})});
     var lignes=OUTIL_LIGNES_SELECTIONNEES.map(function(t){return {type_article:t};});
@@ -3333,15 +3442,19 @@ async function confirmerImportImmos(){
 
 // ══════════════ MODULE MATÉRIEL IT (téléphones, ordinateurs — hors circuit immobilisations) ══════════════
 var materielItList=[];
+var lignesTelList=[];
 var MATERIEL_IT_SPECIAUX=['RESERVE','ASTREINTE','ALARME','SANS AFFECTATION','STAGIAIRE'];
 var materielItSelected=null, materielItHistorique=[];
+var ligneTelSelected=null, ligneTelHistorique=[];
+var matItVue='telephones';
 
 async function loadMaterielIT(){
   dataLoaded.materielIt=true;
   try{
-    var r=await fetch(W+'?materiel_it=1');
+    var r=await fetch(W+'?materiel_it=1'),r2=await fetch(W+'?lignes_telephoniques=1');
     materielItList=await r.json();
-  }catch(e){materielItList=[];}
+    lignesTelList=await r2.json();
+  }catch(e){materielItList=[];lignesTelList=[];}
   renderMaterielIT();
 }
 function nomDetenteurMaterielIT(item){
@@ -3349,8 +3462,22 @@ function nomDetenteurMaterielIT(item){
   if(employesByCode[item.detenteur_code])return employesByCode[item.detenteur_code].Nom;
   return item.detenteur_nom||item.detenteur_code||'—';
 }
+// ── Matériel IT : conteneur à sous-onglets (Téléphones / Lignes, extensible plus tard pour
+// Ordinateurs), même principe que les sous-onglets EPI/Outillage (epiVue/outilVue) ──
+function changerVueMaterielIT(v){matItVue=v;materielItSelected=null;ligneTelSelected=null;renderMaterielIT();}
 function renderMaterielIT(){
-  var div=document.getElementById('materiel-it-content');
+  var outer=document.getElementById('materiel-it-content');
+  if(!outer)return;
+  var vues=[['telephones','📱 Téléphones'],['lignes','☎️ Lignes']];
+  var html='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
+    vues.map(function(v){return '<button onclick="changerVueMaterielIT(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(matItVue===v[0]?'var(--blue)':'#eee')+';color:'+(matItVue===v[0]?'#fff':'#444')+'">'+v[1]+'</button>';}).join('')+
+    '</div><div id="materiel-it-sub"></div>';
+  outer.innerHTML=html;
+  if(matItVue==='lignes')renderMaterielITLignes();
+  else renderMaterielITTelephones();
+}
+function renderMaterielITTelephones(){
+  var div=document.getElementById('materiel-it-sub');
   if(!div)return;
   if(materielItSelected){renderMaterielITDetail();return;}
   var canEdit=peutGererEPI(ADMIN_SESSION.code); // même population que EPI/Outillage (Admin+Logistique+Logistique_Mayotte)
@@ -3425,7 +3552,7 @@ async function voirDetailMaterielIT(code){
 }
 function fermerDetailMaterielIT(){materielItSelected=null;renderMaterielIT();}
 function renderMaterielITDetail(){
-  var div=document.getElementById('materiel-it-content');
+  var div=document.getElementById('materiel-it-sub');
   if(!div)return;
   var m=materielItList.find(function(x){return x.code===materielItSelected;});
   if(!m){div.innerHTML='<p class="es" style="padding:20px">Appareil introuvable.</p><button onclick="fermerDetailMaterielIT()" class="filter-btn">← Retour</button>';return;}
@@ -3640,6 +3767,253 @@ async function importerDonneesMaterielIT(){
   await loadMaterielIT();
 }
 
+// ── Lignes téléphoniques (ajouté août 2026) : entité indépendante du téléphone — un employé peut
+// garder sa ligne en changeant d'appareil, ou l'inverse. Même structure que la vue Téléphones. ──
+function nomDetenteurLigneTel(item){
+  if(!item.detenteur_code&&!item.detenteur_nom)return'—';
+  if(employesByCode[item.detenteur_code])return employesByCode[item.detenteur_code].Nom;
+  return item.detenteur_nom||item.detenteur_code||'—';
+}
+function renderMaterielITLignes(){
+  var div=document.getElementById('materiel-it-sub');
+  if(!div)return;
+  if(ligneTelSelected){renderLigneTelDetail();return;}
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='';
+  if(estAdmin(ADMIN_SESSION.code)&&!lignesTelList.length&&materielItList.some(function(m){return m.n_telephone;})){
+    html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale depuis les téléphones existants</h3></div>'+
+      '<div style="padding:14px"><p style="font-size:12px;color:var(--grey);margin-bottom:10px">Crée une ligne téléphonique pour chaque téléphone ayant déjà un numéro, en reprenant son détenteur actuel comme point de départ de l\'historique. À faire une seule fois.</p>'+
+      '<button onclick="migrerLignesTelephoniques()" style="padding:8px 16px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Migrer maintenant</button>'+
+      '<div id="lignes-tel-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
+  }
+  html+='<div class="card"><div class="card-head"><h3>☎️ Lignes téléphoniques</h3>'+
+    (canEdit?'<button onclick="ouvrirAjoutLigneTel()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter une ligne</button>':'')+
+    '</div>'+
+    '<div class="filters" style="padding:10px 14px">'+
+    '<input type="text" id="lt-q" oninput="refreshLignesTelResults()" placeholder="🔍 Code, n° téléphone, opérateur, détenteur..." style="flex:2;min-width:220px">'+
+    '<select id="lt-statut" onchange="refreshLignesTelResults()"><option value="">Tous statuts</option><option>Active</option><option>Résiliée</option></select>'+
+    '<button class="filter-btn" onclick="document.getElementById(\'lt-q\').value=\'\';document.getElementById(\'lt-statut\').value=\'\';refreshLignesTelResults();">🔄 Réinitialiser</button>'+
+    '<button onclick="exporterLignesTel()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
+    '</div>'+
+    '<span class="card-cnt" id="lt-cnt" style="margin-left:14px"></span>'+
+    '<div id="lt-results"></div></div>';
+  div.innerHTML=html;
+  refreshLignesTelResults();
+}
+function refreshLignesTelResults(){
+  var res=document.getElementById('lt-results');
+  if(!res)return;
+  var q=((document.getElementById('lt-q')||{}).value||'').trim().toUpperCase();
+  var fs=(document.getElementById('lt-statut')||{}).value||'';
+  var rows=lignesTelList.filter(function(l){
+    var detNom=nomDetenteurLigneTel(l);
+    if(fs&&l.statut!==fs)return false;
+    if(q&&!(l.code.toUpperCase().includes(q)||(l.n_telephone||'').includes(q)||(l.operateur||'').toUpperCase().includes(q)||detNom.toUpperCase().includes(q)||(l.detenteur_code||'').toUpperCase().includes(q)))return false;
+    return true;
+  }).sort(function(a,b){return a.code.localeCompare(b.code);});
+  var cnt=document.getElementById('lt-cnt');if(cnt)cnt.textContent=rows.length+' ligne'+(rows.length>1?'s':'');
+  if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucune ligne'+(q||fs?' pour ce filtre':'')+'.</p>';return;}
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>N° téléphone</th><th>Opérateur</th><th>Détenteur</th><th>Depuis</th><th>Statut</th></tr></thead><tbody>';
+  rows.forEach(function(l){
+    var statutColor=l.statut==='Active'?'var(--green)':'var(--grey)';
+    html+='<tr style="cursor:pointer" onclick="voirDetailLigneTel(\''+l.code+'\')"><td style="font-weight:700">'+l.code+' '+drapeauSiteD(l.site)+'</td>'+
+      '<td style="font-size:12px">'+(l.n_telephone||'—')+'</td>'+
+      '<td style="font-size:11px;color:var(--grey)">'+(l.operateur||'—')+'</td>'+
+      '<td style="font-size:12px;font-weight:600">'+nomDetenteurLigneTel(l)+'</td>'+
+      '<td style="font-size:11px;color:var(--grey)">'+(l.depuis?fmtD(l.depuis):'—')+'</td>'+
+      '<td><span style="font-size:11px;font-weight:700;color:'+statutColor+'">'+(l.statut||'—')+'</span></td>'+
+    '</tr>';
+  });
+  html+='</tbody></table></div>';
+  res.innerHTML=html;
+}
+async function voirDetailLigneTel(code){
+  ligneTelSelected=code;
+  ligneTelHistorique=[];
+  renderMaterielIT();
+  try{
+    var r=await fetch(W+'?mouvements_lignes_telephoniques='+encodeURIComponent(code));
+    ligneTelHistorique=await r.json();
+  }catch(e){ligneTelHistorique=[];}
+  renderMaterielIT();
+}
+function fermerDetailLigneTel(){ligneTelSelected=null;renderMaterielIT();}
+function renderLigneTelDetail(){
+  var div=document.getElementById('materiel-it-sub');
+  if(!div)return;
+  var l=lignesTelList.find(function(x){return x.code===ligneTelSelected;});
+  if(!l){div.innerHTML='<p class="es" style="padding:20px">Ligne introuvable.</p><button onclick="fermerDetailLigneTel()" class="filter-btn">← Retour</button>';return;}
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<button onclick="fermerDetailLigneTel()" class="filter-btn" style="margin-bottom:12px">← Retour à la liste</button>'+
+    '<div class="card"><div class="card-head"><h3>'+l.code+' — '+(l.n_telephone||'—')+'</h3>'+
+    (canEdit?'<div style="display:flex;gap:8px"><button onclick="ouvrirAffectationLigneTel(\''+l.code+'\')" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Affecter</button>'+
+      '<button onclick="ouvrirModifLigneTel(\''+l.code+'\')" style="padding:6px 14px;background:#eee;color:#444;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✏️ Modifier</button></div>':'')+
+    '</div>'+
+    '<div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">'+
+      '<div><b style="font-size:11px;color:var(--grey)">N° TÉLÉPHONE</b><div>'+(l.n_telephone||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">OPÉRATEUR</b><div>'+(l.operateur||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">N° CARTE SIM</b><div style="font-size:11px">'+(l.n_carte_sim||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">CODE PIN</b><div>'+(l.code_pin||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">CODE PUK</b><div>'+(l.code_puk||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">CODE RIO</b><div>'+(l.code_rio||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">DÉTENTEUR ACTUEL</b><div style="font-weight:700">'+nomDetenteurLigneTel(l)+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">DEPUIS</b><div>'+(l.depuis?fmtD(l.depuis):'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">STATUT</b><div>'+(l.statut||'—')+'</div></div>'+
+      '<div><b style="font-size:11px;color:var(--grey)">SITE</b><div>'+(l.site||'—')+'</div></div>'+
+    '</div>';
+  if(l.commentaire)html+='<div style="padding:0 14px 14px;font-size:12px;color:var(--grey)"><b>Commentaire :</b> '+l.commentaire+'</div>';
+  html+='</div>';
+  html+='<div class="card" style="margin-top:14px"><div class="card-head"><h3>Historique de détention</h3></div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Détenteur</th><th>Depuis</th><th>Note</th></tr></thead><tbody>'+
+    (ligneTelHistorique.length?ligneTelHistorique.map(function(h){
+      var nom=employesByCode[h.code_employe]?employesByCode[h.code_employe].Nom:(h.nom_detenteur||h.code_employe||'—');
+      return '<tr><td style="font-weight:600">'+nom+'</td><td style="font-size:11px;color:var(--grey)">'+fmtDT(h.horodatage)+'</td><td style="font-size:11px">'+(h.note||'—')+'</td></tr>';
+    }).join(''):'<tr><td colspan="3" class="es">Aucun historique.</td></tr>')+
+    '</tbody></table></div></div>';
+  div.innerHTML=html;
+}
+async function ouvrirAjoutLigneTel(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter une ligne téléphonique';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code *</label><div style="display:flex;gap:8px;align-items:center"><input id="lt-add-code" style="'+addFieldStyle+'" placeholder="Chargement..."><span id="lt-add-code-check" style="font-size:18px"></span></div></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="lt-add-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">N° téléphone</label><input id="lt-add-tel" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Opérateur</label><input id="lt-add-op" style="'+addFieldStyle+'" value="FREE"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">N° carte SIM</label><input id="lt-add-sim" style="'+addFieldStyle+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PIN</label><input id="lt-add-pin" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PUK</label><input id="lt-add-puk" style="'+addFieldStyle+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Code RIO</label><input id="lt-add-rio" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Commentaire</label><input id="lt-add-comment" style="'+addFieldStyle+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=enregistrerLigneTel;
+  try{var r=await fetch(W+'?next_code_ligne_tel=1');var res=await r.json();document.getElementById('lt-add-code').value=res.next_code||'';}catch(e){}
+}
+async function enregistrerLigneTel(){
+  var code=(document.getElementById('lt-add-code').value||'').trim().toUpperCase();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!/^LIG\d{6}$/.test(code)){msg.textContent='Code invalide (format LIG + 6 chiffres, ex: LIG000001).';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={code:code,site:document.getElementById('lt-add-site').value,
+    n_telephone:document.getElementById('lt-add-tel').value.trim(),operateur:document.getElementById('lt-add-op').value.trim(),
+    n_carte_sim:document.getElementById('lt-add-sim').value.trim(),code_pin:document.getElementById('lt-add-pin').value.trim(),
+    code_puk:document.getElementById('lt-add-puk').value.trim(),code_rio:document.getElementById('lt-add-rio').value.trim(),
+    commentaire:document.getElementById('lt-add-comment').value.trim()};
+  try{
+    var r=await fetch(W+'?action=ajouter_ligne_telephonique',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Ligne ajoutée !';
+      setTimeout(function(){fermerAjout();dataLoaded.materielIt=false;loadMaterielIT();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+function ouvrirAffectationLigneTel(code){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires.');return;}
+  document.getElementById('add-titre').textContent='🔄 Affecter '+code;
+  document.getElementById('add-msg').textContent='';
+  var actifs=employesList.filter(function(e){return e.Actif!==false;}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+  var empOpts=actifs.map(function(e){return '<option value="'+e.Code+'">'+e.Code+' — '+(e.Nom||e.Code)+'</option>';}).join('');
+  var specOpts=MATERIEL_IT_SPECIAUX.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Nouveau détenteur *</label><select id="lt-aff-det" style="'+addFieldStyle+'"><option value="">— Sélectionner —</option><optgroup label="Employés">'+empOpts+'</optgroup><optgroup label="Cas particuliers">'+specOpts+'</optgroup></select></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Note</label><input id="lt-aff-note" style="'+addFieldStyle+'" placeholder="Optionnel"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=function(){confirmerAffectationLigneTel(code);};
+}
+async function confirmerAffectationLigneTel(code){
+  var sel=document.getElementById('lt-aff-det');
+  var det=sel.value;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!det){msg.textContent='Sélectionne le nouveau détenteur.';return;}
+  var nom=MATERIEL_IT_SPECIAUX.indexOf(det)!==-1?det:(sel.options[sel.selectedIndex].textContent.split(' — ')[1]||det);
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=affecter_ligne_telephonique',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,code_employe:det,nom_detenteur:nom,note:(document.getElementById('lt-aff-note').value||'').trim()})});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Affectation enregistrée !';
+      setTimeout(function(){fermerAjout();dataLoaded.materielIt=false;loadMaterielIT().then(function(){voirDetailLigneTel(code);});},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+function ouvrirModifLigneTel(code){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires.');return;}
+  var l=lignesTelList.find(function(x){return x.code===code;});
+  if(!l)return;
+  document.getElementById('add-titre').textContent='✏️ Modifier '+code;
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">N° téléphone</label><input id="lt-ed-tel" style="'+addFieldStyle+'" value="'+(l.n_telephone||'').replace(/"/g,'')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Opérateur</label><input id="lt-ed-op" style="'+addFieldStyle+'" value="'+(l.operateur||'').replace(/"/g,'')+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">N° carte SIM</label><input id="lt-ed-sim" style="'+addFieldStyle+'" value="'+(l.n_carte_sim||'').replace(/"/g,'')+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PIN</label><input id="lt-ed-pin" style="'+addFieldStyle+'" value="'+(l.code_pin||'').replace(/"/g,'')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Code PUK</label><input id="lt-ed-puk" style="'+addFieldStyle+'" value="'+(l.code_puk||'').replace(/"/g,'')+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Code RIO</label><input id="lt-ed-rio" style="'+addFieldStyle+'" value="'+(l.code_rio||'').replace(/"/g,'')+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Statut</label><select id="lt-ed-statut" style="'+addFieldStyle+'"><option'+(l.statut==='Active'?' selected':'')+'>Active</option><option'+(l.statut==='Résiliée'?' selected':'')+'>Résiliée</option></select></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Commentaire</label><input id="lt-ed-comment" style="'+addFieldStyle+'" value="'+(l.commentaire||'').replace(/"/g,'')+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
+  btn.onclick=function(){enregistrerModifLigneTel(l.id,code);};
+}
+async function enregistrerModifLigneTel(id,code){
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={id:id,statut:document.getElementById('lt-ed-statut').value,
+    n_telephone:document.getElementById('lt-ed-tel').value.trim(),operateur:document.getElementById('lt-ed-op').value.trim(),
+    n_carte_sim:document.getElementById('lt-ed-sim').value.trim(),code_pin:document.getElementById('lt-ed-pin').value.trim(),
+    code_puk:document.getElementById('lt-ed-puk').value.trim(),code_rio:document.getElementById('lt-ed-rio').value.trim(),
+    commentaire:document.getElementById('lt-ed-comment').value.trim()};
+  try{
+    var r=await fetch(W+'?action=maj_ligne_telephonique',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Modifiée !';
+      setTimeout(function(){fermerAjout();dataLoaded.materielIt=false;loadMaterielIT().then(function(){voirDetailLigneTel(code);});},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+function exporterLignesTel(){
+  var entetes=['Code','N° téléphone','Opérateur','Détenteur','Depuis','Statut','Site'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  lignesTelList.forEach(function(l){lignesCsv.push([l.code,l.n_telephone,l.operateur,nomDetenteurLigneTel(l),l.depuis?fmtD(l.depuis):'',l.statut,l.site].map(csvCell).join(';'));});
+  var csv='﻿'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Lignes_Telephoniques.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
+}
+async function migrerLignesTelephoniques(){
+  if(!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  var source=materielItList.filter(function(m){return m.n_telephone;});
+  if(!source.length){alert('Aucun téléphone avec un numéro de ligne à migrer.');return;}
+  if(!confirm('Créer '+source.length+' ligne(s) téléphonique(s) à partir des téléphones existants (reprend le détenteur actuel de chaque téléphone comme point de départ de l\'historique) ?\n\nÀ faire UNE SEULE FOIS.'))return;
+  var statutEl=document.getElementById('lignes-tel-migration-statut');
+  var setStatut=function(t){if(statutEl)statutEl.textContent=t;};
+  setStatut('⏳ Préparation…');
+  var base=0;
+  try{var r=await fetch(W+'?next_code_ligne_tel=1');var res=await r.json();base=res.max_num||0;}catch(e){}
+  var rowsLignes=source.map(function(m,idx){return {code:'LIG'+String(base+idx+1).padStart(6,'0'),site:m.site||'Reunion',statut:'Active',n_telephone:m.n_telephone,operateur:m.operateur,n_carte_sim:m.n_carte_sim,code_pin:m.code_pin,code_puk:m.code_puk,code_rio:m.code_rio,commentaire:'Migré depuis '+m.code};});
+  var rowsMouv=source.map(function(m,idx){return {code:rowsLignes[idx].code,code_employe:m.detenteur_code||'',nom_detenteur:m.detenteur_nom||'',horodatage:m.depuis||new Date().toISOString()};});
+  var ok1=0,ko1=0;
+  for(var i=0;i<rowsLignes.length;i+=20){
+    setStatut('⏳ Lignes '+Math.min(i+20,rowsLignes.length)+' / '+rowsLignes.length+'…');
+    try{var rc=await fetch(W+'?action=bulk_import_lignes_telephoniques',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:rowsLignes.slice(i,i+20)})});var resc=await rc.json();ok1+=resc.ok||0;ko1+=resc.ko||0;}catch(e){ko1+=20;}
+  }
+  var ok2=0,ko2=0;
+  for(var j=0;j<rowsMouv.length;j+=20){
+    setStatut('⏳ Historique '+Math.min(j+20,rowsMouv.length)+' / '+rowsMouv.length+'…');
+    try{var rm=await fetch(W+'?action=bulk_import_mouvements_lignes_telephoniques',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows:rowsMouv.slice(j,j+20)})});var resm=await rm.json();ok2+=resm.ok||0;ko2+=resm.ko||0;}catch(e){ko2+=20;}
+  }
+  setStatut('✅ Migration terminée : '+ok1+' ligne(s), '+ok2+' mouvement(s) initiaux.'+((ko1+ko2)?' ⚠️ '+(ko1+ko2)+' échec(s).':''));
+  dataLoaded.materielIt=false;
+  await loadMaterielIT();
+}
+
 // ══════════════ AJOUT IMMO / EMPLOYÉ ══════════════
 var addFieldStyle='width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-top:4px';
 var addLabelStyle='font-size:12px;font-weight:700;color:var(--blue)';
@@ -3741,7 +4115,16 @@ function ouvrirAjoutEmploye(){
     '<div class="frow"><label style="'+addLabelStyle+'">Nom complet *</label><input id="ae-nom" style="'+addFieldStyle+'" placeholder="Ex: ROIX Johnny"></div>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Poste</label><input id="ae-poste" style="'+addFieldStyle+'" placeholder="Ex: Conducteur de travaux"></div>'+
     '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Rôle / Droits</label><select id="ae-role" style="'+addFieldStyle+'">'+roleOpts+'</select></div>'+
-    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="ae-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div></div>';
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Site</label><select id="ae-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div></div>'+
+    '<p style="font-size:12px;font-weight:700;color:var(--blue);margin-top:10px">🦺 EPI (si concerné — sinon laisser "Non concerné")</p>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Affectation</label><select id="ae-epi-affectation" style="'+addFieldStyle+'">'+Object.keys(EPI_AFF_LABELS).map(function(k){return '<option value="'+k+'">'+EPI_AFF_LABELS[k]+'</option>';}).join('')+'</select></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">'+
+    '<div><label style="font-size:11px;color:var(--grey)">Pantalon</label><input id="ae-epi-pantalon" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">T-shirt</label><input id="ae-epi-tshirt" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">Veste</label><input id="ae-epi-veste" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">Chaussures</label><input id="ae-epi-chaussures" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">Gants</label><input id="ae-epi-gants" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+    '</div><p style="font-size:10px;color:var(--grey);margin-top:4px">La taille de veste se remplit automatiquement sur celle du t-shirt (modifiable si différente).</p>';
   document.getElementById('add-overlay').style.display='flex';
   document.getElementById('add-confirm-btn').onclick=enregistrerEmploye;
   document.getElementById('ae-code').oninput=function(){
@@ -3750,6 +4133,11 @@ function ouvrirAjoutEmploye(){
     chk.textContent=employesByCode[code]?'❌':'✅';
     chk.title=employesByCode[code]?'Ce code existe déjà':'Disponible';
   };
+  document.getElementById('ae-epi-tshirt').oninput=function(){
+    var veste=document.getElementById('ae-epi-veste');
+    if(!veste.dataset.touche)veste.value=this.value;
+  };
+  document.getElementById('ae-epi-veste').oninput=function(){this.dataset.touche='1';};
 }
 
 async function enregistrerEmploye(){
@@ -3763,12 +4151,26 @@ async function enregistrerEmploye(){
   if(employesByCode[code]){msg.textContent='❌ Le code '+code+' existe déjà.';return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
   var payload={code:code,nom:nom,poste:document.getElementById('ae-poste').value.trim(),role:document.getElementById('ae-role').value,site:document.getElementById('ae-site').value};
+  var tailles={affectation_epi:document.getElementById('ae-epi-affectation').value,
+    taille_pantalon:document.getElementById('ae-epi-pantalon').value.trim(),taille_tshirt:document.getElementById('ae-epi-tshirt').value.trim(),
+    taille_veste:document.getElementById('ae-epi-veste').value.trim(),pointure_chaussures:document.getElementById('ae-epi-chaussures').value.trim(),
+    taille_gants:document.getElementById('ae-epi-gants').value.trim()};
   try{
     var r=await fetch(W+'?action=ajouter_employe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
       msg.style.color='var(--green)';msg.textContent='✅ Employé '+code+' ajouté !';
-      setTimeout(function(){fermerAjout();loadEmployes(true).then(function(){renderUsers();});},1200);
+      var alerteStock='';
+      if(tailles.affectation_epi){
+        try{
+          await fetch(W+'?action=maj_taille_employe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({code:code,item_id:res.id},tailles))});
+          if(!epiCatalogue.length||!epiGrille.length)await loadEPI();
+          var besoin=epiCalculerBesoinStock(tailles.affectation_epi,{taillePantalon:tailles.taille_pantalon,tailleTshirt:tailles.taille_tshirt,tailleVeste:tailles.taille_veste,pointureChaussures:tailles.pointure_chaussures,tailleGants:tailles.taille_gants});
+          var manquants=besoin.filter(function(b){return !b.suffisant;});
+          if(manquants.length)alerteStock='\n\n⚠️ Stock EPI insuffisant pour son profil : '+manquants.map(function(m){return m.type_article+(m.article_trouve?' ('+m.stock_disponible+'/'+m.quantite_requise+' en stock)':' (article introuvable au catalogue pour cette taille)');}).join(', ')+'.';
+        }catch(e2){}
+      }
+      setTimeout(function(){fermerAjout();loadEmployes(true).then(function(){renderUsers();});if(alerteStock)alert('Employé '+code+' créé.'+alerteStock);},1200);
     }else{
       btn.disabled=false;btn.textContent='✅ Enregistrer';
       msg.textContent='❌ '+(res.message||res.error||'Échec');
