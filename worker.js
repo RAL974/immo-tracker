@@ -421,6 +421,16 @@ async function handleRequest(request) {
     }));
   }
 
+  // Toutes les lignes de dotation EPI en un seul appel (avec dotation_id) — utilisé par la vue
+  // "Consommation par année" de l'onglet Historique, pour éviter un appel par fiche.
+  if (p.get('lignes_dotation_epi_toutes') === '1') {
+    const items = await paginate(GL + '/Lignes_Dotation_EPI/items?$expand=fields&$top=2000', 10);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, dotation_id: f.Title || '', type_article: f.Type_Article || '', taille_article: f.Taille_Article || '', reference_article: f.Reference_Article || '', quantite: f.Quantite || 0 };
+    }));
+  }
+
   // ── Module Prime d'outillage : catalogue, grille, lignes de distribution ────
   if (p.get('catalogue_outillage') === '1') {
     const items = await paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5);
@@ -1587,7 +1597,10 @@ async function handleRequest(request) {
       const lignes = body.lignes || [];
       if (!destinataire || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
       try {
-        const idLibre = 'PONCTUEL-' + (body.par_code || 'X') + '-' + Date.now();
+        // Destinataire nommé (employé précis) : Title = son code, pour que la ponctuelle apparaisse
+        // dans son historique individuel — sinon (remise de groupe), identifiant synthétique inerte.
+        const employeCode = (body.employe_code || '').trim().toUpperCase();
+        const idLibre = employeCode || ('PONCTUEL-' + (body.par_code || 'X') + '-' + Date.now());
         const site = (body.site === 'Mayotte') ? 'Mayotte' : 'Reunion';
         const dotRes = await fetch(GL + '/Dotations_EPI/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
           Title: idLibre, Type_Dotation: 'Ponctuelle', Nom_Destinataire: destinataire, Site: site,

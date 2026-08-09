@@ -15,6 +15,11 @@
 <!-- Génération massive de PDF locaux (dotations annuelles EPI, août 2026) : rasterisation de la fiche HTML -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Émargements EPI/Outillage (août 2026) : lecture des fiches scannées en PDF (pdf.js) et
+     reconnaissance de texte pour l'import de scans en lot (Tesseract.js), chargées via CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--blue:#1A3A6B;--orange:#E87722;--green:#27AE60;--red:#E74C3C;--yellow:#F39C12;--grey:#7F8C8D;--bg:#F0F4F8;--card:#fff;--sidebar:220px;--header:54px;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -1386,6 +1391,7 @@ async function importerInventaireDec2025(){
 var epiCatalogue=[], epiGrille=[], epiDotations=[];
 var epiVue='stock'; // 'stock' | 'grille' | 'dotations' | 'ponctuelle'
 var EPI_ANNEE_SELECTIONNEE=null;
+var EPI_DOT_STATUT_FILTRE='';
 var EPI_LIGNES_PONCTUELLES=[];
 var EPI_EMARGEMENT_ID=null;
 var EPI_AFF_LABELS={'':'— Non concerné —','C':'C — Chantier / Travaux Neufs','M':'M — Maintenance','Z':'Z — Conducteur de Travaux','A':'A — Atelier'};
@@ -1407,7 +1413,7 @@ function renderEPI(){
     div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
     return;
   }
-  var vues=[['stock','📦 Stock'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle']];
+  var vues=[['stock','📦 Stock'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle'],['historique','🕘 Historique']];
   var html='';
   if(estAdmin(ADMIN_SESSION.code)&&!epiCatalogue.length){
     html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : tailles, catalogue & grille de dotation</h3></div>'+
@@ -1466,6 +1472,7 @@ function renderEPIVue(){
   else if(epiVue==='grille')renderEPIGrille(c);
   else if(epiVue==='dotations')renderEPIDotations(c);
   else if(epiVue==='ponctuelle')renderEPIPonctuelle(c);
+  else if(epiVue==='historique')renderEPIHistorique(c);
 }
 
 // ── Vue Stock ──
@@ -1726,15 +1733,25 @@ function renderEPIDotations(container){
   if(!EPI_ANNEE_SELECTIONNEE)EPI_ANNEE_SELECTIONNEE=anneeCourante;
   var annees=[];for(var y=anneeCourante+1;y>=anneeCourante-2;y--)annees.push(y);
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var dotAnneeToutes=epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(EPI_ANNEE_SELECTIONNEE);});
+  var nbEnAttente=dotAnneeToutes.filter(function(dd){return dd.statut!=='Emargee';}).length;
   var html='<div class="card"><div class="card-head"><h3>🧾 Dotations employés</h3>'+
+    '<div style="display:flex;gap:8px;align-items:center">'+
     '<select id="epi-annee-sel" onchange="changerAnneeEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(y){return '<option value="'+y+'"'+(y===EPI_ANNEE_SELECTIONNEE?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
-    '</div>';
+    '<select id="epi-dot-statut" onchange="filtrerStatutDotationsEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+
+      '<option value=""'+(EPI_DOT_STATUT_FILTRE===''?' selected':'')+'>Tous les statuts</option>'+
+      '<option value="Emargee"'+(EPI_DOT_STATUT_FILTRE==='Emargee'?' selected':'')+'>✅ Émargées seulement</option>'+
+      '<option value="Generee"'+(EPI_DOT_STATUT_FILTRE==='Generee'?' selected':'')+'>⏳ En attente seulement</option>'+
+    '</select>'+
+    (nbEnAttente?'<span class="badge bu" style="font-size:12px">⏳ '+nbEnAttente+' en attente</span>':'')+
+    '</div></div>';
   if(canEdit)html+='<div style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
     '<button onclick="genererDotationAnnuelleComplete()" style="padding:8px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px" title="Crée les fiches manquantes puis écrit un PDF par fiche dans un dossier local (Chrome/Edge)">🚀 Générer dotation annuelle</button>'+
+    '<button onclick="ouvrirImportLotEPI()" style="padding:8px 16px;background:#1A3A6B;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px" title="Lit automatiquement le code employé sur plusieurs scans à la fois (aide, pas garantie — relecture obligatoire)">📥 Import de scans (lot)</button>'+
     '<a href="javascript:void(0)" onclick="epiChangerDossierPDF()" style="font-size:11px;color:var(--grey);text-decoration:underline">Changer de dossier PDF</a>'+
     '<span id="epi-gen-statut" style="font-size:12px;color:var(--grey)"></span></div>';
-  var dotAnnee=epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(EPI_ANNEE_SELECTIONNEE);});
-  if(!dotAnnee.length)html+='<p class="es" style="padding:16px">Aucune fiche générée pour '+EPI_ANNEE_SELECTIONNEE+'.</p>';
+  var dotAnnee=EPI_DOT_STATUT_FILTRE?dotAnneeToutes.filter(function(dd){return EPI_DOT_STATUT_FILTRE==='Emargee'?dd.statut==='Emargee':dd.statut!=='Emargee';}):dotAnneeToutes;
+  if(!dotAnnee.length)html+='<p class="es" style="padding:16px">Aucune fiche'+(EPI_DOT_STATUT_FILTRE?' pour ce filtre':' générée pour '+EPI_ANNEE_SELECTIONNEE)+'.</p>';
   else{
     html+='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Nom</th><th>Site</th><th>Type</th><th>Statut</th><th>Actions</th></tr></thead><tbody>';
     dotAnnee.sort(function(a,b){return (a.nom_destinataire||'').localeCompare(b.nom_destinataire||'');}).forEach(function(dd){
@@ -1753,6 +1770,128 @@ function renderEPIDotations(container){
   container.innerHTML=html;
 }
 function changerAnneeEPI(v){EPI_ANNEE_SELECTIONNEE=parseInt(v,10);renderEPIVue();}
+function filtrerStatutDotationsEPI(v){EPI_DOT_STATUT_FILTRE=v;renderEPIVue();}
+
+// ── Onglet Historique EPI : matrice employé×année + consommation par année ──
+var EPI_HIST_SOUSVUE='matrice';
+var EPI_HIST_CONSO_ANNEE=null;
+var EPI_HIST_CONSO_TYPE='';
+var EPI_HIST_CONSO_ROWS=[];
+var epiLignesToutes=null; // cache, chargé à la demande (vue consommation uniquement)
+
+function epiAnneesDisponibles(){
+  var set={};
+  epiDotations.forEach(function(dd){
+    var y=dd.annee_civile?parseInt(dd.annee_civile,10):(dd.genere_le?new Date(dd.genere_le).getFullYear():null);
+    if(y)set[y]=true;
+  });
+  set[new Date().getFullYear()]=true;
+  return Object.keys(set).map(Number).sort(function(a,b){return a-b;});
+}
+function changerSousVueHistoriqueEPI(v){EPI_HIST_SOUSVUE=v;renderEPIVue();}
+function renderEPIHistorique(container){
+  var html='<div class="card"><div class="card-head"><h3>🕘 Historique EPI</h3>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button onclick="changerSousVueHistoriqueEPI(\'matrice\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(EPI_HIST_SOUSVUE==='matrice'?'var(--blue)':'#eee')+';color:'+(EPI_HIST_SOUSVUE==='matrice'?'#fff':'#444')+'">👤 Par employé</button>'+
+    '<button onclick="changerSousVueHistoriqueEPI(\'consommation\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(EPI_HIST_SOUSVUE==='consommation'?'var(--blue)':'#eee')+';color:'+(EPI_HIST_SOUSVUE==='consommation'?'#fff':'#444')+'">📊 Consommation par année</button>'+
+    '</div></div><div id="epi-hist-sous"></div></div>';
+  container.innerHTML=html;
+  var sous=document.getElementById('epi-hist-sous');
+  if(EPI_HIST_SOUSVUE==='matrice')renderEPIHistMatrice(sous);
+  else renderEPIHistConsommation(sous);
+}
+function renderEPIHistMatrice(container){
+  var annees=epiAnneesDisponibles();
+  var employes=employesList.filter(function(e){return e.AffectationEPI;}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+  if(!employes.length){container.innerHTML='<p class="es" style="padding:16px">Aucun employé avec une affectation EPI.</p>';return;}
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<p style="font-size:11px;color:var(--grey);padding:10px 14px 0">"Dotation" = statut de la dotation annuelle/entrée de l\'année. "Ponctuelles" = nombre de remises ponctuelles nommément adressées à cet employé cette année-là (cliquable).</p>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Nom</th>'+
+    annees.map(function(a){return '<th style="text-align:center">Dotation '+a+'</th><th style="text-align:center">Ponctuelles '+a+'</th>';}).join('')+
+    '</tr></thead><tbody>';
+  employes.forEach(function(e){
+    html+='<tr><td>'+e.Code+'</td><td>'+(e.Nom||e.Code)+'</td>';
+    annees.forEach(function(annee){
+      var dot=epiDotations.find(function(dd){return dd.code===e.Code&&(dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);});
+      if(!dot)html+='<td style="text-align:center;color:var(--grey)">—</td>';
+      else if(dot.statut==='Emargee')html+='<td style="text-align:center"><a href="javascript:void(0)" onclick="voirFicheEPI(\''+dot.id+'\')" class="badge bn" style="text-decoration:none">✅ Reçue</a></td>';
+      else html+='<td style="text-align:center"><a href="javascript:void(0)" onclick="'+(canEdit?'ouvrirEmargementEPI(\''+dot.id+'\')':'voirFicheEPI(\''+dot.id+'\')')+'" class="badge bu" style="text-decoration:none">⏳ En attente</a></td>';
+      var ponct=epiDotations.filter(function(dd){return dd.code===e.Code&&dd.type_dotation==='Ponctuelle'&&(dd.genere_le?new Date(dd.genere_le).getFullYear():null)===annee;});
+      if(!ponct.length)html+='<td style="text-align:center;color:var(--grey)">—</td>';
+      else html+='<td style="text-align:center"><a href="javascript:void(0)" onclick="epiOuvrirDetailPonctuelles(\''+e.Code+'\','+annee+')" style="color:var(--blue);font-weight:700">'+ponct.length+'</a></td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  container.innerHTML=html;
+}
+function epiOuvrirDetailPonctuelles(code,annee){
+  var ponct=epiDotations.filter(function(dd){return dd.code===code&&dd.type_dotation==='Ponctuelle'&&(dd.genere_le?new Date(dd.genere_le).getFullYear():null)===annee;});
+  document.getElementById('add-titre').textContent='✋ Remises ponctuelles — '+code+' — '+annee;
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=ponct.length?ponct.map(function(dd){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">'+
+      '<span>'+dateFr(dd.genere_le)+' — '+(dd.statut==='Emargee'?'✅ Émargée':'⏳ En attente')+'</span>'+
+      '<span><a href="javascript:void(0)" onclick="voirFicheEPI(\''+dd.id+'\')" style="color:var(--blue)">Voir</a>'+
+      (dd.statut==='Emargee'&&dd.photo_fiche?' · <a href="javascript:void(0)" onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="color:var(--green)">📷</a>':'')+
+      '</span></div>';
+  }).join(''):'<p class="es">Aucune.</p>';
+  var btn=document.getElementById('add-confirm-btn');
+  btn.disabled=false;btn.textContent='Fermer';btn.onclick=fermerAjout;
+  document.getElementById('add-overlay').style.display='flex';
+}
+async function renderEPIHistConsommation(container){
+  container.innerHTML='<p style="padding:16px;color:var(--grey)">Chargement…</p>';
+  if(!epiLignesToutes){
+    try{var r=await fetch(W+'?lignes_dotation_epi_toutes=1');epiLignesToutes=await r.json();}catch(e){epiLignesToutes=[];}
+  }
+  var annees=epiAnneesDisponibles();
+  if(!EPI_HIST_CONSO_ANNEE||annees.indexOf(EPI_HIST_CONSO_ANNEE)===-1)EPI_HIST_CONSO_ANNEE=annees[annees.length-1];
+  var dotById={};epiDotations.forEach(function(dd){dotById[dd.id]=dd;});
+  var typeFiltre=EPI_HIST_CONSO_TYPE;
+  var lignesAnnee=epiLignesToutes.filter(function(l){
+    var dot=dotById[l.dotation_id];
+    if(!dot)return false;
+    var y=dot.annee_civile?parseInt(dot.annee_civile,10):(dot.genere_le?new Date(dot.genere_le).getFullYear():null);
+    if(y!==EPI_HIST_CONSO_ANNEE)return false;
+    if(typeFiltre==='annuelle')return dot.type_dotation==='Annuelle'||dot.type_dotation==='Entree';
+    if(typeFiltre==='ponctuelle')return dot.type_dotation==='Ponctuelle';
+    return true;
+  });
+  var parArticle={};
+  lignesAnnee.forEach(function(l){
+    var key=l.type_article+'|'+(l.taille_article||'');
+    if(!parArticle[key])parArticle[key]={type_article:l.type_article,taille_article:l.taille_article,quantite:0};
+    parArticle[key].quantite+=parseFloat(l.quantite)||0;
+  });
+  var rows=Object.keys(parArticle).map(function(k){return parArticle[k];}).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'')||(a.taille_article||'').localeCompare(b.taille_article||'');});
+  EPI_HIST_CONSO_ROWS=rows;
+  var html='<div style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
+    '<select onchange="changerAnneeConsoEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(a){return '<option value="'+a+'"'+(a===EPI_HIST_CONSO_ANNEE?' selected':'')+'>'+a+'</option>';}).join('')+'</select>'+
+    '<select onchange="changerTypeConsoEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+
+      '<option value=""'+(typeFiltre===''?' selected':'')+'>Tous types</option>'+
+      '<option value="annuelle"'+(typeFiltre==='annuelle'?' selected':'')+'>Dotations annuelles</option>'+
+      '<option value="ponctuelle"'+(typeFiltre==='ponctuelle'?' selected':'')+'>Dotations ponctuelles</option>'+
+    '</select>'+
+    '<button onclick="exporterConsoEPI()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
+    '</div>';
+  if(!rows.length)html+='<p class="es" style="padding:16px">Aucune donnée pour ce filtre.</p>';
+  else html+='<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Quantité distribuée</th></tr></thead><tbody>'+
+      rows.map(function(r){return '<tr><td>'+r.type_article+'</td><td>'+(r.taille_article||'—')+'</td><td style="font-weight:700">'+r.quantite+'</td></tr>';}).join('')+
+      '</tbody></table></div>';
+  container.innerHTML=html;
+}
+function changerAnneeConsoEPI(v){EPI_HIST_CONSO_ANNEE=parseInt(v,10);renderEPIVue();}
+function changerTypeConsoEPI(v){EPI_HIST_CONSO_TYPE=v;renderEPIVue();}
+function exporterConsoEPI(){
+  var entetes=['Type','Taille','Quantité','Année','Filtre'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  EPI_HIST_CONSO_ROWS.forEach(function(r){lignesCsv.push([r.type_article,r.taille_article||'',nbFr(r.quantite),EPI_HIST_CONSO_ANNEE,EPI_HIST_CONSO_TYPE||'Tous'].map(csvCell).join(';'));});
+  var csv='\uFEFF'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Consommation_EPI_'+EPI_HIST_CONSO_ANNEE+'.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
+}
 
 // Bouton unique "🚀 Générer dotation annuelle" : demande l'année, crée les fiches SharePoint
 // manquantes pour tous les employés actifs éligibles, PUIS écrit directement un PDF par fiche
@@ -1772,8 +1911,14 @@ async function genererDotationAnnuelleComplete(){
   var dejaGeneres={};
   epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);}).forEach(function(dd){dejaGeneres[dd.code]=true;});
   var aGenerer=eligibles.filter(function(e){return !dejaGeneres[e.Code];});
+  var nbDejaGeneres=eligibles.length-aGenerer.length;
+  // Garde-fou : la dotation annuelle ne doit normalement se générer qu'une fois par année — avertir
+  // explicitement avant de continuer si ce n'est visiblement pas la première fois pour cette année.
+  if(nbDejaGeneres>0){
+    if(!confirm('La dotation annuelle '+annee+' a déjà été générée pour '+nbDejaGeneres+'/'+eligibles.length+' employé(s) actif(s). '+
+      'Continuer va créer les '+aGenerer.length+' fiche(s) manquante(s) puis régénérer TOUS les PDF de '+annee+' (y compris ceux déjà émargés). Continuer ?'))return;
+  }
   if(aGenerer.length){
-    if(!confirm(aGenerer.length+' employé(s) actif(s) n\'ont pas encore de fiche '+annee+'. Les créer avant de générer les PDF ?'))return;
     var ok=0,ko=0;
     for(var i=0;i<aGenerer.length;i++){
       if(statut)statut.textContent='⏳ Fiches SharePoint '+(i+1)+' / '+aGenerer.length+'…';
@@ -1829,42 +1974,81 @@ function ouvrirEmargementEPI(dotId){
   document.getElementById('add-titre').textContent='✍️ Enregistrer l\'émargement';
   document.getElementById('add-msg').textContent='';
   document.getElementById('add-form').innerHTML=
-    '<div class="frow"><label style="'+addLabelStyle+'">Photo / scan de la fiche signée *</label><input type="file" id="epi-emarge-file" accept="image/*" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Photo ou PDF scanné de la fiche signée *</label><input type="file" id="epi-emarge-file" accept="image/*,.pdf" style="'+addFieldStyle+'"></div>'+
     '<p style="font-size:11px;color:var(--grey)">Le stock des articles de cette fiche sera décrémenté à l\'enregistrement.</p>';
   document.getElementById('add-overlay').style.display='flex';
   var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
   btn.onclick=confirmerEmargementEPI;
 }
-async function confirmerEmargementEPI(){
-  var input=document.getElementById('epi-emarge-file');
-  var msg=document.getElementById('add-msg');
-  var btn=document.getElementById('add-confirm-btn');
-  if(!input.files||!input.files[0]){msg.style.color='var(--red)';msg.textContent='Photo requise.';return;}
-  btn.disabled=true;btn.textContent='Enregistrement…';
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var img=new Image();
-    img.onload=async function(){
+// Convertit un fichier (image OU PDF, 1ère page rendue) en JPEG base64 redimensionné (≤1200px) —
+// helper partagé par tous les flux d'émargement (EPI individuel/lot, outillage), pour accepter aussi
+// les scans PDF en plus des photos, avec une présentation/traitement identique partout.
+function fichierVersJPEGBase64(file){
+  return new Promise(function(resolve,reject){
+    var finaliserImg=function(img){
       var canvas=document.createElement('canvas');
       var ratio=Math.min(1200/img.width,1200/img.height,1);
       canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);
       canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      var b64=canvas.toDataURL('image/jpeg',0.75);
-      var now=new Date();
-      var fn=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+now.getHours()+now.getMinutes()+now.getSeconds()+'.jpg';
-      try{
-        await fetch(W+'?action=upload_fiche_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dotation_id:EPI_EMARGEMENT_ID,data:b64,filename:fn})});
-        var r=await fetch(W+'?action=emarger_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:EPI_EMARGEMENT_ID,par_code:ADMIN_SESSION.code,filename:fn})});
-        var res=await r.json();
-        if(res.success){
-          msg.style.color='var(--green)';msg.textContent='✅ Émargement enregistré.';
-          setTimeout(function(){fermerAjout();dataLoaded.epi=false;loadEPI();},1000);
-        }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
-      }catch(e2){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Erreur réseau : '+e2.message;}
+      resolve(canvas.toDataURL('image/jpeg',0.75));
     };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(input.files[0]);
+    var estPDF=file.type==='application/pdf'||/\.pdf$/i.test(file.name||'');
+    if(estPDF){
+      if(typeof pdfjsLib==='undefined'){reject(new Error('Lecture PDF indisponible (bibliothèque non chargée).'));return;}
+      var readerPdf=new FileReader();
+      readerPdf.onload=function(e){
+        pdfjsLib.getDocument({data:new Uint8Array(e.target.result)}).promise
+          .then(function(pdf){return pdf.getPage(1);})
+          .then(function(page){
+            var viewport=page.getViewport({scale:2});
+            var canvas=document.createElement('canvas');
+            canvas.width=viewport.width;canvas.height=viewport.height;
+            return page.render({canvasContext:canvas.getContext('2d'),viewport:viewport}).promise.then(function(){return canvas;});
+          })
+          .then(function(canvas){
+            var img=new Image();
+            img.onload=function(){finaliserImg(img);};
+            img.onerror=reject;
+            img.src=canvas.toDataURL('image/jpeg',0.92);
+          })
+          .catch(reject);
+      };
+      readerPdf.onerror=reject;
+      readerPdf.readAsArrayBuffer(file);
+    }else{
+      var reader=new FileReader();
+      reader.onload=function(e){
+        var img=new Image();
+        img.onload=function(){finaliserImg(img);};
+        img.onerror=reject;
+        img.src=e.target.result;
+      };
+      reader.onerror=reject;
+      reader.readAsDataURL(file);
+    }
+  });
+}
+function nomFichierEmargement(){
+  var now=new Date();
+  return now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+now.getHours()+now.getMinutes()+now.getSeconds()+'.jpg';
+}
+async function confirmerEmargementEPI(){
+  var input=document.getElementById('epi-emarge-file');
+  var msg=document.getElementById('add-msg');
+  var btn=document.getElementById('add-confirm-btn');
+  if(!input.files||!input.files[0]){msg.style.color='var(--red)';msg.textContent='Photo ou PDF requis.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var b64=await fichierVersJPEGBase64(input.files[0]);
+    var fn=nomFichierEmargement();
+    await fetch(W+'?action=upload_fiche_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dotation_id:EPI_EMARGEMENT_ID,data:b64,filename:fn})});
+    var r=await fetch(W+'?action=emarger_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:EPI_EMARGEMENT_ID,par_code:ADMIN_SESSION.code,filename:fn})});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Émargement enregistré.';
+      setTimeout(function(){fermerAjout();dataLoaded.epi=false;loadEPI();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
+  }catch(e2){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Erreur : '+e2.message;}
 }
 
 // Gabarit partagé de la fiche EPI (letterhead + tableau + bloc signature), réutilisé par l'aperçu
@@ -2009,9 +2193,108 @@ async function epiRasteriserFichePDF(dot,lignes){
 }
 function epiChangerDossierPDF(){epiObtenirDossierHandle(true);}
 
+// ── Import de scans en lot (EPI) : lecture optique (OCR) best-effort du code employé, avec relecture
+// obligatoire avant toute écriture — jamais de rattachement automatique silencieux. Tesseract.js (CDN,
+// zéro backend) recherche des fragments de 4 lettres correspondant à un code parmi les fiches en attente
+// (univers volontairement restreint pour limiter les faux positifs), l'utilisateur valide/corrige chaque
+// ligne, puis chaque ligne résolue suit exactement le même chemin que l'émargement individuel.
+var EPI_IMPORT_LOT=[];
+function ouvrirImportLotEPI(){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  EPI_IMPORT_LOT=[];
+  document.getElementById('add-titre').textContent='📥 Import de scans en lot';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<p style="font-size:12px;color:var(--grey);margin-bottom:8px">Sélectionne plusieurs photos ou PDF de fiches signées. Le code employé est recherché automatiquement (lecture optique best-effort, pas une garantie) — vérifie et corrige chaque ligne avant de valider ; rien n\'est enregistré tant que tu n\'as pas cliqué "Valider le lot".</p>'+
+    '<input type="file" id="epi-lot-files" accept="image/*,.pdf" multiple style="'+addFieldStyle+'">'+
+    '<div id="epi-lot-resultats" style="margin-top:12px"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  var btn=document.getElementById('add-confirm-btn');
+  btn.disabled=true;btn.textContent='✅ Valider le lot';btn.onclick=confirmerImportLotEPI;
+  document.getElementById('epi-lot-files').onchange=function(e){analyserLotEPI(e.target.files);};
+}
+async function analyserLotEPI(fileList){
+  var files=Array.prototype.slice.call(fileList);
+  if(!files.length)return;
+  var resDiv=document.getElementById('epi-lot-resultats');
+  resDiv.innerHTML='<p style="color:var(--grey)">⏳ Chargement du moteur de lecture…</p>';
+  if(typeof Tesseract==='undefined'){resDiv.innerHTML='<p style="color:var(--red)">Bibliothèque de lecture indisponible. Recharge la page et réessaie.</p>';return;}
+  // Univers restreint aux fiches jamais émargées (tous types/années) pour fiabiliser la reconnaissance
+  var pendantes=epiDotations.filter(function(dd){return dd.statut!=='Emargee';});
+  var codesPendants={};pendantes.forEach(function(dd){if(dd.code)codesPendants[dd.code.toUpperCase()]=true;});
+  EPI_IMPORT_LOT=[];
+  for(var i=0;i<files.length;i++){
+    resDiv.innerHTML='<p style="color:var(--grey)">⏳ Analyse '+(i+1)+' / '+files.length+'…</p>';
+    var entry={filename:files[i].name,b64:null,matches:[],selectedDotId:'',erreur:''};
+    try{
+      entry.b64=await fichierVersJPEGBase64(files[i]);
+      var ocrRes=await Tesseract.recognize(entry.b64,'eng',{tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ'});
+      var texteOCR=((ocrRes.data&&ocrRes.data.text)||'').toUpperCase().replace(/[^A-Z]/g,'');
+      var matches=[];
+      for(var c=0;c<texteOCR.length-3;c++){
+        var frag=texteOCR.substr(c,4);
+        if(codesPendants[frag]&&matches.indexOf(frag)===-1)matches.push(frag);
+      }
+      entry.matches=matches;
+      if(matches.length===1){
+        var dot=pendantes.find(function(dd){return dd.code===matches[0];});
+        if(dot)entry.selectedDotId=dot.id;
+      }
+    }catch(e){entry.erreur=e.message;}
+    EPI_IMPORT_LOT.push(entry);
+  }
+  afficherResultatsLotEPI(pendantes);
+}
+function afficherResultatsLotEPI(pendantes){
+  var resDiv=document.getElementById('epi-lot-resultats');
+  resDiv.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Fichier</th><th>Aperçu</th><th>Détecté</th><th>Fiche à émarger</th></tr></thead><tbody>'+
+    EPI_IMPORT_LOT.map(function(entry,idx){
+      var detecte=entry.erreur?'<span style="color:var(--red)">Erreur lecture</span>':(entry.matches.length===1?'✅ '+entry.matches[0]:(entry.matches.length>1?'⚠️ ambigu : '+entry.matches.join(', '):'❌ non détecté'));
+      var opts='<option value="">— Non résolu, choisir —</option>'+pendantes.map(function(dd){return '<option value="'+dd.id+'"'+(dd.id===entry.selectedDotId?' selected':'')+'>'+dd.code+' — '+dd.nom_destinataire+' ('+dd.type_dotation+(dd.annee_civile?' '+dd.annee_civile:'')+')</option>';}).join('');
+      return '<tr><td style="font-size:11px">'+entry.filename+'</td>'+
+        '<td>'+(entry.b64?'<img src="'+entry.b64+'" style="width:60px;height:auto;border:1px solid #ddd;border-radius:4px">':'—')+'</td>'+
+        '<td style="font-size:12px">'+detecte+'</td>'+
+        '<td><select onchange="EPI_IMPORT_LOT['+idx+'].selectedDotId=this.value;majBoutonLotEPI()" style="padding:4px 6px;border:1px solid #ddd;border-radius:6px;font-size:11px;max-width:220px">'+opts+'</select></td></tr>';
+    }).join('')+
+    '</tbody></table></div>'+
+    '<p style="font-size:11px;color:var(--grey);margin-top:8px">⚠️ La lecture automatique est une aide, pas une garantie (qualité du scan, luminosité...). Vérifie chaque ligne avant de valider.</p>';
+  majBoutonLotEPI();
+}
+function majBoutonLotEPI(){
+  var nbResolus=EPI_IMPORT_LOT.filter(function(e){return e.selectedDotId;}).length;
+  var btn=document.getElementById('add-confirm-btn');
+  btn.disabled=nbResolus===0;
+  btn.textContent='✅ Valider le lot ('+nbResolus+'/'+EPI_IMPORT_LOT.length+')';
+}
+async function confirmerImportLotEPI(){
+  var msg=document.getElementById('add-msg');
+  var btn=document.getElementById('add-confirm-btn');
+  var aTraiter=EPI_IMPORT_LOT.filter(function(e){return e.selectedDotId;});
+  if(!aTraiter.length)return;
+  btn.disabled=true;
+  var ok=0,ko=0;
+  for(var i=0;i<aTraiter.length;i++){
+    btn.textContent='⏳ '+(i+1)+' / '+aTraiter.length+'…';
+    try{
+      var fn=nomFichierEmargement();
+      await fetch(W+'?action=upload_fiche_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dotation_id:aTraiter[i].selectedDotId,data:aTraiter[i].b64,filename:fn})});
+      var r=await fetch(W+'?action=emarger_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:aTraiter[i].selectedDotId,par_code:ADMIN_SESSION.code,filename:fn})});
+      var res=await r.json();
+      if(res.success)ok++;else ko++;
+    }catch(e){ko++;}
+  }
+  msg.style.color=ko?'var(--orange)':'var(--green)';
+  msg.textContent='✅ '+ok+' fiche(s) émargée(s)'+(ko?', ⚠️ '+ko+' échec(s) (déjà émargée entretemps, ou stock déjà décrémenté ?)':'')+'.';
+  btn.disabled=false;btn.textContent='Fermer';
+  btn.onclick=function(){fermerAjout();dataLoaded.epi=false;loadEPI();};
+}
+
 // Ouvre la photo/scan de la fiche signée (uploadée à l'émargement), même pattern que les photos d'immos
 function voirPhotoFicheEPI(dotId,filename){
   window.open(W+'?fiche_epi='+encodeURIComponent(dotId+'/'+filename),'_blank');
+}
+function voirPhotoFicheOutillage(code,filename){
+  window.open(W+'?fiche_outillage='+encodeURIComponent(code+'/'+filename),'_blank');
 }
 
 // ── Vue Remise ponctuelle ──
@@ -2044,8 +2327,13 @@ function ouvrirRemisePonctuelleEPI(){
   document.getElementById('add-msg').textContent='';
   var types=[];epiCatalogue.forEach(function(a){if(types.indexOf(a.type_article)===-1)types.push(a.type_article);});
   types.sort();
+  var empActifsOpts=employesList.filter(function(e){return e.Actif;}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');})
+    .map(function(e){return '<option value="'+e.Code+'">'+e.Code+' — '+(e.Nom||e.Code)+'</option>';}).join('');
   document.getElementById('add-form').innerHTML=
-    '<div class="frow"><label style="'+addLabelStyle+'">Destinataire *</label><input id="ep-dest" style="'+addFieldStyle+'" placeholder="Ex : Équipe de Nicolas CAZAMBO"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Destinataire *</label>'+
+      '<select id="ep-dest-emp" onchange="epiChoisirDestinataireNomme(this.value)" style="'+addFieldStyle+';margin-bottom:6px"><option value="">— Destinataire libre (groupe) —</option>'+empActifsOpts+'</select>'+
+      '<input id="ep-dest" style="'+addFieldStyle+'" placeholder="Ex : Équipe de Nicolas CAZAMBO"></div>'+
+    '<p style="font-size:11px;color:var(--grey);margin-top:-8px;margin-bottom:10px">Choisir un employé nommé le fait apparaître dans son historique individuel (onglet Historique) ; laisser sur "destinataire libre" pour une remise de groupe.</p>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Site</label><select id="ep-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Articles</label>'+
       '<div style="display:flex;gap:6px;margin-bottom:8px"><select id="ep-type" onchange="epiMajTaillesPonctuelles()" style="'+addFieldStyle+';flex:2"><option value="">Type...</option>'+types.map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('')+'</select>'+
@@ -2057,6 +2345,19 @@ function ouvrirRemisePonctuelleEPI(){
   document.getElementById('add-overlay').style.display='flex';
   var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Générer la fiche';
   btn.onclick=confirmerRemisePonctuelleEPI;
+}
+function epiChoisirDestinataireNomme(code){
+  var dest=document.getElementById('ep-dest');
+  if(code){
+    var e=employesList.find(function(x){return x.Code===code;});
+    dest.value=e?(e.Nom||code):code;
+    dest.readOnly=true;
+    var siteSel=document.getElementById('ep-site');
+    if(siteSel&&e&&e.Site)siteSel.value=(e.Site==='Mayotte'?'Mayotte':'Reunion');
+  }else{
+    dest.readOnly=false;
+    dest.value='';
+  }
 }
 function epiMajTaillesPonctuelles(){
   var type=document.getElementById('ep-type').value;
@@ -2084,13 +2385,14 @@ function epiSupprimerLignePonctuelle(idx){EPI_LIGNES_PONCTUELLES.splice(idx,1);e
 async function confirmerRemisePonctuelleEPI(){
   var dest=(document.getElementById('ep-dest').value||'').trim();
   var site=document.getElementById('ep-site').value;
+  var empCode=(document.getElementById('ep-dest-emp').value||'').trim();
   var msg=document.getElementById('add-msg');
   var btn=document.getElementById('add-confirm-btn');
   if(!dest){msg.style.color='var(--red)';msg.textContent='Destinataire requis.';return;}
   if(!EPI_LIGNES_PONCTUELLES.length){msg.style.color='var(--red)';msg.textContent='Ajoutez au moins une ligne.';return;}
   btn.disabled=true;btn.textContent='Génération…';
   try{
-    var r=await fetch(W+'?action=generer_remise_ponctuelle_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destinataire:dest,site:site,lignes:EPI_LIGNES_PONCTUELLES,par_code:ADMIN_SESSION.code})});
+    var r=await fetch(W+'?action=generer_remise_ponctuelle_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({destinataire:dest,site:site,employe_code:empCode,lignes:EPI_LIGNES_PONCTUELLES,par_code:ADMIN_SESSION.code})});
     var res=await r.json();
     if(res.success){
       msg.style.color='var(--green)';msg.textContent='✅ Fiche générée.';
@@ -2161,7 +2463,7 @@ function renderOutillage(){
     div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
     return;
   }
-  var vues=[['stock','📦 Stock'],['grille','📐 Grille par service'],['manquant','📋 Reste à distribuer'],['distribution','🧰 Distribution par employé'],['prime','💶 Prime annuelle']];
+  var vues=[['stock','📦 Stock'],['grille','📐 Grille par service'],['manquant','📋 Reste à distribuer'],['distribution','🧰 Distribution par employé'],['prime','💶 Prime annuelle'],['historique','🕘 Historique']];
   var html='';
   if(estAdmin(ADMIN_SESSION.code)&&!outilCatalogue.length){
     html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : catalogue, grille & historique de distribution</h3></div>'+
@@ -2184,6 +2486,96 @@ function renderOutillageVue(){
   else if(outilVue==='manquant')renderOutilManquant(c);
   else if(outilVue==='distribution')renderOutilDistribution(c);
   else if(outilVue==='prime')renderOutilPrime(c);
+  else if(outilVue==='historique')renderOutilHistorique(c);
+}
+
+// ── Onglet Historique Outillage : matrice employé×année + consommation par année ──
+// (même principe que l'Historique EPI ; pas d'état "en attente d'émargement" côté outillage,
+// la photo est déjà exigée au moment même de la distribution — donc pas de filtre "pas signé" ici)
+var OUTIL_HIST_SOUSVUE='matrice';
+var OUTIL_HIST_CONSO_ANNEE=null;
+var OUTIL_HIST_CONSO_ROWS=[];
+function outilAnneesDisponibles(){
+  var set={};
+  outilLignes.forEach(function(l){if(l.date_remise){var y=new Date(l.date_remise).getFullYear();if(y)set[y]=true;}});
+  set[new Date().getFullYear()]=true;
+  return Object.keys(set).map(Number).sort(function(a,b){return a-b;});
+}
+function changerSousVueHistoriqueOutil(v){OUTIL_HIST_SOUSVUE=v;renderOutillageVue();}
+function renderOutilHistorique(container){
+  var html='<div class="card"><div class="card-head"><h3>🕘 Historique Outillage</h3>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button onclick="changerSousVueHistoriqueOutil(\'matrice\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(OUTIL_HIST_SOUSVUE==='matrice'?'var(--blue)':'#eee')+';color:'+(OUTIL_HIST_SOUSVUE==='matrice'?'#fff':'#444')+'">👤 Par employé</button>'+
+    '<button onclick="changerSousVueHistoriqueOutil(\'consommation\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(OUTIL_HIST_SOUSVUE==='consommation'?'var(--blue)':'#eee')+';color:'+(OUTIL_HIST_SOUSVUE==='consommation'?'#fff':'#444')+'">📊 Consommation par année</button>'+
+    '</div></div><div id="outil-hist-sous"></div></div>';
+  container.innerHTML=html;
+  var sous=document.getElementById('outil-hist-sous');
+  if(OUTIL_HIST_SOUSVUE==='matrice')renderOutilHistMatrice(sous);
+  else renderOutilHistConsommation(sous);
+}
+function renderOutilHistMatrice(container){
+  var annees=outilAnneesDisponibles();
+  var employes=employesList.filter(function(e){return e.ServiceOutillage;}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+  if(!employes.length){container.innerHTML='<p class="es" style="padding:16px">Aucun employé rattaché à un service outillage.</p>';return;}
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Nom</th>'+
+    annees.map(function(a){return '<th style="text-align:center">Outils reçus '+a+'</th>';}).join('')+
+    '</tr></thead><tbody>';
+  employes.forEach(function(e){
+    html+='<tr><td>'+e.Code+'</td><td>'+(e.Nom||e.Code)+'</td>';
+    annees.forEach(function(annee){
+      var lignes=outilLignes.filter(function(l){return l.code===e.Code&&l.date_remise&&new Date(l.date_remise).getFullYear()===annee;});
+      if(!lignes.length)html+='<td style="text-align:center;color:var(--grey)">—</td>';
+      else html+='<td style="text-align:center"><a href="javascript:void(0)" onclick="outilOuvrirDetailAnnee(\''+e.Code+'\','+annee+')" style="color:var(--blue);font-weight:700">'+lignes.length+'</a></td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  container.innerHTML=html;
+}
+function outilOuvrirDetailAnnee(code,annee){
+  var lignes=outilLignes.filter(function(l){return l.code===code&&l.date_remise&&new Date(l.date_remise).getFullYear()===annee;});
+  document.getElementById('add-titre').textContent='🧰 Outils reçus — '+code+' — '+annee;
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=lignes.length?lignes.map(function(l){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">'+
+      '<span>'+l.type_article+' — '+fmtD(l.date_remise)+'</span>'+
+      (l.photo_fiche?'<a href="javascript:void(0)" onclick="voirPhotoFicheOutillage(\''+code+'\',\''+l.photo_fiche.replace(/'/g,"\\'")+'\')" style="color:var(--green)">📷 Fiche</a>':'<span style="color:var(--grey);font-size:11px">Sans preuve (import historique)</span>')+
+      '</div>';
+  }).join(''):'<p class="es">Aucun.</p>';
+  var btn=document.getElementById('add-confirm-btn');
+  btn.disabled=false;btn.textContent='Fermer';btn.onclick=fermerAjout;
+  document.getElementById('add-overlay').style.display='flex';
+}
+function renderOutilHistConsommation(container){
+  var annees=outilAnneesDisponibles();
+  if(!OUTIL_HIST_CONSO_ANNEE||annees.indexOf(OUTIL_HIST_CONSO_ANNEE)===-1)OUTIL_HIST_CONSO_ANNEE=annees[annees.length-1];
+  var lignesAnnee=outilLignes.filter(function(l){return l.date_remise&&new Date(l.date_remise).getFullYear()===OUTIL_HIST_CONSO_ANNEE;});
+  var parArticle={};
+  lignesAnnee.forEach(function(l){
+    if(!parArticle[l.type_article])parArticle[l.type_article]={type_article:l.type_article,quantite:0};
+    parArticle[l.type_article].quantite++;
+  });
+  var rows=Object.keys(parArticle).map(function(k){return parArticle[k];}).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'');});
+  OUTIL_HIST_CONSO_ROWS=rows;
+  var html='<div style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
+    '<select onchange="changerAnneeConsoOutil(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(a){return '<option value="'+a+'"'+(a===OUTIL_HIST_CONSO_ANNEE?' selected':'')+'>'+a+'</option>';}).join('')+'</select>'+
+    '<button onclick="exporterConsoOutil()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
+    '</div>';
+  if(!rows.length)html+='<p class="es" style="padding:16px">Aucune donnée pour cette année.</p>';
+  else html+='<div class="tbl-wrap"><table><thead><tr><th>Outil</th><th>Quantité distribuée</th></tr></thead><tbody>'+
+      rows.map(function(r){return '<tr><td>'+r.type_article+'</td><td style="font-weight:700">'+r.quantite+'</td></tr>';}).join('')+
+      '</tbody></table></div>';
+  container.innerHTML=html;
+}
+function changerAnneeConsoOutil(v){OUTIL_HIST_CONSO_ANNEE=parseInt(v,10);renderOutillageVue();}
+function exporterConsoOutil(){
+  var entetes=['Outil','Quantité','Année'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  OUTIL_HIST_CONSO_ROWS.forEach(function(r){lignesCsv.push([r.type_article,nbFr(r.quantite),OUTIL_HIST_CONSO_ANNEE].map(csvCell).join(';'));});
+  var csv='\uFEFF'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Consommation_Outillage_'+OUTIL_HIST_CONSO_ANNEE+'.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
 // ── Vue Prime annuelle (versée en paie de décembre) ──
@@ -2490,45 +2882,34 @@ function toggleLigneOutillage(typeArticle,checked){
   else{OUTIL_LIGNES_SELECTIONNEES=OUTIL_LIGNES_SELECTIONNEES.filter(function(t){return t!==typeArticle;});}
 }
 
-// Fiche imprimable — gabarit repris de voirFicheEPI, sans colonne Taille
+// Fiche imprimable — même gabarit partagé que les fiches EPI (EPI_FICHE_CSS_RULES/EPI_FICHE_LOGO_URL),
+// sans colonne Taille, avec la même colonne Émargement pour rester cohérent visuellement partout.
 function voirFicheOutillage(code,typesArticles){
   var emp=employesList.find(function(e){return e.Code===code;})||{};
   var lignes=typesArticles.map(function(t){
     var art=outilCatalogue.find(function(a){return a.type_article===t;})||{};
     return {reference:art.reference||'',marque:art.marque||'',designation:t,quantite:1};
   });
-  var LOGO_URL='https://ral974.github.io/immo-tracker/logo.jpg';
   var html='<!doctype html><html><head><meta charset="utf-8"><title>Prime outillage - '+code+'</title>'+
     '<style>'+
     '@page{margin:16mm}'+
     'body{font-family:"Segoe UI",Arial,sans-serif;color:#222;margin:0;padding:24px 32px}'+
-    '.letterhead{display:flex;align-items:center;gap:18px;border-bottom:4px solid #F2A93C;padding-bottom:14px;margin-bottom:22px}'+
-    '.letterhead img{height:110px;width:auto}'+
-    '.letterhead .coord{font-size:11.5px;color:#555;line-height:1.5}'+
-    '.letterhead .coord b{color:#1A3A6B;font-size:15px;display:block;margin-bottom:2px}'+
-    '.titre-fiche{text-align:center;background:#1A3A6B;color:#fff;padding:10px 16px;border-radius:8px;font-size:18px;font-weight:700;letter-spacing:.5px;margin-bottom:22px}'+
-    '.dest-box{background:#F4F6FA;border:1px solid #DCE2EC;border-radius:10px;padding:14px 18px;margin-bottom:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}'+
-    '.dest-box div span{display:block;font-size:10.5px;color:#7A828E;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}'+
-    '.dest-box div b{font-size:14px;color:#1A3A6B}'+
-    'table{width:100%;border-collapse:collapse;margin-bottom:34px}'+
-    'th{background:#1A3A6B;color:#fff;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;padding:9px 10px;text-align:left}'+
-    'td{border-bottom:1px solid #E4E7EC;padding:9px 10px;font-size:13px}'+
-    'tbody tr:nth-child(even){background:#F7F9FC}'+
-    '.sign-row{display:flex;justify-content:space-between;gap:24px;margin-top:10px}'+
-    '.sign-box{flex:1;border:1px solid #DCE2EC;border-radius:8px;min-height:70px;padding:8px 10px;font-size:11px;color:#7A828E;text-transform:uppercase;letter-spacing:.3px}'+
+    EPI_FICHE_CSS_RULES+
+    '.dest-box{grid-template-columns:repeat(3,1fr)}'+
     '.print-btn{padding:10px 18px;background:#1A3A6B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;margin-bottom:20px;font-size:14px}'+
     '@media print{.print-btn{display:none}body{padding:0}}'+
     '</style></head><body>'+
     '<button class="print-btn" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>'+
-    '<div class="letterhead"><img src="'+LOGO_URL+'" alt="Electricité Services Réunion"><div class="coord"><b>Electricité Services Réunion</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
+    '<div class="letterhead"><img src="'+EPI_FICHE_LOGO_URL+'" alt="Electricité Services Réunion"><div class="coord"><b>Electricité Services Réunion</b>22, rue Pierre Brossolette - Atelier B7<br>97420 Le Port · Systèmes et Services Électriques</div></div>'+
     '<div class="titre-fiche">PRIME D\'OUTILLAGE</div>'+
     '<div class="dest-box">'+
       '<div><span>Code</span><b>'+code+'</b></div>'+
       '<div><span>Destinataire</span><b>'+(emp.Nom||code)+'</b></div>'+
       '<div><span>Service</span><b>'+(emp.ServiceOutillage||'—')+'</b></div>'+
     '</div>'+
-    '<table><thead><tr><th>Référence</th><th>Marque</th><th>Désignation</th><th>Quantité</th></tr></thead><tbody>'+
-    lignes.map(function(l){return '<tr><td>'+(l.reference||'—')+'</td><td>'+(l.marque||'—')+'</td><td>'+l.designation+'</td><td>'+l.quantite+'</td></tr>';}).join('')+
+    '<table><thead><tr><th>Référence</th><th>Marque</th><th>Désignation</th><th>Quantité</th><th style="text-align:center">Émargement</th></tr></thead><tbody>'+
+    lignes.map(function(l){return '<tr><td>'+(l.reference||'—')+'</td><td>'+(l.marque||'—')+'</td><td>'+l.designation+'</td><td>'+l.quantite+'</td>'+
+      '<td style="text-align:center"><span style="display:inline-block;width:15px;height:15px;border:1.5px solid #7A828E;border-radius:2px"></span></td></tr>';}).join('')+
     '</tbody></table>'+
     '<div class="sign-row"><div class="sign-box">Date</div><div class="sign-box">Nom</div><div class="sign-box">Signature</div></div>'+
     '</body></html>';
@@ -2545,7 +2926,7 @@ function ouvrirDistributionOutillage(){
   document.getElementById('add-msg').textContent='';
   document.getElementById('add-form').innerHTML=
     '<p style="font-size:12px;color:var(--grey);margin-bottom:8px">'+OUTIL_LIGNES_SELECTIONNEES.length+' article(s) sélectionné(s). Imprimez/faites signer la fiche (ouverte dans un nouvel onglet), puis joignez la photo de la fiche signée ici.</p>'+
-    '<div class="frow"><label style="'+addLabelStyle+'">Photo / scan de la fiche signée *</label><input type="file" id="outil-emarge-file" accept="image/*" style="'+addFieldStyle+'"></div>';
+    '<div class="frow"><label style="'+addLabelStyle+'">Photo ou PDF scanné de la fiche signée *</label><input type="file" id="outil-emarge-file" accept="image/*,.pdf" style="'+addFieldStyle+'"></div>';
   document.getElementById('add-overlay').style.display='flex';
   var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Enregistrer';
   btn.onclick=confirmerDistributionOutillage;
@@ -2554,34 +2935,21 @@ async function confirmerDistributionOutillage(){
   var input=document.getElementById('outil-emarge-file');
   var msg=document.getElementById('add-msg');
   var btn=document.getElementById('add-confirm-btn');
-  if(!input.files||!input.files[0]){msg.style.color='var(--red)';msg.textContent='Photo requise.';return;}
+  if(!input.files||!input.files[0]){msg.style.color='var(--red)';msg.textContent='Photo ou PDF requis.';return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var img=new Image();
-    img.onload=async function(){
-      var canvas=document.createElement('canvas');
-      var ratio=Math.min(1200/img.width,1200/img.height,1);
-      canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);
-      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      var b64=canvas.toDataURL('image/jpeg',0.75);
-      var now=new Date();
-      var fn=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+now.getHours()+now.getMinutes()+now.getSeconds()+'.jpg';
-      try{
-        await fetch(W+'?action=upload_fiche_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:OUTIL_EMPLOYE_SELECTIONNE,data:b64,filename:fn})});
-        var lignes=OUTIL_LIGNES_SELECTIONNEES.map(function(t){return {type_article:t};});
-        var r=await fetch(W+'?action=distribuer_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:OUTIL_EMPLOYE_SELECTIONNE,lignes:lignes,par_code:ADMIN_SESSION.code,filename:fn})});
-        var res=await r.json();
-        if(res.success){
-          msg.style.color='var(--green)';msg.textContent='✅ Distribution enregistrée.';
-          var codeFait=OUTIL_EMPLOYE_SELECTIONNE;
-          setTimeout(function(){fermerAjout();OUTIL_LIGNES_SELECTIONNEES=[];OUTIL_EMPLOYE_SELECTIONNE=codeFait;dataLoaded.outillage=false;loadOutillage().then(function(){outilVue='distribution';renderOutillage();});},1000);
-        }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
-      }catch(e2){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Erreur réseau : '+e2.message;}
-    };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(input.files[0]);
+  try{
+    var b64=await fichierVersJPEGBase64(input.files[0]);
+    var fn=nomFichierEmargement();
+    await fetch(W+'?action=upload_fiche_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:OUTIL_EMPLOYE_SELECTIONNE,data:b64,filename:fn})});
+    var lignes=OUTIL_LIGNES_SELECTIONNEES.map(function(t){return {type_article:t};});
+    var r=await fetch(W+'?action=distribuer_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:OUTIL_EMPLOYE_SELECTIONNE,lignes:lignes,par_code:ADMIN_SESSION.code,filename:fn})});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Distribution enregistrée.';
+      var codeFait=OUTIL_EMPLOYE_SELECTIONNE;
+      setTimeout(function(){fermerAjout();OUTIL_LIGNES_SELECTIONNEES=[];OUTIL_EMPLOYE_SELECTIONNE=codeFait;dataLoaded.outillage=false;loadOutillage().then(function(){outilVue='distribution';renderOutillage();});},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
+  }catch(e2){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.style.color='var(--red)';msg.textContent='Erreur : '+e2.message;}
 }
 
 async function sauvegarderServiceOutillage(code){
