@@ -225,6 +225,28 @@ async function handleRequest(request) {
     return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
+  // ── Export JSON en lecture seule d'une liste SharePoint (sauvegarde manuelle avant migration/import
+  // de masse — voir PROCEDURE_ROLLBACK.md). Protégé requireAdmin, même mécanisme de jeton HMAC que
+  // les actions gated POST ; transmis ici en paramètre de requête (&token=) puisqu'il s'agit d'un GET
+  // sans corps JSON. Liste blanche des listes connues du modèle de données (02_MODELE_DONNEES.md)
+  // plutôt qu'un nom de liste Graph arbitraire, pour éviter toute faute de frappe silencieuse.
+  if (p.get('export_liste')) {
+    const _auth = await requireAdmin({ token: p.get('token') });
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+    // Uniquement des listes réellement lues/écrites via Graph ailleurs dans ce fichier (voir GL + '/NomListe').
+    // Pas de "Chantiers" : malgré 02_MODELE_DONNEES.md, aucune liste SharePoint de ce nom n'est utilisée
+    // (Code_Chantier/Nom_Chantier sont des champs texte libre sur Reservations/Mouvements) — voir
+    // ARCHITECTURE_GLOBALE.md, section écarts constatés.
+    const EXPORTABLE_LISTS = ['Immos', 'Employes', 'Mouvements', 'Transferts_En_Attente', 'Reservations', 'Absences',
+      'Campagnes_Inventaire', 'Lignes_Inventaire', 'Catalogue_Articles_EPI', 'Grille_Dotation_EPI', 'Dotations_EPI',
+      'Lignes_Dotation_EPI', 'Catalogue_Outillage', 'Grille_Outillage', 'Lignes_Outillage', 'Materiel_IT',
+      'Mouvements_Materiel_IT', 'Lignes_Telephoniques', 'Mouvements_Lignes_Telephoniques'];
+    const nomListe = p.get('export_liste');
+    if (EXPORTABLE_LISTS.indexOf(nomListe) === -1) return json({ success: false, error: 'liste_inconnue', listes_valides: EXPORTABLE_LISTS }, 400);
+    const items = await paginate(GL + '/' + encodeURIComponent(nomListe) + '/items?$expand=fields&$top=200', 60);
+    return json({ success: true, liste: nomListe, exporte_le: new Date().toISOString(), count: items.length, items: items.map(i => Object.assign({ id: i.id }, i.fields)) });
+  }
+
   // ── Métadonnées achat (valeur + date) ──────────────────────────────────────
   if (p.get('immo_metadata') === '1') {
     const items = await paginate(GL + '/Immos/items?$expand=fields&$top=200', 6);

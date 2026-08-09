@@ -1,0 +1,340 @@
+# Immo Tracker — Modèle de données (SharePoint)
+
+*Les données résident dans le site SharePoint `espacesoleil97.sharepoint.com/sites/Logistique-Immos`, 6 listes. Les noms indiqués sont les noms internes techniques (à respecter impérativement lors de toute modification de colonne dans SharePoint).*
+
+## Liste `Immos`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code immobilisation, ex. `IM000123` |
+| `Libelle` | Texte | Désignation |
+| `Categorie` | Texte | Catégorie (dérivée du compte d'immobilisation, voir plus bas) |
+| `N_Serie` | Texte | Numéro de série |
+| `Etat` | Texte | Neuf / Bon / Usé / Abîmé / Hors service |
+| `Valeur_Achat` | Nombre | Prix d'achat HT |
+| `Date_Achat` | Date | Date d'achat |
+| `Date_Mise_Service` | Date | Date de mise en service (ajoutée juillet 2026) |
+| `Compte_Immobilisation` | Texte | Compte comptable d'immobilisation (ajoutée juillet 2026) |
+| `Compte_Amortissement` | Texte | Compte d'amortissement — **pilote la durée d'amortissement automatique** (ajoutée juillet 2026) |
+| `Compte_Dotation` | Texte | Compte de dotation (ajoutée juillet 2026) |
+| `Duree_Amortissement` | Nombre | ⚠️ Existe dans SharePoint mais **n'est plus utilisée par le code** depuis le passage à la durée 100% automatique par compte d'amortissement (voir `03_REGLES_METIER_ET_ROLES.md`). Peut être supprimée sans impact. |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Actif` | Texte | `Oui` / `Non` (Non = immo sortie) |
+| `FDS_URL` | Texte/lien | Lien vers fiche/document. Deux formats possibles (août 2026) : un lien de partage SharePoint classique saisi manuellement (`https://...sharepoint.com/...`), ou un repère `FDS:CODE_IM/nom_fichier.ext` généré par le bouton "➕ Ajouter FDS" du dashboard (fichier stocké dans `/FDS_Immos/{code}/{fichier}` sur le drive, servi via le proxy `?fds=code`). Les deux formats sont lus indifféremment par `getFdsUrl()` côté dashboard. |
+
+Content-type de la liste : `Élément`.
+
+## Liste `Employes`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code collaborateur, ex. `AIWI` |
+| `field_1` | Texte | Nom complet |
+| `field_2` | Texte | **Statut actif** : `Oui` / `Non`. ⚠️ **Il n'existe PAS de colonne `Actif` sur cette liste** — piège rencontré et corrigé en juillet 2026 (le code utilisait par erreur `Actif`, qui n'existe que sur la liste Immos). |
+| `Poste` | Texte | Intitulé du poste |
+| `Code_CT` | Texte | Rôle / droits (voir `03_REGLES_METIER_ET_ROLES.md`) |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `MotDePasse` | Texte | Empreinte PBKDF2/SHA-256 (format `saltHex:hashHex`), jamais en clair |
+
+Content-type de la liste : `Item`.
+
+## Liste `Mouvements`
+
+| Colonne | Contenu |
+|---|---|
+| `Title` | Code immobilisation concernée |
+| `Code_Employe` | Auteur du mouvement (pour un retour validé : le **déclarant terrain**, pas le validateur — voir ci-dessous) |
+| `Type_Mouvement` | `Transfert` / `Retour` / `Panne` / `Réparation` / `Archivage` / `Entretien` (ajouté août 2026, voir ci-dessous) |
+| `Code_Chantier` | Destination. Pour un transfert classique : code du receveur. Pour un retour **validé par un garant** : format spécial `DEPOT|code_validateur|nom_validateur` |
+| `Commentaire` | Utilisé pour stocker le nom du déclarant terrain dans le cas d'un retour validé |
+| `Etat` | État constaté à ce mouvement |
+| `Note` | Commentaire libre + traçabilité automatique (ex. `[retour validé par COUTAREL Nicolas]`) |
+| `Cout_Reparation` | Nombre (ajoutée août 2026) — coût structuré d'une réparation/entretien. Source de vérité pour les calculs de ratio (voir `03_REGLES_METIER_ET_ROLES.md`) ; le dashboard se replie sur l'ancien format texte (`##COUT:X##` dans `Note`) pour les mouvements créés avant l'ajout de cette colonne. |
+| `Horodatage` | Date et heure ISO |
+
+⚠️ **`Entretien` vs `Réparation`** : un mouvement `Réparation` (créé lors de la résolution d'une panne) signifie que l'immo **revient au dépôt** — il est traité comme un changement de possession dans le calcul de localisation. Un mouvement `Entretien` (créé via le bouton "🔧 Enregistrer réparation", indépendant d'une panne déclarée — entretien préventif, réparation ponctuelle) **n'affecte pas** la localisation courante de l'immo, au même titre que `Panne`/`Suivi_Panne`. Les deux types comptent dans le cumul de coûts utilisé pour le seuil de réforme.
+
+## Autres listes
+
+| Liste | Rôle |
+|---|---|
+| `Transferts_En_Attente` | Transferts et retours dépôt en attente de validation |
+| `Reservations` | Réservations de matériel |
+| `Chantiers` | Référentiel des chantiers |
+
+## Catégories dérivées du compte d'immobilisation
+
+| Compte | Catégorie |
+|---|---|
+| 21541 | Électroportatif |
+| 21542 | Mesure & test |
+| 21543 | Matériel de chantier |
+| 21544 | Coffrets & armoires |
+| 2154 / 2181 | Matériel & installations |
+| 2182 | Véhicules |
+| 2183 | Informatique & bureautique |
+| 2184 | Mobilier |
+| 205 | Logiciels & licences |
+| 2718 / 2752 | Immobilisations financières (cautions) |
+| 2315 | En cours |
+
+## Durées d'amortissement — barème officiel par compte d'amortissement
+
+*Transmis par William en juillet 2026, remplace toute logique de durée par catégorie ou saisie manuelle. Source unique de vérité : `DUREES_AMORT_MOIS` dans `dashboard.html`.*
+
+| Compte amortissement | Durée |
+|---|---|
+| 2805 | 12 mois (1 an) |
+| 28154 | 120 mois (10 ans) |
+| 281541 | 36 mois (3 ans) |
+| 281542 | 48 mois (4 ans) |
+| 281543 | 60 mois (5 ans) |
+| 281544 | 48 mois (4 ans) |
+| 28181 | 60 mois (5 ans) |
+| 28182 | 12 mois (1 an) |
+| 28183 | 36 mois (3 ans) |
+| 28184 | 60 mois (5 ans) |
+| 28315 | 36 mois (3 ans) |
+| 28718 | Non amortissable (caution) |
+| 28752 | Non amortissable (caution) |
+| *(compte inconnu/absent)* | 60 mois (5 ans) par défaut |
+
+## Comptes "administratifs" masqués aux rôles terrain
+
+Les rôles terrain (CT, Ouvrier, RA, Logistique_Mayotte, CT_Specialise, Ouvrier_Specialise) ne voient pas les immobilisations dont le compte d'immobilisation est : `205, 2154, 2181, 2182, 2183, 2184, 2718, 2752`.
+
+**Exception** : 19 étiqueteuses BROTHER (compte 2183 historiquement mal affecté) restent visibles pour tous : `IM000272, IM000495, IM000496, IM000605, IM000606, IM000607, IM000643, IM000685, IM000686, IM000771, IM000889, IM000897, IM000898, IM000899, IM000900, IM000901, IM000902, IM000903, IM000904`.
+
+**Exception Logistique_Mayotte** : ce rôle, bien que mono-site, voit en plus la catégorie Véhicules (compte 2182) pour gérer l'entretien sur place — sans droit d'action sur les véhicules de La Réunion.
+
+Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour filtrer l'onglet "Au dépôt" et toutes les statistiques d'usage (Analyses) — avec un bouton pour révéler les immos administratives si besoin.
+
+## Liste `Campagnes_Inventaire` (ajoutée août 2026)
+
+*Campagnes de comptage physique du **stock d'articles/consommables** (visserie, câbles, appareillage électrique…) — à ne pas confondre avec l'inventaire des immobilisations (QR codes), projet séparé non encore validé par la direction.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de la campagne (ex. `Inventaire annuel 2026`) |
+| `Date_Debut` | Date | |
+| `Date_Fin` | Date | Optionnelle, indicative |
+| `Statut` | Texte | `En cours` / `Clôturée` |
+| `Cree_Par` | Texte | Code employé |
+| `Cloture_Par` | Texte | Code employé (vide tant qu'en cours) |
+| `Date_Cloture` | Date/heure | ISO |
+
+## Liste `Lignes_Inventaire` (ajoutée août 2026)
+
+*Une ligne = une référence comptée à un endroit donné, pendant une campagne. Une même référence peut apparaître plusieurs fois dans une campagne (endroits différents).*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de la campagne (référence texte simple, pas de colonne Lookup SharePoint — cohérent avec le reste du modèle) |
+| `Zone` | Texte | **Obligatoire à la saisie.** Emplacement physique dans le dépôt (n° de rack, lettre d'étage — ex. `30E`, `Atelier`, `Carton`). C'est l'axe de comptage principal : l'entreprise compte son stock par zone de dépôt, pas par chantier (voir `03_REGLES_METIER_ET_ROLES.md`) |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Chantier` | Texte | Optionnel — information complémentaire quand on sait à quel chantier l'article est destiné, sans remplacer la zone |
+| `Fabricant` | Texte | Tel que saisi par l'opérateur, ou tel que lu automatiquement sur le code-barres scanné (voir plus bas) |
+| `Reference` | Texte | Référence article — soit saisie manuellement, soit remplie automatiquement par le code-barres fabricant (EAN) scanné à la caméra (aucun catalogue de prix rattaché) |
+| `Designation` | Texte | Désignation libre |
+| `Quantite` | Nombre | |
+| `Chute_Cable` | Texte | `Oui` / vide — règle métier : un câble dont le métrage n'est pas un multiple des bobines standard (50/100/250/500/1000m, 3000/4000m pour RJ45 Telenco) est par définition une chute |
+| `Observations` | Texte | Libre, optionnel |
+| `Code_Employe` | Texte | Auteur de la ligne |
+| `Horodatage` | Date/heure | ISO |
+
+⚠️ Aucune valorisation (prix, valeur) n'est stockée : la base de prix utilisée lors du comptage de décembre 2025 a trop évolué depuis pour être fiable. Voir `04_HISTORIQUE_DECISIONS.md` pour le raisonnement complet.
+
+⚠️ Le dashboard **ne compare pas** une campagne à la précédente (pas d'écart calculé) : chaque campagne restitue simplement l'état du stock à l'instant T (regroupé par Zone + Site + Référence). Pour une entreprise du bâtiment, il n'y a pas de stock minimum fixe ni de continuité garantie entre deux campagnes (chantiers qui se terminent, nature des chantiers qui change) — comparer à décembre 2025 n'a pas de sens métier. Voir `04_HISTORIQUE_DECISIONS.md`.
+
+## Module EPI — extension de la liste `Employes` (ajoutée août 2026)
+
+6 nouvelles colonnes, permettant de générer automatiquement les fiches de dotation EPI :
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Affectation_EPI` | Texte | `C` (Chantier/Travaux Neufs) / `M` (Maintenance) / `Z` (Conducteur de Travaux) / `A` (Atelier). Vide = non concerné (personnel bureau). Pilote la grille de dotation standard (voir `03_REGLES_METIER_ET_ROLES.md`). |
+| `Taille_Pantalon` | Texte | Valeur telle que communiquée par le salarié (`M` ou `40`, indifféremment) |
+| `Taille_Tshirt` | Texte | Réutilisée aussi pour Polos, T-shirts manches longues, Ensemble pluie (même échelle de taille) |
+| `Taille_Veste` | Texte | |
+| `Pointure_Chaussures` | Texte | |
+| `Taille_Gants` | Texte | |
+
+## Liste `Catalogue_Articles_EPI` (ajoutée août 2026)
+
+*Catalogue des articles EPI par taille, avec stock vivant. Une ligne = une référence commandable pour une taille donnée.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Type d'article (ex. `Pantalon`) — regroupement lisible dans SharePoint |
+| `Type_Article` | Texte | Identique à `Title`, utilisé pour les filtres côté Worker |
+| `Taille_Salarie` | Texte | Valeur de taille telle qu'elle apparaît sur la fiche salarié (`42`, `M`...) — clé de correspondance |
+| `Taille_Affichage` | Texte | Taille normalisée pour affichage (`L`, `42`...) |
+| `Reference` | Texte | SKU fournisseur |
+| `Designation` | Texte | |
+| `Fournisseur` | Texte | |
+| `Stock_Actuel` | Nombre | Solde vivant : décrémenté à l'émargement d'une fiche de dotation, incrémenté à la réception d'une commande |
+
+⚠️ La correspondance taille salarié → référence a été importée telle quelle depuis le fichier Excel source (`Liste EPI.xlsx` / onglet "Correspondance tailles articles"), **confirmée exacte par William** malgré des apparences de doublons de référence entre tailles voisines (ex. Pantalon 46 et 48 pointent vers la même référence) — ne pas "corriger" cette table sans revalider avec lui.
+
+Recherche d'un article pour une taille employé donnée : `Type_Article` = X **et** (`Taille_Salarie` = valeur **ou** `Taille_Affichage` = valeur), comparaison insensible à la casse — gère nativement le cas où la taille est communiquée sous forme numérique ou alphabétique, sans normalisation forcée à la saisie.
+
+## Liste `Grille_Dotation_EPI` (ajoutée août 2026)
+
+*Grille de dotation standard par profil — éditable depuis le dashboard (Admin/Logistique), pas figée dans le code.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Affectation (`C`/`M`/`Z`/`A`) |
+| `Type_Article` | Texte | Doit correspondre à un `Type_Article` du catalogue |
+| `Quantite` | Nombre | Quantité standard remise pour ce profil |
+
+## Liste `Dotations_EPI` (ajoutée août 2026)
+
+*Une fiche = un événement de remise EPI (dotation annuelle, entrée, ou remise ponctuelle).*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code employé, ou identifiant libre pour une remise ponctuelle (ex. `PONCTUEL-CONI-1234567890`) |
+| `Type_Dotation` | Texte | `Annuelle` / `Entree` / `Ponctuelle` |
+| `Annee_Civile` | Nombre | Renseigné pour Annuelle/Entree — sert à éviter une double génération pour la même année |
+| `Nom_Destinataire` | Texte | Nom complet employé, ou texte libre pour une remise ponctuelle (ex. "Équipe de Nicolas CAZAMBO") |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Statut` | Texte | `Generee` (en attente de signature) / `Emargee` (signée, stock décrémenté) |
+| `Genere_Par` / `Genere_Le` | Texte / Date-heure | |
+| `Emarge_Par` / `Emarge_Le` | Texte / Date-heure | Vides tant que `Statut = Generee` |
+| `Photo_Fiche` | Texte | Nom de fichier dans `/Fiches_EPI/{id}/` une fois émargée (même mécanisme que les photos d'immos, dossier dédié) |
+
+## Liste `Lignes_Dotation_EPI` (ajoutée août 2026)
+
+*Détail des articles d'une fiche de dotation.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | ID SharePoint de la fiche `Dotations_EPI` parente (texte, pas de colonne Lookup — cohérent avec `Lignes_Inventaire`) |
+| `Type_Article` | Texte | |
+| `Taille_Article` | Texte | |
+| `Reference_Article` | Texte | |
+| `Quantite` | Nombre | |
+
+## Extension de la liste `Employes` — module Prime d'outillage (ajoutée août 2026)
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Service_Outillage` | Texte | `Travaux Neufs` / `Maintenance` / vide (non concerné). **Indépendant de `Affectation_EPI`** : un CT ou un salarié Atelier peut très bien être rattaché à l'un de ces 2 services pour la prime d'outillage sans que ça corresponde à son profil EPI (C/M/Z/A). |
+
+## Liste `Catalogue_Outillage` (ajoutée août 2026)
+
+*Catalogue des outils de la prime d'outillage, avec stock vivant. Une ligne = un outil (pas de déclinaison par taille, contrairement aux EPI).*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Désignation de l'outil |
+| `Reference` | Texte | Référence fournisseur |
+| `Distributeur` | Texte | |
+| `Marque` | Texte | |
+| `Prix_Unitaire` | Nombre | Prix final négocié (et non le prix catalogue TTC) |
+| `Stock_Actuel` | Nombre | Solde vivant : décrémenté à chaque distribution, incrémenté à chaque réception de commande |
+| `Duree_Amortissement_Mois` | Nombre | Durée retenue (12 à 60 mois selon l'article), ajoutée août 2026 — pilote le calcul de la prime annuelle versée en paie de décembre (voir `03_REGLES_METIER_ET_ROLES.md`) |
+
+## Liste `Grille_Outillage` (ajoutée août 2026)
+
+*Kit standard par service — éditable depuis le dashboard.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Service (`Travaux Neufs` / `Maintenance`) |
+| `Type_Article` | Texte | Doit correspondre à un `Title` du catalogue |
+| `Quantite` | Nombre | Quantité cible du kit standard (quasi toujours 1) |
+
+## Liste `Lignes_Outillage` (ajoutée août 2026)
+
+*État de distribution : une ligne = un outil réellement remis à un employé. Contrairement aux EPI (fiche + lignes séparées avec statut Generee/Emargee), une seule liste plate suffit ici : pas de notion d'année civile, et la distribution est actée directement (pas d'étape intermédiaire "fiche générée en attente"). "Ce qui reste à distribuer" se calcule en soustrayant les lignes déjà reçues de la grille du service de l'employé — les lignes "non reçues" ne sont jamais matérialisées.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code employé |
+| `Type_Article` | Texte | Désignation de l'outil (correspond au catalogue) |
+| `Date_Remise` | Date/heure | ISO ; vide/approximative pour les lignes importées de l'historique |
+| `Emarge_Par` | Texte | Code de qui a enregistré la distribution (vide pour l'import historique) |
+| `Photo_Fiche` | Texte | Nom de fichier preuve dans `/Fiches_Outillage/{code}/` (vide pour l'historique — les fiches papier existantes n'ont pas été re-scannées) |
+| `Lot_Distribution` | Texte | Identifiant de lot regroupant les lignes distribuées ensemble en une seule action/photo (`MIGRATION` pour l'import historique) |
+
+## Module Matériel IT — téléphones, puis ordinateurs (ajouté août 2026)
+
+*Suivi du parc de téléphones et ordinateurs professionnels, **hors circuit des immobilisations** (ces articles ne sont pas immobilisés comptablement) — voir `04_HISTORIQUE_DECISIONS.md` pour le contexte. Même principe que les immos (détenteur courant dérivé du dernier mouvement), mais sans le workflow panne/réservation, inutile ici : 100% piloté depuis le dashboard, réservé à Admin/Logistique/Logistique_Mayotte (même population que la gestion EPI/Outillage, `peutGererEPI()` réutilisée côté dashboard).*
+
+⚠️ **2 listes SharePoint à créer par William avant mise en service** (étape bloquante, comme pour chaque nouveau module) : `Materiel_IT` et `Mouvements_Materiel_IT`.
+
+### Liste `Materiel_IT`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code interne, ex. `TEL000001` (téléphones) / `PC000001` (ordinateurs, à venir) — préfixe + 6 chiffres, généré automatiquement (`?next_code_materiel_it=<préfixe>`) |
+| `Type_Materiel` | Texte | `Téléphone` / `Ordinateur` (extensible) |
+| `Marque` | Texte | |
+| `Modele` | Texte | |
+| `N_Serie` | Texte | N° de série / IMEI |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Statut` | Texte | `En service` / `Hors service` / `Perdu` / `Volé` |
+| `Date_Sortie_Service` | Date | Vide si en service |
+| `Cout_Mensuel` | Nombre | Coût mensuel de l'abonnement associé (vide si non applicable, ex. ordinateur ou téléphone sans ligne active) |
+| `N_Telephone` | Texte | (téléphonie uniquement) |
+| `Operateur` | Texte | |
+| `N_Carte_SIM` | Texte | |
+| `Code_PIN` | Texte | |
+| `Code_PUK` | Texte | |
+| `Code_RIO` | Texte | |
+| `Code_deverouillage` | Texte | ⚠️ Nom interne réel tel que créé par William dans SharePoint (sans le 2e "r", casse différente de "Code_Deverrouillage") — corrigé dans le code après incident de migration, voir `04_HISTORIQUE_DECISIONS.md` |
+| `Commentaire` | Texte | Libre |
+
+### Liste `Mouvements_Materiel_IT`
+
+*Historique de détention — une ligne = un changement de détenteur. Le détenteur courant d'un appareil est déduit du mouvement le plus récent (`Horodatage`), exactement comme pour les Mouvements des immos. Un appareil sans aucun mouvement n'a personne d'affecté ("en stock").*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code de l'appareil (ex. `TEL000001`) |
+| `Code_Employe` | Texte | Code du détenteur, ou l'une des valeurs spéciales `RESERVE` / `ASTREINTE` / `ALARME` / `SANS AFFECTATION` / `STAGIAIRE` (matériel non affecté à une personne nommée — reprises du fichier de suivi historique) |
+| `Nom_Detenteur` | Texte | Nom affiché (nom complet si code employé réel, sinon la valeur spéciale elle-même) |
+| `Note` | Texte | Optionnel |
+| `Horodatage` | Date/heure | ISO — début de cette détention |
+
+## Lignes téléphoniques (ajouté août 2026)
+
+*Entité **indépendante** du téléphone (`Materiel_IT`) — un employé peut garder sa ligne (numéro/SIM/opérateur) en changeant d'appareil, ou l'inverse. Même principe de détenteur courant dérivé du dernier mouvement, miroir exact du modèle `Materiel_IT`/`Mouvements_Materiel_IT`.*
+
+### Liste `Lignes_Telephoniques`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code interne, ex. `LIG000001` — préfixe fixe `LIG` + 6 chiffres, généré automatiquement (`?next_code_ligne_tel=1`) |
+| `N_Telephone` | Texte | |
+| `Operateur` | Texte | |
+| `N_Carte_SIM` | Texte | |
+| `Code_PIN` | Texte | |
+| `Code_PUK` | Texte | |
+| `Code_RIO` | Texte | |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Statut` | Texte | `Active` / `Résiliée` |
+| `Commentaire` | Texte | Libre |
+
+### Liste `Mouvements_Lignes_Telephoniques`
+
+Mêmes colonnes et même principe que `Mouvements_Materiel_IT` (`Title` = code de la ligne, `Code_Employe`, `Nom_Detenteur`, `Note`, `Horodatage`).
+
+⚠️ `Materiel_IT` conserve ses colonnes `N_Telephone`/`Operateur`/etc. telles quelles en base (pas de suppression) mais le dashboard n'écrit plus dedans pour les nouveaux appareils — ces champs sont désormais l'affaire de `Lignes_Telephoniques`. Une migration one-shot (bouton dans l'onglet Lignes) crée une ligne pour chaque téléphone existant ayant déjà un numéro, en reprenant son détenteur actuel comme point de départ de l'historique.
+
+## Fichiers JSON associés
+
+- **`immos.json`** (tableau) : catalogue léger utilisé par la PWA et le Dashboard pour les libellés/catégories/comptes en lecture rapide. Généré à partir de SharePoint, redéployé après modifications importantes.
+- **`immos_full.json`** (objet, clé = code IM) : catalogue complet utilisé uniquement par l'outil de migration EBP → SharePoint (`enrichirImmosEBP()` dans le dashboard). Contient 1167 immos (1023 actives + 144 sorties), issu de l'export comptable EBP (`Export_immos_030726_avec_sites.xls`).
+- **`inventaire_dec2025.json`** (tableau, ajouté août 2026) : ~2417 lignes de comptage brut du stock d'articles de décembre 2025 (zone, site, chantier, fabriquant, référence, désignation, quantité, chute de câble, observations — sans les colonnes de valorisation du fichier Excel d'origine, obsolètes). Utilisé une seule fois par l'outil de migration (`importerInventaireDec2025()` dans le dashboard) pour créer la première campagne de référence dans `Lignes_Inventaire`.
+- **`epi_personnel.json`** (tableau, ajouté août 2026) : 73 salariés avec affectation EPI et 5 tailles, issu de `Liste EPI.xlsx` / "Liste Personnel". Utilisé une seule fois par l'outil de migration (`importerDonneesEPI()` dans le dashboard) pour enrichir la liste `Employes`.
+- **`epi_catalogue.json`** (tableau, ajouté août 2026) : ~58 lignes du catalogue d'articles EPI par taille (dont les 2 articles Polo "IMPERIUM" et T-shirt manches longues "MOTECARLO LS", initialement sans taille dans le fichier source, complétés en 5 tailles S à XXL chacun), issu de `Liste EPI.xlsx` / "Correspondance tailles articles" + "Liste articles". Stock initial à 0 partout — à alimenter via une réception initiale correspondant au stock physique réel.
+- **`epi_grille_dotation.json`** (tableau, ajouté août 2026) : 40 lignes (4 profils C/M/Z/A × ~10 types d'article), déduites des quantités observées dans `Liste EPI.xlsx` / "Liste Personnel" (identiques pour tous les salariés d'un même profil).
+- **`outillage_catalogue.json`** (tableau, ajouté août 2026) : ~41 outils avec référence/marque/prix final/stock actuel, issu de `Détail prime d'outillage.xlsx` / "Commande globale". Stock initial calculé (`Total reçu` − quantités déjà distribuées comptées dans les onglets par service), pas remis à 0 comme pour les EPI (donnée fiable disponible dès le départ).
+- **`outillage_grille.json`** (tableau, ajouté août 2026) : ~66 lignes (2 services × ~33 outils en moyenne), issues des colonnes quantité cible des onglets "Tx Neufs"/"Maintenance".
+- **`outillage_services.json`** (tableau, ajouté août 2026) : ~63 salariés avec leur service outillage, déduit de la colonne dans laquelle leur code apparaît dans le fichier source.
+- **`outillage_lignes.json`** (tableau, ajouté août 2026) : ~1895 lignes de distribution historique (une ligne = un outil déjà remis à un employé), issues des matrices 0/1 des onglets "Tx Neufs"/"Maintenance". Utilisés une seule fois par l'outil de migration (`importerDonneesOutillage()` dans le dashboard).
+- **`materiel_it_catalogue.json`** (tableau, ajouté août 2026) : 40 téléphones, issu de `1.5.3. Matériel et utilisateurs 2026.05.23.xlsx` (onglet "2"). Coût mensuel (23,22€ HT, tarif plat Free Pro constaté sur facture) appliqué uniquement aux appareils actifs avec une ligne téléphonique FREE en cours.
+- **`materiel_it_mouvements.json`** (tableau, ajouté août 2026) : 40 lignes d'historique initial (un mouvement par appareil, détenteur actuel), issues du même fichier. Date de détention = date d'entrée si connue, sinon date du fichier source (23/05/2026) en repli — voir `04_HISTORIQUE_DECISIONS.md` pour la limite assumée de cette approximation. 3 codes détenteurs (`ADWI`, `HOAL`, `VIMA`) non retrouvés dans `Employes` au moment de la migration, importés tels quels — à corriger par William si nécessaire.

@@ -1,0 +1,49 @@
+# Immo Tracker — Roadmap des évolutions futures
+
+*Idées évoquées avec William en juillet 2026, non développées à ce stade. Ce document sert de mémoire pour ne pas perdre ces pistes et pour cadrer leur développement futur. Aucune de ces évolutions n'est un engagement ferme — à prioriser selon les besoins réels.*
+
+## Proposée par William : module de gestion des temps
+
+**Besoin exprimé :** report d'heures des collaborateurs (terrain ou ailleurs), saisie des congés, notes des managers sur les heures/travaux effectués.
+
+**Analyse et mise en garde :** ce module change le périmètre de l'application (on sort du suivi d'immobilisations pour entrer en gestion des temps / RH). Deux angles distincts à ne pas confondre :
+
+1. **Pré-pointage opérationnel par chantier** (recommandé) : un CT ou ouvrier déclare "tant d'heures sur tel chantier, telle date", pour ventiler les coûts et remonter une donnée exploitable. C'est un ajout naturel — l'infrastructure (employés, chantiers, rôles, auth, PWA mobile) s'y prête directement. Une liste SharePoint `Heures` (Code_Employe, Code_Chantier, Date, Nb_Heures, Note_Manager) suffirait techniquement.
+2. **Gestion RH des congés/compteurs légaux** (à éviter en l'état) : implique des obligations légales (droit du travail), un risque d'erreur à conséquence salariale, et un possible doublon avec un outil paie déjà existant chez Electricité Services Réunion (à vérifier — Silae, PayFit, module EBP Paie ?). Ne pas construire de "faux outil RH" en interne sans validation de la direction / du service paie.
+
+**Recommandation :** si ce module est lancé, le cadrer strictement comme "suivi opérationnel des heures par chantier" (donnée de gestion, pas de paie), avec validation manager et export — pas comme un système de gestion des congés légaux. Prévoir une phase de cadrage dédiée avant tout développement : qui saisit, qui valide, quel export, quelle articulation avec l'outil paie existant.
+
+## Proposées par l'assistant
+
+### A. Inventaire physique annuel assisté — deux sujets distincts, à ne pas confondre
+
+**A1. Immobilisations (scan QR codes)** — toujours **non fait**, projet séparé non encore validé par la direction. Mode "campagne d'inventaire" : lancement d'une campagne, chaque gestionnaire scanne les QR codes du matériel physiquement présent, l'application calcule l'écart entre le théorique (SharePoint) et le constaté (scans), et liste les manquants / mal localisés / retrouvés. Répondrait au problème vécu par William (véhicules mal localisés pendant un an entre Réunion et Mayotte). Nécessite au préalable la pose de QR codes/plaques sur les immos.
+
+**A2. Stock d'articles/consommables — ✅ FAIT (août 2026)**, développé après clarification que le besoin réel décrit ci-dessus (au moment de la première rédaction de cette roadmap) concernait en fait ce sujet, distinct des immobilisations. Campagne de comptage manuel (pas de QR/codes-barres sur les articles), dépôt + chantiers actifs, comparaison quantités vs comptage précédent (import du comptage décembre 2025 comme référence). Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
+
+### B. Photos et constat d'état en image
+À la réception ou au retour d'un matériel, possibilité de joindre une photo (stockage SharePoint). Utile en particulier pour les retours en mauvais état validés par un garant : preuve visuelle qui évite les litiges "c'était déjà abîmé avant". Techniquement : accès à l'appareil photo du navigateur mobile + stockage lié au mouvement.
+
+### C. Coûts de réparation structurés + seuil de réforme — ✅ FAIT (août 2026)
+Développé et déployé : coût structuré (colonne SharePoint `Cout_Reparation` sur `Mouvements`), saisie possible à la résolution d'une panne ou indépendamment (entretien, nouveau type de mouvement `Entretien`), double ratio (valeur d'achat ET VNC), seuil de réforme réglable (40/60/80%, défaut 60%) dans l'onglet Analyses. Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
+
+### D. Demandes de matériel planifiées à l'avance
+Un CT peut demander du matériel pour une date future (ex. "2 perceuses + 1 échafaudage semaine 32 sur tel chantier"), au lieu du mode réactif actuel (réservation immédiate uniquement). Le gestionnaire dépôt voit un planning de demandes à préparer. Fait passer l'app du suivi réactif à la planification logistique — cohérent avec le métier de William (achats/logistique).
+
+### E. Interface simplifiée pour Mayotte
+Constat : le référent matériel à Mayotte (Logistique_Mayotte) est peu à l'aise avec l'informatique (imprime des documents, envoie des photos par email plutôt que d'utiliser l'app). Évolution : une vue ultra-simplifiée à 3 actions principales ("Je reçois", "Je rends", "Signaler panne"), sans les fonctions avancées, pour ce profil spécifiquement. Petit effort de développement, gain d'adoption potentiellement important sur le terrain à Mayotte.
+
+### F. Digest de notifications hebdomadaire
+Aujourd'hui : un email par mouvement (flux Power Automate existant). Évolution : ajout d'un digest hebdomadaire automatique récapitulant les points nécessitant une action (transferts en attente depuis plus de 7 jours, retours à valider, garanties expirant dans le mois). Évite que des actions en attente restent "oubliées" dans le flux continu d'emails individuels.
+
+## Priorisation suggérée (à valider avec William)
+
+1. **A — Inventaire physique** : consolide la fiabilité de toute la base de données, sur laquelle s'appuient déjà l'amortissement, l'export comptable et la maintenance préventive.
+2. **Module temps chantier** (cadré comme suivi opérationnel, pas RH) : valeur métier forte pour le pilotage des coûts de chantier.
+3. **B — Photos / constat d'état** : effort modéré, réduit les litiges au quotidien.
+4. **C — Coûts de réparation + seuil de réforme** : extension naturelle de l'axe 3 déjà en place.
+5. **D, E, F** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
+
+## Note pour toute reprise de ce document
+
+Avant de développer l'une de ces pistes, revalider avec William : le besoin a-t-il changé, une contrainte nouvelle est-elle apparue (ex. outil RH externe déjà choisi), le périmètre reste-t-il pertinent ? Ce document est une mémoire d'intentions, pas un cahier des charges figé.

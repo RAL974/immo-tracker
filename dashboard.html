@@ -557,6 +557,9 @@ var W='https://immo-proxy.ral-85d.workers.dev/';
 // ── Jeton de session : injecté automatiquement sur les actions sensibles (admin / gestion dépôt) ──
 // Un seul point d'interception plutôt que de modifier chacun des appels fetch dispersés dans le
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
+// Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
+// EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
+var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques'];
 var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques'];
 (function(){
   var origFetch=window.fetch.bind(window);
@@ -5074,6 +5077,10 @@ function renderUsers(){
       '<button onclick="lancerSeedImmoSites()" style="padding:8px 14px;background:#0277BD;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Sites des immos</button>'+
       '<button onclick="lancerDedupeEmployes()" style="padding:8px 14px;background:#C62828;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">🧹 Nettoyer doublons</button>'+
       '<button onclick="enrichirImmosEBP()" style="padding:8px 14px;background:#6A1B9A;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">📥 Enrichir immos (EBP)</button>'+
+      '<select id="export-liste-select" style="padding:8px 10px;border:1px solid #FFE082;border-radius:8px;font-size:12px">'+
+        EXPORTABLE_LISTS.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')+
+      '</select>'+
+      '<button onclick="exporterListeSauvegarde()" style="padding:8px 14px;background:#2E7D32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">💾 Exporter une liste (sauvegarde)</button>'+
       '<div id="ebp-statut" style="flex-basis:100%;font-size:12px;color:var(--grey);margin-top:6px"></div>'+
       '</div></details>';
   }
@@ -5202,6 +5209,25 @@ async function lancerDedupeEmployes(){
       alert(msg);
       loadEmployes(true).then(function(){renderUsers();});
     }else{alert('Échec : '+(res.error||'inconnu'));}
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// Exporte en JSON une liste SharePoint complète (sauvegarde manuelle avant migration/import de
+// masse — voir PROCEDURE_ROLLBACK.md). Endpoint GET en lecture seule, protégé requireAdmin côté
+// Worker : le jeton de session est transmis en paramètre d'URL (&token=) car cet appel n'est pas
+// un POST intercepté par le mécanisme GATED_ACTIONS (qui ne patche que le corps JSON des POST).
+async function exporterListeSauvegarde(){
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  var sel=document.getElementById('export-liste-select');
+  var nom=sel?sel.value:'';
+  if(!nom){alert('Choisir une liste à exporter.');return;}
+  try{
+    var r=await fetch(W+'?export_liste='+encodeURIComponent(nom)+'&token='+encodeURIComponent(ADMIN_SESSION.token||''));
+    var res=await r.json();
+    if(!res.success){alert('Échec : '+(res.error||'inconnu'));return;}
+    var blob=new Blob([JSON.stringify(res.items,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a2=document.createElement('a');a2.href=url;a2.download='Backup_'+nom+'_'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
 
