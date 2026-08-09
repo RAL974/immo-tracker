@@ -1730,8 +1730,7 @@ function renderEPIDotations(container){
     '<select id="epi-annee-sel" onchange="changerAnneeEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(y){return '<option value="'+y+'"'+(y===EPI_ANNEE_SELECTIONNEE?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
     '</div>';
   if(canEdit)html+='<div style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
-    '<button onclick="genererFichesManquantesEPI()" style="padding:8px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">🚀 Générer les fiches manquantes '+EPI_ANNEE_SELECTIONNEE+'</button>'+
-    '<button onclick="genererDotationsAnnuellesPDF()" style="padding:8px 16px;background:#1A3A6B;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px" title="Écrit un PDF par fiche directement dans un dossier local (Chrome/Edge)">📁 Générer les PDF '+EPI_ANNEE_SELECTIONNEE+'</button>'+
+    '<button onclick="genererDotationAnnuelleComplete()" style="padding:8px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px" title="Crée les fiches manquantes puis écrit un PDF par fiche dans un dossier local (Chrome/Edge)">🚀 Générer dotation annuelle</button>'+
     '<a href="javascript:void(0)" onclick="epiChangerDossierPDF()" style="font-size:11px;color:var(--grey);text-decoration:underline">Changer de dossier PDF</a>'+
     '<span id="epi-gen-statut" style="font-size:12px;color:var(--grey)"></span></div>';
   var dotAnnee=epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(EPI_ANNEE_SELECTIONNEE);});
@@ -1755,27 +1754,64 @@ function renderEPIDotations(container){
 }
 function changerAnneeEPI(v){EPI_ANNEE_SELECTIONNEE=parseInt(v,10);renderEPIVue();}
 
-async function genererFichesManquantesEPI(){
+// Bouton unique "🚀 Générer dotation annuelle" : demande l'année, crée les fiches SharePoint
+// manquantes pour tous les employés actifs éligibles, PUIS écrit directement un PDF par fiche
+// dans le dossier local choisi — en une seule action, sans étape intermédiaire à comprendre.
+async function genererDotationAnnuelleComplete(){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  if(typeof html2canvas==='undefined'||!window.jspdf){alert('Erreur de chargement des librairies PDF. Recharge la page et réessaie.');return;}
+  var saisie=prompt('Générer la dotation annuelle EPI pour quelle année ?',EPI_ANNEE_SELECTIONNEE||new Date().getFullYear());
+  if(saisie==null)return;
+  var annee=parseInt(saisie,10);
+  if(!annee||annee<2000||annee>2100){alert('Année invalide.');return;}
+  EPI_ANNEE_SELECTIONNEE=annee;
   var statut=document.getElementById('epi-gen-statut');
-  var annee=EPI_ANNEE_SELECTIONNEE;
+
+  // Étape 1 : créer les fiches manquantes pour tous les employés actifs éligibles (SharePoint)
   var eligibles=employesList.filter(function(e){return e.Actif&&e.AffectationEPI;});
   var dejaGeneres={};
   epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);}).forEach(function(dd){dejaGeneres[dd.code]=true;});
   var aGenerer=eligibles.filter(function(e){return !dejaGeneres[e.Code];});
-  if(!aGenerer.length){if(statut)statut.textContent='Toutes les fiches '+annee+' sont déjà générées.';return;}
-  if(!confirm('Générer '+aGenerer.length+' fiche(s) de dotation pour '+annee+' ?'))return;
-  var ok=0,ko=0;
-  for(var i=0;i<aGenerer.length;i++){
-    if(statut)statut.textContent='⏳ '+(i+1)+' / '+aGenerer.length+'…';
-    try{
-      var r=await fetch(W+'?action=generer_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:aGenerer[i].Code,annee:annee,type_dotation:'Annuelle',par_code:ADMIN_SESSION.code})});
-      var res=await r.json();
-      if(res.success)ok++;else ko++;
-    }catch(e){ko++;}
+  if(aGenerer.length){
+    if(!confirm(aGenerer.length+' employé(s) actif(s) n\'ont pas encore de fiche '+annee+'. Les créer avant de générer les PDF ?'))return;
+    var ok=0,ko=0;
+    for(var i=0;i<aGenerer.length;i++){
+      if(statut)statut.textContent='⏳ Fiches SharePoint '+(i+1)+' / '+aGenerer.length+'…';
+      try{
+        var r=await fetch(W+'?action=generer_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:aGenerer[i].Code,annee:annee,type_dotation:'Annuelle',par_code:ADMIN_SESSION.code})});
+        var res=await r.json();
+        if(res.success)ok++;else ko++;
+      }catch(e){ko++;}
+    }
+    if(statut)statut.textContent='✅ '+ok+' fiche(s) créée(s)'+(ko?', '+ko+' échec(s)':'')+'. Préparation des PDF…';
+    dataLoaded.epi=false;
+    await loadEPI();
   }
-  if(statut)statut.textContent='✅ '+ok+' fiche(s) générée(s)'+(ko?', '+ko+' échec(s)':'')+'.';
-  dataLoaded.epi=false;
-  await loadEPI();
+
+  // Étape 2 : générer le PDF de toutes les fiches de l'année (celles qui existaient déjà + celles créées ci-dessus)
+  var dotAnnee=epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);});
+  if(!dotAnnee.length){alert('Aucun employé actif avec une affectation EPI pour '+annee+' — rien à générer.');renderEPIVue();return;}
+  var dirHandle=await epiObtenirDossierHandle(false);
+  if(!dirHandle){renderEPIVue();return;}
+  var okp=0,kop=0;
+  for(var j=0;j<dotAnnee.length;j++){
+    var dot=dotAnnee[j];
+    if(statut)statut.textContent='⏳ PDF '+(j+1)+' / '+dotAnnee.length+'…';
+    try{
+      var r2=await fetch(W+'?lignes_dotation_epi='+encodeURIComponent(dot.id));
+      var lignes=await r2.json();
+      var blob=await epiRasteriserFichePDF(dot,lignes);
+      var filename='Dotation_annuelle_EPI_'+annee+'_'+dot.code+'.pdf';
+      var fileHandle=await dirHandle.getFileHandle(filename,{create:true});
+      var writable=await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      okp++;
+    }catch(e){kop++;}
+  }
+  renderEPIVue();
+  var statutFin=document.getElementById('epi-gen-statut');
+  if(statutFin)statutFin.textContent='✅ '+okp+' PDF généré(s) pour '+annee+' dans le dossier choisi'+(kop?', '+kop+' échec(s)':'')+'.';
 }
 
 async function annulerDotationEPI(id){
@@ -1858,8 +1894,9 @@ function epiFicheBodyHtml(dot,lignes,annee,affTxt){
       '<div><span>Site</span><b>'+(dot.site==='Mayotte'?'Mayotte':'Réunion')+'</b></div>'+
       '<div><span>Affectation</span><b>'+affTxt+'</b></div>'+
     '</div>'+
-    '<table><thead><tr><th>Référence</th><th>Désignation</th><th>Taille</th><th>Quantité</th></tr></thead><tbody>'+
-    lignes.map(function(l){return '<tr><td>'+(l.reference_article||'—')+'</td><td>'+(l.type_article||'')+'</td><td>'+(l.taille_article||'—')+'</td><td>'+l.quantite+'</td></tr>';}).join('')+
+    '<table><thead><tr><th>Référence</th><th>Désignation</th><th>Taille</th><th>Quantité</th><th style="text-align:center">Émargement</th></tr></thead><tbody>'+
+    lignes.map(function(l){return '<tr><td>'+(l.reference_article||'—')+'</td><td>'+(l.type_article||'')+'</td><td>'+(l.taille_article||'—')+'</td><td>'+l.quantite+'</td>'+
+      '<td style="text-align:center"><span style="display:inline-block;width:15px;height:15px;border:1.5px solid #7A828E;border-radius:2px"></span></td></tr>';}).join('')+
     '</tbody></table>'+
     '<div class="sign-row"><div class="sign-box">Date</div><div class="sign-box">Nom</div><div class="sign-box">Signature</div></div>';
 }
@@ -1957,7 +1994,10 @@ async function epiRasteriserFichePDF(dot,lignes){
   var img=el.querySelector('img');
   if(img&&!img.complete){await new Promise(function(res){img.onload=res;img.onerror=res;});}
   var canvas;
-  try{canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#ffffff'});}
+  // ignoreElements : la fiche n'a elle-même aucun <canvas>, donc on écarte ceux du reste de la page
+  // (ex. les graphiques Chart.js de l'onglet Analyses, toujours présents dans le DOM même onglet fermé)
+  // pour éviter que html2canvas tente de les recopier et échoue avec "canvas is tainted".
+  try{canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#ffffff',ignoreElements:function(node){return node.tagName==='CANVAS';}});}
   finally{document.body.removeChild(el);}
   var imgData=canvas.toDataURL('image/jpeg',0.92);
   var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
@@ -1966,33 +2006,6 @@ async function epiRasteriserFichePDF(dot,lignes){
   if(imgH>pageH){imgH=pageH;imgW=canvas.width*imgH/canvas.height;}
   pdf.addImage(imgData,'JPEG',(pageW-imgW)/2,10,imgW,imgH);
   return pdf.output('blob');
-}
-async function genererDotationsAnnuellesPDF(){
-  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
-  if(typeof html2canvas==='undefined'||!window.jspdf){alert('Erreur de chargement des librairies PDF. Recharge la page et réessaie.');return;}
-  var annee=EPI_ANNEE_SELECTIONNEE;
-  var dotAnnee=epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);});
-  if(!dotAnnee.length){alert('Aucune fiche générée pour '+annee+'. Génère d\'abord les fiches manquantes.');return;}
-  var dirHandle=await epiObtenirDossierHandle(false);
-  if(!dirHandle)return;
-  var statut=document.getElementById('epi-gen-statut');
-  var ok=0,ko=0;
-  for(var i=0;i<dotAnnee.length;i++){
-    var dot=dotAnnee[i];
-    if(statut)statut.textContent='⏳ PDF '+(i+1)+' / '+dotAnnee.length+'…';
-    try{
-      var r=await fetch(W+'?lignes_dotation_epi='+encodeURIComponent(dot.id));
-      var lignes=await r.json();
-      var blob=await epiRasteriserFichePDF(dot,lignes);
-      var filename='Dotation_annuelle_EPI_'+annee+'_'+dot.code+'.pdf';
-      var fileHandle=await dirHandle.getFileHandle(filename,{create:true});
-      var writable=await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      ok++;
-    }catch(e){ko++;}
-  }
-  if(statut)statut.textContent='✅ '+ok+' PDF généré(s) dans le dossier choisi'+(ko?', '+ko+' échec(s)':'')+'.';
 }
 function epiChangerDossierPDF(){epiObtenirDossierHandle(true);}
 
