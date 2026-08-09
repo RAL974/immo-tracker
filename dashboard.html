@@ -557,7 +557,7 @@ var W='https://immo-proxy.ral-85d.workers.dev/';
 // ── Jeton de session : injecté automatiquement sur les actions sensibles (admin / gestion dépôt) ──
 // Un seul point d'interception plutôt que de modifier chacun des appels fetch dispersés dans le
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it'];
 (function(){
   var origFetch=window.fetch.bind(window);
   window.fetch=function(input,init){
@@ -653,6 +653,43 @@ function estGarant(code){
   if(estSuperAdmin(code))return true;
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='admin'||role==='logistique'||role==='logistique_mayotte';
+}
+// ── Recherche/suggestion d'employé — pattern réutilisé partout où on choisit un employé
+// (Transférer à, Modifier un transfert, destinataire nommé d'une remise ponctuelle EPI), même
+// logique que la recherche d'immo (tape un fragment de code ou de nom, clique une suggestion).
+// excludeAdmin=true écarte les comptes admin/super-admin (pas des destinataires terrain valides).
+function empListeCandidats(excludeAdmin){
+  return employesList.filter(function(e){return e.Actif&&(!excludeAdmin||!estAdmin(e.Code));}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
+}
+function attacherRechercheEmploye(inputId,suggestId,candidats,onChoix){
+  var input=document.getElementById(inputId);
+  var box=document.getElementById(suggestId);
+  if(!input||!box)return;
+  var maj=function(){
+    var raw=(input.value||'').trim();
+    if(input.dataset.code&&input.value!==input.dataset.label){input.dataset.code='';input.dataset.nom='';}
+    if(!raw){box.style.display='none';return;}
+    var qu=raw.toUpperCase();
+    var matches=candidats.filter(function(e){return e.Code.toUpperCase().includes(qu)||(e.Nom||'').toUpperCase().includes(qu);}).slice(0,30);
+    if(!matches.length){box.innerHTML='<div style="padding:8px 10px;font-size:12px;color:var(--grey)">Aucune correspondance.</div>';box.style.display='block';return;}
+    box.innerHTML=matches.map(function(e){return '<div class="emp-suggest-item" data-code="'+e.Code+'" data-nom="'+(e.Nom||e.Code).replace(/"/g,'&quot;')+'" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0"><b>'+e.Code+'</b> — '+(e.Nom||e.Code)+'</div>';}).join('');
+    box.style.display='block';
+  };
+  input.oninput=maj;
+  input.onfocus=maj;
+  input.onblur=function(){setTimeout(function(){box.style.display='none';},150);};
+  box.onmousedown=function(e){
+    var it=e.target.closest('.emp-suggest-item');if(!it)return;
+    e.preventDefault();
+    var code=it.getAttribute('data-code'),nom=it.getAttribute('data-nom');
+    var label=nom+' ('+code+')';
+    input.value=label;
+    input.dataset.code=code;
+    input.dataset.nom=nom;
+    input.dataset.label=label;
+    box.style.display='none';
+    if(onChoix)onChoix(code,nom);
+  };
 }
 // Peut voir les données comptables (dates, comptes) sur les fiches : Admin, Gestionnaire Dépôt RUN (Logistique), Encadrement
 function peutVoirCompta(code){
@@ -2327,13 +2364,11 @@ function ouvrirRemisePonctuelleEPI(){
   document.getElementById('add-msg').textContent='';
   var types=[];epiCatalogue.forEach(function(a){if(types.indexOf(a.type_article)===-1)types.push(a.type_article);});
   types.sort();
-  var empActifsOpts=employesList.filter(function(e){return e.Actif;}).slice().sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');})
-    .map(function(e){return '<option value="'+e.Code+'">'+e.Code+' — '+(e.Nom||e.Code)+'</option>';}).join('');
   document.getElementById('add-form').innerHTML=
-    '<div class="frow"><label style="'+addLabelStyle+'">Destinataire *</label>'+
-      '<select id="ep-dest-emp" onchange="epiChoisirDestinataireNomme(this.value)" style="'+addFieldStyle+';margin-bottom:6px"><option value="">— Destinataire libre (groupe) —</option>'+empActifsOpts+'</select>'+
-      '<input id="ep-dest" style="'+addFieldStyle+'" placeholder="Ex : Équipe de Nicolas CAZAMBO"></div>'+
-    '<p style="font-size:11px;color:var(--grey);margin-top:-8px;margin-bottom:10px">Choisir un employé nommé le fait apparaître dans son historique individuel (onglet Historique) ; laisser sur "destinataire libre" pour une remise de groupe.</p>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Destinataire *</label><div style="position:relative">'+
+      '<input id="ep-dest" autocomplete="off" style="'+addFieldStyle+'" placeholder="Tape un code/nom d\'employé, ou une description libre pour un groupe (ex : Équipe de Nicolas CAZAMBO)">'+
+      '<div id="ep-dest-suggest" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div></div>'+
+    '<p style="font-size:11px;color:var(--grey);margin-top:-8px;margin-bottom:10px">Choisir un employé suggéré le fait apparaître dans son historique individuel (onglet Historique) ; garder un texte libre pour une remise de groupe.</p>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Site</label><select id="ep-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Articles</label>'+
       '<div style="display:flex;gap:6px;margin-bottom:8px"><select id="ep-type" onchange="epiMajTaillesPonctuelles()" style="'+addFieldStyle+';flex:2"><option value="">Type...</option>'+types.map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('')+'</select>'+
@@ -2343,21 +2378,13 @@ function ouvrirRemisePonctuelleEPI(){
       '<div id="ep-lignes-liste" style="font-size:12px"></div>'+
     '</div>';
   document.getElementById('add-overlay').style.display='flex';
-  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Générer la fiche';
-  btn.onclick=confirmerRemisePonctuelleEPI;
-}
-function epiChoisirDestinataireNomme(code){
-  var dest=document.getElementById('ep-dest');
-  if(code){
+  attacherRechercheEmploye('ep-dest','ep-dest-suggest',empListeCandidats(true),function(code,nom){
     var e=employesList.find(function(x){return x.Code===code;});
-    dest.value=e?(e.Nom||code):code;
-    dest.readOnly=true;
     var siteSel=document.getElementById('ep-site');
     if(siteSel&&e&&e.Site)siteSel.value=(e.Site==='Mayotte'?'Mayotte':'Reunion');
-  }else{
-    dest.readOnly=false;
-    dest.value='';
-  }
+  });
+  var btn=document.getElementById('add-confirm-btn');btn.disabled=false;btn.textContent='✅ Générer la fiche';
+  btn.onclick=confirmerRemisePonctuelleEPI;
 }
 function epiMajTaillesPonctuelles(){
   var type=document.getElementById('ep-type').value;
@@ -2383,9 +2410,10 @@ function epiAjouterLignePonctuelle(){
 }
 function epiSupprimerLignePonctuelle(idx){EPI_LIGNES_PONCTUELLES.splice(idx,1);epiRenderLignesPonctuelles();}
 async function confirmerRemisePonctuelleEPI(){
-  var dest=(document.getElementById('ep-dest').value||'').trim();
+  var destInput=document.getElementById('ep-dest');
+  var dest=(destInput.value||'').trim();
   var site=document.getElementById('ep-site').value;
-  var empCode=(document.getElementById('ep-dest-emp').value||'').trim();
+  var empCode=destInput.dataset.code||'';
   var msg=document.getElementById('add-msg');
   var btn=document.getElementById('add-confirm-btn');
   if(!dest){msg.style.color='var(--red)';msg.textContent='Destinataire requis.';return;}
@@ -5418,8 +5446,6 @@ var actionCourante=null;
 function ouvrirActionMouvement(type,codeIM,libIM,codeEmp,nomEmp){
   actionCourante={type:type,codeIM:codeIM,libIM:libIM,codeEmp:codeEmp,nomEmp:nomEmp};
   document.getElementById('act-titre').textContent=type==='Retour'?'📥 Créer un retour au dépôt':'🔄 Créer un transfert';
-  var allEmps={};(d.all_movements||[]).forEach(function(m){if(m.code_employe&&m.nom_employe)allEmps[m.code_employe]=m.nom_employe;});
-  var empOpts='<option value="">-- Sélectionner --</option>'+Object.keys(allEmps).sort().map(function(c){return'<option value="'+c+'" data-nom="'+allEmps[c].replace(/"/g,'')+'">'+allEmps[c]+' ('+c+')</option>';}).join('');
   var immoOpts='<option value="">-- Sélectionner --</option>'+(d.inventory||[]).map(function(i){var l=getLib(i.code_im);return'<option value="'+i.code_im+'">'+i.code_im+' — '+l+'</option>';}).join('');
   var html='';
   html+='<div class="frow"><label>Immo</label>';
@@ -5428,12 +5454,14 @@ function ouvrirActionMouvement(type,codeIM,libIM,codeEmp,nomEmp){
   html+='</div>';
   if(type==='Transfert'){html+='<div class="frow"><label>Transférer à</label>';
     if(codeEmp)html+='<input type="text" id="act-emp-fix" value="'+nomEmp+' ('+codeEmp+')" readonly style="background:#F8FAFC">';
-    else html+='<select id="act-emp">'+empOpts+'</select>';
+    else html+='<div style="position:relative"><input type="text" id="act-emp" autocomplete="off" placeholder="Tape un code ou un nom..." style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px">'+
+      '<div id="act-emp-suggest" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div>';
     html+='</div>';}
   html+='<div class="frow"><label>État</label><select id="act-etat"><option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option><option value="Hors service">🔴 Hors service</option></select></div>';
   html+='<div class="frow"><label>Note</label><textarea id="act-note" rows="2" placeholder="Motif..."></textarea></div>';
   document.getElementById('act-form').innerHTML=html;
   document.getElementById('act-overlay').classList.add('open');
+  if(type==='Transfert'&&!codeEmp)attacherRechercheEmploye('act-emp','act-emp-suggest',empListeCandidats(true));
 }
 function fermerAction(){
   document.getElementById('act-overlay').classList.remove('open');
@@ -5448,23 +5476,25 @@ async function soumettreAction(){
   var etat=(document.getElementById('act-etat')||{}).value||'Bon état';
   var note=(document.getElementById('act-note')||{}).value||'';
   if(!codeIM){alert('Sélectionne une immo.');return;}
-  var payload={code_im:codeIM,etat:etat,note:(note?note+' — ':'')+' [Dashboard]',horodatage:new Date().toISOString()};
-  if(actionCourante.type==='Retour'){payload.code_employe='CONI';payload.nom_employe='Dépôt';payload.type_mouvement='Retour';payload.code_chantier='DEPOT';}
+  // Identité réelle du donneur/déclarant résolue côté serveur depuis le jeton de session
+  // (creer_mouvement_direct) — le payload ne fournit que le nécessaire côté client.
+  var payload={code_im:codeIM,etat:etat,note:(note?note+' — ':'')+' [Dashboard]'};
+  if(actionCourante.type==='Retour'){payload.type_mouvement='Retour';}
   else{
     var empFix=document.getElementById('act-emp-fix');
-    var empSel=document.getElementById('act-emp');
-    var ec=actionCourante.codeEmp||(empSel?empSel.value:'');
-    var en=actionCourante.nomEmp||(empSel?empSel.options[empSel.selectedIndex].dataset.nom||ec:ec);
-    if(!ec){alert('Sélectionne un employé.');return;}
-    payload.code_employe=ec;payload.nom_employe=en;payload.type_mouvement='Transfert';payload.code_chantier='DASH|Dashboard';
+    var empInput=document.getElementById('act-emp');
+    var ec=actionCourante.codeEmp||(empInput?empInput.dataset.code||'':'');
+    var en=actionCourante.nomEmp||(empInput?empInput.dataset.nom||'':'');
+    if(!ec){alert('Sélectionne un employé dans la liste de suggestions.');return;}
+    payload.type_mouvement='Transfert';payload.code_employe_receveur=ec;payload.nom_receveur=en;
   }
   var btn=document.querySelector('#act-overlay .fact-btns button');
   if(btn){btn.textContent='...';btn.disabled=true;}
   try{
-    var r=await fetch(W,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var r=await fetch(W+'?action=creer_mouvement_direct',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var dat=await r.json();
     if(dat.success!==false){fermerAction();setTimeout(refreshAll,500);}
-    else{alert('Erreur.');if(btn){btn.textContent='✅ Confirmer';btn.disabled=false;}}
+    else{alert('Erreur'+(dat.error?' : '+dat.error:'')+'.');if(btn){btn.textContent='✅ Confirmer';btn.disabled=false;}}
   }catch(e){alert('Erreur : '+e.message);if(btn){btn.textContent='✅ Confirmer';btn.disabled=false;}}
 }
 
@@ -5502,21 +5532,21 @@ async function annulerTransfert(tid){
 
 function ouvrirModifTransfert(tid,cim,recCode,recNom){
   document.getElementById('act-titre').textContent='✏️ Modifier le transfert — '+getLib(cim);
-  var allEmps={};(d.all_movements||[]).forEach(function(m){if(m.code_employe&&m.nom_employe)allEmps[m.code_employe]=m.nom_employe;});
-  var empOpts='<option value="">-- Garder '+recNom+' --</option>'+Object.keys(allEmps).sort().map(function(c){return'<option value="'+c+'" data-nom="'+allEmps[c].replace(/"/g,'')+'">'+allEmps[c]+' ('+c+')</option>';}).join('');
   document.getElementById('act-form').innerHTML=
     '<div class="frow"><label>Code IM</label><input type="text" value="'+cim+' — '+getLib(cim)+'" readonly style="background:#F8FAFC"></div>'+
-    '<div class="frow"><label>Changer le receveur (optionnel)</label><select id="mt-receveur">'+empOpts+'</select></div>'+
+    '<div class="frow"><label>Changer le receveur (optionnel)</label><div style="position:relative">'+
+      '<input type="text" id="mt-receveur" autocomplete="off" placeholder="Garder '+recNom+' — ou tape un code/nom pour changer" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px">'+
+      '<div id="mt-receveur-suggest" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div></div>'+
     '<div class="frow"><label>Note</label><textarea id="mt-note" rows="2" placeholder="Motif de la modification..."></textarea></div>';
   document.getElementById('act-overlay').classList.add('open');
+  attacherRechercheEmploye('mt-receveur','mt-receveur-suggest',empListeCandidats(true));
   document.querySelector('#act-overlay .fact-btns button').onclick=function(){
-    var newRec=document.getElementById('mt-receveur').value;
+    var input=document.getElementById('mt-receveur');
+    var newRec=input.dataset.code||'';
     var note=document.getElementById('mt-note').value;
     // Mettre à jour le transfert dans Transferts_En_Attente
     if(newRec){
-      var opt=document.getElementById('mt-receveur').options[document.getElementById('mt-receveur').selectedIndex];
-      var newNom=opt.dataset.nom||newRec;
-      fetch(W+'?action=maj_transfert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_employe_receveur:newRec,nom_receveur:newNom,note:note})}).then(function(){fermerAction();renderTransferts();});
+      fetch(W+'?action=maj_transfert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_employe_receveur:newRec,nom_receveur:input.dataset.nom||newRec,note:note})}).then(function(){fermerAction();renderTransferts();});
     }else{fermerAction();}
   };
 }
@@ -5538,7 +5568,7 @@ function ouvrirSuiviPanne(codeIM){
     var note  = (document.getElementById('sp-note')||{}).value||'';
     if(!prest && !note){ alert('Renseignez au moins le prestataire ou une note.'); return; }
     fetch(W+'?action=maj_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code_im:codeIM,prestataire:prest,cout_estime:cout,note_suivi:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
+      body:JSON.stringify({code_im:codeIM,prestataire:prest,cout_estime:cout,note_suivi:note,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
       .then(function(){fermerAction();renderAlertes();})
       .catch(function(e){alert('Erreur : '+e.message);});
   };
@@ -5564,7 +5594,7 @@ function resoudrePanneComplet(codeIM){
     if(btn.dataset.busy==='1')return; // anti double-clic
     btn.dataset.busy='1'; btn.disabled=true;
     fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
+      body:JSON.stringify({code_im:codeIM,etat_resolution:etat,prestataire:prest,cout_reel:cout,note:note,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
       .then(function(){btn.dataset.busy='';btn.disabled=false;fermerAction();refreshAll();alert('✅ Panne résolue ! ' + codeIM + ' est de retour dans le parc.');})
       .catch(function(e){btn.dataset.busy='';btn.disabled=false;alert('Erreur : '+e.message);});
   };
@@ -5595,7 +5625,7 @@ function ouvrirEnregistrerReparation(codeIM){
     if(btn.dataset.busy==='1')return; // anti double-clic
     btn.dataset.busy='1'; btn.disabled=true;
     fetch(W+'?action=enregistrer_reparation',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code_im:codeIM,date_reparation:date,prestataire:prest,cout_reparation:cout,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
+      body:JSON.stringify({code_im:codeIM,date_reparation:date,prestataire:prest,cout_reparation:cout,note:note,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
       .then(function(){btn.dataset.busy='';btn.disabled=false;fermerAction();refreshAll();alert('✅ Réparation/entretien enregistré pour ' + codeIM + '.');})
       .catch(function(e){btn.dataset.busy='';btn.disabled=false;alert('Erreur : '+e.message);});
   };
@@ -5639,7 +5669,7 @@ function declarerVol(codeIM,libelle,type){
   if(!confirm('1ere CONFIRMATION : Declarer ' + codeIM + ' [' + type + '] ? Immo retirée définitivement du parc.'))return;
   if(!confirm('CONFIRMATION FINALE : Cette action est irreversible. Confirmer [' + type + '] pour ' + codeIM + ' ?'))return;
   fetch(W+'?action=declarer_vol',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
+    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo ' + codeIM + ' déclarée [' + type + ']. Retirée du parc.');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -5673,8 +5703,8 @@ function validerSortieDefinitive(){
   if(!confirm('CONFIRMATION FINALE : Sortir définitivement '+codeIM+' du parc comme ['+type+'] ?'))return;
   var endpoint=type==='Volé'||type==='Disparu'?'declarer_vol':'marquer_statut_immo';
   var payload=endpoint==='declarer_vol'
-    ?{code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')}
-    :{code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')};
+    ?{code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom}
+    :{code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom};
   fetch(W+'?action='+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(){fermerAction();fermerFiche();refreshAll();alert('✅ '+codeIM+' sorti du parc : '+type);})
     .catch(function(e){alert('Erreur : '+e.message);});
@@ -5685,7 +5715,7 @@ function declarerPanneDash(codeIM){
   if(!motif||motif.trim().length<5){alert('Le motif est obligatoire (5 caractères min.)');return;}
   if(!confirm('Déclarer une panne sur ' + codeIM + ' ? Motif : "' + motif + '"'))return;
   fetch(W+'?action=declarer_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,code_employe:ADMIN_SESSION.code||'CONI',nom_employe:ADMIN_SESSION.nom||nomEmploye('CONI'),motif:motif})})
+    body:JSON.stringify({code_im:codeIM,code_employe:ADMIN_SESSION.code,nom_employe:ADMIN_SESSION.nom,motif:motif})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne déclarée. Immo marquée "En panne".');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -5696,7 +5726,7 @@ function marquerImmoInactive(codeIM,libelle,type){
   if(!confirm('1ere CONFIRMATION : Marquer ' + codeIM + ' comme [' + type + '] ? Cette action exclut l immo des reservations.'))return;
   if(!confirm('CONFIRMATION FINALE IRREVERSIBLE : Confirmer definitvement le statut [' + type + '] pour ' + codeIM + ' ?'))return;
   fetch(W+'?action=marquer_statut_immo',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
+    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Immo marquée comme ' + type + '.');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -5707,7 +5737,7 @@ function resoudrePanne(codeIM){
   var note=prompt('Note de resolution (optionnel) :', '') || '';
   if(!confirm('Panne resolue sur ' + codeIM + ' ? Nouvel etat : ' + etat))return;
   fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:ADMIN_SESSION.code||'CONI',par_nom:ADMIN_SESSION.nom||nomEmploye('CONI')})})
+    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne résolue !');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }

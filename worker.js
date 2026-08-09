@@ -1166,22 +1166,26 @@ async function handleRequest(request) {
       const itemId = rd.value && rd.value[0] ? rd.value[0].id : null;
       if (!itemId) return json({ success: false, error: 'Immo non trouvée' });
       const rp = await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
-      // Créer aussi un mouvement pour la traçabilité
-      await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: body.par_code || 'ADMIN', Type_Mouvement: body.type_mouv || 'Archivage', Commentaire: body.par_nom || 'Admin', Etat: body.etat, Note: body.motif || '', Horodatage: new Date().toISOString() } }) });
+      // Créer aussi un mouvement pour la traçabilité — identité de l'auteur = session vérifiée,
+      // jamais une valeur fournie par le client (évite l'attribution à un faux compte 'ADMIN').
+      const vraiNom1 = await getNomResolver();
+      await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: _auth.session.code, Type_Mouvement: body.type_mouv || 'Archivage', Commentaire: vraiNom1(_auth.session.code, _auth.session.code), Etat: body.etat, Note: body.motif || '', Horodatage: new Date().toISOString() } }) });
       return json({ success: rp.ok });
     }
 
     // ── Mettre à jour le suivi d'une panne (prestataire, coût, note) ──
     if (action === 'maj_panne') {
       const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const vraiNomSuivi = await getNomResolver();
+      const nomAuteur = vraiNomSuivi(_auth.session.code, _auth.session.code);
       // Créer un mouvement de suivi — marqueur ##PRESTA:Nom## non-ambigu pour la localisation
       const note = '[SUIVI ' + new Date().toLocaleDateString('fr-FR') + ']' +
         (body.prestataire ? ' ##PRESTA:' + body.prestataire + '## Prestataire: ' + body.prestataire : '') +
         (body.cout_estime ? ' Cout estime: ' + body.cout_estime + 'EUR' : '') +
         ' ' + (body.note_suivi || '');
       const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
-        Title: body.code_im, Code_Employe: body.par_code || 'CONI', Type_Mouvement: 'Suivi_Panne',
-        Commentaire: body.par_nom || body.par_code || 'CONI', Etat: 'En panne', Note: note, Horodatage: new Date().toISOString()
+        Title: body.code_im, Code_Employe: _auth.session.code, Type_Mouvement: 'Suivi_Panne',
+        Commentaire: nomAuteur, Etat: 'En panne', Note: note, Horodatage: new Date().toISOString()
       } }) });
       return json({ success: r.ok });
     }
@@ -1198,7 +1202,9 @@ async function handleRequest(request) {
       return json({ success: rp.ok });
     }
 
-    // ── Résoudre une panne ──
+    // ── Résoudre une panne ── (partagée avec la PWA terrain, badge sans mot de passe — pas de
+    // jeton de session disponible dans ce flux, l'identité vient donc du corps de la requête,
+    // comme declarer_panne/reserver/transfert ; jamais de nom codé en dur en repli)
     if (action === 'resoudre_panne') {
       const ri = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + body.code_im + "'&$top=1", { headers: H });
       const rid = await ri.json();
@@ -1213,8 +1219,8 @@ async function handleRequest(request) {
       // (source de vérité pour les calculs) et dans Note (lisible tel quel dans SharePoint,
       // et compatible avec les mouvements historiques créés avant l'ajout de la colonne).
       const mvFields = {
-        Title: body.code_im, Code_Employe: body.par_code || 'CONI', Type_Mouvement: 'Réparation',
-        Commentaire: body.par_nom || body.par_code || 'CONI', Etat: body.etat_resolution || 'Bon état',
+        Title: body.code_im, Code_Employe: body.par_code || '', Type_Mouvement: 'Réparation',
+        Commentaire: body.par_nom || body.par_code || '', Etat: body.etat_resolution || 'Bon état',
         Note: noteRep, Horodatage: new Date().toISOString()
       };
       if (coutNum > 0) mvFields.Cout_Reparation = coutNum;
@@ -1236,9 +1242,10 @@ async function handleRequest(request) {
       const note = 'ENTRETIEN ' + new Date().toLocaleDateString('fr-FR') +
         (body.prestataire ? ' | Prestataire: ' + body.prestataire : '') +
         ' | ##COUT:' + coutNum + '## ' + coutNum + 'EUR | ' + (body.note || '');
+      const vraiNomEnt = await getNomResolver();
       const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
-        Title: body.code_im, Code_Employe: body.par_code || 'CONI', Type_Mouvement: 'Entretien',
-        Commentaire: body.par_nom || body.par_code || 'CONI', Note: note, Cout_Reparation: coutNum, Horodatage: horodatage
+        Title: body.code_im, Code_Employe: _auth.session.code, Type_Mouvement: 'Entretien',
+        Commentaire: vraiNomEnt(_auth.session.code, _auth.session.code), Note: note, Cout_Reparation: coutNum, Horodatage: horodatage
       } }) });
       return json({ success: r.ok });
     }
@@ -1351,7 +1358,7 @@ async function handleRequest(request) {
           Title: campagne, Zone: l.zone || '', Site: l.site || 'Reunion', Chantier: l.chantier || '',
           Fabricant: l.fabriquant || '', Reference: String(l.reference || ''), Designation: l.designation || '',
           Quantite: l.quantite || 0, Chute_Cable: l.chute_cable ? 'Oui' : '', Observations: l.observations || '',
-          Code_Employe: body.par_code || 'ADMIN', Horodatage: body.horodatage || new Date().toISOString()
+          Code_Employe: _auth.session.code, Horodatage: body.horodatage || new Date().toISOString()
         } }
       }));
       try {
@@ -2013,16 +2020,20 @@ async function handleRequest(request) {
     }
 
     // ── Déclarer vol ou disparition ──
+    // Partagée avec la PWA terrain (badge sans mot de passe) — pas de jeton de session dans ce
+    // flux, l'identité vient donc du corps de la requête, comme declarer_panne/reserver/transfert ;
+    // jamais de nom codé en dur ('ADMIN'/'Admin') en repli.
     if (action === 'declarer_vol') {
       const etatVol = body.type_vol || 'Volé';
+      const nomAuteurVol = body.par_nom || body.par_code || '';
       const ri = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + body.code_im + "'&$top=1", { headers: H });
       const rid = await ri.json();
       const itemId = rid.value && rid.value[0] ? rid.value[0].id : null;
       if (itemId) await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Etat: etatVol, Actif: false }) });
       await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
-        Title: body.code_im, Code_Employe: body.par_code || 'ADMIN', Type_Mouvement: 'Archivage',
-        Commentaire: body.par_nom || 'Admin', Etat: etatVol,
-        Note: body.motif + ' [' + etatVol + ' déclaré par ' + (body.par_nom || 'Admin') + ']',
+        Title: body.code_im, Code_Employe: body.par_code || '', Type_Mouvement: 'Archivage',
+        Commentaire: nomAuteurVol, Etat: etatVol,
+        Note: body.motif + ' [' + etatVol + ' déclaré par ' + (nomAuteurVol || 'inconnu') + ']',
         Horodatage: new Date().toISOString()
       } }) });
       return json({ success: true });
@@ -2069,9 +2080,29 @@ async function handleRequest(request) {
       return json({ success: r.ok, vers_depot: versDepot });
     }
 
-    // Mouvement direct
-    const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: body.code_employe, Type_Mouvement: body.type_mouvement, Code_Chantier: body.code_chantier, Commentaire: body.nom_employe, Etat: body.etat || '', Note: body.note || '', Horodatage: body.horodatage } }) });
-    return json({ success: r.ok, status: r.status });
+    // Transfert/retour rapide déclenché depuis la fiche immo du dashboard (remplace l'ancien point
+    // d'entrée générique "Mouvement direct", qui n'exigeait ni jeton de session ni identité vérifiée
+    // — le donneur/déclarant est désormais toujours l'identité de la session, jamais une valeur
+    // fournie par le client, pour éviter qu'un mouvement soit attribué à la mauvaise personne).
+    if (action === 'creer_mouvement_direct') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      if (!body.code_im) return json({ success: false, error: 'donnees_invalides' });
+      const vraiNom = await getNomResolver();
+      const donneurCode = _auth.session.code;
+      const donneurNom = vraiNom(donneurCode, donneurCode);
+      let mvFields;
+      if (body.type_mouvement === 'Retour') {
+        mvFields = { Title: body.code_im, Code_Employe: donneurCode, Type_Mouvement: 'Retour', Code_Chantier: 'DEPOT', Commentaire: donneurNom, Etat: body.etat || '', Note: body.note || '', Horodatage: new Date().toISOString() };
+      } else {
+        const receveur = (body.code_employe_receveur || '').trim().toUpperCase();
+        if (!receveur) return json({ success: false, error: 'donnees_invalides' });
+        if (!(await estEmployeActifServeur(receveur))) return json({ success: false, error: 'employe_inactif', message: 'Cet employé est inactif — transfert impossible.' });
+        const receveurNom = body.nom_receveur || vraiNom(receveur, receveur);
+        mvFields = { Title: body.code_im, Code_Employe: receveur, Type_Mouvement: 'Transfert', Code_Chantier: donneurCode + '|' + donneurNom, Commentaire: receveurNom, Etat: body.etat || '', Note: body.note || '', Horodatage: new Date().toISOString() };
+      }
+      const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: mvFields }) });
+      return json({ success: r.ok, status: r.status });
+    }
   }
 
   return new Response('Not found', { status: 404, headers: cors });
