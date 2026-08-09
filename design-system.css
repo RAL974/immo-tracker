@@ -21,6 +21,7 @@
    ============================================================================ */
 
 :root{
+  color-scheme:light; /* écrasé en dark par :root[data-theme="dark"] plus bas — voir ce bloc pour le pourquoi */
   /* ── Couleurs de marque (dérivées du logo) ── */
   --ds-gold-50:#FDF8EC;
   --ds-gold-100:#FAEEC9;
@@ -67,6 +68,7 @@
   --ds-danger-dark:#B02333;
   --ds-info:#2F80C9;
   --ds-info-bg:#EAF3FB;
+  --ds-info-dark:#0D47A1;
 
   --ds-neutral-50:var(--ds-ink-50);
   --ds-neutral-100:var(--ds-ink-100);
@@ -146,10 +148,17 @@
   --ds-z-confirm:1150;
 }
 
-/* ── Mode sombre : variables prêtes, non activées (aucun sélecteur ne pose
-   data-theme="dark" pour l'instant — implémentation future d'un bouton de
-   bascule, hors périmètre de cette session). ── */
+/* ── Mode sombre : activé via un bouton de bascule dans le header (dashboard.html,
+   toggleTheme()/initTheme()) qui pose data-theme="dark"|"light" sur <html> et
+   persiste le choix en localStorage. Par défaut (aucun choix enregistré), l'écran
+   suit prefers-color-scheme au chargement — validé visuellement dans le navigateur
+   avant activation (voir 04_HISTORIQUE_DECISIONS.md). ── */
 :root[data-theme="dark"]{
+  /* Fait passer les contrôles natifs non stylés explicitement (options de <select> non ouvertes,
+     ascenseur, cases à cocher natives) en rendu sombre côté navigateur — filet de sécurité pour les
+     nombreux petits <select>/<input> de filtre du dashboard qui n'ont pas de background/color
+     explicites (ex. filtres site par onglet) et resteraient sinon blancs même en mode sombre. */
+  color-scheme:dark;
   --ds-bg:#15181E;
   --ds-surface:#1E222A;
   --ds-surface-alt:#242830;
@@ -157,20 +166,39 @@
   --ds-border-strong:#3A4049;
   --ds-text:#EDEFF2;
   --ds-text-muted:#9AA3B1;
-  --ds-primary:#0D1015;
+  /* --ds-primary sert à la fois de couleur de texte/accent (titres, valeurs, bordures d'accent —
+     la grande majorité de ses usages dans dashboard.html) sur les cartes/panneaux --ds-surface, et
+     à quelques usages de fond de "chrome" fixe (header/sidebar/boutons, découplés via --blue-chrome
+     dans dashboard.html, qui n'a pas besoin de suivre ce token). D'où une valeur CLAIRE ici — un
+     marine sombre comme en mode clair serait illisible en texte sur une carte déjà sombre. */
+  --ds-primary:var(--ds-info-dark);
   --ds-primary-dark:#000000;
   --ds-accent:var(--ds-gold-400);
   --ds-accent-contrast:#1B2028;
   --ds-success-bg:#12281C;
+  --ds-success-dark:#4ADE80;   /* texte badge sur fond sombre : le ton "-dark" du mode clair (#157A46) serait illisible sur --ds-success-bg sombre */
   --ds-warning-bg:#2E2210;
+  --ds-warning-dark:#FFB84D;
   --ds-danger-bg:#2E1416;
+  --ds-danger-dark:#FF6B7A;
   --ds-info-bg:#122536;
-}
-@media (prefers-color-scheme: dark){
-  /* Volontairement vide pour l'instant : le thème sombre ne s'active que si
-     data-theme="dark" est explicitement posé sur <html> (voir bloc ci-dessus).
-     On ne bascule pas automatiquement sur la préférence système tant que le
-     rendu sombre complet du dashboard n'a pas été validé visuellement. */
+  --ds-info-dark:#6FB3F0;
+  --ds-gold-50:#241F10;      /* survol de ligne de tableau (tr:hover), pâle en clair → tinté sombre ici */
+
+  /* Échelle neutre INVERSÉE (pas un simple alias vers --ds-ink-* comme en clair) : les badges,
+     survols, texte atténué et bordures sombres/claires reposent tous sur cette échelle. Sans cette
+     inversion, un badge "neutre" (--ds-neutral-100, très clair en mode jour) resterait clair et
+     illisible sur fond sombre. */
+  --ds-neutral-50:#1B2028;
+  --ds-neutral-100:#242A36;
+  --ds-neutral-200:#2E333D;
+  --ds-neutral-300:#4B5261;
+  --ds-neutral-400:#6B7383;
+  --ds-neutral-500:#9AA3B1;
+  --ds-neutral-600:#CBD0D8;
+  --ds-neutral-700:#E7E9EC;
+  --ds-neutral-800:#F4F5F7;
+  --ds-neutral-900:#FFFFFF;
 }
 
 /* ============================================================================

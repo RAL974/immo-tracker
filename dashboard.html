@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — Electricité Services Réunion Logistique</title>
 <link rel="icon" href="logo-icon.jpg">
+<!-- Mode sombre (ajouté août 2026) : posé le plus tôt possible (avant les feuilles de style, qui
+     bloquent le premier rendu de toute façon) pour éviter un flash clair→sombre au chargement. Sans
+     préférence enregistrée (première visite), on suit prefers-color-scheme — le bouton du header
+     (toggleTheme(), plus bas dans le fichier) permet ensuite de forcer/persister un choix explicite. -->
+<script>(function(){try{var t=localStorage.getItem('immo_theme')||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <!-- Observabilité (août 2026) : remonte les erreurs JS en temps réel plutôt que de les découvrir
      via une plainte utilisateur (voir 04_HISTORIQUE_DECISIONS.md) — DSN pas un secret, prévu pour
      être embarqué côté client. Chargé tôt pour capter les erreurs des scripts suivants aussi. -->
@@ -62,24 +67,32 @@ if(window.Sentry)Sentry.init({
      pointent désormais vers les nouveaux tokens --ds-* plutôt que des couleurs figées en dur. -->
 <link rel="stylesheet" href="design-system.css">
 <style>
-:root{--blue:var(--ds-primary);--orange:var(--ds-accent);--green:var(--ds-success);--red:var(--ds-danger);--yellow:var(--ds-warning);--grey:var(--ds-neutral-500);--bg:var(--ds-bg);--card:var(--ds-surface);--sidebar:220px;--header:54px;}
+:root{--blue:var(--ds-primary);--orange:var(--ds-accent);--green:var(--ds-success);--red:var(--ds-danger);--yellow:var(--ds-warning);--grey:var(--ds-neutral-500);--bg:var(--ds-bg);--card:var(--ds-surface);--sidebar:220px;--header:54px;
+  /* --blue est utilisé à la fois comme fond de chrome (header/sidebar/boutons, toujours du texte
+     blanc dessus) et comme couleur de texte/accent (titres, valeurs, liens sur fond --card). En
+     mode sombre --ds-primary devient volontairement clair (lisible en texte sur carte sombre) —
+     mais un fond de bouton/header ne doit PAS suivre ce changement (marine sombre → texte blanc
+     illisible dessus). --blue-chrome reste donc une marine fixe, indépendante du thème, réservée
+     aux usages de fond ; --blue (texte) continue de suivre --ds-primary. */
+  --blue-chrome:#1B2634;
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:#2C3E50;display:flex;flex-direction:column;min-height:100vh;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--ds-text,#2C3E50);display:flex;flex-direction:column;min-height:100vh;}
 
 /* ── Login ── */
-#pin-overlay{position:fixed;inset:0;background:var(--blue);display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:0;}
-#pin-box{background:#fff;border-radius:20px;padding:36px 32px;text-align:center;width:320px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+#pin-overlay{position:fixed;inset:0;background:var(--blue-chrome);display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:0;}
+#pin-box{background:var(--card);border-radius:20px;padding:36px 32px;text-align:center;width:320px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
 #pin-box img{width:120px;margin-bottom:16px;}
 #pin-box h2{color:var(--blue);font-size:18px;margin-bottom:4px;}
 #pin-box p{color:var(--grey);font-size:13px;margin-bottom:20px;}
-#pin-input{width:100%;padding:14px;border:2px solid #ddd;border-radius:10px;font-size:22px;letter-spacing:8px;text-align:center;font-weight:700;}
+#pin-input{width:100%;padding:14px;border:2px solid var(--ds-border-strong,#ddd);border-radius:10px;font-size:22px;letter-spacing:8px;text-align:center;font-weight:700;background:var(--card);color:var(--ds-text,#222);}
 #pin-input:focus{outline:none;border-color:var(--orange);}
-#pin-btn,#pin-btn2,#pin-btn3{width:100%;margin-top:12px;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
+#pin-btn,#pin-btn2,#pin-btn3{width:100%;margin-top:12px;padding:14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
 #pin-btn:hover,#pin-btn2:hover,#pin-btn3:hover{background:#0d2a52;}
 #pin-error{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
 
 /* ── Header ── */
-#header{background:var(--blue);color:#fff;height:var(--header);display:flex;align-items:center;padding:0 16px;gap:10px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:var(--ds-shadow-sm,0 2px 8px rgba(0,0,0,.3));border-bottom:1px solid rgba(255,255,255,.06);}
+#header{background:var(--blue-chrome);color:#fff;height:var(--header);display:flex;align-items:center;padding:0 16px;gap:10px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:var(--ds-shadow-sm,0 2px 8px rgba(0,0,0,.3));border-bottom:1px solid rgba(255,255,255,.06);}
 #header img{height:30px;}
 #header h1{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.2px;}
 #header-actions{display:flex;gap:8px;align-items:center;}
@@ -96,17 +109,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #gsearch-input::placeholder{color:rgba(255,255,255,.65);}
 #gsearch-input:focus{outline:none;background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5);}
 #gsearch-kbd{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.15);border-radius:4px;padding:1px 5px;pointer-events:none;}
-#gsearch-results{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;max-height:70vh;overflow-y:auto;background:#fff;color:#222;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);z-index:200;text-align:left;}
+#gsearch-results{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;max-height:70vh;overflow-y:auto;background:var(--card);color:var(--ds-text,#222);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);z-index:200;text-align:left;}
 #gsearch-results.open{display:block;}
 #gsearch-results .gs-group-label{padding:8px 12px 4px;font-size:11px;font-weight:800;color:var(--grey);text-transform:uppercase;letter-spacing:.4px;}
 #gsearch-results .gs-item{padding:8px 12px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;align-items:center;}
-#gsearch-results .gs-item:hover{background:#f0f4f8;}
+#gsearch-results .gs-item:hover{background:var(--ds-surface-alt,#f0f4f8);}
 #gsearch-results .gs-item small{color:var(--grey);font-size:11px;white-space:nowrap;}
 #gsearch-results .gs-empty{padding:16px;text-align:center;color:var(--grey);font-size:13px;}
 @media (max-width:768px){#gsearch-wrap{display:none;}}
 
 /* ── Sidebar ── */
-#sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:var(--blue);overflow-y:auto;z-index:90;padding:8px 0 20px;border-right:1px solid rgba(255,255,255,.05);}
+#sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:var(--blue-chrome);overflow-y:auto;z-index:90;padding:8px 0 20px;border-right:1px solid rgba(255,255,255,.05);}
 .nav-group{padding:18px 16px 6px;font-size:10px;font-weight:800;color:rgba(255,255,255,.35);letter-spacing:1.5px;text-transform:uppercase;}
 .nav-group:first-child{padding-top:8px;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 11px;cursor:pointer;color:rgba(255,255,255,.72);border-radius:var(--ds-radius-sm,8px);margin:1px 8px;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease),border-color var(--ds-transition-fast,.15s ease);position:relative;border-left:3px solid transparent;}
@@ -119,7 +132,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .nav-badge.orange{background:var(--orange);}
 
 /* ── Bandeau alertes ── */
-#action-banner{margin:calc(var(--header) + 8px) 0 0 var(--sidebar);display:none;align-items:center;gap:8px;padding:8px 16px;background:#fff;border-left:4px solid var(--orange);flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+#action-banner{margin:calc(var(--header) + 8px) 0 0 var(--sidebar);display:none;align-items:center;gap:8px;padding:8px 16px;background:var(--card);border-left:4px solid var(--orange);flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.08);}
 #action-banner.visible{display:flex;}
 .ab-chip{display:flex;align-items:center;gap:5px;padding:4px 12px;border-radius:16px;font-size:12px;font-weight:700;cursor:pointer;}
 .ab-chip:hover{opacity:.85;}
@@ -140,17 +153,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;}
 .kpi{background:var(--card);border-radius:var(--ds-radius-lg,12px);padding:16px 16px 14px;box-shadow:var(--ds-shadow-sm,0 2px 12px rgba(0,0,0,.07));cursor:pointer;border-top:4px solid var(--orange);transition:transform var(--ds-transition-base,.18s ease),box-shadow var(--ds-transition-base,.18s ease);}
 .kpi:hover{transform:translateY(-3px);box-shadow:var(--ds-shadow-md,0 2px 12px rgba(0,0,0,.07));}
-.kpi-icon{width:34px;height:34px;border-radius:var(--ds-radius-md,10px);display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:10px;background:#FFF8E1;color:#E65100;}
+.kpi-icon{width:34px;height:34px;border-radius:var(--ds-radius-md,10px);display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:10px;background:var(--ds-warning-bg,#FFF8E1);color:var(--ds-warning-dark,#E65100);}
 .kpi.blue{border-top-color:var(--blue);}
-.kpi.blue .kpi-icon{background:#E3F2FD;color:#0D47A1;}
+.kpi.blue .kpi-icon{background:var(--ds-info-bg,#E3F2FD);color:var(--ds-info-dark,#0D47A1);}
 .kpi.green{border-top-color:var(--green);}
-.kpi.green .kpi-icon{background:#E8F5E9;color:#1B5E20;}
+.kpi.green .kpi-icon{background:var(--ds-success-bg,#E8F5E9);color:var(--ds-success-dark,#1B5E20);}
 .kpi.red{border-top-color:var(--red);}
-.kpi.red .kpi-icon{background:#FBE9E7;color:#B71C1C;}
+.kpi.red .kpi-icon{background:var(--ds-danger-bg,#FBE9E7);color:var(--ds-danger-dark,#B71C1C);}
 .kpi.grey{border-top-color:var(--grey);}
-.kpi.grey .kpi-icon{background:#ECEFF1;color:#37474F;}
+.kpi.grey .kpi-icon{background:var(--ds-neutral-100,#ECEFF1);color:var(--ds-neutral-600,#37474F);}
 .kpi.yellow{border-top-color:var(--yellow);}
-.kpi.yellow .kpi-icon{background:#FFF3E0;color:#E65100;}
+.kpi.yellow .kpi-icon{background:var(--ds-warning-bg,#FFF3E0);color:var(--ds-warning-dark,#E65100);}
 .kv{font-size:28px;font-weight:800;color:var(--blue);line-height:1.05;letter-spacing:-.3px;}
 .kl{font-size:11.5px;color:var(--grey);margin-top:5px;font-weight:600;}
 
@@ -170,7 +183,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 .icode{font-weight:700;color:var(--blue);font-family:var(--ds-font-mono,monospace);font-size:12px;}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:var(--ds-radius-full,8px);font-size:11px;font-weight:700;line-height:1.3;white-space:nowrap;}
 .bn{background:var(--ds-success-bg,#E8F5E9);color:var(--ds-success-dark,#1B5E20);}
-.bb{background:var(--ds-info-bg,#E3F2FD);color:#0D47A1;}
+.bb{background:var(--ds-info-bg,#E3F2FD);color:var(--ds-info-dark,#0D47A1);}
 .bu{background:var(--ds-warning-bg,#FFF8E1);color:var(--ds-warning-dark,#E65100);}
 .ba{background:var(--ds-danger-bg,#FBE9E7);color:var(--ds-danger-dark,#B71C1C);}
 .bh{background:var(--ds-neutral-100,#ECEFF1);color:var(--ds-neutral-600,#37474F);}
@@ -192,10 +205,10 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 
 /* ── Filtres ── */
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-.filters input,.filters select{padding:8px 12px;border:1.5px solid var(--ds-border-strong,#ddd);border-radius:var(--ds-radius-sm,8px);font-size:13px;background:#fff;transition:border-color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);}
+.filters input,.filters select{padding:8px 12px;border:1.5px solid var(--ds-border-strong,#ddd);border-radius:var(--ds-radius-sm,8px);font-size:13px;background:var(--card,#fff);color:var(--ds-text,#222);transition:border-color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);}
 .filters input{flex:1;min-width:180px;}
 .filters input:focus,.filters select:focus{outline:none;border-color:var(--orange);box-shadow:var(--ds-shadow-focus);}
-.filter-btn{padding:8px 16px;background:var(--blue);color:#fff;border:none;border-radius:var(--ds-radius-sm,8px);font-weight:600;cursor:pointer;font-size:13px;transition:filter var(--ds-transition-fast,.15s ease);}
+.filter-btn{padding:8px 16px;background:var(--blue-chrome);color:#fff;border:none;border-radius:var(--ds-radius-sm,8px);font-weight:600;cursor:pointer;font-size:13px;transition:filter var(--ds-transition-fast,.15s ease);}
 .filter-btn:hover{filter:brightness(1.1);}
 
 /* ── Charts ── */
@@ -218,19 +231,19 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 
 /* ── Groupes détenteurs ── */
 .det-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;}
-.det-card{background:#F8FAFC;border-radius:10px;padding:12px;border:1px solid #eee;}
+.det-card{background:var(--ds-surface-alt,#F8FAFC);border-radius:10px;padding:12px;border:1px solid var(--ds-border,#eee);}
 .det-nom{font-weight:700;color:var(--blue);font-size:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-.det-cnt{background:var(--blue);color:#fff;font-size:11px;padding:1px 8px;border-radius:8px;}
-.det-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;font-size:12px;}
+.det-cnt{background:var(--blue-chrome);color:#fff;font-size:11px;padding:1px 8px;border-radius:8px;}
+.det-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--ds-border,#eee);font-size:12px;}
 .det-item:last-child{border:none;}
 
 /* ── Gantt réservations ── */
 .gantt-wrap{overflow-x:auto;padding-bottom:4px;}
 .gantt-table{border-collapse:collapse;font-size:11px;}
-.gantt-table th{padding:2px 4px;background:#F0F4F8;color:var(--grey);border:1px solid #ddd;}
-.gantt-table td{width:22px;min-width:22px;padding:2px;border:1px solid #f0f0f0;}
-.gantt-table .immo-col{padding:4px 10px;white-space:nowrap;position:sticky;left:0;background:#fff;border-right:2px solid #eee;z-index:2;}
-.gantt-table .header-col{padding:3px 6px;text-align:center;position:sticky;left:0;background:#F0F4F8;z-index:2;min-width:140px;}
+.gantt-table th{padding:2px 4px;background:var(--ds-surface-alt,#F0F4F8);color:var(--grey);border:1px solid var(--ds-border,#ddd);}
+.gantt-table td{width:22px;min-width:22px;padding:2px;border:1px solid var(--ds-border,#f0f0f0);}
+.gantt-table .immo-col{padding:4px 10px;white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);border-right:2px solid var(--ds-border,#eee);z-index:2;}
+.gantt-table .header-col{padding:3px 6px;text-align:center;position:sticky;left:0;background:var(--ds-surface-alt,#F0F4F8);z-index:2;min-width:140px;}
 .today-cell{border:2px solid var(--orange)!important;}
 
 /* ── Resa stats ── */
@@ -239,9 +252,9 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 /* ── Fiche drawer ── */
 #fiche-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:none;}
 #fiche-overlay.open{display:block;}
-#fiche-panel{position:fixed;top:0;right:0;bottom:0;width:min(700px,100vw);background:#fff;box-shadow:-8px 0 40px rgba(0,0,0,.25);display:flex;flex-direction:column;z-index:501;transform:translateX(100%);transition:transform .25s ease;}
+#fiche-panel{position:fixed;top:0;right:0;bottom:0;width:min(700px,100vw);background:var(--card);box-shadow:-8px 0 40px rgba(0,0,0,.25);display:flex;flex-direction:column;z-index:501;transform:translateX(100%);transition:transform .25s ease;}
 #fiche-overlay.open #fiche-panel{transform:translateX(0);}
-#fiche-hd{background:var(--blue);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+#fiche-hd{background:var(--blue-chrome);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
 #fiche-hd h2{flex:1;font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #fiche-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
 #fiche-body{flex:1;overflow-y:auto;padding:20px;}
@@ -253,17 +266,17 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 .fiche-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .fiche-btn{padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;}
 .fiche-btn.orange{background:var(--orange);color:#fff;}
-.fiche-btn.blue{background:var(--blue);color:#fff;}
+.fiche-btn.blue{background:var(--blue-chrome);color:#fff;}
 .fiche-btn.green{background:var(--green);color:#fff;}
 
 /* ── Modal action ── */
 #act-overlay{position:fixed;inset:0;background:rgba(18,21,27,.6);z-index:600;display:none;align-items:center;justify-content:center;padding:16px;}
 #act-overlay.open{display:flex;}
-#act-modal{background:#fff;border-radius:var(--ds-radius-xl,16px);padding:24px;width:min(480px,100%);max-height:90vh;overflow-y:auto;box-shadow:var(--ds-shadow-xl);}
+#act-modal{background:var(--card);border-radius:var(--ds-radius-xl,16px);padding:24px;width:min(480px,100%);max-height:90vh;overflow-y:auto;box-shadow:var(--ds-shadow-xl);}
 #act-modal h3{color:var(--blue);margin-bottom:16px;font-size:16px;}
 .frow{margin-bottom:14px;}
 .frow label{display:block;font-size:11px;font-weight:700;color:var(--grey);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
-.frow input,.frow select,.frow textarea{width:100%;padding:10px 12px;border:1.5px solid var(--ds-border-strong,#ddd);border-radius:var(--ds-radius-sm,8px);font-size:14px;font-family:var(--ds-font-sans);transition:border-color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);}
+.frow input,.frow select,.frow textarea{width:100%;padding:10px 12px;border:1.5px solid var(--ds-border-strong,#ddd);border-radius:var(--ds-radius-sm,8px);font-size:14px;font-family:var(--ds-font-sans);background:var(--card,#fff);color:var(--ds-text,#222);transition:border-color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);}
 .frow input:focus,.frow select:focus,.frow textarea:focus{outline:none;border-color:var(--orange);box-shadow:var(--ds-shadow-focus);}
 .fact-btns{display:flex;gap:8px;margin-top:16px;}
 .fact-btns button{flex:1;padding:12px;border:none;border-radius:var(--ds-radius-sm,8px);font-weight:700;font-size:14px;cursor:pointer;transition:filter var(--ds-transition-fast,.15s ease),transform var(--ds-transition-fast,.15s ease);}
@@ -271,7 +284,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 .fact-btns button:active{transform:translateY(1px);}
 
 /* ── Responsive ── */
-#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--blue);z-index:200;flex-direction:row;border-top:1px solid rgba(255,255,255,.08);box-shadow:var(--ds-shadow-md,0 -2px 12px rgba(0,0,0,.15));overflow-x:auto;}
+#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--blue-chrome);z-index:200;flex-direction:row;border-top:1px solid rgba(255,255,255,.08);box-shadow:var(--ds-shadow-md,0 -2px 12px rgba(0,0,0,.15));overflow-x:auto;}
 .bnav-item{flex:1;min-width:52px;padding:7px 4px 6px;color:rgba(255,255,255,.6);text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease);border-top:2px solid transparent;}
 .bnav-item .bi{font-size:18px;line-height:1;}
 .bnav-item span:last-child{font-size:9px;margin-top:2px;white-space:nowrap;font-weight:600;}
@@ -317,15 +330,15 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     </div>
     <div id="pin-step2" style="display:none">
       <p style="font-size:14px;color:var(--blue);font-weight:700;margin-bottom:8px">Qui êtes-vous ?</p>
-      <select id="pin-identite" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:12px"></select>
+      <select id="pin-identite" style="width:100%;padding:12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:10px;font-size:15px;margin-bottom:12px;background:var(--card);color:var(--ds-text,#222)"></select>
       <button id="pin-btn2" onclick="etapeMotDePasse()">Continuer →</button>
       <p style="font-size:11px;color:var(--grey);margin-top:8px">Vos actions (validations, résolutions de panne, sorties) seront tracées à votre nom.</p>
     </div>
     <div id="pin-step3" style="display:none">
       <p id="pwd-qui" style="font-size:14px;color:var(--blue);font-weight:700;margin-bottom:4px"></p>
       <p id="pwd-consigne" style="font-size:12px;color:var(--grey);margin-bottom:10px"></p>
-      <input type="password" id="pwd-input" placeholder="Mot de passe" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:8px" onkeydown="if(event.key==='Enter')validerMotDePasse()">
-      <input type="password" id="pwd-input2" placeholder="Confirmez le mot de passe" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:15px;margin-bottom:8px;display:none" onkeydown="if(event.key==='Enter')validerMotDePasse()">
+      <input type="password" id="pwd-input" placeholder="Mot de passe" style="width:100%;padding:12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:10px;font-size:15px;margin-bottom:8px;background:var(--card);color:var(--ds-text,#222)" onkeydown="if(event.key==='Enter')validerMotDePasse()">
+      <input type="password" id="pwd-input2" placeholder="Confirmez le mot de passe" style="width:100%;padding:12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:10px;font-size:15px;margin-bottom:8px;display:none;background:var(--card);color:var(--ds-text,#222)" onkeydown="if(event.key==='Enter')validerMotDePasse()">
       <button id="pin-btn3" onclick="validerMotDePasse()">Se connecter →</button>
       <p id="pwd-error" style="color:var(--red);font-size:12px;margin-top:8px"></p>
       <p style="font-size:11px;color:var(--grey);margin-top:6px"><a href="#" onclick="retourIdentite();return false;" style="color:var(--blue)">← Changer d'identité</a></p>
@@ -348,6 +361,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div id="header-actions">
     <span id="admin-identite-badge" style="font-size:11px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px;white-space:nowrap;cursor:pointer" onclick="changerIdentite()" title="Changer d'identité"></span>
     <span id="last-upd"></span>
+    <button id="btn-theme" onclick="toggleTheme()" title="Basculer clair / sombre" style="background:rgba(255,255,255,.15)"></button>
     <button id="btn-export" onclick="exportExcel()">📥 Excel</button>
     <button id="btn-refresh" onclick="refreshAll()">🔄 Actualiser</button>
   </div>
@@ -407,19 +421,19 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     <div id="act-form"></div>
     <div class="fact-btns">
       <button id="act-confirm-btn" style="background:var(--orange);color:#fff">✅ Confirmer</button>
-      <button style="background:#eee;color:#444" onclick="fermerAction()">Annuler</button>
+      <button style="background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444)" onclick="fermerAction()">Annuler</button>
     </div>
   </div>
 </div>
 
 <!-- Modal ajout immo / employé -->
 <div id="add-overlay" onclick="if(event.target===this)fermerAjout()" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:650;display:none;align-items:center;justify-content:center;padding:16px">
-  <div style="background:#fff;border-radius:16px;padding:24px;width:min(520px,100%);max-height:90vh;overflow-y:auto">
+  <div style="background:var(--card);color:var(--ds-text,#222);border-radius:16px;padding:24px;width:min(520px,100%);max-height:90vh;overflow-y:auto">
     <h3 id="add-titre" style="color:var(--blue);margin-bottom:16px;font-size:16px">Ajouter</h3>
     <div id="add-form"></div>
     <div class="fact-btns" style="display:flex;gap:8px;margin-top:16px">
       <button id="add-confirm-btn" style="background:var(--green);color:#fff;flex:1;padding:12px;border:none;border-radius:10px;font-weight:700;cursor:pointer">✅ Enregistrer</button>
-      <button style="background:#eee;color:#444;padding:12px 18px;border:none;border-radius:10px;cursor:pointer" onclick="fermerAjout()">Annuler</button>
+      <button style="background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);padding:12px 18px;border:none;border-radius:10px;cursor:pointer" onclick="fermerAjout()">Annuler</button>
     </div>
     <p id="add-msg" style="margin-top:10px;font-size:13px"></p>
   </div>
@@ -471,7 +485,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
         <select id="depot-etat" onchange="renderDepot()"><option value="">Tous états</option><option>Neuf</option><option>Bon état</option><option>Usé</option><option>Abîmé</option><option>Hors service</option><option>Inconnu</option></select>
         <select id="depot-site" onchange="setSiteFilter('depot',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
         <select id="depot-actif" onchange="renderDepot()"><option value="1" selected>Actives seulement</option><option value="0">Sorties seulement</option><option value="">Actives + sorties</option></select>
-        <select id="depot-nb" onchange="renderDepot()" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+        <select id="depot-nb" onchange="renderDepot()" style="padding:8px 12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px;background:var(--card,#fff);color:var(--ds-text,#222)">
           <option value="50">50 max</option><option value="100">100 max</option><option value="200">200 max</option><option value="0">Tous</option>
         </select>
         <button class="filter-btn" onclick="resetFiltresDepot()">🔄 Réinitialiser</button>
@@ -503,18 +517,18 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
       <div class="card"><div class="card-head"><h3>Historique des mouvements</h3><span class="card-cnt" id="cnt-hist"></span></div>
         <div style="padding:12px;display:flex;gap:8px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap;align-items:center">
           <input type="text" id="hist-q" style="flex:1;min-width:180px;padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px" placeholder="Code IM, numéro, nom...">
-          <select id="hist-type" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+          <select id="hist-type" style="padding:8px 12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px;background:var(--card,#fff);color:var(--ds-text,#222)">
             <option value="">Tous types</option>
             <option value="Transfert">🔄 Transferts</option>
             <option value="Retour">📥 Retours dépôt</option>
           </select>
-          <select id="hist-site" onchange="setSiteFilter('historique',this.value)" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+          <select id="hist-site" onchange="setSiteFilter('historique',this.value)" style="padding:8px 12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px;background:var(--card,#fff);color:var(--ds-text,#222)">
             <option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option>
           </select>
-          <select id="hist-actif" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+          <select id="hist-actif" style="padding:8px 12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px;background:var(--card,#fff);color:var(--ds-text,#222)">
             <option value="">Immos actives + sorties</option><option value="1" selected>Immos actives seulement</option><option value="0">Immos sorties seulement</option>
           </select>
-          <select id="hist-nb" style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px;background:#fff">
+          <select id="hist-nb" style="padding:8px 12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px;background:var(--card,#fff);color:var(--ds-text,#222)">
             <option value="50">50 derniers</option>
             <option value="100">100 derniers</option>
             <option value="200">200 derniers</option>
@@ -532,7 +546,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
       <div class="card">
         <div class="card-head"><h3>Transferts en attente de validation</h3><span class="card-cnt" id="cnt-transf"></span></div>
         <p style="padding:8px 18px;font-size:13px;color:var(--grey);border-bottom:1px solid #f0f0f0">Valider ici la réception d'un matériel depuis le dashboard, sans scanner.</p>
-        <div style="padding:8px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="transf-site" onchange="setSiteFilter('transferts',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select><button class="filter-btn" onclick="resetFiltresTransf()">🔄 Réinitialiser</button></div>
+        <div style="padding:8px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="transf-site" onchange="setSiteFilter('transferts',this.value)" style="padding:7px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select><button class="filter-btn" onclick="resetFiltresTransf()">🔄 Réinitialiser</button></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Donneur</th><th>Receveur</th><th>État déclaré</th><th>Attente</th><th>Note</th><th>Action</th></tr></thead><tbody id="tb-transf"></tbody></table></div>
       </div>
     </div>
@@ -558,7 +572,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
       <div class="card"><div class="card-head"><h3>Liste des réservations</h3>
         <div style="display:flex;gap:8px;align-items:center">
           <span class="card-cnt" id="cnt-resa"></span>
-          <button id="resa-add-btn" onclick="ouvrirAjoutReservation()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter une réservation</button>
+          <button id="resa-add-btn" onclick="ouvrirAjoutReservation()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter une réservation</button>
         </div></div>
         <div class="tbl-wrap"><table><thead><tr><th>Statut</th><th>Code IM</th><th>Libellé</th><th>Demandeur</th><th>Chantier</th><th>Du</th><th>Au</th><th>Action</th></tr></thead><tbody id="tb-resa"></tbody></table></div>
       </div>
@@ -583,7 +597,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
         <div class="card"><div class="card-head"><h3>Suivi des documents</h3>
           <div style="display:flex;gap:8px;align-items:center">
             <span class="card-cnt" id="cnt-docs"></span>
-            <button id="docs-add-fds-btn" onclick="ouvrirAjoutFDS()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter FDS</button>
+            <button id="docs-add-fds-btn" onclick="ouvrirAjoutFDS()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter FDS</button>
           </div></div>
           <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Catégorie</th><th>Statut</th><th>FDS</th><th>Photos</th></tr></thead><tbody id="tb-docs"></tbody></table></div>
         </div>
@@ -646,7 +660,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div class="bnav-item" onclick="openMobileMenu()"><span class="bi">☰</span><span>Plus</span></div>
 </nav>
 <!-- Menu mobile "Plus" -->
-<div id="mobile-menu" style="display:none;position:fixed;bottom:56px;left:0;right:0;background:var(--blue);z-index:300;padding:8px">
+<div id="mobile-menu" style="display:none;position:fixed;bottom:56px;left:0;right:0;background:var(--blue-chrome);z-index:300;padding:8px">
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
     <div class="bnav-item" data-tab="depot" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🏭</span><span>Dépôt</span></div>
     <div class="bnav-item" data-tab="historique" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📋</span><span>Historique</span></div>
@@ -837,6 +851,23 @@ async function loadImmoMeta(){
   if(Object.keys(immoMeta).length>0)return;
   try{var r=await fetch(W+'?immo_metadata=1');immoMeta=await r.json();}catch(e){immoMeta={};}
 }
+// ── Mode sombre (ajouté août 2026) ──────────────────────────────────────
+// data-theme est déjà posé sur <html> par le script synchrone en tête de <head> (avant le premier
+// rendu, pour éviter un flash clair→sombre) — ces fonctions ne font que gérer le bouton et la
+// bascule manuelle. Persisté en localStorage ; sans préférence enregistrée, le script d'amorçage
+// suit prefers-color-scheme. Variables --ds-* déjà prêtes dans design-system.css.
+function currentTheme(){return document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';}
+function majBoutonTheme(){
+  var btn=document.getElementById('btn-theme');
+  if(btn)btn.textContent=currentTheme()==='dark'?'☀️ Clair':'🌙 Sombre';
+}
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme',theme==='dark'?'dark':'light');
+  try{localStorage.setItem('immo_theme',theme);}catch(e){}
+  majBoutonTheme();
+}
+function toggleTheme(){applyTheme(currentTheme()==='dark'?'light':'dark');}
+
 var TZ='Indian/Reunion';
 var PIN='ES974';
 var ADMIN_SESSION={code:null,nom:null,token:null}; // identité de l'admin connecté + jeton de session (actions sensibles)
@@ -1140,6 +1171,7 @@ function changerIdentite(){
 }
 
 document.getElementById('pin-input').addEventListener('keydown',function(e){if(e.key==='Enter')checkPin();});
+majBoutonTheme(); // synchronise le libellé du bouton avec data-theme déjà posé par le script d'amorçage (voir <head>)
 // Reprise de session existante (sessionStorage = effacé à la fermeture de l'onglet)
 if(sessionStorage.getItem('auth')==='1'&&sessionStorage.getItem('admin_code')){
   ADMIN_SESSION={code:sessionStorage.getItem('admin_code'),nom:sessionStorage.getItem('admin_nom')||sessionStorage.getItem('admin_code'),token:sessionStorage.getItem('admin_token')||null};
@@ -1383,7 +1415,7 @@ function renderInventaireStock(){
     return;
   }
   var html='<div class="card"><div class="card-head"><h3>📦 Campagnes d\'inventaire de stock</h3>'+
-    (peutGererInventaire(ADMIN_SESSION.code)?'<button onclick="lancerCampagneInventaire()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Lancer une campagne</button>':'')+
+    (peutGererInventaire(ADMIN_SESSION.code)?'<button onclick="lancerCampagneInventaire()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Lancer une campagne</button>':'')+
     '</div>';
   html+='<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Comptage de stock d\'articles/consommables (visserie, câbles, appareillage…) — distinct de l\'inventaire des immobilisations.</p>';
   if(!invCampagnesList.length){
@@ -1467,7 +1499,7 @@ function renderInventaireImmos(){
     return;
   }
   var html='<div class="card"><div class="card-head"><h3>📸 Campagnes d\'inventaire physique des immobilisations</h3>'+
-    (peutGererInventaireImmos(ADMIN_SESSION.code)?'<button onclick="lancerCampagneInventaireImmos()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Lancer une campagne</button>':'')+
+    (peutGererInventaireImmos(ADMIN_SESSION.code)?'<button onclick="lancerCampagneInventaireImmos()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Lancer une campagne</button>':'')+
     '</div>';
   html+='<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Chaque collaborateur au profil admin scanne, depuis la PWA, les immos physiquement présentes — la campagne compare ensuite le constaté au théorique (dernier mouvement enregistré).</p>';
   if(!invImmosCampagnesList.length){
@@ -1565,7 +1597,7 @@ function renderDetailCampagneInventaireImmos(nom){
       (rap.manquantes.length>300?' … et '+(rap.manquantes.length-300)+' de plus (voir l\'export CSV pour la liste complète)':'')+
     '</div></div>';
   }
-  html+='<div style="padding:12px 14px"><button onclick="invImmosCampagneOuverte=null;renderInventaireImmos();" style="padding:6px 14px;background:#eee;border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
+  html+='<div style="padding:12px 14px"><button onclick="invImmosCampagneOuverte=null;renderInventaireImmos();" style="padding:6px 14px;background:var(--ds-neutral-100,#eee);border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
   html+='</div>';
   return html;
 }
@@ -1627,7 +1659,7 @@ function renderDetailCampagneInventaire(nom){
   '</div>';
   html+='<div id="inv-stock-results"><p class="es" style="padding:16px">Chargement…</p></div>';
   html+='<div id="inv-sans-ref-results"></div>';
-  html+='<div style="padding:12px 14px"><button onclick="invCampagneOuverte=null;renderInventaireStock();" style="padding:6px 14px;background:#eee;border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
+  html+='<div style="padding:12px 14px"><button onclick="invCampagneOuverte=null;renderInventaireStock();" style="padding:6px 14px;background:var(--ds-neutral-100,#eee);border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
   html+='</div>';
   return html;
 }
@@ -1832,7 +1864,7 @@ function renderEPI(){
       '<div id="epi-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
   }
   html+='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
-    vues.map(function(v){return '<button onclick="changerVueEPI(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(epiVue===v[0]?'var(--blue)':'#eee')+';color:'+(epiVue===v[0]?'#fff':'#444')+'">'+v[1]+'</button>';}).join('')+
+    vues.map(function(v){return '<button onclick="changerVueEPI(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(epiVue===v[0]?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(epiVue===v[0]?'#fff':'var(--ds-text,#444)')+'">'+v[1]+'</button>';}).join('')+
     '</div><div id="epi-vue-content"></div>';
   div.innerHTML=html;
   renderEPIVue();
@@ -1891,14 +1923,15 @@ function renderEPIStock(container){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   container.innerHTML='<div id="epi-resume-sous-seuil"></div>'+
     '<div class="card"><div class="card-head"><h3>📦 Stock articles EPI</h3>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-    (canEdit?'<button onclick="ouvrirAjoutArticleEPI()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<span class="card-cnt" id="epi-stock-cnt"></span>'+
+    (canEdit?'<button onclick="ouvrirAjoutArticleEPI()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
     (canEdit?'<button onclick="document.getElementById(\'epi-stock-file\').click()" style="padding:6px 14px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📤 Importer inventaire (Excel)</button>'+
       '<input type="file" id="epi-stock-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importerInventaireExcelEPI(this)">':'')+
     '<button onclick="exporterStockEPI()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
     '</div></div>'+
     '<div id="epi-import-preview"></div>'+
-    '<div style="padding:10px 14px"><input type="text" id="epi-stock-q" oninput="refreshEPIStockResults()" placeholder="🔍 Filtrer par type, taille, référence..." style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px"></div>'+
+    '<div class="filters" style="padding:10px 14px 0;margin-bottom:0"><input type="text" id="epi-stock-q" oninput="refreshEPIStockResults()" placeholder="🔍 Filtrer par type, taille, référence..." style="max-width:400px"></div>'+
     '<div id="epi-stock-results"></div></div>';
   refreshEPIStockResults();
   majResumeSousSeuilEPI();
@@ -1997,7 +2030,7 @@ function afficherPreviewImportEPI(matches,nonTrouves){
   if(!matches.length){
     prev.innerHTML='<div class="card" style="border-top:3px solid var(--red);margin:10px 14px"><div style="padding:14px"><b>Aucune référence reconnue</b> dans le fichier importé. Vérifiez que la colonne "Référence" correspond bien aux références du catalogue EPI.'+
       (nonTrouves.length?'<p style="font-size:11px;color:var(--grey);margin-top:6px">Références lues : '+nonTrouves.slice(0,15).join(', ')+(nonTrouves.length>15?'…':'')+'</p>':'')+
-      '<button onclick="document.getElementById(\'epi-import-preview\').innerHTML=\'\'" style="margin-top:10px;padding:6px 14px;background:#eee;border:none;border-radius:8px;cursor:pointer">Fermer</button></div></div>';
+      '<button onclick="document.getElementById(\'epi-import-preview\').innerHTML=\'\'" style="margin-top:10px;padding:6px 14px;background:var(--ds-neutral-100,#eee);border:none;border-radius:8px;cursor:pointer">Fermer</button></div></div>';
     return;
   }
   var changements=matches.filter(function(m){return m.ancien!==m.nouveau;});
@@ -2009,7 +2042,7 @@ function afficherPreviewImportEPI(matches,nonTrouves){
     matches.map(function(m){var chg=m.ancien!==m.nouveau;return '<tr'+(chg?' style="background:#FFF8E1"':'')+'><td style="font-size:11px">'+m.reference+'</td><td>'+m.type_article+'</td><td>'+m.taille+'</td><td>'+m.ancien+'</td><td style="font-weight:700;color:'+(chg?'var(--orange)':'var(--grey)')+'">'+m.nouveau+'</td></tr>';}).join('')+
     '</tbody></table></div>'+
     '<div style="display:flex;gap:8px;margin-top:14px"><button onclick="confirmerImportEPI()" style="padding:8px 18px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Confirmer l\'import ('+matches.length+' article'+(matches.length>1?'s':'')+')</button>'+
-    '<button onclick="document.getElementById(\'epi-import-preview\').innerHTML=\'\'" style="padding:8px 18px;background:#eee;color:#444;border:none;border-radius:8px;cursor:pointer">Annuler</button></div>'+
+    '<button onclick="document.getElementById(\'epi-import-preview\').innerHTML=\'\'" style="padding:8px 18px;background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);border:none;border-radius:8px;cursor:pointer">Annuler</button></div>'+
     '<div id="epi-import-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div>'+
     '</div></div>';
   prev.innerHTML=html;
@@ -2036,6 +2069,8 @@ function refreshEPIStockResults(){
     if(!q)return true;
     return (a.type_article||'').toUpperCase().includes(q)||(a.taille_affichage||'').toString().toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.designation||'').toUpperCase().includes(q);
   }).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'')||(a.taille_affichage||'').toString().localeCompare((b.taille_affichage||'').toString());});
+  var cntEl=document.getElementById('epi-stock-cnt');
+  if(cntEl)cntEl.textContent=rows.length+(epiCatalogue.length>rows.length?' / '+epiCatalogue.length+' (filtrés)':'')+' article(s)';
   if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun article'+(q?' pour ce filtre':'')+'.</p>';return;}
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var html='<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Référence</th><th>Désignation</th><th>Stock actuel</th><th>Seuil mini</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
@@ -2045,7 +2080,7 @@ function refreshEPIStockResults(){
     html+='<tr'+(a.stock_actuel<seuil?' class="warn-row"':'')+'><td>'+a.type_article+'</td><td>'+a.taille_affichage+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.designation||'—')+'</td>'+
       '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
       '<td style="font-size:12px;color:var(--grey)">'+(a.stock_mini>0?a.stock_mini:'— (défaut '+seuil+')')+'</td>'+
-      (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
+      (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
         '<button onclick="editerStockEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button> '+
         '<button onclick="editerSeuilEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\','+(a.stock_mini||0)+')" style="padding:4px 10px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🎚️ Seuil</button></td>':'')+
     '</tr>';
@@ -2151,7 +2186,7 @@ function renderEPIGrille(container){
   var byKey={};epiGrille.forEach(function(g){byKey[g.affectation+'|'+g.type_article]=g;});
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var html='<div class="card"><div class="card-head"><h3>📐 Grille de dotation standard</h3>'+
-    (canEdit?'<button onclick="ajouterTypeGrilleEPI()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
+    (canEdit?'<button onclick="ajouterTypeGrilleEPI()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
     '</div>'+
     '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Quantité standard remise par profil, utilisée pour générer automatiquement les fiches de dotation.'+(canEdit?' Cliquez sur une valeur pour la modifier.':'')+'</p>'+
     '<div class="tbl-wrap"><table><thead><tr><th>Type d\'article</th>'+affectations.map(function(a){return '<th>'+a[1]+'</th>';}).join('')+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
@@ -2160,7 +2195,7 @@ function renderEPIGrille(container){
     affectations.forEach(function(a){
       var g=byKey[a[0]+'|'+t];
       var qte=g?g.quantite:0;
-      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleDotationEPI(\''+a[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:6px;text-align:center"></td>';
+      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleDotationEPI(\''+a[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;text-align:center;background:var(--card,#fff);color:var(--ds-text,#222)"></td>';
       else html+='<td style="text-align:center">'+qte+'</td>';
     });
     if(canEdit)html+='<td><button onclick="supprimerTypeGrilleEPI(\''+t.replace(/'/g,"\\'")+'\')" title="Retirer ce type d\'article de la grille" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button></td>';
@@ -2236,9 +2271,10 @@ function renderEPIDotations(container){
       '</tbody></table></div></div>';
   }
   html+='<div class="card"><div class="card-head"><h3>🧾 Dotations employés</h3>'+
-    '<div style="display:flex;gap:8px;align-items:center">'+
-    '<select id="epi-annee-sel" onchange="changerAnneeEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(y){return '<option value="'+y+'"'+(y===EPI_ANNEE_SELECTIONNEE?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
-    '<select id="epi-dot-statut" onchange="filtrerStatutDotationsEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<span class="card-cnt" id="epi-dotations-cnt"></span>'+
+    '<select id="epi-annee-sel" onchange="changerAnneeEPI(this.value)" style="padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+annees.map(function(y){return '<option value="'+y+'"'+(y===EPI_ANNEE_SELECTIONNEE?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+    '<select id="epi-dot-statut" onchange="filtrerStatutDotationsEPI(this.value)" style="padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+
       '<option value=""'+(EPI_DOT_STATUT_FILTRE===''?' selected':'')+'>Tous les statuts</option>'+
       '<option value="Emargee"'+(EPI_DOT_STATUT_FILTRE==='Emargee'?' selected':'')+'>✅ Émargées seulement</option>'+
       '<option value="Generee"'+(EPI_DOT_STATUT_FILTRE==='Generee'?' selected':'')+'>⏳ En attente seulement</option>'+
@@ -2258,9 +2294,9 @@ function renderEPIDotations(container){
       html+='<tr><td>'+lienEmpSiConnu(dd.code)+'</td><td>'+lienEmpSiConnu(dd.code,dd.nom_destinataire)+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dd.type_dotation+'</td>'+
         '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
         '<td style="white-space:nowrap">'+
-        '<button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
+        '<button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--ds-neutral-100,#eee);border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
         (dd.statut==='Emargee'&&dd.photo_fiche?'<button onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">📷 Fiche émargée</button>':'')+
-        (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">✍️ Émarger</button>'+
+        (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">✍️ Émarger</button>'+
         '<button onclick="annulerDotationEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button>':'')+
         '</td></tr>';
     });
@@ -2268,6 +2304,8 @@ function renderEPIDotations(container){
   }
   html+='</div>';
   container.innerHTML=html;
+  var dotCntEl=document.getElementById('epi-dotations-cnt');
+  if(dotCntEl)dotCntEl.textContent=dotAnnee.length+(dotAnneeToutes.length>dotAnnee.length?' / '+dotAnneeToutes.length+' (filtrées)':'')+' fiche(s)';
 }
 function changerAnneeEPI(v){EPI_ANNEE_SELECTIONNEE=parseInt(v,10);renderEPIVue();}
 function filtrerStatutDotationsEPI(v){EPI_DOT_STATUT_FILTRE=v;renderEPIVue();}
@@ -2343,8 +2381,8 @@ function changerSousVueHistoriqueEPI(v){EPI_HIST_SOUSVUE=v;renderEPIVue();}
 function renderEPIHistorique(container){
   var html='<div class="card"><div class="card-head"><h3>🕘 Historique EPI</h3>'+
     '<div style="display:flex;gap:8px">'+
-    '<button onclick="changerSousVueHistoriqueEPI(\'matrice\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(EPI_HIST_SOUSVUE==='matrice'?'var(--blue)':'#eee')+';color:'+(EPI_HIST_SOUSVUE==='matrice'?'#fff':'#444')+'">👤 Par employé</button>'+
-    '<button onclick="changerSousVueHistoriqueEPI(\'consommation\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(EPI_HIST_SOUSVUE==='consommation'?'var(--blue)':'#eee')+';color:'+(EPI_HIST_SOUSVUE==='consommation'?'#fff':'#444')+'">📊 Consommation par année</button>'+
+    '<button onclick="changerSousVueHistoriqueEPI(\'matrice\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(EPI_HIST_SOUSVUE==='matrice'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(EPI_HIST_SOUSVUE==='matrice'?'#fff':'var(--ds-text,#444)')+'">👤 Par employé</button>'+
+    '<button onclick="changerSousVueHistoriqueEPI(\'consommation\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(EPI_HIST_SOUSVUE==='consommation'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(EPI_HIST_SOUSVUE==='consommation'?'#fff':'var(--ds-text,#444)')+'">📊 Consommation par année</button>'+
     '</div></div><div id="epi-hist-sous"></div></div>';
   container.innerHTML=html;
   var sous=document.getElementById('epi-hist-sous');
@@ -2418,8 +2456,8 @@ async function renderEPIHistConsommation(container){
   var rows=Object.keys(parArticle).map(function(k){return parArticle[k];}).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'')||(a.taille_article||'').localeCompare(b.taille_article||'');});
   EPI_HIST_CONSO_ROWS=rows;
   var html='<div style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
-    '<select onchange="changerAnneeConsoEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(a){return '<option value="'+a+'"'+(a===EPI_HIST_CONSO_ANNEE?' selected':'')+'>'+a+'</option>';}).join('')+'</select>'+
-    '<select onchange="changerTypeConsoEPI(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+
+    '<select onchange="changerAnneeConsoEPI(this.value)" style="padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+annees.map(function(a){return '<option value="'+a+'"'+(a===EPI_HIST_CONSO_ANNEE?' selected':'')+'>'+a+'</option>';}).join('')+'</select>'+
+    '<select onchange="changerTypeConsoEPI(this.value)" style="padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+
       '<option value=""'+(typeFiltre===''?' selected':'')+'>Tous types</option>'+
       '<option value="annuelle"'+(typeFiltre==='annuelle'?' selected':'')+'>Dotations annuelles</option>'+
       '<option value="ponctuelle"'+(typeFiltre==='ponctuelle'?' selected':'')+'>Dotations ponctuelles</option>'+
@@ -2845,10 +2883,10 @@ function afficherResultatsLotEPI(pendantes){
         '<span style="color:var(--grey)">Non vérifiable</span>';
       var opts='<option value="">— Non résolu, choisir —</option>'+pendantes.map(function(dd){return '<option value="'+dd.id+'"'+(dd.id===entry.selectedDotId?' selected':'')+'>'+dd.code+' — '+dd.nom_destinataire+' ('+dd.type_dotation+(dd.annee_civile?' '+dd.annee_civile:'')+')</option>';}).join('');
       return '<tr><td style="font-size:11px">'+entry.filename+'</td>'+
-        '<td>'+(entry.b64?'<img src="'+entry.b64+'" style="width:60px;height:auto;border:1px solid #ddd;border-radius:4px">':'—')+'</td>'+
+        '<td>'+(entry.b64?'<img src="'+entry.b64+'" style="width:60px;height:auto;border:1px solid var(--ds-border-strong,#ddd);border-radius:4px">':'—')+'</td>'+
         '<td style="font-size:12px">'+detecte+'</td>'+
         '<td style="font-size:11px">'+sig+'</td>'+
-        '<td><select onchange="EPI_IMPORT_LOT['+idx+'].selectedDotId=this.value;majBoutonLotEPI()" style="padding:4px 6px;border:1px solid #ddd;border-radius:6px;font-size:11px;max-width:220px">'+opts+'</select></td></tr>';
+        '<td><select onchange="EPI_IMPORT_LOT['+idx+'].selectedDotId=this.value;majBoutonLotEPI()" style="padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;font-size:11px;max-width:220px">'+opts+'</select></td></tr>';
     }).join('')+
     '</tbody></table></div>'+
     '<p style="font-size:11px;color:var(--grey);margin-top:8px">⚠️ La lecture automatique et la détection de signature sont une aide, pas une garantie. Une fiche sans signature détectée est bloquée par défaut — coche "Forcer" seulement après vérification visuelle de l\'aperçu.</p>';
@@ -2894,19 +2932,19 @@ function voirPhotoFicheOutillage(code,filename){
 // ── Vue Remise ponctuelle ──
 function renderEPIPonctuelle(container){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
-  var html='<div class="card"><div class="card-head"><h3>✋ Remise ponctuelle</h3></div>'+
+  var ponct=epiDotations.filter(function(dd){return dd.type_dotation==='Ponctuelle';});
+  var html='<div class="card"><div class="card-head"><h3>✋ Remise ponctuelle</h3><span class="card-cnt">'+ponct.length+' remise(s)</span></div>'+
     '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Ex. : remise groupée de matériel demandée par un CT pour son équipe. Ne compte pas dans le suivi de dotation annuelle individuelle.</p>';
   if(canEdit)html+='<div style="padding:0 14px 14px"><button onclick="ouvrirRemisePonctuelleEPI()" style="padding:10px 18px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">➕ Nouvelle remise ponctuelle</button></div>';
-  var ponct=epiDotations.filter(function(dd){return dd.type_dotation==='Ponctuelle';});
   if(!ponct.length)html+='<p class="es" style="padding:0 14px 16px">Aucune remise ponctuelle pour l\'instant.</p>';
   else{
     html+='<div class="tbl-wrap"><table><thead><tr><th>Destinataire</th><th>Site</th><th>Générée le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>';
     ponct.sort(function(a,b){return new Date(b.genere_le)-new Date(a.genere_le);}).forEach(function(dd){
       html+='<tr><td>'+lienEmpSiConnu(dd.code,dd.nom_destinataire)+'</td><td>'+badgeSiteD(dd.site)+'</td><td>'+dateFr(dd.genere_le)+'</td>'+
         '<td>'+(dd.statut==='Emargee'?'<span class="badge bn">✅ Émargée</span>':'<span class="badge bu">⏳ En attente</span>')+'</td>'+
-        '<td style="white-space:nowrap"><button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:#eee;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
+        '<td style="white-space:nowrap"><button onclick="voirFicheEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--ds-neutral-100,#eee);border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">🖨️ Voir</button>'+
         (dd.statut==='Emargee'&&dd.photo_fiche?'<button onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">📷 Fiche émargée</button>':'')+
-        (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✍️ Émarger</button>':'')+
+        (dd.statut!=='Emargee'&&canEdit?'<button onclick="ouvrirEmargementEPI(\''+dd.id+'\')" style="padding:4px 8px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✍️ Émarger</button>':'')+
         '</td></tr>';
     });
     html+='</tbody></table></div>';
@@ -2924,7 +2962,7 @@ function ouvrirRemisePonctuelleEPI(){
   document.getElementById('add-form').innerHTML=
     '<div class="frow"><label style="'+addLabelStyle+'">Destinataire *</label><div style="position:relative">'+
       '<input id="ep-dest" autocomplete="off" style="'+addFieldStyle+'" placeholder="Tape un code/nom d\'employé, ou une description libre pour un groupe (ex : Équipe de Nicolas CAZAMBO)">'+
-      '<div id="ep-dest-suggest" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div></div>'+
+      '<div id="ep-dest-suggest" style="position:absolute;top:100%;left:0;right:0;background:var(--card,#fff);color:var(--ds-text,#222);border:1px solid var(--ds-border,#ddd);border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div></div>'+
     '<p style="font-size:11px;color:var(--grey);margin-top:-8px;margin-bottom:10px">Choisir un employé suggéré le fait apparaître dans son historique individuel (onglet Historique) ; garder un texte libre pour une remise de groupe.</p>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Site</label><select id="ep-site" style="'+addFieldStyle+'"><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select></div>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Articles</label>'+
@@ -3057,7 +3095,7 @@ function renderOutillage(){
       '<div id="outil-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
   }
   html+='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
-    vues.map(function(v){return '<button onclick="changerVueOutillage(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(outilVue===v[0]?'var(--blue)':'#eee')+';color:'+(outilVue===v[0]?'#fff':'#444')+'">'+v[1]+'</button>';}).join('')+
+    vues.map(function(v){return '<button onclick="changerVueOutillage(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(outilVue===v[0]?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(outilVue===v[0]?'#fff':'var(--ds-text,#444)')+'">'+v[1]+'</button>';}).join('')+
     '</div><div id="outillage-vue-content"></div>';
   div.innerHTML=html;
   renderOutillageVue();
@@ -3091,8 +3129,8 @@ function changerSousVueHistoriqueOutil(v){OUTIL_HIST_SOUSVUE=v;renderOutillageVu
 function renderOutilHistorique(container){
   var html='<div class="card"><div class="card-head"><h3>🕘 Historique Outillage</h3>'+
     '<div style="display:flex;gap:8px">'+
-    '<button onclick="changerSousVueHistoriqueOutil(\'matrice\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(OUTIL_HIST_SOUSVUE==='matrice'?'var(--blue)':'#eee')+';color:'+(OUTIL_HIST_SOUSVUE==='matrice'?'#fff':'#444')+'">👤 Par employé</button>'+
-    '<button onclick="changerSousVueHistoriqueOutil(\'consommation\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(OUTIL_HIST_SOUSVUE==='consommation'?'var(--blue)':'#eee')+';color:'+(OUTIL_HIST_SOUSVUE==='consommation'?'#fff':'#444')+'">📊 Consommation par année</button>'+
+    '<button onclick="changerSousVueHistoriqueOutil(\'matrice\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(OUTIL_HIST_SOUSVUE==='matrice'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(OUTIL_HIST_SOUSVUE==='matrice'?'#fff':'var(--ds-text,#444)')+'">👤 Par employé</button>'+
+    '<button onclick="changerSousVueHistoriqueOutil(\'consommation\')" style="padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:12px;background:'+(OUTIL_HIST_SOUSVUE==='consommation'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(OUTIL_HIST_SOUSVUE==='consommation'?'#fff':'var(--ds-text,#444)')+'">📊 Consommation par année</button>'+
     '</div></div><div id="outil-hist-sous"></div></div>';
   container.innerHTML=html;
   var sous=document.getElementById('outil-hist-sous');
@@ -3144,7 +3182,7 @@ function renderOutilHistConsommation(container){
   var rows=Object.keys(parArticle).map(function(k){return parArticle[k];}).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'');});
   OUTIL_HIST_CONSO_ROWS=rows;
   var html='<div style="padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
-    '<select onchange="changerAnneeConsoOutil(this.value)" style="padding:6px 10px;border:1px solid #ddd;border-radius:8px">'+annees.map(function(a){return '<option value="'+a+'"'+(a===OUTIL_HIST_CONSO_ANNEE?' selected':'')+'>'+a+'</option>';}).join('')+'</select>'+
+    '<select onchange="changerAnneeConsoOutil(this.value)" style="padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+annees.map(function(a){return '<option value="'+a+'"'+(a===OUTIL_HIST_CONSO_ANNEE?' selected':'')+'>'+a+'</option>';}).join('')+'</select>'+
     '<button onclick="exporterConsoOutil()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
     '</div>';
   if(!rows.length)html+='<p class="es" style="padding:16px">Aucune donnée pour cette année.</p>';
@@ -3189,7 +3227,8 @@ function renderOutilPrime(container){
   });
   var articlesSansDuree=outilCatalogue.filter(function(a){return !a.duree_amortissement_mois;});
   var html='<div class="card"><div class="card-head"><h3>💶 Prime annuelle (paie de décembre)</h3>'+
-    '<button onclick="exporterPrimeOutillage()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div>'+
+    '<div style="display:flex;gap:8px;align-items:center"><span class="card-cnt">'+eligibles.length+' employé(s)</span>'+
+    '<button onclick="exporterPrimeOutillage()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div></div>'+
     '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Calculée sur les outils réellement reçus par chaque employé (Prix unitaire × 12 / Durée d\'amortissement).'+
     (articlesSansDuree.length?' ⚠️ '+articlesSansDuree.length+' article(s) sans durée d\'amortissement renseignée, exclus du calcul.':'')+'</p>';
   var total=0;
@@ -3272,8 +3311,9 @@ async function importerDonneesOutillage(){
 function renderOutilStock(container){
   container.innerHTML='<div id="outil-resume-sous-seuil"></div>'+
     '<div class="card"><div class="card-head"><h3>📦 Stock outillage</h3>'+
-    '<button onclick="exporterStockOutillage()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div>'+
-    '<div style="padding:10px 14px"><input type="text" id="outil-stock-q" oninput="refreshOutilStockResults()" placeholder="🔍 Filtrer par désignation, référence, marque..." style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px"></div>'+
+    '<div style="display:flex;gap:8px;align-items:center"><span class="card-cnt" id="outil-stock-cnt"></span>'+
+    '<button onclick="exporterStockOutillage()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div></div>'+
+    '<div class="filters" style="padding:10px 14px 0;margin-bottom:0"><input type="text" id="outil-stock-q" oninput="refreshOutilStockResults()" placeholder="🔍 Filtrer par désignation, référence, marque..." style="max-width:400px"></div>'+
     '<div id="outil-stock-results"></div></div>';
   refreshOutilStockResults();
   majResumeSousSeuilOutillage();
@@ -3297,6 +3337,8 @@ function refreshOutilStockResults(){
     if(!q)return true;
     return (a.type_article||'').toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.marque||'').toUpperCase().includes(q);
   }).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'');});
+  var cntEl2=document.getElementById('outil-stock-cnt');
+  if(cntEl2)cntEl2.textContent=rows.length+(outilCatalogue.length>rows.length?' / '+outilCatalogue.length+' (filtrés)':'')+' outil(s)';
   if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun article'+(q?' pour ce filtre':'')+'.</p>';return;}
   var canEdit=peutGererOutillage(ADMIN_SESSION.code);
   var valeurTotale=outilCatalogue.reduce(function(s,a){return s+(a.stock_actuel*a.prix_unitaire);},0);
@@ -3308,7 +3350,7 @@ function refreshOutilStockResults(){
     html+='<tr'+(a.stock_actuel<seuil?' class="warn-row"':'')+'><td>'+a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.marque||'—')+'</td><td>'+a.prix_unitaire.toFixed(2)+' €</td>'+
       '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
       '<td style="font-size:12px;color:var(--grey)">'+(a.stock_mini>0?a.stock_mini:'— (défaut '+seuil+')')+'</td>'+
-      (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
+      (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
         '<button onclick="editerStockOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button> '+
         '<button onclick="editerSeuilOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\','+(a.stock_mini||0)+')" style="padding:4px 10px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🎚️ Seuil</button></td>':'')+
     '</tr>';
@@ -3413,7 +3455,7 @@ function renderOutilGrille(container){
     services.forEach(function(s){
       var g=byKey[s[0]+'|'+t];
       var qte=g?g.quantite:0;
-      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleOutillage(\''+s[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:6px;text-align:center"></td>';
+      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleOutillage(\''+s[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;text-align:center;background:var(--card,#fff);color:var(--ds-text,#222)"></td>';
       else html+='<td style="text-align:center">'+qte+'</td>';
     });
     if(canEdit)html+='<td><button onclick="supprimerTypeGrilleOutillage(\''+t.replace(/'/g,"\\'")+'\')" title="Retirer ce type d\'article de la grille" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button></td>';
@@ -3471,7 +3513,7 @@ function renderOutilManquant(container){
     m.employes.forEach(function(c){parArticle[m.type_article].detail.push({code:c,service:m.service});});
   });
   var articles=Object.keys(parArticle).sort();
-  var html='<div class="card"><div class="card-head"><h3>📋 Ce qui reste à distribuer</h3></div>';
+  var html='<div class="card"><div class="card-head"><h3>📋 Ce qui reste à distribuer</h3><span class="card-cnt">'+articles.length+' article(s)</span></div>';
   if(!articles.length){container.innerHTML=html+'<p class="es" style="padding:16px">Tout est distribué ! 🎉</p></div>';return;}
   html+='<div class="tbl-wrap"><table><thead><tr><th>Outil</th><th>Manquant</th><th>Détail</th></tr></thead><tbody>';
   articles.forEach(function(a){
@@ -3488,8 +3530,8 @@ function renderOutilManquant(container){
 // ── Vue Distribution par employé ──
 function renderOutilDistribution(container){
   var eligibles=employesList.filter(function(e){return e.ServiceOutillage;}).sort(function(a,b){return (a.Nom||'').localeCompare(b.Nom||'');});
-  var html='<div class="card"><div class="card-head"><h3>🧰 Distribution par employé</h3></div>'+
-    '<div style="padding:10px 14px"><select id="outil-emp-sel" onchange="changerEmployeOutillage(this.value)" style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px">'+
+  var html='<div class="card"><div class="card-head"><h3>🧰 Distribution par employé</h3><span class="card-cnt">'+eligibles.length+' employé(s)</span></div>'+
+    '<div style="padding:10px 14px"><select id="outil-emp-sel" onchange="changerEmployeOutillage(this.value)" style="width:100%;max-width:400px;padding:8px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+
     '<option value="">-- Sélectionner un employé --</option>'+
     eligibles.map(function(e){return '<option value="'+e.Code+'"'+(OUTIL_EMPLOYE_SELECTIONNE===e.Code?' selected':'')+'>'+e.Nom+' ('+e.Code+') — '+e.ServiceOutillage+'</option>';}).join('')+
     '</select></div><div id="outil-emp-detail"></div></div>';
@@ -3785,7 +3827,7 @@ function renderDepot(){
       '<button onclick="depotChangerPage(1)" class="filter-btn" style="padding:6px 14px"'+(depotPage>=totalPages-1?' disabled':'')+'>Suivant ▶</button>';
   }
   var toggleEl=document.getElementById('depot-admin-toggle');
-  if(toggleEl){toggleEl.innerHTML=nbAdminDepot>0?'<button onclick="toggleAdminImmos(\'depot\')" style="padding:5px 12px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:'+(SHOW_ADMIN.depot?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.depot?'➖ Masquer':'➕ Afficher')+' les '+nbAdminDepot+' immos hors activité (mobilier, informatique, véhicules, financières…)</button>':'';}
+  if(toggleEl){toggleEl.innerHTML=nbAdminDepot>0?'<button onclick="toggleAdminImmos(\'depot\')" style="padding:5px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:12px;background:'+(SHOW_ADMIN.depot?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.depot?'➖ Masquer':'➕ Afficher')+' les '+nbAdminDepot+' immos hors activité (mobilier, informatique, véhicules, financières…)</button>':'';}
   tbEl.innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
     affiche.map(function(i){
       var l=getLib(i.code_im);var c=getCat(i.code_im);
@@ -3795,7 +3837,7 @@ function renderDepot(){
       return'<tr>'+
         '<td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+i.code_im+'</span></td>'+
         '<td style="font-size:12px">'+l+'</td>'+
-        '<td>'+badgeSiteD(siteImmoDash(i.code_im))+(peutEditerEmplacement(ADMIN_SESSION.code)?'<select class="immo-site-sel" data-cim="'+i.code_im+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid #eee;border-radius:5px"><option value="Reunion"'+(siteImmoDash(i.code_im)==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(siteImmoDash(i.code_im)==='Mayotte'?' selected':'')+'>Mayotte</option></select>':'')+'</td>'+
+        '<td>'+badgeSiteD(siteImmoDash(i.code_im))+(peutEditerEmplacement(ADMIN_SESSION.code)?'<select class="immo-site-sel" data-cim="'+i.code_im+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid var(--ds-border,#eee);border-radius:5px;background:var(--card,#fff);color:var(--ds-text,#222)"><option value="Reunion"'+(siteImmoDash(i.code_im)==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(siteImmoDash(i.code_im)==='Mayotte'?' selected':'')+'>Mayotte</option></select>':'')+'</td>'+
         '<td style="font-size:11px;color:var(--grey)">'+c+'</td>'+
         '<td>'+ebadge(i.etat)+'</td>'+
         '<td style="font-size:12px;font-weight:600;color:var(--blue)">'+va+'</td>'+
@@ -3894,7 +3936,7 @@ function afficherPreviewImportImmos(creations,affectations,erreurs){
   if(!creations.length&&!affectations.length){
     prev.innerHTML='<div class="card" style="border-top:3px solid var(--red);margin:10px 0"><div style="padding:14px"><b>Aucune ligne exploitable</b> dans le fichier importé.'+
       (erreurs.length?'<p style="font-size:11px;color:var(--grey);margin-top:6px">'+erreurs.length+' ligne(s) ignorée(s) — ex : '+erreurs.slice(0,5).map(function(e){return 'L'+e.ligne+' '+e.code+' ('+e.motif+')';}).join(', ')+(erreurs.length>5?'…':'')+'</p>':'')+
-      '<button onclick="document.getElementById(\'depot-import-preview\').innerHTML=\'\'" style="margin-top:10px;padding:6px 14px;background:#eee;border:none;border-radius:8px;cursor:pointer">Fermer</button></div></div>';
+      '<button onclick="document.getElementById(\'depot-import-preview\').innerHTML=\'\'" style="margin-top:10px;padding:6px 14px;background:var(--ds-neutral-100,#eee);border:none;border-radius:8px;cursor:pointer">Fermer</button></div></div>';
     return;
   }
   var html='<div class="card" style="border-top:3px solid var(--orange);margin:10px 0"><div class="card-head"><h3>📤 Aperçu de l\'import</h3></div><div style="padding:14px">'+
@@ -3914,7 +3956,7 @@ function afficherPreviewImportImmos(creations,affectations,erreurs){
     html+='<p style="font-size:11px;color:var(--red);margin-top:10px">⚠️ Lignes ignorées : '+erreurs.slice(0,20).map(function(e){return 'L'+e.ligne+' '+e.code+' ('+e.motif+')';}).join(' · ')+(erreurs.length>20?'…':'')+'</p>';
   }
   html+='<div style="display:flex;gap:8px;margin-top:14px"><button onclick="confirmerImportImmos()" style="padding:8px 18px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Confirmer l\'import ('+(creations.length+affectations.length)+' ligne'+((creations.length+affectations.length)>1?'s':'')+')</button>'+
-    '<button onclick="document.getElementById(\'depot-import-preview\').innerHTML=\'\'" style="padding:8px 18px;background:#eee;color:#444;border:none;border-radius:8px;cursor:pointer">Annuler</button></div>'+
+    '<button onclick="document.getElementById(\'depot-import-preview\').innerHTML=\'\'" style="padding:8px 18px;background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);border:none;border-radius:8px;cursor:pointer">Annuler</button></div>'+
     '<div id="depot-import-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div>'+
     '</div></div>';
   prev.innerHTML=html;
@@ -3990,7 +4032,7 @@ function renderMaterielIT(){
   if(!outer)return;
   var vues=[['telephones','📱 Téléphones'],['lignes','☎️ Lignes']];
   var html='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
-    vues.map(function(v){return '<button onclick="changerVueMaterielIT(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(matItVue===v[0]?'var(--blue)':'#eee')+';color:'+(matItVue===v[0]?'#fff':'#444')+'">'+v[1]+'</button>';}).join('')+
+    vues.map(function(v){return '<button onclick="changerVueMaterielIT(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(matItVue===v[0]?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(matItVue===v[0]?'#fff':'var(--ds-text,#444)')+'">'+v[1]+'</button>';}).join('')+
     '</div><div id="materiel-it-sub"></div>';
   outer.innerHTML=html;
   if(matItVue==='lignes')renderMaterielITLignes();
@@ -4009,7 +4051,7 @@ function renderMaterielITTelephones(){
       '<div id="materiel-it-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
   }
   html+='<div class="card"><div class="card-head"><h3>📱 Matériel IT</h3>'+
-    (canEdit?'<button onclick="ouvrirAjoutMaterielIT()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter un appareil</button>':'')+
+    (canEdit?'<button onclick="ouvrirAjoutMaterielIT()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter un appareil</button>':'')+
     '</div>'+
     '<div class="filters" style="padding:10px 14px">'+
     '<input type="text" id="mit-q" oninput="refreshMaterielITResults()" placeholder="🔍 Code, marque, modèle, détenteur, n° tél..." style="flex:2;min-width:220px">'+
@@ -4079,8 +4121,8 @@ function renderMaterielITDetail(){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var html='<button onclick="fermerDetailMaterielIT()" class="filter-btn" style="margin-bottom:12px">← Retour à la liste</button>'+
     '<div class="card"><div class="card-head"><h3>'+m.code+' — '+(m.marque||'')+' '+(m.modele||'')+'</h3>'+
-    (canEdit?'<div style="display:flex;gap:8px"><button onclick="ouvrirAffectationMaterielIT(\''+m.code+'\')" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Affecter</button>'+
-      '<button onclick="ouvrirModifMaterielIT(\''+m.code+'\')" style="padding:6px 14px;background:#eee;color:#444;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✏️ Modifier</button></div>':'')+
+    (canEdit?'<div style="display:flex;gap:8px"><button onclick="ouvrirAffectationMaterielIT(\''+m.code+'\')" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Affecter</button>'+
+      '<button onclick="ouvrirModifMaterielIT(\''+m.code+'\')" style="padding:6px 14px;background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✏️ Modifier</button></div>':'')+
     '</div>'+
     '<div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">'+
       '<div><b style="font-size:11px;color:var(--grey)">TYPE</b><div>'+(m.type_materiel||'—')+'</div></div>'+
@@ -4307,7 +4349,7 @@ function renderMaterielITLignes(){
       '<div id="lignes-tel-migration-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div></div></div>';
   }
   html+='<div class="card"><div class="card-head"><h3>☎️ Lignes téléphoniques</h3>'+
-    (canEdit?'<button onclick="ouvrirAjoutLigneTel()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter une ligne</button>':'')+
+    (canEdit?'<button onclick="ouvrirAjoutLigneTel()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter une ligne</button>':'')+
     '</div>'+
     '<div class="filters" style="padding:10px 14px">'+
     '<input type="text" id="lt-q" oninput="refreshLignesTelResults()" placeholder="🔍 Code, n° téléphone, opérateur, détenteur..." style="flex:2;min-width:220px">'+
@@ -4366,8 +4408,8 @@ function renderLigneTelDetail(){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var html='<button onclick="fermerDetailLigneTel()" class="filter-btn" style="margin-bottom:12px">← Retour à la liste</button>'+
     '<div class="card"><div class="card-head"><h3>'+l.code+' — '+(l.n_telephone||'—')+'</h3>'+
-    (canEdit?'<div style="display:flex;gap:8px"><button onclick="ouvrirAffectationLigneTel(\''+l.code+'\')" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Affecter</button>'+
-      '<button onclick="ouvrirModifLigneTel(\''+l.code+'\')" style="padding:6px 14px;background:#eee;color:#444;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✏️ Modifier</button></div>':'')+
+    (canEdit?'<div style="display:flex;gap:8px"><button onclick="ouvrirAffectationLigneTel(\''+l.code+'\')" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Affecter</button>'+
+      '<button onclick="ouvrirModifLigneTel(\''+l.code+'\')" style="padding:6px 14px;background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">✏️ Modifier</button></div>':'')+
     '</div>'+
     '<div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">'+
       '<div><b style="font-size:11px;color:var(--grey)">N° TÉLÉPHONE</b><div>'+(l.n_telephone||'—')+'</div></div>'+
@@ -4535,7 +4577,7 @@ async function migrerLignesTelephoniques(){
 }
 
 // ══════════════ AJOUT IMMO / EMPLOYÉ ══════════════
-var addFieldStyle='width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-top:4px';
+var addFieldStyle='width:100%;padding:10px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:14px;margin-top:4px;background:var(--card);color:var(--ds-text,#222)';
 var addLabelStyle='font-size:12px;font-weight:700;color:var(--blue)';
 
 function fermerAjout(){document.getElementById('add-overlay').style.display='none';}
@@ -4639,11 +4681,11 @@ function ouvrirAjoutEmploye(){
     '<p style="font-size:12px;font-weight:700;color:var(--blue);margin-top:10px">🦺 EPI (si concerné — sinon laisser "Non concerné")</p>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Affectation</label><select id="ae-epi-affectation" style="'+addFieldStyle+'">'+Object.keys(EPI_AFF_LABELS).map(function(k){return '<option value="'+k+'">'+EPI_AFF_LABELS[k]+'</option>';}).join('')+'</select></div>'+
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">'+
-    '<div><label style="font-size:11px;color:var(--grey)">Pantalon</label><input id="ae-epi-pantalon" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-    '<div><label style="font-size:11px;color:var(--grey)">T-shirt</label><input id="ae-epi-tshirt" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-    '<div><label style="font-size:11px;color:var(--grey)">Veste</label><input id="ae-epi-veste" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-    '<div><label style="font-size:11px;color:var(--grey)">Chaussures</label><input id="ae-epi-chaussures" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-    '<div><label style="font-size:11px;color:var(--grey)">Gants</label><input id="ae-epi-gants" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">Pantalon</label><input id="ae-epi-pantalon" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">T-shirt</label><input id="ae-epi-tshirt" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">Veste</label><input id="ae-epi-veste" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">Chaussures</label><input id="ae-epi-chaussures" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+    '<div><label style="font-size:11px;color:var(--grey)">Gants</label><input id="ae-epi-gants" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
     '</div><p style="font-size:10px;color:var(--grey);margin-top:4px">La taille de veste se remplit automatiquement sur celle du t-shirt (modifiable si différente).</p>';
   document.getElementById('add-overlay').style.display='flex';
   document.getElementById('add-confirm-btn').onclick=enregistrerEmploye;
@@ -4776,7 +4818,7 @@ function renderTransferts(){
     html+='<td style="font-size:11px;color:var(--grey)">'+(t.note||'—')+'</td>';
     html+='<td style="white-space:nowrap;min-width:200px">';
     if(estGarant(ADMIN_SESSION.code)){
-    html+='<select class="sel-etat-t" style="font-size:11px;padding:2px 6px;border:1px solid #ddd;border-radius:6px;margin-right:4px;margin-bottom:4px">';
+    html+='<select class="sel-etat-t" style="font-size:11px;padding:2px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;margin-right:4px;margin-bottom:4px">';
     html+='<option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option>';
     html+='</select><br>';
     html+='<button class="btn-val-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">✅ Valider</button>';
@@ -4857,7 +4899,7 @@ function renderResa(){
   var pFin=new Date(lundi.getTime()+NB*86400000);
   var ganttData=reservations.filter(function(r){if(!r.date_debut&&!r.date_fin)return false;var rd=r.date_debut?new Date(r.date_debut):lundi;var rf=r.date_fin?new Date(r.date_fin):pFin;return!(rf<lundi||rd>pFin);});
   var gh='<table class="gantt-table"><thead><tr><th class="header-col">Immo</th>';
-  var lastM=-1;cols.forEach(function(dd){if(dd.getMonth()!==lastM){var sp=cols.filter(function(c){return c.getMonth()===dd.getMonth();}).length;gh+='<th colspan="'+sp+'" style="background:#F0F4F8;color:var(--blue);font-weight:700;text-align:center;border:1px solid #ddd">'+moisFR[dd.getMonth()]+' '+dd.getFullYear()+'</th>';lastM=dd.getMonth();}});
+  var lastM=-1;cols.forEach(function(dd){if(dd.getMonth()!==lastM){var sp=cols.filter(function(c){return c.getMonth()===dd.getMonth();}).length;gh+='<th colspan="'+sp+'" style="background:#F0F4F8;color:var(--blue);font-weight:700;text-align:center;border:1px solid var(--ds-border-strong,#ddd)">'+moisFR[dd.getMonth()]+' '+dd.getFullYear()+'</th>';lastM=dd.getMonth();}});
   gh+='</tr><tr><th class="header-col"></th>';
   cols.forEach(function(dd){var isT=dd.toDateString()===today.toDateString();var isW=dd.getDay()===0||dd.getDay()===6;var st=isT?'background:var(--orange);color:#fff;border-radius:3px;':isW?'color:#ccc;':'color:var(--grey);';gh+='<th style="'+st+'padding:1px 2px;text-align:center">'+jFR[(dd.getDay()+6)%7]+'<br>'+dd.getDate()+'</th>';});
   gh+='</tr></thead><tbody>';
@@ -4900,7 +4942,7 @@ function renderResa(){
       tr+='<td style="font-size:12px">'+(r.nom_chantier||'—')+'</td>';
       tr+='<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td>';
       tr+='<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_fin)+'</td>';
-      tr+='<td><select class="resa-action-sel" data-rid="'+r.id+'" data-cim="'+r.code_im+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'" data-deb="'+r.date_debut+'" data-fin="'+r.date_fin+'" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:6px"><option value="">Action...</option><option value="Confirmee">✅ Confirmer</option><option value="Annulee">❌ Annuler</option><option value="contre_prop">✏️ Proposer modification</option></select></td>';
+      tr+='<td><select class="resa-action-sel" data-rid="'+r.id+'" data-cim="'+r.code_im+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'" data-deb="'+r.date_debut+'" data-fin="'+r.date_fin+'" style="font-size:11px;padding:3px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"><option value="">Action...</option><option value="Confirmee">✅ Confirmer</option><option value="Annulee">❌ Annuler</option><option value="contre_prop">✏️ Proposer modification</option></select></td>';
       tr+='</tr>';return tr;
     }).join('');
 }
@@ -4915,7 +4957,7 @@ function ouvrirAjoutReservation(){
   var empOpts='<option value="">— Sélectionner —</option>'+actifs.map(function(e){return '<option value="'+e.Code+'">'+e.Code+' — '+(e.Nom||e.Code)+'</option>';}).join('');
   document.getElementById('add-form').innerHTML=
     '<div class="frow"><label style="'+addLabelStyle+'">Pour qui ? *</label><select id="ar-employe" style="'+addFieldStyle+'">'+empOpts+'</select></div>'+
-    '<div class="frow" style="position:relative"><label style="'+addLabelStyle+'">Immobilisation *</label><div style="display:flex;gap:8px;align-items:center"><input id="ar-code" autocomplete="off" style="'+addFieldStyle+'" placeholder="Tape un code, un nom ou une marque (ex: 532, rainureuse, Makita)"><span id="ar-code-check" style="font-size:18px"></span></div><div id="ar-code-suggest" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div><p id="ar-code-lib" style="font-size:11px;color:var(--grey);margin-top:2px"></p></div>'+
+    '<div class="frow" style="position:relative"><label style="'+addLabelStyle+'">Immobilisation *</label><div style="display:flex;gap:8px;align-items:center"><input id="ar-code" autocomplete="off" style="'+addFieldStyle+'" placeholder="Tape un code, un nom ou une marque (ex: 532, rainureuse, Makita)"><span id="ar-code-check" style="font-size:18px"></span></div><div id="ar-code-suggest" style="position:absolute;top:100%;left:0;right:0;background:var(--card,#fff);color:var(--ds-text,#222);border:1px solid var(--ds-border,#ddd);border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div><p id="ar-code-lib" style="font-size:11px;color:var(--grey);margin-top:2px"></p></div>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Chantier</label><input id="ar-chantier" style="'+addFieldStyle+'" placeholder="Optionnel"></div>'+
     '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date de début *</label><input id="ar-date-debut" type="date" style="'+addFieldStyle+'"></div>'+
     '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date de fin *</label><input id="ar-date-fin" type="date" style="'+addFieldStyle+'"></div></div>'+
@@ -5127,8 +5169,8 @@ function renderMaint(){
 
   // ── Rendu ──
   var filtreHtml='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center">'+
-    '<select onchange="setSiteFilter(\'maintenance\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
-    '<label style="font-size:12px;color:var(--grey)">Seuil dormance : <select onchange="setSeuilDormant(this.value)" style="padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:12px"><option value="3"'+(SEUIL_DORMANT_MOIS===3?' selected':'')+'>3 mois</option><option value="6"'+(SEUIL_DORMANT_MOIS===6?' selected':'')+'>6 mois</option><option value="12"'+(SEUIL_DORMANT_MOIS===12?' selected':'')+'>12 mois</option></select></label></div>';
+    '<select onchange="setSiteFilter(\'maintenance\',this.value)" style="padding:7px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select>'+
+    '<label style="font-size:12px;color:var(--grey)">Seuil dormance : <select onchange="setSeuilDormant(this.value)" style="padding:6px 8px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:12px"><option value="3"'+(SEUIL_DORMANT_MOIS===3?' selected':'')+'>3 mois</option><option value="6"'+(SEUIL_DORMANT_MOIS===6?' selected':'')+'>6 mois</option><option value="12"'+(SEUIL_DORMANT_MOIS===12?' selected':'')+'>12 mois</option></select></label></div>';
 
   // Bandeau résumé
   var vncDormant=dormantes.reduce(function(s,x){return s+x.vnc;},0);
@@ -5247,7 +5289,7 @@ function renderAlertes(){
   if(hs.length)html+='<div class="card" style="margin-bottom:12px;border-top:3px solid var(--red)"><div class="card-head"><h3>🔴 Hors service actuel ('+hs.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Détenteur</th><th>Depuis</th></tr></thead><tbody>'+hs.map(function(i){return'<tr class="urgent-row"><td><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+'</td><td style="font-size:12px">'+getLib(i.code_im)+'</td><td>'+i.detenteur_nom+'</td><td>'+fmtD(i.since)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
   if(ret.length)html+='<div class="card"><div class="card-head"><h3>⏰ Transferts >24h ('+ret.length+')</h3></div><div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Donneur</th><th>Receveur</th><th>Attente</th></tr></thead><tbody>'+ret.map(function(t){var h=Math.round((now-new Date(t.horodatage).getTime())/3600000);return'<tr class="warn-row"><td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+getLib(t.code_im).replace(/"/g,'')+'">'+t.code_im+'</span>'+drapImmoDash(t.code_im)+'</td><td>'+t.donneur_nom+'</td><td>'+t.receveur_nom+'</td><td><span class="badge bret">'+h+'h</span></td></tr>';}).join('')+'</tbody></table></div></div>';
   // Filtre site en tête
-  var filtreHtml='<div style="margin-bottom:12px"><select onchange="setSiteFilter(\'alertes\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select></div>';
+  var filtreHtml='<div style="margin-bottom:12px"><select onchange="setSiteFilter(\'alertes\',this.value)" style="padding:7px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px"><option value=""'+(fs===''?' selected':'')+'>🌍 Tous les sites</option><option value="Reunion"'+(fs==='Reunion'?' selected':'')+'>Réunion</option><option value="Mayotte"'+(fs==='Mayotte'?' selected':'')+'>Mayotte</option></select></div>';
   if(!html)html='<div class="es" style="padding:40px">Aucune alerte active'+(fs?' sur '+fs:'')+'. Tout est OK ✅</div>';
   div.innerHTML=filtreHtml+html;
   // Attacher handlers des boutons Suivi et Résoudre
@@ -5505,7 +5547,7 @@ function resetFiltresUsers(){reinitialiserFiltres(['users-q','users-role','users
 // Génère le HTML d'un sélecteur de filtre site pour un onglet
 function siteFilterSelect(tab){
   var v=SITE_FILTERS[tab]||'';
-  return '<select onchange="setSiteFilter(\''+tab+'\',this.value)" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px">'+
+  return '<select onchange="setSiteFilter(\''+tab+'\',this.value)" style="padding:7px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px">'+
     '<option value=""'+(v===''?' selected':'')+'>🌍 Tous les sites</option>'+
     '<option value="Reunion"'+(v==='Reunion'?' selected':'')+'>Réunion</option>'+
     '<option value="Mayotte"'+(v==='Mayotte'?' selected':'')+'>Mayotte</option>'+
@@ -5604,11 +5646,11 @@ function renderUsers(){
 
   // Filtres — rendus UNE fois ; le filtrage ne régénère que le tbody (garde le focus de l\'input)
   html+='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'+
-    '<input type="text" id="users-q" oninput="filterUsers()" placeholder="🔍 Rechercher un nom ou code..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
-    '<select id="users-role" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">'+
+    '<input type="text" id="users-q" oninput="filterUsers()" placeholder="🔍 Rechercher un nom ou code..." style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:14px">'+
+    '<select id="users-role" onchange="filterUsers()" style="padding:8px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:14px">'+
     '<option value="">Tous les rôles</option><option value="Administrateur">Administrateur</option><option value="Gestionnaire dépôt RUN">Gestionnaire dépôt RUN</option><option value="Logistique Mayotte">Logistique Mayotte</option><option value="Responsable d’affaires">Responsable d’affaires</option><option value="CT spécialisé">CT spécialisé</option><option value="Conducteur de travaux">CT</option><option value="Ouvrier spécialisé">Ouvrier spécialisé</option><option value="Ouvrier">Ouvrier</option><option value="Encadrement">Encadrement</option></select>'+
-    '<select id="users-site" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px"><option value="">Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>'+
-    '<select id="users-actif" onchange="filterUsers()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px"><option value="">Actifs + inactifs</option><option value="1" selected>Actifs seulement</option><option value="0">Inactifs seulement</option></select>'+
+    '<select id="users-site" onchange="filterUsers()" style="padding:8px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:14px"><option value="">Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>'+
+    '<select id="users-actif" onchange="filterUsers()" style="padding:8px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:14px"><option value="">Actifs + inactifs</option><option value="1" selected>Actifs seulement</option><option value="0">Inactifs seulement</option></select>'+
     '<button class="filter-btn" onclick="resetFiltresUsers()">🔄 Réinitialiser</button>'+
     '</div>';
 
@@ -5654,11 +5696,11 @@ function filterUsers(){
       '<td><span class="link-emp" data-emp="'+u.code+'" data-nom="'+u.nom.replace(/"/g,'')+'"><b style="font-size:13px">'+u.nom+'</b></span></td>'+
       '<td style="font-family:monospace;font-size:12px;color:var(--grey)">'+u.code+'</td>'+
       '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span>'+(u.explicite?'':' <span style="font-size:9px;color:#bbb" title="Rôle déduit automatiquement">(auto)</span>')+'</td>'+
-      '<td>'+badgeSiteD(u.site)+'<select class="site-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid #eee;border-radius:5px">'+siteOpts+'</select></td>'+
+      '<td>'+badgeSiteD(u.site)+'<select class="site-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid var(--ds-border,#eee);border-radius:5px;background:var(--card,#fff);color:var(--ds-text,#222)">'+siteOpts+'</select></td>'+
       '<td style="text-align:center"><button class="actif-toggle" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" data-actif="'+(u.actif?'1':'0')+'" style="border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;background:'+(u.actif?'var(--ds-success-bg,#E8F5E9)':'var(--ds-danger-bg,#FFEBEE)')+';color:'+(u.actif?'var(--ds-success-dark,#1B5E20)':'var(--ds-danger-dark,#B71C1C)')+'">'+(u.actif?'✓ Actif':'✕ Inactif')+'</button></td>'+
       '<td style="text-align:center">'+(u.hasPwd?'<span title="Mot de passe défini" style="color:#1B5E20;font-size:13px">🔒 Défini</span><br><button class="pwd-reset" data-code="'+u.code+'" style="margin-top:3px;border:none;background:#FFF3E0;color:#E65100;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">Réinitialiser</button>':'<span title="Aucun mot de passe" style="color:#B71C1C;font-size:12px">🔓 Non défini</span>')+'</td>'+
       '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
-      '<td><select class="role-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">'+opts+'</select></td>'+
+      '<td><select class="role-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="font-size:11px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px">'+opts+'</select></td>'+
     '</tr>';
   }).join('')||'<tr><td colspan="8" class="es">Aucun utilisateur trouvé.</td></tr>';
   // Attacher les handlers
@@ -5958,7 +6000,7 @@ function renderAnalyse(){
   });
   candidats.sort(function(a,b){return (b.alerte?1:0)-(a.alerte?1:0)||b.ratio_vnc-a.ratio_vnc||b.ratio_achat-a.ratio_achat||b.nb_pannes-a.nb_pannes;});
   html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>🚨 Candidats à la réforme</h3>'+
-    '<label style="font-size:12px;color:var(--grey)">Seuil : <select onchange="setSeuilReforme(this.value)" style="padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:12px">'+
+    '<label style="font-size:12px;color:var(--grey)">Seuil : <select onchange="setSeuilReforme(this.value)" style="padding:6px 8px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:12px">'+
     '<option value="40"'+(SEUIL_REFORME_PCT===40?' selected':'')+'>40%</option>'+
     '<option value="60"'+(SEUIL_REFORME_PCT===60?' selected':'')+'>60%</option>'+
     '<option value="80"'+(SEUIL_REFORME_PCT===80?' selected':'')+'>80%</option></select></label></div>';
@@ -5998,7 +6040,7 @@ function renderAnalyse(){
   inv.forEach(function(i){if(!estImmoActivite(i.code_im))return;var c=getCat(i.code_im)||'Sans catégorie';catTotal[c]=(catTotal[c]||0)+1;if(i.statut==='En circulation')catCirc[c]=(catCirc[c]||0)+1;});
   html+='<div class="card"><div class="card-head"><h3>📈 Taux d utilisation par catégorie</h3></div><div style="padding:12px">';
   Object.keys(catTotal).sort(function(a,b){var pa=Math.round((catCirc[a]||0)/catTotal[a]*100);var pb=Math.round((catCirc[b]||0)/catTotal[b]*100);return pb-pa;}).forEach(function(c){var tot=catTotal[c];var circ=catCirc[c]||0;var pct=Math.round(circ/tot*100);
-    html+='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+c+'</span><span><b>'+circ+'</b>/'+tot+' ('+pct+'%)</span></div><div style="background:#eee;border-radius:4px;height:6px"><div style="background:var(--orange);width:'+pct+'%;height:6px;border-radius:4px"></div></div></div>';
+    html+='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+c+'</span><span><b>'+circ+'</b>/'+tot+' ('+pct+'%)</span></div><div style="background:var(--ds-neutral-100,#eee);border-radius:4px;height:6px"><div style="background:var(--orange);width:'+pct+'%;height:6px;border-radius:4px"></div></div></div>';
   });
   html+='</div></div>';
 
@@ -6201,13 +6243,13 @@ async function chargerFicheEmploye(code,nom){
     html+='<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>🦺 EPI</h3></div><div style="padding:12px 14px">';
     if(canEditEPI){
       html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px">'+
-        '<div><label style="font-size:11px;color:var(--grey)">Affectation</label><select id="epi-emp-affectation" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px">'+Object.keys(EPI_AFF_LABELS).map(function(k){return '<option value="'+k+'"'+(k===empEpi.affectationEpi?' selected':'')+'>'+EPI_AFF_LABELS[k]+'</option>';}).join('')+'</select></div>'+
-        '<div><label style="font-size:11px;color:var(--grey)">Pantalon</label><input id="epi-emp-pantalon" value="'+(empEpi.taillePantalon||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-        '<div><label style="font-size:11px;color:var(--grey)">T-shirt</label><input id="epi-emp-tshirt" value="'+(empEpi.tailleTshirt||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-        '<div><label style="font-size:11px;color:var(--grey)">Veste</label><input id="epi-emp-veste" value="'+(empEpi.tailleVeste||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-        '<div><label style="font-size:11px;color:var(--grey)">Chaussures</label><input id="epi-emp-chaussures" value="'+(empEpi.pointureChaussures||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-        '<div><label style="font-size:11px;color:var(--grey)">Gants</label><input id="epi-emp-gants" value="'+(empEpi.tailleGants||'')+'" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px"></div>'+
-        '</div><button onclick="sauvegarderTaillesEPI(\''+code+'\')" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px">💾 Enregistrer</button>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Affectation</label><select id="epi-emp-affectation" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px">'+Object.keys(EPI_AFF_LABELS).map(function(k){return '<option value="'+k+'"'+(k===empEpi.affectationEpi?' selected':'')+'>'+EPI_AFF_LABELS[k]+'</option>';}).join('')+'</select></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Pantalon</label><input id="epi-emp-pantalon" value="'+(empEpi.taillePantalon||'')+'" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">T-shirt</label><input id="epi-emp-tshirt" value="'+(empEpi.tailleTshirt||'')+'" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Veste</label><input id="epi-emp-veste" value="'+(empEpi.tailleVeste||'')+'" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Chaussures</label><input id="epi-emp-chaussures" value="'+(empEpi.pointureChaussures||'')+'" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+        '<div><label style="font-size:11px;color:var(--grey)">Gants</label><input id="epi-emp-gants" value="'+(empEpi.tailleGants||'')+'" style="width:100%;padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"></div>'+
+        '</div><button onclick="sauvegarderTaillesEPI(\''+code+'\')" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px">💾 Enregistrer</button>'+
         (empEpi.affectationEpi?' <button onclick="genererDotationIndividuelleEPI(\''+code+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;margin-left:6px">🚀 Générer sa fiche EPI</button>':'');
     }else{
       html+='<p style="font-size:12px;color:var(--grey)">Affectation : '+(EPI_AFF_LABELS[empEpi.affectationEpi]||'—')+' · Pantalon '+(empEpi.taillePantalon||'—')+' · T-shirt '+(empEpi.tailleTshirt||'—')+' · Veste '+(empEpi.tailleVeste||'—')+' · Chaussures '+(empEpi.pointureChaussures||'—')+' · Gants '+(empEpi.tailleGants||'—')+'</p>';
@@ -6235,10 +6277,10 @@ async function chargerFicheEmploye(code,nom){
     if(canEditOutil){
       html+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'+
         '<label style="font-size:11px;color:var(--grey)">Service</label>'+
-        '<select id="outil-emp-service" style="padding:6px;border:1px solid #ddd;border-radius:6px">'+
+        '<select id="outil-emp-service" style="padding:6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px">'+
         ['','Travaux Neufs','Maintenance'].map(function(s){return '<option value="'+s+'"'+(s===empOutil.serviceOutillage?' selected':'')+'>'+(s||'— Non concerné —')+'</option>';}).join('')+
         '</select>'+
-        '<button onclick="sauvegarderServiceOutillage(\''+code+'\')" style="padding:6px 12px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Enregistrer</button>'+
+        '<button onclick="sauvegarderServiceOutillage(\''+code+'\')" style="padding:6px 12px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">💾 Enregistrer</button>'+
         '</div>';
     }
     if(peutVoirOutillage(ADMIN_SESSION.code)&&empOutil.serviceOutillage){
@@ -6367,7 +6409,7 @@ async function ouvrirPhotosModal(codeIM){
   try{
     var r=await fetch(W+'?photos='+encodeURIComponent(codeIM));
     var photos=await r.json();
-    var html='<button onclick="chargerFicheImmo(\''+codeIM+'\')" style="margin-bottom:12px;padding:6px 14px;background:#eee;border:none;border-radius:8px;cursor:pointer;font-size:13px">← Retour fiche</button>';
+    var html='<button onclick="chargerFicheImmo(\''+codeIM+'\')" style="margin-bottom:12px;padding:6px 14px;background:var(--ds-neutral-100,#eee);border:none;border-radius:8px;cursor:pointer;font-size:13px">← Retour fiche</button>';
     html+='<h3 style="color:var(--blue);margin-bottom:12px">'+codeIM+' — '+photos.length+' photo(s)</h3>';
     if(!photos.length)html+='<p style="color:var(--grey)">Aucune photo.</p>';
     else html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+photos.map(function(p){return'<div style="border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)"><img src="'+p.url+'" loading="lazy" style="width:100%;height:150px;object-fit:cover;cursor:pointer" onclick="window.open(this.src)"><p style="font-size:11px;color:var(--grey);padding:4px 8px;margin:0">'+fmtD(p.created)+'</p></div>';}).join('')+'</div>';
@@ -6521,7 +6563,7 @@ function ouvrirActionMouvement(type,codeIM,libIM,codeEmp,nomEmp){
   if(type==='Transfert'){html+='<div class="frow"><label>Transférer à</label>';
     if(codeEmp)html+='<input type="text" id="act-emp-fix" value="'+nomEmp+' ('+codeEmp+')" readonly style="background:#F8FAFC">';
     else html+='<div style="position:relative"><input type="text" id="act-emp" autocomplete="off" placeholder="Tape un code ou un nom..." style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px">'+
-      '<div id="act-emp-suggest" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div>';
+      '<div id="act-emp-suggest" style="position:absolute;top:100%;left:0;right:0;background:var(--card,#fff);color:var(--ds-text,#222);border:1px solid var(--ds-border,#ddd);border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div>';
     html+='</div>';}
   html+='<div class="frow"><label>État</label><select id="act-etat"><option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option><option value="Hors service">🔴 Hors service</option></select></div>';
   html+='<div class="frow"><label>Note</label><textarea id="act-note" rows="2" placeholder="Motif..."></textarea></div>';
@@ -6602,7 +6644,7 @@ function ouvrirModifTransfert(tid,cim,recCode,recNom){
     '<div class="frow"><label>Code IM</label><input type="text" value="'+cim+' — '+getLib(cim)+'" readonly style="background:#F8FAFC"></div>'+
     '<div class="frow"><label>Changer le receveur (optionnel)</label><div style="position:relative">'+
       '<input type="text" id="mt-receveur" autocomplete="off" placeholder="Garder '+recNom+' — ou tape un code/nom pour changer" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px">'+
-      '<div id="mt-receveur-suggest" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div></div>'+
+      '<div id="mt-receveur-suggest" style="position:absolute;top:100%;left:0;right:0;background:var(--card,#fff);color:var(--ds-text,#222);border:1px solid var(--ds-border,#ddd);border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div></div>'+
     '<div class="frow"><label>Note</label><textarea id="mt-note" rows="2" placeholder="Motif de la modification..."></textarea></div>';
   document.getElementById('act-overlay').classList.add('open');
   attacherRechercheEmploye('mt-receveur','mt-receveur-suggest',empListeCandidats(true));
@@ -6729,17 +6771,6 @@ function soumettreContreProposition(){
     .catch(function(e){alert('Erreur : '+e.message);});
 }
 
-async function declarerVol(codeIM,libelle,type){
-  var motif=prompt('MOTIF OBLIGATOIRE - Declarer ' + codeIM + ' comme [' + type + '] - min 10 car. :');
-  if(!motif||motif.trim().length<10){alert('Motif obligatoire, 10 car. minimum.');return;}
-  if(!(await confirmModal('1ere CONFIRMATION : Declarer ' + codeIM + ' [' + type + '] ? Immo retirée définitivement du parc.')))return;
-  if(!(await confirmModal('CONFIRMATION FINALE : Cette action est irreversible. Confirmer [' + type + '] pour ' + codeIM + ' ?',{danger:true})))return;
-  fetch(W+'?action=declarer_vol',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,type_vol:type,motif:motif,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
-    .then(function(){fermerFiche();refreshAll();alert('✅ Immo ' + codeIM + ' déclarée [' + type + ']. Retirée du parc.');})
-    .catch(function(e){alert('Erreur : '+e.message);});
-}
-
 function ouvrirModalSortie(codeIM,libelle){
   document.getElementById('act-titre').textContent='⛔ Sortie définitive — '+libelle;
   document.getElementById('act-form').innerHTML=
@@ -6783,28 +6814,6 @@ async function declarerPanneDash(codeIM){
   fetch(W+'?action=declarer_panne',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({code_im:codeIM,code_employe:ADMIN_SESSION.code,nom_employe:ADMIN_SESSION.nom,motif:motif})})
     .then(function(){fermerFiche();refreshAll();alert('✅ Panne déclarée. Immo marquée "En panne".');})
-    .catch(function(e){alert('Erreur : '+e.message);});
-}
-
-async function marquerImmoInactive(codeIM,libelle,type){
-  var motif=prompt('Motif pour ' + codeIM + ' [' + type + '] - min 10 car. :');
-  if(!motif||motif.trim().length<10){alert('Motif obligatoire, 10 car. minimum.');return;}
-  if(!(await confirmModal('1ere CONFIRMATION : Marquer ' + codeIM + ' comme [' + type + '] ? Cette action exclut l immo des reservations.')))return;
-  if(!(await confirmModal('CONFIRMATION FINALE IRREVERSIBLE : Confirmer definitvement le statut [' + type + '] pour ' + codeIM + ' ?',{danger:true})))return;
-  fetch(W+'?action=marquer_statut_immo',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat:type,actif:false,motif:motif,type_mouv:'Archivage',par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
-    .then(function(){fermerFiche();refreshAll();alert('✅ Immo marquée comme ' + type + '.');})
-    .catch(function(e){alert('Erreur : '+e.message);});
-}
-
-async function resoudrePanne(codeIM){
-  var etat=prompt('Etat de l immo ' + codeIM + ' apres reparation :', 'Bon état');
-  if(!etat)return;
-  var note=prompt('Note de resolution (optionnel) :', '') || '';
-  if(!(await confirmModal('Panne resolue sur ' + codeIM + ' ? Nouvel etat : ' + etat)))return;
-  fetch(W+'?action=resoudre_panne',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code_im:codeIM,etat_resolution:etat,note:note,par_code:ADMIN_SESSION.code,par_nom:ADMIN_SESSION.nom})})
-    .then(function(){fermerFiche();refreshAll();alert('✅ Panne résolue !');})
     .catch(function(e){alert('Erreur : '+e.message);});
 }
 
