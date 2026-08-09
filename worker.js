@@ -1502,7 +1502,8 @@ async function handleRequest(request) {
           Reference: reference, Designation: body.designation || '', Fournisseur: body.fournisseur || '', Stock_Actuel: parseFloat(body.stock_actuel) || 0
         } }) });
         const rd = await r.json();
-        return json({ success: r.ok, id: rd.id });
+        if (!r.ok) return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+        return json({ success: true, id: rd.id });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 

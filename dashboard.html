@@ -668,9 +668,10 @@ function attacherRechercheEmploye(inputId,suggestId,candidats,onChoix){
   var maj=function(){
     var raw=(input.value||'').trim();
     if(input.dataset.code&&input.value!==input.dataset.label){input.dataset.code='';input.dataset.nom='';}
-    if(!raw){box.style.display='none';return;}
+    // Champ vide (simple clic/focus) : on montre déjà toute la liste, comme un menu déroulant
+    // classique — elle se filtre ensuite au fur et à mesure de la frappe.
     var qu=raw.toUpperCase();
-    var matches=candidats.filter(function(e){return e.Code.toUpperCase().includes(qu)||(e.Nom||'').toUpperCase().includes(qu);}).slice(0,30);
+    var matches=candidats.filter(function(e){return !qu||e.Code.toUpperCase().includes(qu)||(e.Nom||'').toUpperCase().includes(qu);}).slice(0,50);
     if(!matches.length){box.innerHTML='<div style="padding:8px 10px;font-size:12px;color:var(--grey)">Aucune correspondance.</div>';box.style.display='block';return;}
     box.innerHTML=matches.map(function(e){return '<div class="emp-suggest-item" data-code="'+e.Code+'" data-nom="'+(e.Nom||e.Code).replace(/"/g,'&quot;')+'" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0"><b>'+e.Code+'</b> — '+(e.Nom||e.Code)+'</div>';}).join('');
     box.style.display='block';
@@ -1551,6 +1552,8 @@ async function enregistrerArticleEPI(){
   msg.style.color='var(--red)';
   if(!typeArticle){msg.textContent='Le type d\'article est obligatoire.';return;}
   if(!reference){msg.textContent='La référence est obligatoire.';return;}
+  var typeExiste=epiCatalogue.some(function(a){return (a.type_article||'').trim().toLowerCase()===typeArticle.toLowerCase();});
+  if(!typeExiste&&!confirm('« '+typeArticle+' » n\'existe pas encore dans le catalogue EPI. Êtes-vous sûr de vouloir créer cette nouvelle catégorie d\'articles ?')){return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
   var payload={type_article:typeArticle,taille_salarie:(document.getElementById('ax-taille-sal').value||'').trim(),
     taille_affichage:(document.getElementById('ax-taille-aff').value||'').trim(),reference:reference,
@@ -4003,12 +4006,13 @@ function ouvrirAjoutReservation(){
     var raw=(document.getElementById('ar-code').value||'').trim();
     var code=raw.toUpperCase();
     var chk=document.getElementById('ar-code-check'),lib=document.getElementById('ar-code-lib');
-    if(!raw){chk.textContent='';lib.textContent='';suggestBox.style.display='none';return;}
     if(im[code]){
       chk.textContent='✅';lib.textContent=getLib(code);suggestBox.style.display='none';return;
     }
     chk.textContent='';lib.textContent='';
-    var matches=Object.keys(im).filter(function(c){return c.includes(code)||(im[c].Libelle||'').toUpperCase().includes(code);}).slice(0,30);
+    // Champ vide (simple clic/focus) : on montre déjà une liste (les 50 premières), comme un menu
+    // déroulant classique — elle se filtre ensuite au fur et à mesure de la frappe.
+    var matches=Object.keys(im).filter(function(c){return !code||c.includes(code)||(im[c].Libelle||'').toUpperCase().includes(code);}).slice(0,50);
     if(!matches.length){suggestBox.innerHTML='<div style="padding:8px 10px;font-size:12px;color:var(--grey)">Aucune correspondance.</div>';suggestBox.style.display='block';return;}
     suggestBox.innerHTML=matches.map(function(c){return '<div class="ar-suggest-item" data-code="'+c+'" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0"><b>'+c+'</b> — '+(im[c].Libelle||'').replace(/</g,'&lt;')+'</div>';}).join('');
     suggestBox.style.display='block';
