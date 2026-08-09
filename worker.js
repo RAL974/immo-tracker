@@ -171,6 +171,22 @@ async function handleRequest(request) {
     return (code, fallback) => (code && _nomParCode[code]) || fallback || code || '';
   }
 
+  // Vérifie si un employé est actif (field_2 !== 'Non') — utilisé pour bloquer réservations,
+  // transferts et dotations vers un employé sorti. Un code introuvable ou vide n'est PAS bloqué
+  // (hors périmètre de ce contrôle, qui ne porte que sur les employés explicitement inactifs).
+  let _actifParCode = null;
+  async function estEmployeActifServeur(code) {
+    if (!code) return true;
+    if (!_actifParCode) {
+      _actifParCode = {};
+      try {
+        const emp = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
+        emp.forEach(i => { const f = i.fields || {}; const c = f.Title || ''; if (c) _actifParCode[c] = f.field_2 !== 'Non'; });
+      } catch (e) {}
+    }
+    return _actifParCode[code] !== false;
+  }
+
   // ── Debugs ──────────────────────────────────────────────────────────────────
   if (p.get('debug_immos')    === '1') { const r = await fetch(GL + '/Immos/items?$expand=fields&$top=2', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
 
@@ -230,6 +246,7 @@ async function handleRequest(request) {
         n_serie:      (f.N_Serie || '').toString().trim(),
         etat:         (f.Etat || '').toString().trim(),
         site:         site,
+        actif:        (f.Actif || 'Oui') !== 'Non',
         id:           i.id
       };
     });
@@ -1078,6 +1095,7 @@ async function handleRequest(request) {
     }
 
     if (action === 'reserver') {
+      if (!(await estEmployeActifServeur(body.code_employe))) return json({ success: false, error: 'employe_inactif', message: 'Cet employé est inactif — réservation impossible.' });
       const r = await fetch(GL + '/Reservations/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_employe || '', Nom_Employe: body.nom_employe || '', Code_Chantier: body.code_chantier || '', Nom_Chantier: body.nom_chantier || '', Date_Debut: body.date_debut, Date_Fin: body.date_fin, Statut: 'Demandee', Note: body.note || '', Code_IM: body.code_im || '' } }) });
       return json({ success: r.ok, status: r.status, detail: await r.text() });
     }
@@ -1117,6 +1135,11 @@ async function handleRequest(request) {
     }
 
     if (action === 'transfert') {
+      // Le donneur (retour dépôt) peut être sorti (il rend simplement son matériel) — seul le
+      // receveur d'un vrai transfert (pas un retour vers DEPOT) doit être un employé actif.
+      if (body.code_employe_receveur !== 'DEPOT' && !(await estEmployeActifServeur(body.code_employe_receveur))) {
+        return json({ success: false, error: 'employe_inactif', message: 'Cet employé est inactif — transfert impossible.' });
+      }
       const r = await fetch(GL + '/Transferts_En_Attente/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe_Donneur: body.code_employe_donneur, Nom_Donneur: body.nom_donneur, Code_Employe_Receveur: body.code_employe_receveur, Nom_Receveur: body.nom_receveur, Statut: 'En attente', Etat: body.etat || '', Note: body.note || '' } }) });
       return json({ success: r.ok, status: r.status });
     }
@@ -1514,6 +1537,7 @@ async function handleRequest(request) {
         const empData = await empRes.json();
         const emp = empData.value && empData.value[0] ? empData.value[0].fields : null;
         if (!emp) return json({ success: false, error: 'employe_introuvable' });
+        if (emp.field_2 === 'Non') return json({ success: false, error: 'employe_inactif', message: 'Cet employé est inactif — dotation impossible.' });
         const affectation = (emp.Affectation_EPI || '').trim();
         if (!affectation) return json({ success: false, error: 'affectation_manquante' });
         const [grilleItems, catItems] = await Promise.all([
@@ -1784,6 +1808,19 @@ async function handleRequest(request) {
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
+    // Édition directe (valeur absolue) du stock d'un article outillage — état des stocks pas encore fait,
+    // permet de corriger un chiffre sans passer par un delta de réception.
+    if (action === 'editer_stock_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const catId = body.id;
+      const qte = parseFloat(body.quantite);
+      if (!catId || isNaN(qte) || qte < 0) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Catalogue_Outillage/items/' + catId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Stock_Actuel: qte }) });
+        return json({ success: r.ok, nouveau_stock: qte });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
     // Distribue un ou plusieurs articles à un employé en une seule action (photo de la preuve signée déjà
     // uploadée via upload_fiche_outillage) : crée les lignes de distribution et décrémente le stock. Pas
     // d'étape "générée en attente" intermédiaire comme les EPI — la distribution est actée directement.
@@ -1792,12 +1829,16 @@ async function handleRequest(request) {
       const code = (body.code || '').trim().toUpperCase();
       const lignes = body.lignes || []; // [{type_article}]
       if (!code || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (!(await estEmployeActifServeur(code))) return json({ success: false, error: 'employe_inactif', message: 'Cet employé est inactif — distribution impossible.' });
       try {
         const catItems = await paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5);
         const catByType = {};
         catItems.forEach(i => { const cf = i.fields || {}; catByType[cf.Title || ''] = { id: i.id, stock: parseFloat(cf.Stock_Actuel) || 0 }; });
         const decrParType = {};
         lignes.forEach(l => { decrParType[l.type_article] = (decrParType[l.type_article] || 0) + 1; });
+        // Vérification stock suffisant AVANT toute écriture — jamais de stock négatif sur un article distribué
+        const insuffisants = Object.keys(decrParType).filter(type => { const cat = catByType[type]; return !cat || cat.stock - decrParType[type] < 0; });
+        if (insuffisants.length) return json({ success: false, error: 'stock_insuffisant', message: 'Stock insuffisant pour : ' + insuffisants.join(', ') });
         const stockRequests = Object.keys(decrParType).map((type, idx) => {
           const cat = catByType[type];
           if (!cat) return null;
