@@ -223,6 +223,27 @@ const S = {
 // ── Utilitaires ───────────────────────────────────────────
 function vib(ms) { if (navigator.vibrate) navigator.vibrate(ms || 150); }
 
+// ── État "envoi en cours" sur un bouton d'action ────────────
+// Retour visuel immédiat + anti double-soumission (réseau terrain parfois lent/instable) : même
+// principe que le garde dataset.busy déjà utilisé pour l'inventaire, généralisé et étendu avec un
+// libellé visible pendant l'attente. setBusy renvoie false (sans rien faire) si déjà en cours ou
+// si aucun bouton n'a été fourni (onclick="fn(this)" — voir chaque appel) : dégrade proprement sans
+// throw si un appelant omet exceptionnellement l'argument.
+function setBusy(btn, busyLabel) {
+  if (!btn || btn.dataset.busy === '1') return false;
+  btn.dataset.busy = '1';
+  btn.dataset.origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ ' + (busyLabel || 'Envoi en cours...');
+  return true;
+}
+function clearBusy(btn) {
+  if (!btn) return;
+  btn.dataset.busy = '';
+  btn.disabled = false;
+  if (btn.dataset.origHtml != null) { btn.innerHTML = btn.dataset.origHtml; delete btn.dataset.origHtml; }
+}
+
 function toast(msg, type, ms) {
   const el = document.getElementById('toast');
   if (!el) return;
@@ -254,14 +275,26 @@ function fdsUrl(code) {
   return u;
 }
 
+// Mêmes couleurs (mêmes tokens --ds-*) que .badge .bn/.bb/.bu/.ba/.bh/.bpanne du dashboard
+// (dashboard.html) — même concept d'état affiché de façon cohérente sur les deux interfaces.
 function ebadge(e) {
-  const map = { 'Neuf': '#E8F5E9:#1B5E20', 'Bon état': '#E3F2FD:#0D47A1', 'Usé': '#FFF8E1:#E65100', 'Abîmé': '#FFEBEE:#B71C1C', 'Hors service': '#F5F5F5:#616161', 'En panne': '#FFF3E0:#E65100' };
-  const c = map[e] || '#F5F5F5:#9E9E9E';
+  const map = {
+    'Neuf': 'var(--ds-success-bg,#E8F5E9):var(--ds-success-dark,#1B5E20)',
+    'Bon état': 'var(--ds-info-bg,#E3F2FD):#0D47A1',
+    'Usé': 'var(--ds-warning-bg,#FFF8E1):var(--ds-warning-dark,#E65100)',
+    'Abîmé': 'var(--ds-danger-bg,#FBE9E7):var(--ds-danger-dark,#B71C1C)',
+    'Hors service': 'var(--ds-neutral-100,#ECEFF1):var(--ds-neutral-600,#37474F)',
+    'En panne': 'var(--ds-warning-bg,#FFF3E0):var(--ds-warning-dark,#E65100)',
+  };
+  const c = map[e] || 'var(--ds-neutral-100,#F5F5F5):var(--ds-neutral-400,#9E9E9E)';
   const [bg, fg] = c.split(':');
   return e ? `<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${bg};color:${fg}">${e}</span>` : '';
 }
 
-const SCOL = { 'Demandee': '#F39C12', 'Confirmee': '#27AE60', 'En cours': '#2980B9', 'En retard': '#E74C3C', 'Rendue': '#95A5A6', 'Annulee': '#BDC3C7' };
+// Hex litéral obligatoire ici (pas var(...)) : rsLabel() suffixe un canal alpha ("22") directement
+// sur la chaîne — valeurs alignées sur les tokens --ds-warning/--ds-success/--ds-info/--ds-danger/
+// --ds-neutral du design system (design-system.css), recopiées car var() ne supporte pas ce suffixe.
+const SCOL = { 'Demandee': '#E8912C', 'Confirmee': '#1E9E5A', 'En cours': '#2F80C9', 'En retard': '#DC3545', 'Rendue': '#4B5261', 'Annulee': '#9AA3B1' };
 const SLAB = { 'Demandee': '⏳ En attente', 'Confirmee': '✅ Confirmée', 'En cours': '🔄 En cours', 'En retard': '⚠️ En retard', 'Rendue': '📦 Rendue', 'Annulee': '❌ Annulée' };
 function rsLabel(s) { const c = SCOL[s] || '#999'; const l = SLAB[s] || s; return `<span style="padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:${c}22;color:${c}">${l}</span>`; }
 
@@ -308,16 +341,58 @@ function immosFilt(cat, q, filtrerSite) {
 }
 
 // ── Scanner ───────────────────────────────────────────────
+// Repli de saisie manuelle générique, affiché sous la zone de scan sur TOUS les écrans de scan
+// (auparavant réservé à l'activation) : réutilise exactement le même callback qu'un scan réussi
+// (contrat commun à tous les appels de startScanner — cb(codeDécodé)), donc aucune logique
+// dupliquée. Utile terrain : caméra en panne, QR abîmé/sale, ou simplement plus rapide à taper.
+function injectManualFallback(el, cb) {
+  const wrapId = el.id + '-manual-wrap';
+  const old = document.getElementById(wrapId);
+  if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = wrapId;
+  wrap.style.cssText = 'width:100%;margin-top:8px';
+  wrap.innerHTML =
+    '<button type="button" class="btn btn-link" style="font-size:13px">⌨️ La caméra ne marche pas ? Saisir le code manuellement</button>' +
+    '<div class="search-row hidden" style="margin-top:6px">' +
+      '<input type="text" class="select-input" placeholder="Ex : IM000123" autocapitalize="characters">' +
+      '<button type="button" class="btn btn-secondary" style="width:auto;padding:14px 20px">OK</button>' +
+    '</div>';
+  el.insertAdjacentElement('afterend', wrap);
+  const toggleBtn = wrap.children[0], row = wrap.children[1], input = row.querySelector('input'), submitBtn = row.querySelector('button');
+  toggleBtn.onclick = () => { row.classList.toggle('hidden'); if (!row.classList.contains('hidden')) input.focus(); };
+  const submit = () => { const v = input.value.trim(); if (v) cb(v); };
+  submitBtn.onclick = submit;
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+}
+
 // boxConfig optionnel : zone de visée personnalisée (ex. rectangle large pour les codes-barres EAN,
 // par défaut un carré adapté aux QR codes). La lib html5-qrcode détecte QR ET codes-barres (EAN/UPC/Code128...)
 // simultanément sans configuration supplémentaire.
-function startScanner(elId, cb, boxConfig) {
+// skipManualFallback : pour l'écran d'activation uniquement, qui a déjà son propre repli manuel
+// (activationManuelle(), un prompt() dédié) — le format attendu par son callback (code|nom, comme
+// un QR de carte BTP) ne correspond pas à ce qu'un humain taperait naturellement dans le champ
+// générique ci-dessous, donc pas de doublon source de confusion pour cet écran précis.
+function startScanner(elId, cb, boxConfig, skipManualFallback) {
   stopScanner();
   const el = document.getElementById(elId);
   if (!el) return;
+  el.innerHTML = '<p style="color:#fff;text-align:center;padding:60px 20px;font-size:14px">📷 Démarrage de la caméra...</p>';
+  let dejaScanne = false;
+  // Confirmation immédiate (vibration + toast) sur CHAQUE scan réussi, scan caméra ou saisie
+  // manuelle confondus — même point de passage, un seul endroit à maintenir. dejaScanne évite un
+  // double déclenchement si la librairie relit le même code avant l'arrêt effectif du flux vidéo.
+  const onDecode = (decodedText) => {
+    if (dejaScanne) return;
+    dejaScanne = true;
+    vib(120);
+    toast('✅ Scanné !', 'success', 1200);
+    cb(decodedText);
+  };
+  if (!skipManualFallback) injectManualFallback(el, onDecode);
   S.scanner = new Html5Qrcode(elId);
-  S.scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: boxConfig || { width: 240, height: 240 } }, cb, () => {}).catch(() => {
-    if (el) el.innerHTML = '<p style="color:#fff;text-align:center;padding:40px 20px;font-size:14px">⚠️ Impossible d\'accéder à la caméra.<br>Vérifie les permissions.</p>';
+  S.scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: boxConfig || { width: 240, height: 240 } }, onDecode, () => {}).catch(() => {
+    if (el) el.innerHTML = '<p style="color:#fff;text-align:center;padding:40px 20px;font-size:14px">⚠️ Impossible d\'accéder à la caméra.<br>Vérifie les permissions' + (skipManualFallback ? '.' : ', ou utilise la saisie manuelle ci-dessous.') + '</p>';
   });
 }
 
@@ -343,7 +418,7 @@ function showScreen(id, skipInit) {
 
   switch (id) {
     case 'screen-activation':
-      setTimeout(() => startScanner('scanner-activation', onScanActivation), 200);
+      setTimeout(() => startScanner('scanner-activation', onScanActivation, undefined, true), 200);
       break;
     case 'screen-mon-materiel':       afficherMonMateriel(); break;
     case 'screen-transferts-attente': afficherTransfertsEnAttente(); break;
@@ -369,12 +444,24 @@ window.addEventListener('load', async () => {
   rafraichirBadges();
 });
 
+// Horodatage de la dernière synchronisation réussie des catalogues statiques (immos.json/
+// employes.json, les deux seuls fichiers mis en cache par sw.js — voir CONFIG.proxy plus bas,
+// jamais intercepté par le service worker car autre origine). Affiché dans la bannière hors-ligne
+// (voir index.html) pour que l'utilisateur sache si ce qu'il voit est à jour ou pas. Ne marque une
+// synchronisation que si le navigateur se croit en ligne au moment du fetch : un fetch qui aboutit
+// alors qu'on est hors-ligne vient forcément du cache (stale-while-revalidate côté sw.js), pas
+// d'une donnée fraîche — l'horodater comme "maintenant" serait trompeur.
+function marquerSyncReussie() {
+  if (navigator.onLine) localStorage.setItem('lastSync', new Date().toISOString());
+}
+
 async function chargerImmos() {
   try {
     const r = await fetch('immos.json');
     const arr = await r.json();
     arr.forEach(i => { S.immos[i.Code_IM] = i; });
     ['resa-categorie', 'rech-cat', 'force-cat', 'stock-cat'].forEach(id => buildCatSelect(id));
+    marquerSyncReussie();
   } catch (e) {}
   // Charger les sites réels des immos (colonne Site SharePoint via le Worker)
   try {
@@ -403,6 +490,7 @@ async function chargerEmployes() {
       arr = raw.map(e => ({ Code: e.Code, Nom: e.Nom, Poste: e.Poste || '', Droits: '', Site: '', Actif: true }));
     }
     S.employes = arr;
+    marquerSyncReussie();
     // Index code → droits + site + actif (pour peutReserver / filtrage géographique / statut)
     S.droitsByCode = {};
     S.siteByCode = {};
@@ -789,7 +877,8 @@ function enregistrerMouvement(m) {
 }
 
 // ── Accepter un transfert ─────────────────────────────────
-async function accepterTransfert() {
+async function accepterTransfert(btn) {
+  if (!setBusy(btn, 'Validation...')) return;
   const t    = S.transfertEnCours;
   const etat = document.getElementById('accepter-etat').value;
   const note = document.getElementById('accepter-note').value.trim();
@@ -808,6 +897,7 @@ async function accepterTransfert() {
       rafraichirBadges();
     } else { toast('Erreur lors de la validation', 'error'); }
   } catch (e) { toast('Erreur réseau', 'error'); }
+  clearBusy(btn);
 }
 
 function refuserTransfert() { showScreen('screen-accueil'); }
@@ -1195,7 +1285,7 @@ function scannerPourForce() {
   });
 }
 
-async function validerForceAttribution() {
+async function validerForceAttribution(btn) {
   if (!forceImmoCode) { toast('Sélectionne une immo', 'error'); return; }
   const sel = document.getElementById('force-receveur');
   if (!sel?.value) { toast('Sélectionne un employé', 'error'); return; }
@@ -1204,6 +1294,7 @@ async function validerForceAttribution() {
   const etat    = document.getElementById('force-etat')?.value || 'Bon état';
   const note    = document.getElementById('force-note')?.value.trim() || '';
   if (!confirm(`Attribuer ${lib(forceImmoCode)} à ${nomRec} sans validation ?`)) return;
+  if (!setBusy(btn, 'Attribution...')) return;
   try {
     const m = { code_im: forceImmoCode, code_employe: codeRec, nom_employe: nomRec, type_mouvement: 'Transfert', code_chantier: S.employe.code + '|' + S.employe.nom, etat, note: (note ? note + ' — ' : '') + '[Attribution forcée par ' + S.employe.nom + ']', horodatage: new Date().toISOString() };
     const r = await fetch(CONFIG.proxy, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) });
@@ -1211,6 +1302,7 @@ async function validerForceAttribution() {
     if (d.success !== false) { showRecap('⚡ Attribution forcée', { ...m, nom_employe: nomRec }, null); forceImmoCode = null; rafraichirBadges(); }
     else toast('Erreur lors de l\'attribution', 'error');
   } catch (e) { toast('Erreur réseau', 'error'); }
+  clearBusy(btn);
 }
 
 // ── Réservations ──────────────────────────────────────────
@@ -1288,12 +1380,13 @@ function scannerPourResa() {
   });
 }
 
-async function soumettreReservation() {
+async function soumettreReservation(btn) {
   if (!S.resaImmoCode) { toast('Sélectionne une immo', 'error'); return; }
   const debut = document.getElementById('resa-date-debut').value;
   const fin   = document.getElementById('resa-date-fin').value;
   if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
   if (new Date(fin) <= new Date(debut)) { toast('La date de retour doit être après le départ', 'error'); return; }
+  if (!setBusy(btn, 'Vérification...')) return;
   // Vérifier conflits
   try {
     const r = await fetch(CONFIG.proxy + '?reservations=1');
@@ -1301,7 +1394,7 @@ async function soumettreReservation() {
     const conflits = resas.filter(r => r.code_im === S.resaImmoCode && r.statut !== 'Annulee' && r.statut !== 'Rendue' && !(new Date(fin) < new Date(r.date_debut) || new Date(debut) > new Date(r.date_fin)));
     if (conflits.length > 0) {
       const msg = conflits.map(c => `${c.nom_employe} (${fmt(c.date_debut)} → ${fmt(c.date_fin)})`).join(' | ');
-      if (!confirm(`Cette immo est déjà réservée : ${msg}. Envoyer quand même ?`)) return;
+      if (!confirm(`Cette immo est déjà réservée : ${msg}. Envoyer quand même ?`)) { clearBusy(btn); return; }
     }
   } catch (e) {}
 
@@ -1311,6 +1404,7 @@ async function soumettreReservation() {
   const codeEmp = pourQCode || S.employe.code;
   const nomEmp  = pourQNom  || S.employe.nom;
 
+  btn.innerHTML = '⏳ Envoi...';
   try {
     const r = await fetch(CONFIG.proxy + '?action=reserver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       code_im: S.resaImmoCode, code_employe: codeEmp, nom_employe: nomEmp,
@@ -1328,6 +1422,7 @@ async function soumettreReservation() {
       majBadgeResas();
     } else toast('Erreur lors de la réservation', 'error');
   } catch (e) { toast('Erreur réseau', 'error'); }
+  clearBusy(btn);
 }
 
 async function afficherMesReservations() {
@@ -1413,17 +1508,19 @@ async function ouvrirModifResa(id) {
   } catch (e) { toast('Erreur', 'error'); }
 }
 
-async function validerModifResa() {
+async function validerModifResa(btn) {
   if (!resaEnCoursId) return;
   const debut = document.getElementById('modif-date-debut').value;
   const fin   = document.getElementById('modif-date-fin').value;
   if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
+  if (!setBusy(btn, 'Enregistrement...')) return;
   try {
     await fetch(CONFIG.proxy + '?action=modifier_resa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: resaEnCoursId, date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), nom_chantier: document.getElementById('modif-chantier').value, note: document.getElementById('modif-note').value }) });
     toast('Réservation modifiée', 'success');
     resaEnCoursId = null;
     showScreen('screen-mes-reservations');
   } catch (e) { toast('Erreur', 'error'); }
+  clearBusy(btn);
 }
 
 // ── Scanner pour déclarer une panne (admin) ─────────────────────────────
@@ -1539,7 +1636,7 @@ function ouvrirEcranSignalerAbsence() {
   showScreen('screen-signaler-absence');
 }
 
-async function soumettreAbsence() {
+async function soumettreAbsence(btn) {
   const codeAbsent = (document.getElementById('select-absence-employe') || {}).value || '';
   const date = (document.getElementById('absence-date') || {}).value || '';
   const motif = (document.getElementById('absence-motif') || {}).value || '';
@@ -1547,6 +1644,7 @@ async function soumettreAbsence() {
   if (!date) { toast('Indique la date de l\'absence', 'error'); return; }
   const empObj = (S.employes || []).find(e => e.Code === codeAbsent);
   const nomAbsent = empObj ? empObj.Nom : codeAbsent;
+  if (!setBusy(btn, 'Envoi...')) return;
   try {
     const r = await fetch(CONFIG.proxy + '?action=signaler_absence', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1575,6 +1673,7 @@ async function soumettreAbsence() {
       toast('Erreur lors du signalement', 'error');
     }
   } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
+  clearBusy(btn);
 }
 
 // ── Campagne d'inventaire de stock (articles/consommables — distinct des immobilisations) ──
@@ -1695,8 +1794,7 @@ async function soumettreLigneInventaire() {
     code_employe: S.employe.code,
   };
   const btn = document.getElementById('inv-btn-soumettre');
-  if (btn.dataset.busy === '1') return;
-  btn.dataset.busy = '1'; btn.disabled = true;
+  if (!setBusy(btn, 'Enregistrement...')) return;
   const enEdition = S.invLigneEnEdition;
   try {
     let action = 'ajouter_ligne_inventaire', body = payload;
@@ -1706,7 +1804,7 @@ async function soumettreLigneInventaire() {
     }
     const r = await fetch(CONFIG.proxy + '?action=' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json();
-    btn.dataset.busy = ''; btn.disabled = false;
+    clearBusy(btn);
     if (d.success !== false) {
       vib(150);
       toast(enEdition ? '✅ Ligne modifiée' : '✅ Ligne ajoutée', 'success');
@@ -1717,7 +1815,7 @@ async function soumettreLigneInventaire() {
     } else {
       toast('Erreur : ' + (d.error || 'inconnue'), 'error');
     }
-  } catch (e) { btn.dataset.busy = ''; btn.disabled = false; toast('Erreur réseau : ' + e.message, 'error'); }
+  } catch (e) { clearBusy(btn); toast('Erreur réseau : ' + e.message, 'error'); }
 }
 
 // Scan du code-barres fabricant (EAN/UPC/Code128...) pour remplir directement la Référence.
@@ -1909,11 +2007,12 @@ function ouvrirEcranPanne(codeIM) {
 // Appelée aussi depuis le bouton "Mon matériel"
 function signalerPannePWA(codeIM) { ouvrirEcranPanne(codeIM); }
 
-async function soumettrePanne() {
+async function soumettrePanne(btn) {
   const motif = (document.getElementById('panne-motif') || {}).value || '';
   if (!motif || motif.trim().length < 5) {
     toast('Décrivez la panne (5 caractères minimum)', 'error'); return;
   }
+  if (!setBusy(btn, 'Envoi...')) return;
   try {
     const r = await fetch(CONFIG.proxy + '?action=declarer_panne', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1938,6 +2037,7 @@ async function soumettrePanne() {
       rafraichirBadges();
     } else { toast('Erreur lors du signalement', 'error'); }
   } catch (e) { toast('Erreur réseau : ' + e.message, 'error'); }
+  clearBusy(btn);
 }
 
 // ── Ouvrir écran résolution panne ────────────────────────
@@ -1956,7 +2056,7 @@ function ouvrirEcranResolution(codeIM) {
 
 function resoudrePannePWA(codeIM) { ouvrirEcranResolution(codeIM); }
 
-async function soumettreResolution() {
+async function soumettreResolution(btn) {
   const etat  = (document.getElementById('resolution-etat') || {}).value || 'Bon état';
   const prest = (document.getElementById('resolution-prest') || {}).value || '';
   const coutRaw = (document.getElementById('resolution-cout') || {}).value || '';
@@ -1965,6 +2065,7 @@ async function soumettreResolution() {
   if (!note || note.trim().length < 10) {
     toast('La note de résolution est obligatoire (10 car. min.)', 'error'); return;
   }
+  if (!setBusy(btn, 'Envoi...')) return;
   try {
     const r = await fetch(CONFIG.proxy + '?action=resoudre_panne', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1998,6 +2099,7 @@ async function soumettreResolution() {
       rafraichirBadges();
     } else { toast('Erreur lors de la résolution', 'error'); }
   } catch (e) { toast('Erreur réseau', 'error'); }
+  clearBusy(btn);
 }
 
 // ── Ouvrir écran retrait parc (vol, disparu, HS, perdu) ──
@@ -2048,7 +2150,8 @@ function retraitConfirm1() {
   document.getElementById('retrait-confirm2').classList.remove('hidden');
 }
 
-async function retraitConfirm2() {
+async function retraitConfirm2(btn) {
+  if (!setBusy(btn, 'Envoi...')) return;
   const motif = (document.getElementById('retrait-motif') || {}).value || '';
   const typeRetrait = PANNE_STATE.typeRetrait || (document.getElementById('retrait-type') || {}).value || 'Volé';
   const actionEndpoint = (typeRetrait === 'Volé' || typeRetrait === 'Disparu') ? 'declarer_vol' : 'marquer_statut_immo';
@@ -2069,6 +2172,7 @@ async function retraitConfirm2() {
     showScreen('screen-confirmation', true);
     rafraichirBadges();
   } catch (e) { toast('Erreur réseau', 'error'); }
+  clearBusy(btn);
 }
 
 // Alias pour les anciens appels

@@ -4,9 +4,12 @@
 // file d'attente les actions (scan, réservation, transfert...) : celles-ci nécessitent le Worker
 // en direct et échouent proprement (toast "Erreur réseau") si hors-ligne, comme avant. Voir
 // 04_HISTORIQUE_DECISIONS.md pour le périmètre choisi.
-const CACHE_VERSION = 'v1';
+// v2 (août 2026) : ajout de design-system.css (palette/typo partagée avec dashboard.html) et de
+// style.css (coquille visuelle déjà existante mais jamais explicitement mise en cache jusqu'ici)
+// à la coquille applicative — voir 04_HISTORIQUE_DECISIONS.md.
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = 'immo-tracker-' + CACHE_VERSION;
-const APP_SHELL = ['./', './index.html', './app.js', './manifest.json', './immos.json', './employes.json', './logo.jpg', './logo-icon.jpg'];
+const APP_SHELL = ['./', './index.html', './app.js', './style.css', './design-system.css', './manifest.json', './immos.json', './employes.json', './logo.jpg', './logo-icon.jpg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(

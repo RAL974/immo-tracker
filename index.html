@@ -13,11 +13,15 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo-icon.jpg">
   <link rel="stylesheet" href="style.css">
+  <!-- Design system (août 2026) : mêmes tokens --ds-* que dashboard.html, voir 04_HISTORIQUE_DECISIONS.md.
+       Les variables historiques (--blue, --orange...) définies dans style.css et ci-dessous sont
+       conservées (des dizaines d'usages dans les deux fichiers), juste réaliasées vers --ds-*. -->
+  <link rel="stylesheet" href="design-system.css">
   <style>
     /* ── Base manquante ────────────────────────────────── */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F0F4F8; color: #2C3E50; }
-    :root { --blue:#1A3A6B; --orange:#E87722; --green:#27AE60; --red:#E74C3C; --grey:#7F8C8D; }
+    body { font-family: var(--ds-font-sans,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif); background: var(--bg,#F0F4F8); color: var(--text,#2C3E50); }
+    :root { --blue:var(--ds-primary); --orange:var(--ds-accent); --green:var(--ds-success); --red:var(--ds-danger); --yellow:var(--ds-warning); --grey:var(--ds-neutral-500); }
 
     /* ── Écrans ────────────────────────────────────────── */
     .screen { display: none; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px 16px 40px; max-width: 480px; margin: 0 auto; gap: 10px; }
@@ -29,14 +33,16 @@
     .subtitle { color: var(--grey); font-size: 13px; margin-bottom: 4px; }
 
     /* ── Boutons ───────────────────────────────────────── */
-    .btn { width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .btn:active { opacity: .8; }
+    /* min-height:48px sur tous les boutons, y compris les liens secondaires : cible tactile
+       terrain (parfois avec des gants) — voir 04_HISTORIQUE_DECISIONS.md. */
+    .btn { width: 100%; min-height: 48px; padding: 14px 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .15s, transform .1s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn:active { opacity: .8; transform: scale(.97); }
     .btn-primary   { background: var(--blue);   color: #fff; }
     .btn-secondary { background: var(--orange); color: #fff; }
-    .btn-tertiary  { background: #E3F2FD; color: var(--blue); }
+    .btn-tertiary  { background: var(--ds-info-bg,#E3F2FD); color: var(--blue); }
     .btn-outline   { background: transparent; color: var(--blue); border: 2px solid var(--blue); }
     .btn-danger    { background: var(--red);    color: #fff; }
-    .btn-link      { background: transparent; color: var(--grey); font-size: 14px; padding: 10px; border: none; width: 100%; cursor: pointer; font-weight: 600; }
+    .btn-link      { background: transparent; color: var(--grey); font-size: 14px; min-height: 48px; padding: 12px 10px; border: none; width: 100%; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .btn-link:hover { color: var(--blue); }
     .btn-group     { display: flex; gap: 10px; width: 100%; }
     .btn-group .btn { flex: 1; font-size: 14px; padding: 14px 10px; }
@@ -87,9 +93,9 @@
     .alert-degradation { background: #FFEBEE; border: 2px solid var(--red); border-radius: 10px; padding: 10px 14px; color: var(--red); font-weight: 700; font-size: 13px; width: 100%; text-align: center; }
 
     /* ── Photo ─────────────────────────────────────────── */
-    .photo-zone { width: 100%; background: #FFF8F0; border: 2px dashed var(--orange); border-radius: 12px; padding: 12px; text-align: center; }
-    .photo-zone p { font-size: 12px; color: #888; margin-bottom: 8px; }
-    .photo-btn-label { cursor: pointer; display: inline-block; padding: 8px 16px; background: var(--orange); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 700; }
+    .photo-zone { width: 100%; background: var(--ds-gold-50,#FFF8F0); border: 2px dashed var(--orange); border-radius: 12px; padding: 12px; text-align: center; }
+    .photo-zone p { font-size: 13px; color: var(--grey); margin-bottom: 8px; }
+    .photo-btn-label { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 20px; background: var(--orange); color: #fff; border-radius: 10px; font-size: 14px; font-weight: 700; }
 
     /* ── Toast ─────────────────────────────────────────── */
     #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--green); color: #fff; padding: 14px 24px; border-radius: 12px; font-weight: 700; font-size: 15px; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,.3); opacity: 0; transition: opacity .3s; white-space: nowrap; pointer-events: none; }
@@ -103,6 +109,13 @@
 
     /* ── Admin section ─────────────────────────────────── */
     .admin-section { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── Actions ancrées en bas (accessibles au pouce) ────
+       Regroupe le bouton principal d'un écran + son "Annuler"/"Retour" adjacent dans une barre
+       collée en bas du viewport une fois que le contenu défile en dessous — jamais besoin de
+       chercher le bouton en bas d'un long formulaire. Sans effet sur les écrans courts (le
+       sticky ne "colle" que si le contenu dépasse la hauteur visible). */
+    .sticky-actions { position: sticky; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 8px; background: var(--bg); padding: 10px 0 4px; margin-top: 2px; z-index: 5; }
   </style>
 </head>
 <body>
@@ -174,7 +187,7 @@
   <h2>Activation</h2>
   <p class="scanner-hint">Scanne le QR code de ta <strong>carte BTP</strong></p>
   <div id="scanner-activation" class="scanner-box"></div>
-  <button class="btn btn-link" onclick="activationManuelle()" style="font-size:12px;color:var(--grey)">Pas de carte ? Saisir mon code manuellement</button>
+  <button class="btn btn-tertiary" onclick="activationManuelle()">⌨️ Pas de carte ? Saisir mon code manuellement</button>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
 </div>
 
@@ -204,8 +217,10 @@
   <select id="select-receveur" class="select-input">
     <option value="">-- Sélectionne un employé --</option>
   </select>
-  <button class="btn btn-secondary" onclick="validerReceveur()">Suivant →</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-secondary" onclick="validerReceveur()">Suivant →</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════════ SCAN CARTE RECEVEUR ══════════════ -->
@@ -238,8 +253,10 @@
     </label>
     <div id="photo-etat-preview" style="margin-top:8px"></div>
   </div>
-  <button class="btn btn-secondary" onclick="confirmerAvecEtat()">✅ Confirmer</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-secondary" onclick="confirmerAvecEtat()">✅ Confirmer</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════════ CONFIRMATION ══════════════ -->
@@ -311,8 +328,10 @@
     </label>
     <div id="photo-reception-preview" style="margin-top:8px"></div>
   </div>
-  <button class="btn btn-secondary" onclick="accepterTransfert()">✅ Accepter et valider</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">← Retour</button>
+  <div class="sticky-actions">
+    <button class="btn btn-secondary" onclick="accepterTransfert(this)">✅ Accepter et valider</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">← Retour</button>
+  </div>
 </div>
 
 <!-- ══════════════ RECHERCHE UNIFIÉE (admin) ══════════════ -->
@@ -383,8 +402,10 @@
   </select>
   <label class="field-label">Motif (optionnel)</label>
   <textarea id="force-note" class="note-textarea" placeholder="Raison de l'attribution..."></textarea>
-  <button class="btn btn-secondary" onclick="validerForceAttribution()">⚡ Attribuer maintenant</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-secondary" onclick="validerForceAttribution(this)">⚡ Attribuer maintenant</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════════ SCAN FORCE ══════════════ -->
@@ -420,8 +441,10 @@
   <input type="date" id="absence-date" class="select-input">
   <label class="field-label">Motif (optionnel)</label>
   <textarea id="absence-motif" class="note-textarea" placeholder="Ex : ne s'est pas présenté sur le chantier ce matin..."></textarea>
-  <button class="btn btn-secondary" onclick="soumettreAbsence()">✅ Signaler l'absence</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-gestion-personnel')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-secondary" onclick="soumettreAbsence(this)">✅ Signaler l'absence</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-gestion-personnel')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════════ CAMPAGNE D'INVENTAIRE DE STOCK ══════════════ -->
@@ -448,10 +471,12 @@
     <input type="text" id="inv-designation" class="select-input" placeholder="Description de l'article">
     <label class="field-label">Quantité comptée</label>
     <input type="number" id="inv-quantite" class="select-input" step="0.01" placeholder="0">
-    <label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px"><input type="checkbox" id="inv-chute-cable" style="width:18px;height:18px"> Chute de câble (métrage non standard)</label>
+    <label style="display:flex;align-items:center;gap:10px;min-height:48px;margin:6px 0;padding:6px 4px;font-size:14px;cursor:pointer"><input type="checkbox" id="inv-chute-cable" style="width:22px;height:22px;flex-shrink:0"> Chute de câble (métrage non standard)</label>
     <label class="field-label">Observations (optionnel)</label>
     <textarea id="inv-observations" class="note-textarea" placeholder="Ex : à vérifier, article lié, obsolète..."></textarea>
-    <button class="btn btn-secondary" id="inv-btn-soumettre" onclick="soumettreLigneInventaire()">✅ Ajouter la ligne</button>
+    <div class="sticky-actions">
+      <button class="btn btn-secondary" id="inv-btn-soumettre" onclick="soumettreLigneInventaire()">✅ Ajouter la ligne</button>
+    </div>
     <div id="inv-mes-lignes" style="margin-top:16px"></div>
   </div>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
@@ -494,8 +519,10 @@
   <input type="text" id="resa-chantier" class="select-input" placeholder="Nom ou code du chantier...">
   <label class="field-label">Note (optionnel)</label>
   <textarea id="resa-note" class="note-textarea" placeholder="Précisions..."></textarea>
-  <button class="btn btn-primary" onclick="soumettreReservation()">✅ Envoyer la demande</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-primary" onclick="soumettreReservation(this)">✅ Envoyer la demande</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════════ MODIFIER RÉSERVATION ══════════════ -->
@@ -519,8 +546,10 @@
   <input type="text" id="modif-chantier" class="select-input">
   <label class="field-label">Note</label>
   <textarea id="modif-note" class="note-textarea"></textarea>
-  <button class="btn btn-primary" onclick="validerModifResa()">✅ Enregistrer</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-mes-reservations')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-primary" onclick="validerModifResa(this)">✅ Enregistrer</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-mes-reservations')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════════ SCAN RÉSERVATION ══════════════ -->
@@ -536,8 +565,10 @@
   <p id="panne-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
   <label class="field-label">Description du problème <span style="color:var(--red)">*</span></label>
   <textarea id="panne-motif" class="note-textarea" placeholder="Décrivez précisément la panne, le dysfonctionnement... (5 car. min.)" style="min-height:120px"></textarea>
-  <button class="btn btn-secondary" onclick="soumettrePanne()">📢 Confirmer le signalement</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-secondary" onclick="soumettrePanne(this)">📢 Confirmer le signalement</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════ ÉCRAN RÉSOUDRE PANNE ══════════ -->
@@ -557,8 +588,10 @@
   <input type="number" id="resolution-cout" class="select-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
   <label class="field-label">Note de résolution <span style="color:var(--red)">*</span></label>
   <textarea id="resolution-note" class="note-textarea" placeholder="Décrivez la réparation effectuée... (10 car. min.)" style="min-height:100px"></textarea>
-  <button class="btn btn-secondary" onclick="soumettreResolution()">✅ Valider le retour dans le parc</button>
-  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  <div class="sticky-actions">
+    <button class="btn btn-secondary" onclick="soumettreResolution(this)">✅ Valider le retour dans le parc</button>
+    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+  </div>
 </div>
 
 <!-- ══════════ ÉCRAN RETRAIT PARC ══════════ -->
@@ -570,16 +603,18 @@
   </div>
   <label class="field-label">Motif obligatoire <span style="color:var(--red)">*</span></label>
   <textarea id="retrait-motif" class="note-textarea" placeholder="Expliquez en détail la raison... (10 car. min.)" style="min-height:100px"></textarea>
-  <div id="retrait-confirm1" style="width:100%">
+  <div id="retrait-confirm1" class="sticky-actions" style="width:100%">
     <button class="btn btn-danger" onclick="retraitConfirm1()">⚠️ 1ère confirmation — continuer</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
   <div id="retrait-confirm2" class="hidden" style="width:100%">
-    <div style="background:#FFEBEE;border-radius:10px;padding:12px;font-size:14px;font-weight:700;color:var(--red);text-align:center;margin-bottom:8px">
+    <div style="background:var(--ds-danger-bg,#FFEBEE);border-radius:10px;padding:12px;font-size:14px;font-weight:700;color:var(--red);text-align:center;margin-bottom:8px">
       🔴 CONFIRMATION FINALE IRRÉVERSIBLE
     </div>
-    <button class="btn btn-danger" onclick="retraitConfirm2()">🔴 Confirmer définitivement</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+    <div class="sticky-actions">
+      <button class="btn btn-danger" onclick="retraitConfirm2(this)">🔴 Confirmer définitivement</button>
+      <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
+    </div>
   </div>
 </div>
 
@@ -594,7 +629,16 @@ if('serviceWorker' in navigator){
 function majBanniereHorsLigne(){
   var banner=document.getElementById('offline-banner');
   var horsLigne=!navigator.onLine;
-  if(banner)banner.classList.toggle('show',horsLigne);
+  if(banner){
+    if(horsLigne){
+      var last=localStorage.getItem('lastSync');
+      var quand=(last&&typeof fmtDT==='function')?fmtDT(last):null;
+      banner.textContent=quand
+        ? '📴 Hors ligne — données du '+quand
+        : '📴 Hors ligne — données jamais synchronisées, certaines actions nécessitent le réseau';
+    }
+    banner.classList.toggle('show',horsLigne);
+  }
   document.body.classList.toggle('offline-active',horsLigne);
 }
 window.addEventListener('online',majBanniereHorsLigne);

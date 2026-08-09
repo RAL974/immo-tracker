@@ -1,16 +1,21 @@
 /* ── Variables ───────────────────────────────────────────────── */
+/* Design system (août 2026) : mêmes tokens --ds-* que dashboard.html (design-system.css, lié
+   dans index.html). Noms de variables historiques conservés (utilisés dans ce fichier et dans
+   le <style> inline de index.html, qui gagne la cascade sur les propriétés qu'il redéfinit —
+   les deux :root sont donc tenus alignés pour éviter toute désynchronisation). */
 :root {
-  --blue:    #1A3A6B;
-  --orange:  #E87722;
-  --bg:      #FFF8F0;
-  --card:    #FFFFFF;
-  --text:    #2C3E50;
-  --light:   #F5F0E8;
-  --green:   #27AE60;
-  --red:     #E74C3C;
-  --grey:    #95A5A6;
-  --shadow:  0 2px 12px rgba(0,0,0,0.10);
-  --radius:  14px;
+  --blue:    var(--ds-primary);
+  --orange:  var(--ds-accent);
+  --bg:      var(--ds-bg);
+  --card:    var(--ds-surface);
+  --text:    var(--ds-text);
+  --light:   var(--ds-neutral-50);
+  --green:   var(--ds-success);
+  --red:     var(--ds-danger);
+  --yellow:  var(--ds-warning);
+  --grey:    var(--ds-neutral-500);
+  --shadow:  var(--ds-shadow-sm, 0 2px 12px rgba(0,0,0,0.10));
+  --radius:  var(--ds-radius-lg, 14px);
 }
 
 /* ── Reset & Base ─────────────────────────────────────────────── */
@@ -116,7 +121,7 @@ p { font-size: 14px; color: var(--grey); text-align: center; }
 
 .btn-primary   { background: var(--blue);   color: white; box-shadow: 0 4px 14px rgba(26,58,107,0.30); }
 .btn-secondary { background: var(--orange); color: white; box-shadow: 0 4px 14px rgba(232,119,34,0.30); }
-.btn-tertiary  { background: #2980B9;       color: white; box-shadow: 0 4px 14px rgba(41,128,185,0.25); }
+.btn-tertiary  { background: var(--ds-info-bg,#E3F2FD); color: var(--blue); box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 .btn-outline   { background: transparent; color: var(--blue); border: 2px solid var(--blue); }
 .btn-link      { background: transparent; color: var(--blue); font-size: 14px; font-weight: 600; padding: 10px; box-shadow: none; }
 .btn-connecte  { background: var(--green); color: white; }
@@ -256,11 +261,13 @@ label.field-label {
   border-radius: 10px;
   margin-left: 6px;
 }
-.etat-neuf      { background: #E8F5E9; color: #1B5E20; }
-.etat-bon       { background: #E3F2FD; color: #0D47A1; }
-.etat-use       { background: #FFF8E1; color: #E65100; }
-.etat-abime     { background: #FBE9E7; color: #B71C1C; }
-.etat-horsservice { background: #ECEFF1; color: #37474F; }
+/* Mêmes couleurs que .badge .bn/.bb/.bu/.ba/.bh du dashboard (dashboard.html) — même concept
+   d'état, même palette, deux jeux de classes distincts pour deux gabarits HTML différents. */
+.etat-neuf      { background: var(--ds-success-bg,#E8F5E9); color: var(--ds-success-dark,#1B5E20); }
+.etat-bon       { background: var(--ds-info-bg,#E3F2FD); color: #0D47A1; }
+.etat-use       { background: var(--ds-warning-bg,#FFF8E1); color: var(--ds-warning-dark,#E65100); }
+.etat-abime     { background: var(--ds-danger-bg,#FBE9E7); color: var(--ds-danger-dark,#B71C1C); }
+.etat-horsservice { background: var(--ds-neutral-100,#ECEFF1); color: var(--ds-neutral-600,#37474F); }
 
 .empty-msg {
   color: var(--grey);
