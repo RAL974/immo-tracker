@@ -54,6 +54,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #btn-refresh{background:var(--orange);}
 #last-upd{font-size:11px;opacity:.6;white-space:nowrap;}
 
+/* ── Recherche globale (header) ── */
+#gsearch-wrap{position:relative;flex:0 1 320px;min-width:120px;}
+#gsearch-input{width:100%;padding:7px 34px 7px 12px;border-radius:var(--ds-radius-sm,6px);border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;font-size:13px;}
+#gsearch-input::placeholder{color:rgba(255,255,255,.65);}
+#gsearch-input:focus{outline:none;background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5);}
+#gsearch-kbd{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.15);border-radius:4px;padding:1px 5px;pointer-events:none;}
+#gsearch-results{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;max-height:70vh;overflow-y:auto;background:#fff;color:#222;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);z-index:200;text-align:left;}
+#gsearch-results.open{display:block;}
+#gsearch-results .gs-group-label{padding:8px 12px 4px;font-size:11px;font-weight:800;color:var(--grey);text-transform:uppercase;letter-spacing:.4px;}
+#gsearch-results .gs-item{padding:8px 12px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;align-items:center;}
+#gsearch-results .gs-item:hover{background:#f0f4f8;}
+#gsearch-results .gs-item small{color:var(--grey);font-size:11px;white-space:nowrap;}
+#gsearch-results .gs-empty{padding:16px;text-align:center;color:var(--grey);font-size:13px;}
+@media (max-width:768px){#gsearch-wrap{display:none;}}
+
 /* ── Sidebar ── */
 #sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:var(--blue);overflow-y:auto;z-index:90;padding:8px 0 20px;border-right:1px solid rgba(255,255,255,.05);}
 .nav-group{padding:18px 16px 6px;font-size:10px;font-weight:800;color:rgba(255,255,255,.35);letter-spacing:1.5px;text-transform:uppercase;}
@@ -287,6 +302,13 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <img src="logo-dark.jpg" alt="Electricité Services Réunion" onerror="this.style.display='none'">
   <h1>Immo Tracker — Electricité Services Réunion</h1>
   <button id="hamburger" onclick="toggleSidebar()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;display:none">☰</button>
+  <!-- Recherche globale : immos, employés, articles EPI/outillage — purement client-side sur les
+       données déjà chargées, aucun appel Worker (voir 03_REGLES_METIER_ET_ROLES.md). -->
+  <div id="gsearch-wrap">
+    <input type="text" id="gsearch-input" placeholder="Rechercher (immo, employé, article...)" autocomplete="off" oninput="renderGlobalSearch(this.value)" onkeydown="onGSearchKeydown(event)" onfocus="if(this.value)renderGlobalSearch(this.value)">
+    <span id="gsearch-kbd">/</span>
+    <div id="gsearch-results"></div>
+  </div>
   <div id="header-actions">
     <span id="admin-identite-badge" style="font-size:11px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px;white-space:nowrap;cursor:pointer" onclick="changerIdentite()" title="Changer d'identité"></span>
     <span id="last-upd"></span>
@@ -305,6 +327,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div class="nav-item" data-tab="depot"><span class="nav-icon">🏭</span><span class="nav-label">Au dépôt</span><span class="nav-badge green" id="nb-depot">—</span></div>
   <div class="nav-item" data-tab="historique"><span class="nav-icon">📋</span><span class="nav-label">Historique</span></div>
   <div class="nav-item" data-tab="inventaire-stock"><span class="nav-icon">📦</span><span class="nav-label">Inventaire stock</span></div>
+  <div class="nav-item" data-tab="inventaire-immos"><span class="nav-icon">📸</span><span class="nav-label">Inventaire immos (scan)</span></div>
 
   <div class="nav-group">LOGISTIQUE</div>
   <div class="nav-item" data-tab="transferts"><span class="nav-icon">📦</span><span class="nav-label">Transferts</span><span class="nav-badge" id="nb-transf">—</span></div>
@@ -548,6 +571,9 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     <div id="pane-inventaire-stock" class="tab-pane">
       <div id="inventaire-stock-content"></div>
     </div>
+    <div id="pane-inventaire-immos" class="tab-pane">
+      <div id="inventaire-immos-content"></div>
+    </div>
 
     <!-- EPI : dotation & stock -->
     <div id="pane-epi" class="tab-pane">
@@ -606,7 +632,7 @@ var W='https://immo-proxy.ral-85d.workers.dev/';
 // Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
 var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques'];
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques'];
 (function(){
   var origFetch=window.fetch.bind(window);
   window.fetch=function(input,init){
@@ -1153,6 +1179,7 @@ function renderTab(name){
     case 'maintenance':    if(!dataLoaded.maint)loadMaint(); else renderMaint(); break;
     case 'absences':       if(!dataLoaded.absences)loadAbsences(); else renderAbsences(); break;
     case 'inventaire-stock': if(!dataLoaded.invStock)loadInventaireStock(); else renderInventaireStock(); break;
+    case 'inventaire-immos': if(!dataLoaded.invImmos)loadInventaireImmos(); else renderInventaireImmos(); break;
     case 'epi':             if(!dataLoaded.epi)loadEPI(); else renderEPI(); break;
     case 'outillage':       if(!dataLoaded.outillage)loadOutillage(); else renderOutillage(); break;
     case 'materiel-it':     if(!dataLoaded.materielIt)loadMaterielIT(); else renderMaterielIT(); break;
@@ -1361,6 +1388,152 @@ async function cloturerCampagneInventaireDash(nom){
     if(d.success){alert('✅ Campagne clôturée.');dataLoaded.invStock=false;await loadInventaireStock();}
     else alert('❌ Erreur lors de la clôture.');
   }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Campagne d'inventaire PHYSIQUE des IMMOBILISATIONS par scan QR (roadmap item A1,
+// 05_ROADMAP_EVOLUTIONS_FUTURES.md) — à ne pas confondre avec l'inventaire de stock d'articles
+// ci-dessus, sujet distinct. Lancement/clôture réservés aux administrateurs (requireAdmin côté
+// Worker) ; le scan lui-même se fait côté PWA, profils admin terrain (badge sans mot de passe).
+// ══════════════════════════════════════════════════════════════════════════
+var invImmosCampagnesList=[], invImmosCampagneOuverte=null, invImmosScansCache={};
+function peutGererInventaireImmos(code){return estAdmin(code);}
+function peutVoirInventaireImmos(code){
+  if(peutGererInventaireImmos(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='encadrement';
+}
+async function loadInventaireImmos(){
+  dataLoaded.invImmos=true;
+  if(!peutVoirInventaireImmos(ADMIN_SESSION.code)){renderInventaireImmos();return;}
+  try{
+    var r=await fetch(W+'?campagnes_inventaire_immos=1');
+    invImmosCampagnesList=await r.json();
+  }catch(e){invImmosCampagnesList=[];}
+  await loadImmoMeta();
+  renderInventaireImmos();
+}
+function renderInventaireImmos(){
+  var div=document.getElementById('inventaire-immos-content');
+  if(!div)return;
+  if(!peutVoirInventaireImmos(ADMIN_SESSION.code)){
+    div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé aux administrateurs (et à l\'encadrement en consultation).</p>';
+    return;
+  }
+  var html='<div class="card"><div class="card-head"><h3>📸 Campagnes d\'inventaire physique des immobilisations</h3>'+
+    (peutGererInventaireImmos(ADMIN_SESSION.code)?'<button onclick="lancerCampagneInventaireImmos()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Lancer une campagne</button>':'')+
+    '</div>';
+  html+='<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Chaque collaborateur au profil admin scanne, depuis la PWA, les immos physiquement présentes — la campagne compare ensuite le constaté au théorique (dernier mouvement enregistré).</p>';
+  if(!invImmosCampagnesList.length){
+    html+='<p class="es" style="padding:16px">Aucune campagne pour l\'instant.</p>';
+  }else{
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Campagne</th><th>Début</th><th>Statut</th><th>Scans</th><th>Créée par</th><th>Action</th></tr></thead><tbody>';
+    invImmosCampagnesList.forEach(function(c){
+      html+='<tr>'+
+        '<td><a href="javascript:void(0)" onclick="voirDetailCampagneInventaireImmos(\''+c.nom.replace(/'/g,"\\'")+'\')" style="font-weight:700;color:var(--blue)">'+c.nom+'</a></td>'+
+        '<td>'+dateFr(c.date_debut)+'</td>'+
+        '<td>'+(c.statut==='Clôturée'?'<span class="badge bh">Clôturée</span>':'<span class="badge bb">En cours</span>')+'</td>'+
+        '<td>'+c.nb_scans+'</td>'+
+        '<td style="font-size:11px;color:var(--grey)">'+nomEmploye(c.cree_par)+'</td>'+
+        '<td>'+(c.statut!=='Clôturée'&&peutGererInventaireImmos(ADMIN_SESSION.code)?'<button onclick="cloturerCampagneInventaireImmosDash(\''+c.nom.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">Clôturer</button>':'')+'</td>'+
+      '</tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+  if(invImmosCampagneOuverte)html+=renderDetailCampagneInventaireImmos(invImmosCampagneOuverte);
+  div.innerHTML=html;
+}
+async function lancerCampagneInventaireImmos(){
+  var nom=prompt('Nom de la campagne (ex : Inventaire physique 2026) :');
+  if(!nom||!nom.trim())return;
+  var enCours=invImmosCampagnesList.filter(function(c){return c.statut!=='Clôturée';});
+  if(enCours.length&&!(await confirmModal('Une campagne est déjà en cours ("'+enCours[0].nom+'"). Les scans réalisés depuis la PWA ciblent toujours la campagne en cours la plus récente — en créer une nouvelle maintenant risque de répartir les scans entre les deux. Continuer quand même ?',{danger:true})))return;
+  var dateDebut=prompt('Date de début (AAAA-MM-JJ) :',new Date().toISOString().slice(0,10));
+  try{
+    var r=await fetch(W+'?action=creer_campagne_inventaire_immos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom:nom.trim(),date_debut:dateDebut})});
+    var d=await r.json();
+    if(d.success){alert('✅ Campagne créée.');dataLoaded.invImmos=false;await loadInventaireImmos();}
+    else alert('❌ Erreur : '+(d.message||d.error||''));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+async function cloturerCampagneInventaireImmosDash(nom){
+  if(!(await confirmModal('Clôturer la campagne "'+nom+'" ? Le rapport d\'écarts restera consultable, mais plus aucun nouveau scan ne pourra s\'y rattacher.')))return;
+  try{
+    var r=await fetch(W+'?action=cloturer_campagne_inventaire_immos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom:nom})});
+    var d=await r.json();
+    if(d.success){alert('✅ Campagne clôturée.');dataLoaded.invImmos=false;await loadInventaireImmos();}
+    else alert('❌ Erreur lors de la clôture.');
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+async function voirDetailCampagneInventaireImmos(nom){
+  invImmosCampagneOuverte=nom;
+  try{
+    var r=await fetch(W+'?scans_inventaire_immos='+encodeURIComponent(nom));
+    invImmosScansCache[nom]=await r.json();
+  }catch(e){invImmosScansCache[nom]=[];}
+  renderInventaireImmos();
+}
+// Rapport d'écarts : manquantes = immos actives jamais scannées pendant la campagne ; écarts =
+// immos scannées mais dont le site du scan diverge du site théorique (immoMeta), ou scannées alors
+// que le système les considère sorties du parc (HS définitif/Perdu/Volé — Actif=Non).
+function calculerEcartsInventaireImmos(nom){
+  var scans=invImmosScansCache[nom]||[];
+  var parCode={};
+  scans.forEach(function(s){(parCode[s.code_im]=parCode[s.code_im]||[]).push(s);});
+  var codesActifs=Object.keys(immoMeta).filter(function(c){return immoMeta[c].actif;});
+  var manquantes=codesActifs.filter(function(c){return !parCode[c];});
+  var ecarts=[];
+  Object.keys(parCode).forEach(function(c){
+    var meta=immoMeta[c];
+    var dernierScan=parCode[c].slice().sort(function(a,b){return new Date(b.horodatage)-new Date(a.horodatage);})[0];
+    if(!meta){ecarts.push({code:c,scan:dernierScan,motif:'Immo inconnue du référentiel comptable'});return;}
+    if(!meta.actif){ecarts.push({code:c,scan:dernierScan,motif:'Scannée alors que sortie du parc (hors service/perdue/volée)'});return;}
+    if(meta.site&&dernierScan.site&&meta.site!==dernierScan.site){ecarts.push({code:c,scan:dernierScan,motif:'Site du scan ('+dernierScan.site+') ≠ site théorique ('+meta.site+')'});}
+  });
+  // totalScannees ne compte que les immos ACTIVES effectivement vues (dénominateur cohérent avec
+  // totalActives) — une immo inactive scannée est un écart (ci-dessus), pas une "immo vue" au
+  // sens du taux de couverture de la campagne, sinon le pourcentage serait trompeur.
+  var scanneesActives=codesActifs.filter(function(c){return parCode[c];});
+  return {manquantes:manquantes,ecarts:ecarts,totalActives:codesActifs.length,totalScans:scans.length,totalScannees:scanneesActives.length};
+}
+function renderDetailCampagneInventaireImmos(nom){
+  var rap=calculerEcartsInventaireImmos(nom);
+  var pct=rap.totalActives?Math.round(rap.totalScannees/rap.totalActives*100):0;
+  var html='<div class="card"><div class="card-head"><h3>📋 '+nom+'</h3>'+
+    '<button onclick="exporterEcartsInventaireImmos(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export rapport (CSV)</button></div>';
+  html+='<div style="display:flex;gap:12px;padding:12px 14px;flex-wrap:wrap">'+
+    '<div style="background:#E3F2FD;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--blue)">'+rap.totalScannees+' / '+rap.totalActives+'</div><div style="font-size:11px;color:var(--grey)">Immos vues ('+pct+'%)</div></div>'+
+    '<div style="background:'+(rap.manquantes.length?'#FBE9E7':'#E8F5E9')+';border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:'+(rap.manquantes.length?'var(--red)':'var(--green)')+'">'+rap.manquantes.length+'</div><div style="font-size:11px;color:var(--grey)">Manquantes (jamais scannées)</div></div>'+
+    '<div style="background:'+(rap.ecarts.length?'#FFF8E1':'#E8F5E9')+';border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:'+(rap.ecarts.length?'#E65100':'var(--green)')+'">'+rap.ecarts.length+'</div><div style="font-size:11px;color:var(--grey)">Écarts (mal localisées)</div></div>'+
+    '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)">'+rap.totalScans+'</div><div style="font-size:11px;color:var(--grey)">Scan(s) au total</div></div>'+
+  '</div>';
+  if(rap.ecarts.length){
+    html+='<div style="padding:0 14px"><h4 style="font-size:12px;color:#E65100;margin-bottom:6px">⚠️ Écarts</h4><div class="tbl-wrap"><table><thead><tr><th>Immo</th><th>Motif</th><th>Scannée par</th><th>Le</th></tr></thead><tbody>'+
+      rap.ecarts.map(function(e){return '<tr class="warn-row"><td>'+lienImSiConnu(e.code)+' '+getLib(e.code)+'</td><td style="font-size:12px">'+e.motif+'</td><td style="font-size:11px;color:var(--grey)">'+nomEmploye(e.scan.code_employe)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtDT(e.scan.horodatage)+'</td></tr>';}).join('')+
+    '</tbody></table></div></div>';
+  }
+  if(rap.manquantes.length){
+    html+='<div style="padding:12px 14px 0"><h4 style="font-size:12px;color:var(--red);margin-bottom:6px">🚨 Manquantes ('+rap.manquantes.length+')</h4><div style="font-size:12px;line-height:2">'+
+      rap.manquantes.slice(0,300).map(function(c){return lienImSiConnu(c)+' '+getLib(c);}).join(', ')+
+      (rap.manquantes.length>300?' … et '+(rap.manquantes.length-300)+' de plus (voir l\'export CSV pour la liste complète)':'')+
+    '</div></div>';
+  }
+  html+='<div style="padding:12px 14px"><button onclick="invImmosCampagneOuverte=null;renderInventaireImmos();" style="padding:6px 14px;background:#eee;border:none;border-radius:8px;font-size:12px;cursor:pointer">Fermer le détail</button></div>';
+  html+='</div>';
+  return html;
+}
+function lienImSiConnu(code){return '<span class="link-im" data-cim="'+code+'" data-lib="'+getLib(code).replace(/"/g,'')+'">'+code+'</span>';}
+function exporterEcartsInventaireImmos(nom){
+  var rap=calculerEcartsInventaireImmos(nom);
+  var entetes=['Type','Code IM','Libellé','Motif / Scannée par','Horodatage'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  rap.manquantes.forEach(function(c){lignesCsv.push(['Manquante',c,getLib(c),'',''].map(csvCell).join(';'));});
+  rap.ecarts.forEach(function(e){lignesCsv.push(['Écart',e.code,getLib(e.code),e.motif+' — scannée par '+nomEmploye(e.scan.code_employe),fmtDT(e.scan.horodatage)].map(csvCell).join(';'));});
+  var csv='\uFEFF'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Rapport_Ecarts_'+nom.replace(/[^a-zA-Z0-9]+/g,'_')+'.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
 async function voirDetailCampagneInventaire(nom){
@@ -1604,7 +1777,7 @@ function renderEPI(){
     div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
     return;
   }
-  var vues=[['stock','📦 Stock'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle'],['historique','🕘 Historique']];
+  var vues=[['stock','📦 Stock'],['commande','🛒 Suggestion de commande'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle'],['historique','🕘 Historique']];
   var html='';
   if(estAdmin(ADMIN_SESSION.code)&&!epiCatalogue.length){
     html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : tailles, catalogue & grille de dotation</h3></div>'+
@@ -1660,6 +1833,7 @@ function renderEPIVue(){
   var c=document.getElementById('epi-vue-content');
   if(!c)return;
   if(epiVue==='stock')renderEPIStock(c);
+  else if(epiVue==='commande')renderEPICommande(c);
   else if(epiVue==='grille')renderEPIGrille(c);
   else if(epiVue==='dotations')renderEPIDotations(c);
   else if(epiVue==='ponctuelle')renderEPIPonctuelle(c);
@@ -1669,7 +1843,8 @@ function renderEPIVue(){
 // ── Vue Stock ──
 function renderEPIStock(container){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
-  container.innerHTML='<div class="card"><div class="card-head"><h3>📦 Stock articles EPI</h3>'+
+  container.innerHTML='<div id="epi-resume-sous-seuil"></div>'+
+    '<div class="card"><div class="card-head"><h3>📦 Stock articles EPI</h3>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
     (canEdit?'<button onclick="ouvrirAjoutArticleEPI()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
     (canEdit?'<button onclick="document.getElementById(\'epi-stock-file\').click()" style="padding:6px 14px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📤 Importer inventaire (Excel)</button>'+
@@ -1680,6 +1855,18 @@ function renderEPIStock(container){
     '<div style="padding:10px 14px"><input type="text" id="epi-stock-q" oninput="refreshEPIStockResults()" placeholder="🔍 Filtrer par type, taille, référence..." style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px"></div>'+
     '<div id="epi-stock-results"></div></div>';
   refreshEPIStockResults();
+  majResumeSousSeuilEPI();
+}
+// Carte récap "articles sous seuil" — filtre la liste en un clic (tape le type dans la recherche).
+function majResumeSousSeuilEPI(){
+  var el=document.getElementById('epi-resume-sous-seuil');
+  if(!el)return;
+  var sousSeuil=epiCatalogue.filter(function(a){return a.stock_actuel<seuilEPI(a);});
+  if(!sousSeuil.length){el.innerHTML='';return;}
+  el.innerHTML='<div class="card" style="border-top:3px solid var(--red);margin-bottom:14px"><div class="card-head"><h3>⚠️ '+sousSeuil.length+' article(s) EPI sous le seuil d\'alerte</h3></div>'+
+    '<div style="padding:10px 14px;display:flex;gap:6px;flex-wrap:wrap">'+
+    sousSeuil.map(function(a){return '<span class="badge ba" style="cursor:pointer" onclick="document.getElementById(\'epi-stock-q\').value=\''+a.type_article.replace(/'/g,"\\'")+'\';refreshEPIStockResults();">'+a.type_article+' '+a.taille_affichage+' ('+a.stock_actuel+')</span>';}).join('')+
+    '</div></div>';
 }
 
 // ── Ajout d'un nouvel article catalogue EPI ──
@@ -1805,17 +1992,40 @@ function refreshEPIStockResults(){
   }).sort(function(a,b){return (a.type_article||'').localeCompare(b.type_article||'')||(a.taille_affichage||'').toString().localeCompare((b.taille_affichage||'').toString());});
   if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun article'+(q?' pour ce filtre':'')+'.</p>';return;}
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
-  var html='<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Référence</th><th>Désignation</th><th>Stock actuel</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Référence</th><th>Désignation</th><th>Stock actuel</th><th>Seuil mini</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
   rows.forEach(function(a){
-    var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<5?'bu':'bn');
-    html+='<tr><td>'+a.type_article+'</td><td>'+a.taille_affichage+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.designation||'—')+'</td>'+
+    var seuil=seuilEPI(a);
+    var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<seuil?'bu':'bn');
+    html+='<tr'+(a.stock_actuel<seuil?' class="warn-row"':'')+'><td>'+a.type_article+'</td><td>'+a.taille_affichage+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.designation||'—')+'</td>'+
       '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
+      '<td style="font-size:12px;color:var(--grey)">'+(a.stock_mini>0?a.stock_mini:'— (défaut '+seuil+')')+'</td>'+
       (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
-        '<button onclick="editerStockEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button></td>':'')+
+        '<button onclick="editerStockEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button> '+
+        '<button onclick="editerSeuilEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\','+(a.stock_mini||0)+')" style="padding:4px 10px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🎚️ Seuil</button></td>':'')+
     '</tr>';
   });
   html+='</tbody></table></div>';
   res.innerHTML=html;
+}
+// Seuil "stock bas" effectif d'un article EPI : le seuil personnalisé (Stock_Mini) s'il est
+// renseigné (>0), sinon le seuil par défaut historique (5) déjà utilisé avant cette fonctionnalité
+// — pas de régression tant que William n'a pas encore renseigné de seuils personnalisés.
+function seuilEPI(a){return a.stock_mini>0?a.stock_mini:5;}
+async function editerSeuilEPI(catId,label,seuilActuel){
+  var s=prompt('Seuil d\'alerte "stock bas" pour "'+label+'" (0 = utiliser le seuil par défaut) :',seuilActuel||0);
+  if(s==null)return;
+  var n=parseFloat((s||'').replace(',','.'));
+  if(isNaN(n)||n<0){alert('Seuil invalide.');return;}
+  try{
+    var r=await fetch(W+'?action=maj_stock_mini_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:catId,stock_mini:n})});
+    var res=await r.json();
+    if(res.success){
+      var art=epiCatalogue.find(function(a){return a.id===catId;});
+      if(art)art.stock_mini=n;
+      refreshEPIStockResults();
+      majResumeSousSeuilEPI();
+    }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
 }
 async function editerStockEPI(catId,label,stockActuel){
   var qte=prompt('Nouveau stock pour "'+label+'" (valeur actuelle : '+stockActuel+') :',stockActuel);
@@ -1829,8 +2039,36 @@ async function editerStockEPI(catId,label,stockActuel){
       var art=epiCatalogue.find(function(a){return a.id===catId;});
       if(art)art.stock_actuel=n;
       refreshEPIStockResults();
+      majResumeSousSeuilEPI();
     }else alert('Échec : '+((res&&(res.error||res.message))||'inconnu'));
   }catch(e){alert('Erreur réseau : '+e.message);}
+}
+// ── Vue Suggestion de commande ──
+// Quantité suggérée = besoin restant à distribuer (nouveaux entrants sans fiche cette année,
+// calculerManquantsEPI) + seuil mini − stock actuel, plafonnée à 0.
+function renderEPICommande(container){
+  var annee=new Date().getFullYear();
+  var manquants=calculerManquantsEPI(annee);
+  var besoinParId={};
+  manquants.forEach(function(m){
+    var art=epiTrouverArticleCatalogue(m.type_article,m.taille);
+    if(art)besoinParId[art.id]=(besoinParId[art.id]||0)+m.total;
+  });
+  var rows=epiCatalogue.map(function(a){
+    var besoinRestant=besoinParId[a.id]||0;
+    var seuil=seuilEPI(a);
+    var suggestion=Math.max(0,besoinRestant+seuil-a.stock_actuel);
+    return {a:a,besoinRestant:besoinRestant,seuil:seuil,suggestion:suggestion};
+  }).filter(function(r){return r.suggestion>0;}).sort(function(x,y){return y.suggestion-x.suggestion;});
+  var html='<div class="card"><div class="card-head"><h3>🛒 Suggestion de commande EPI</h3><span class="card-cnt">'+rows.length+'</span></div>';
+  if(!rows.length){container.innerHTML=html+'<p class="es" style="padding:16px">Aucune commande suggérée : le stock couvre le seuil et le besoin restant des nouveaux entrants '+annee+' sans fiche.</p></div>';return;}
+  html+='<div style="padding:8px 14px;font-size:12px;color:var(--grey)">Quantité suggérée = besoin restant à distribuer aux nouveaux entrants '+annee+' sans fiche + seuil mini − stock actuel.</div>';
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Stock actuel</th><th>Seuil mini</th><th>Besoin restant (nouveaux entrants)</th><th>À commander</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html+='<tr><td>'+r.a.type_article+'</td><td>'+r.a.taille_affichage+'</td><td>'+r.a.stock_actuel+'</td><td>'+r.seuil+'</td><td>'+r.besoinRestant+'</td><td><span class="badge ba" style="font-size:13px">'+r.suggestion+'</span></td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  container.innerHTML=html;
 }
 async function receptionCommandeEPI(catId,label){
   var qte=prompt('Quantité reçue pour "'+label+'" :');
@@ -1844,6 +2082,7 @@ async function receptionCommandeEPI(catId,label){
       var art=epiCatalogue.find(function(a){return a.id===catId;});
       if(art)art.stock_actuel=res.nouveau_stock;
       refreshEPIStockResults();
+      majResumeSousSeuilEPI();
     }else alert('Échec : '+(res.error||'inconnu'));
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
@@ -2025,6 +2264,25 @@ function epiEmployesSansFiche(annee){
   var dejaGeneres={};
   epiDotations.filter(function(dd){return (dd.type_dotation==='Annuelle'||dd.type_dotation==='Entree')&&String(dd.annee_civile)===String(annee);}).forEach(function(dd){dejaGeneres[dd.code]=true;});
   return eligibles.filter(function(e){return !dejaGeneres[e.Code];});
+}
+// "Reste à distribuer" côté EPI (miroir de calculerManquantsOutillage) : pour chaque employé
+// encore sans fiche cette année, somme le besoin en articles par type+taille — même esprit que
+// la carte "Nouveaux entrants" déjà existante, mais agrégé par article plutôt que par employé,
+// pour servir de base à la suggestion de commande.
+function calculerManquantsEPI(annee){
+  var sansFiche=epiEmployesSansFiche(annee);
+  var parArticle={};
+  sansFiche.forEach(function(e){
+    var emp=employesByCode[e.Code]||{};
+    var tailles={taillePantalon:emp.taillePantalon,tailleTshirt:emp.tailleTshirt,tailleVeste:emp.tailleVeste,pointureChaussures:emp.pointureChaussures,tailleGants:emp.tailleGants};
+    epiCalculerBesoinStock(e.AffectationEPI,tailles).forEach(function(b){
+      var key=b.type_article+'|'+(b.taille||'');
+      parArticle[key]=parArticle[key]||{type_article:b.type_article,taille:b.taille,total:0,detail:[]};
+      parArticle[key].total+=b.quantite_requise;
+      parArticle[key].detail.push(e.Code);
+    });
+  });
+  return Object.keys(parArticle).map(function(k){return parArticle[k];});
 }
 function epiAnneesDisponibles(){
   var set={};
@@ -2744,7 +3002,7 @@ function renderOutillage(){
     div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
     return;
   }
-  var vues=[['stock','📦 Stock'],['grille','📐 Grille par service'],['manquant','📋 Reste à distribuer'],['distribution','🧰 Distribution par employé'],['prime','💶 Prime annuelle'],['historique','🕘 Historique']];
+  var vues=[['stock','📦 Stock'],['commande','🛒 Suggestion de commande'],['grille','📐 Grille par service'],['manquant','📋 Reste à distribuer'],['distribution','🧰 Distribution par employé'],['prime','💶 Prime annuelle'],['historique','🕘 Historique']];
   var html='';
   if(estAdmin(ADMIN_SESSION.code)&&!outilCatalogue.length){
     html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : catalogue, grille & historique de distribution</h3></div>'+
@@ -2763,6 +3021,7 @@ function renderOutillageVue(){
   var c=document.getElementById('outillage-vue-content');
   if(!c)return;
   if(outilVue==='stock')renderOutilStock(c);
+  else if(outilVue==='commande')renderOutilCommande(c);
   else if(outilVue==='grille')renderOutilGrille(c);
   else if(outilVue==='manquant')renderOutilManquant(c);
   else if(outilVue==='distribution')renderOutilDistribution(c);
@@ -2965,11 +3224,24 @@ async function importerDonneesOutillage(){
 
 // ── Vue Stock ──
 function renderOutilStock(container){
-  container.innerHTML='<div class="card"><div class="card-head"><h3>📦 Stock outillage</h3>'+
+  container.innerHTML='<div id="outil-resume-sous-seuil"></div>'+
+    '<div class="card"><div class="card-head"><h3>📦 Stock outillage</h3>'+
     '<button onclick="exporterStockOutillage()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button></div>'+
     '<div style="padding:10px 14px"><input type="text" id="outil-stock-q" oninput="refreshOutilStockResults()" placeholder="🔍 Filtrer par désignation, référence, marque..." style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px"></div>'+
     '<div id="outil-stock-results"></div></div>';
   refreshOutilStockResults();
+  majResumeSousSeuilOutillage();
+}
+function seuilOutil(a){return a.stock_mini>0?a.stock_mini:3;}
+function majResumeSousSeuilOutillage(){
+  var el=document.getElementById('outil-resume-sous-seuil');
+  if(!el)return;
+  var sousSeuil=outilCatalogue.filter(function(a){return a.stock_actuel<seuilOutil(a);});
+  if(!sousSeuil.length){el.innerHTML='';return;}
+  el.innerHTML='<div class="card" style="border-top:3px solid var(--red);margin-bottom:14px"><div class="card-head"><h3>⚠️ '+sousSeuil.length+' outil(s) sous le seuil d\'alerte</h3></div>'+
+    '<div style="padding:10px 14px;display:flex;gap:6px;flex-wrap:wrap">'+
+    sousSeuil.map(function(a){return '<span class="badge ba" style="cursor:pointer" onclick="document.getElementById(\'outil-stock-q\').value=\''+a.type_article.replace(/'/g,"\\'")+'\';refreshOutilStockResults();">'+a.type_article+' ('+a.stock_actuel+')</span>';}).join('')+
+    '</div></div>';
 }
 function refreshOutilStockResults(){
   var res=document.getElementById('outil-stock-results');
@@ -2983,13 +3255,16 @@ function refreshOutilStockResults(){
   var canEdit=peutGererOutillage(ADMIN_SESSION.code);
   var valeurTotale=outilCatalogue.reduce(function(s,a){return s+(a.stock_actuel*a.prix_unitaire);},0);
   var html='<div style="padding:0 14px 8px;font-size:12px;color:var(--grey)">Valeur totale du stock : <strong style="color:var(--blue)">'+valeurTotale.toFixed(2)+' €</strong></div>';
-  html+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Référence</th><th>Marque</th><th>Prix unitaire</th><th>Stock actuel</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Désignation</th><th>Référence</th><th>Marque</th><th>Prix unitaire</th><th>Stock actuel</th><th>Seuil mini</th>'+(canEdit?'<th>Action</th>':'')+'</tr></thead><tbody>';
   rows.forEach(function(a){
-    var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<3?'bu':'bn');
-    html+='<tr><td>'+a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.marque||'—')+'</td><td>'+a.prix_unitaire.toFixed(2)+' €</td>'+
+    var seuil=seuilOutil(a);
+    var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<seuil?'bu':'bn');
+    html+='<tr'+(a.stock_actuel<seuil?' class="warn-row"':'')+'><td>'+a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.marque||'—')+'</td><td>'+a.prix_unitaire.toFixed(2)+' €</td>'+
       '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
+      '<td style="font-size:12px;color:var(--grey)">'+(a.stock_mini>0?a.stock_mini:'— (défaut '+seuil+')')+'</td>'+
       (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
-        '<button onclick="editerStockOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button></td>':'')+
+        '<button onclick="editerStockOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\','+a.stock_actuel+')" style="padding:4px 10px;background:#607D8B;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Éditer</button> '+
+        '<button onclick="editerSeuilOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\','+(a.stock_mini||0)+')" style="padding:4px 10px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🎚️ Seuil</button></td>':'')+
     '</tr>';
   });
   html+='</tbody></table></div>';
@@ -3007,6 +3282,23 @@ async function editerStockOutillage(catId,label,stockActuel){
       var art=outilCatalogue.find(function(a){return a.id===catId;});
       if(art)art.stock_actuel=res.nouveau_stock;
       refreshOutilStockResults();
+      majResumeSousSeuilOutillage();
+    }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+async function editerSeuilOutillage(catId,label,seuilActuel){
+  var s=prompt('Seuil d\'alerte "stock bas" pour "'+label+'" (0 = utiliser le seuil par défaut) :',seuilActuel||0);
+  if(s==null)return;
+  var n=parseFloat((s||'').replace(',','.'));
+  if(isNaN(n)||n<0){alert('Seuil invalide.');return;}
+  try{
+    var r=await fetch(W+'?action=maj_stock_mini_outillage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:catId,stock_mini:n})});
+    var res=await r.json();
+    if(res.success){
+      var art=outilCatalogue.find(function(a){return a.id===catId;});
+      if(art)art.stock_mini=n;
+      refreshOutilStockResults();
+      majResumeSousSeuilOutillage();
     }else alert('Échec : '+(res.error||'inconnu'));
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
@@ -3022,8 +3314,32 @@ async function receptionCommandeOutillage(catId,label){
       var art=outilCatalogue.find(function(a){return a.id===catId;});
       if(art)art.stock_actuel=res.nouveau_stock;
       refreshOutilStockResults();
+      majResumeSousSeuilOutillage();
     }else alert('Échec : '+(res.error||'inconnu'));
   }catch(e){alert('Erreur réseau : '+e.message);}
+}
+// ── Vue Suggestion de commande ──
+// Quantité suggérée = besoin restant à distribuer (calculerManquantsOutillage, déjà utilisé par
+// l'onglet "Ce qui reste à distribuer") + seuil mini − stock actuel, plafonnée à 0.
+function renderOutilCommande(container){
+  var manquants=calculerManquantsOutillage();
+  var besoinParArticle={};
+  manquants.forEach(function(m){besoinParArticle[m.type_article]=(besoinParArticle[m.type_article]||0)+m.employes.length;});
+  var rows=outilCatalogue.map(function(a){
+    var besoinRestant=besoinParArticle[a.type_article]||0;
+    var seuil=seuilOutil(a);
+    var suggestion=Math.max(0,besoinRestant+seuil-a.stock_actuel);
+    return {a:a,besoinRestant:besoinRestant,seuil:seuil,suggestion:suggestion};
+  }).filter(function(r){return r.suggestion>0;}).sort(function(x,y){return y.suggestion-x.suggestion;});
+  var html='<div class="card"><div class="card-head"><h3>🛒 Suggestion de commande outillage</h3><span class="card-cnt">'+rows.length+'</span></div>';
+  if(!rows.length){container.innerHTML=html+'<p class="es" style="padding:16px">Aucune commande suggérée : le stock couvre le seuil et le besoin restant à distribuer.</p></div>';return;}
+  html+='<div style="padding:8px 14px;font-size:12px;color:var(--grey)">Quantité suggérée = besoin restant à distribuer (voir "Ce qui reste à distribuer") + seuil mini − stock actuel.</div>';
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Outil</th><th>Référence</th><th>Stock actuel</th><th>Seuil mini</th><th>Besoin restant à distribuer</th><th>À commander</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html+='<tr><td>'+r.a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+r.a.reference+'</td><td>'+r.a.stock_actuel+'</td><td>'+r.seuil+'</td><td>'+r.besoinRestant+'</td><td><span class="badge ba" style="font-size:13px">'+r.suggestion+'</span></td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  container.innerHTML=html;
 }
 function exporterStockOutillage(){
   var entetes=['Désignation','Référence','Distributeur','Marque','Prix unitaire','Stock actuel','Valeur stock'];
@@ -6020,6 +6336,123 @@ document.addEventListener('click',function(e){
     var code=elEmp.dataset.emp; var nom=elEmp.dataset.nom||code;
     if(code)ouvrirFiche('emp',code,nom);
   }
+});
+
+// ── Recherche globale (header, raccourci "/") ────────────
+// Purement client-side sur les données déjà chargées en mémoire (im, employesList, epiCatalogue,
+// outilCatalogue) — aucun nouvel appel Worker (voir 03_REGLES_METIER_ET_ROLES.md). Résultats
+// groupés par type, plafonnés par groupe pour rester lisible. Immos/employés ont une fiche
+// (drawer) qui s'ouvre sans changer d'onglet ; les articles EPI/outillage n'ont pas de fiche
+// individuelle, donc la navigation bascule vers l'onglet + sous-vue Stock concernés, filtrée
+// sur la référence (réutilise les champs de recherche déjà existants sur ces vues).
+var GSEARCH_MAX=8;
+function renderGlobalSearch(qRaw){
+  var box=document.getElementById('gsearch-results');
+  if(!box)return;
+  var q=(qRaw||'').trim().toUpperCase();
+  if(q.length<2){box.classList.remove('open');box.innerHTML='';return;}
+
+  var immos=Object.keys(im).filter(function(c){
+    var i=im[c]||{};
+    return c.toUpperCase().includes(q)||(i.Libelle||'').toUpperCase().includes(q)||(i.N_Serie||'').toUpperCase().includes(q);
+  }).slice(0,GSEARCH_MAX);
+
+  var employes=(employesList||[]).filter(function(e){
+    return (e.Code||'').toUpperCase().includes(q)||(e.Nom||'').toUpperCase().includes(q);
+  }).slice(0,GSEARCH_MAX);
+
+  var epiRes=(epiCatalogue||[]).filter(function(a){
+    return (a.type_article||'').toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.designation||'').toUpperCase().includes(q)||(a.taille_affichage||'').toString().toUpperCase().includes(q);
+  }).slice(0,GSEARCH_MAX);
+
+  var outilRes=(outilCatalogue||[]).filter(function(a){
+    return (a.type_article||'').toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.marque||'').toUpperCase().includes(q);
+  }).slice(0,GSEARCH_MAX);
+
+  if(!immos.length&&!employes.length&&!epiRes.length&&!outilRes.length){
+    box.innerHTML='<div class="gs-empty">Aucun résultat pour "'+qRaw.replace(/</g,'&lt;')+'".</div>';
+    box.classList.add('open');
+    return;
+  }
+
+  var html='';
+  if(immos.length){
+    html+='<div class="gs-group-label">📦 Immobilisations</div>';
+    html+=immos.map(function(c){
+      var i=im[c]||{};
+      var lib=(i.Libelle||c).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      return '<div class="gs-item" onclick="fermerGSearch();ouvrirFiche(\'immo\',\''+c+'\',\''+lib+'\')"><span>'+c+' — '+(i.Libelle||'—')+'</span><small>'+(i.N_Serie?'N° '+i.N_Serie:'')+'</small></div>';
+    }).join('');
+  }
+  if(employes.length){
+    html+='<div class="gs-group-label">👤 Employés</div>';
+    html+=employes.map(function(e){
+      var nom=(e.Nom||e.Code).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      return '<div class="gs-item" onclick="fermerGSearch();ouvrirFiche(\'emp\',\''+e.Code+'\',\''+nom+'\')"><span>'+e.Code+' — '+(e.Nom||'—')+'</span><small>'+(e.Poste||'')+'</small></div>';
+    }).join('');
+  }
+  if(epiRes.length){
+    html+='<div class="gs-group-label">🦺 Articles EPI</div>';
+    html+=epiRes.map(function(a){
+      var ref=(a.reference||'').replace(/'/g,"\\'");
+      return '<div class="gs-item" onclick="fermerGSearch();irVersArticleEPI(\''+ref+'\')"><span>'+a.type_article+' '+(a.taille_affichage||'')+'</span><small>'+(a.reference||'')+'</small></div>';
+    }).join('');
+  }
+  if(outilRes.length){
+    html+='<div class="gs-group-label">🧰 Outillage</div>';
+    html+=outilRes.map(function(a){
+      var ref=(a.reference||'').replace(/'/g,"\\'");
+      return '<div class="gs-item" onclick="fermerGSearch();irVersArticleOutillage(\''+ref+'\')"><span>'+a.type_article+'</span><small>'+(a.reference||'')+'</small></div>';
+    }).join('');
+  }
+  box.innerHTML=html;
+  box.classList.add('open');
+}
+
+function fermerGSearch(){
+  var box=document.getElementById('gsearch-results');
+  if(box){box.classList.remove('open');box.innerHTML='';}
+  var input=document.getElementById('gsearch-input');
+  if(input)input.value='';
+}
+
+function onGSearchKeydown(e){
+  if(e.key==='Escape'){fermerGSearch();e.target.blur();}
+}
+
+async function irVersArticleEPI(reference){
+  if(!peutVoirEPI(ADMIN_SESSION.code)){alert('Réservé à l\'encadrement et aux gestionnaires dépôt.');return;}
+  if(!dataLoaded.epi)await loadEPI();
+  epiVue='stock';
+  goTab('epi');
+  var qEl=document.getElementById('epi-stock-q');
+  if(qEl){qEl.value=reference;refreshEPIStockResults();}
+}
+
+async function irVersArticleOutillage(reference){
+  if(!peutVoirOutillage(ADMIN_SESSION.code)){alert('Réservé à l\'encadrement et aux gestionnaires dépôt.');return;}
+  if(!dataLoaded.outillage)await loadOutillage();
+  outilVue='stock';
+  goTab('outillage');
+  var qEl=document.getElementById('outil-stock-q');
+  if(qEl){qEl.value=reference;refreshOutilStockResults();}
+}
+
+// Raccourci clavier "/" : focus la recherche globale, sauf si l'utilisateur est déjà en train de
+// taper ailleurs (input/textarea/select/contenteditable) — comportement standard (GitHub, Slack...).
+document.addEventListener('keydown',function(e){
+  if(e.key!=='/')return;
+  var tag=(e.target&&e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea'||tag==='select'||(e.target&&e.target.isContentEditable))return;
+  e.preventDefault();
+  var input=document.getElementById('gsearch-input');
+  if(input)input.focus();
+});
+
+// Ferme le panneau de résultats au clic en dehors de la zone de recherche.
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('gsearch-wrap');
+  if(wrap&&!wrap.contains(e.target))fermerGSearch();
 });
 
 // ── Modal action admin ───────────────────────────────────

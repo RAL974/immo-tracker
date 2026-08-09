@@ -17,7 +17,7 @@
 
 ### A. Inventaire physique annuel assisté — deux sujets distincts, à ne pas confondre
 
-**A1. Immobilisations (scan QR codes)** — toujours **non fait**, projet séparé non encore validé par la direction. Mode "campagne d'inventaire" : lancement d'une campagne, chaque gestionnaire scanne les QR codes du matériel physiquement présent, l'application calcule l'écart entre le théorique (SharePoint) et le constaté (scans), et liste les manquants / mal localisés / retrouvés. Répondrait au problème vécu par William (véhicules mal localisés pendant un an entre Réunion et Mayotte). Nécessite au préalable la pose de QR codes/plaques sur les immos.
+**A1. Immobilisations (scan QR codes) — ✅ FAIT (août 2026)**, code livré et vérifié : lancement/clôture de campagne côté dashboard (`requireAdmin`), mode scan continu côté PWA (profils admin uniquement), rapport d'écarts (site ≠ théorique, immo sortie du parc scannée, immos non scannées) construit sans jamais créer de `Mouvement` — isolation totale vis-à-vis de la logique de détenteur courant existante. **En attente de la création de 2 listes SharePoint par William** (`Campagnes_Inventaire_Immos`, `Scans_Inventaire_Immos`, voir `02_MODELE_DONNEES.md`) avant mise en service réelle — suppose aussi la pose préalable de QR codes/plaques sur les immos. Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
 
 **A2. Stock d'articles/consommables — ✅ FAIT (août 2026)**, développé après clarification que le besoin réel décrit ci-dessus (au moment de la première rédaction de cette roadmap) concernait en fait ce sujet, distinct des immobilisations. Campagne de comptage manuel (pas de QR/codes-barres sur les articles), dépôt + chantiers actifs, comparaison quantités vs comptage précédent (import du comptage décembre 2025 comme référence). Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
 
@@ -38,10 +38,10 @@ Aujourd'hui : un email par mouvement (flux Power Automate existant). Évolution 
 
 ## Priorisation suggérée (à valider avec William)
 
-1. **A — Inventaire physique** : consolide la fiabilité de toute la base de données, sur laquelle s'appuient déjà l'amortissement, l'export comptable et la maintenance préventive.
+1. ~~**A — Inventaire physique**~~ : **fait (août 2026)**, code livré pour les deux volets (stock A2, immobilisations A1) — consolide la fiabilité de la base de données sur laquelle s'appuient déjà l'amortissement, l'export comptable et la maintenance préventive.
 2. **Module temps chantier** (cadré comme suivi opérationnel, pas RH) : valeur métier forte pour le pilotage des coûts de chantier.
 3. **B — Photos / constat d'état** : effort modéré, réduit les litiges au quotidien.
-4. **C — Coûts de réparation + seuil de réforme** : extension naturelle de l'axe 3 déjà en place.
+4. ~~**C — Coûts de réparation + seuil de réforme**~~ : **fait (août 2026)**.
 5. **D, E, F** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
 
 ## Note pour toute reprise de ce document

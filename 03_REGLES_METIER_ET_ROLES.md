@@ -95,6 +95,27 @@ Deux nouvelles capacités `ROLE_CAPS` :
 
 Détail technique dans `02_MODELE_DONNEES.md` et l'historique dans `04_HISTORIQUE_DECISIONS.md`.
 
+## Campagne d'inventaire physique des immobilisations par scan (roadmap item A1, ajouté août 2026)
+
+*À ne pas confondre avec la campagne d'inventaire de stock ci-dessus (articles/consommables, sans code) : ici on recense les **immobilisations elles-mêmes**, une par une, par scan de leur QR code. Deux paires de listes SharePoint séparées (`Campagnes_Inventaire_Immos`/`Scans_Inventaire_Immos`), deux onglets distincts.*
+
+**Lancement/clôture réservés au dashboard, requireAdmin** : contrairement à la campagne de stock (ouverte à plusieurs rôles terrain pour la saisie), le lancement (`creer_campagne_inventaire_immos`) et la clôture (`cloturer_campagne_inventaire_immos`) d'une campagne physique sont strictement Admin — cohérent avec le fait qu'une seule campagne à la fois doit être active et que sa clôture déclenche le calcul définitif du rapport d'écarts. `Cree_Par`/`Cloture_Par` sont toujours résolus depuis le jeton de session vérifié (`_auth.session.code`), jamais depuis le corps de la requête.
+
+**Le scan lui-même reste une action PWA, profils admin uniquement, sans mot de passe** : `enregistrer_scan_inventaire_immo` suit le même modèle de confiance que `reserver`/`transfert`/`ajouter_ligne_inventaire` (badge scanné, pas de jeton de session possible côté terrain) — volontairement **non protégée** par le mécanisme `requireAdmin`/`requireGarant` (elle casserait pour tout le monde sinon, voir `security.gated-actions.test.js`). L'accès à l'écran de scan lui-même est filtré côté PWA aux seuls codes admin (`CONFIG.admins`), comme le reste de la "Section admin" déjà présente sur l'écran d'accueil terrain.
+
+**Un scan n'est jamais un mouvement** : contrairement à toute autre action de l'app, scanner une immo pendant une campagne d'inventaire n'écrit **aucune** ligne dans `Mouvements` et ne change ni le détenteur courant ni la localisation affichée ailleurs dans l'app — c'est un simple relevé de présence physique ("vu, ici, par untel, à telle date"), isolé dans `Scans_Inventaire_Immos`. Ce choix protège la logique métier existante ("détenteur = dernier Mouvement", utilisée partout : circulation, dépôt, analyses, amortissement) de tout effet de bord.
+
+**Scan en continu** : contrairement aux écrans de scan classiques (un scan → une action → retour à l'accueil), l'écran d'inventaire physique ré-arme la caméra automatiquement après chaque scan enregistré, pour enchaîner sur l'immo suivante sans repasser par un menu — geste terrain répétitif par nature (on scanne toutes les immos d'un dépôt ou d'un chantier à la suite).
+
+**Rapport d'écarts, calculé à la clôture (ou à tout moment en cours de campagne)** : comparaison entre les scans enregistrés et la localisation théorique déjà connue (`immoMeta`, alimentée par `Immos.Site`/`Immos.Actif` — jamais par un nouveau champ). Deux catégories d'écart, construites uniquement à partir de données déjà fiables (pas de nouvelle source de vérité) :
+- **Immo scannée mais sortie du parc** (`Immos.Actif = Non`, ex. hors service/perdue/volée) — anomalie potentielle : soit le statut est erroné, soit une immo réformée est encore utilisée sur le terrain.
+- **Site du scan ≠ site théorique** (`Immos.Site`) — signale une immo mal localisée entre Réunion et Mayotte, exactement le type d'écart qui avait motivé la migration EBP de juillet 2026 (véhicules mal affectés).
+- **Immos non scannées** (actives, absentes de tous les scans de la campagne) : listées séparément comme "manquantes possibles", sans affirmer qu'elles sont réellement perdues — une immo peut simplement ne pas avoir été présentée au scan (chantier isolé, oubli), ce rapport est une aide au contrôle, pas un verdict.
+
+Ce rapport ne calcule **aucun taux au sens strict de "immos perdues"** : le taux de couverture affiché ("Immos vues") ne compte que les immos actives réellement scannées au moins une fois, rapporté au total des immos actives — une immo scannée mais déjà sortie du parc est comptée dans les écarts, pas dans "vues", pour ne pas gonfler artificiellement le taux de couverture.
+
+Détail des colonnes dans `02_MODELE_DONNEES.md`, raisonnement complet dans `04_HISTORIQUE_DECISIONS.md`.
+
 ## Module EPI — dotation & stock (ajouté août 2026)
 
 Chaque salarié "hors bureau" (poste chantier, maintenance, atelier, conducteur de travaux) reçoit un paquetage d'EPI à son entrée puis à chaque nouvelle année civile, dont le contenu dépend uniquement de son `Affectation_EPI` (C/M/Z/A — voir `02_MODELE_DONNEES.md`).
@@ -118,6 +139,8 @@ Chaque salarié "hors bureau" (poste chantier, maintenance, atelier, conducteur 
 
 **Correspondance taille salarié → article** : chaque type d'article consulte un champ de taille précis sur la fiche employé (`Taille_Pantalon`, `Taille_Tshirt`, `Taille_Veste`, `Pointure_Chaussures`, `Taille_Gants`) — Polos, T-shirts manches longues et Ensemble pluie réutilisent l'échelle `Taille_Tshirt`, faute de champ dédié pour ces articles annexes. Si aucun article du catalogue ne correspond à la taille recherchée pour un type donné, la ligne est omise de la fiche et signalée à l'utilisateur (`non_trouves` dans la réponse), plutôt que de générer une ligne incomplète silencieusement.
 
+**Seuils d'alerte "stock bas" (ajouté août 2026)** : chaque référence du catalogue (`Catalogue_Articles_EPI.Stock_Mini`) peut avoir un seuil d'alerte personnalisé, édité un par un depuis l'onglet Stock (bouton "🎚️ Seuil", action `maj_stock_mini_epi`). Sans seuil personnalisé (valeur `0`/vide), le dashboard applique un seuil par défaut de 5 — comportement identique à avant cette fonctionnalité, pour ne rien casser tant que William n'a pas encore renseigné de seuils par article. Sous ce seuil, une pastille "stock bas" (`.badge bu`) s'affiche sur la ligne et l'article remonte dans une carte récapitulative en tête de l'onglet Stock. Un nouvel onglet **"🛒 Suggestion de commande"** calcule, pour chaque article dont le stock ne couvre plus le besoin, une quantité à commander = besoin restant à distribuer aux nouveaux entrants de l'année sans fiche encore générée + seuil mini − stock actuel (jamais négatif) — le "besoin restant" est calculé exactement comme la carte "Nouveaux entrants sans dotation", agrégé par article plutôt que par employé.
+
 ## Module Prime d'outillage (ajouté août 2026)
 
 Kit d'outils remis en nature aux salariés de terrain, valorisé comme un avantage — distinct des EPI (vêtements/protection) : les outils sont des articles durables donnés **une seule fois**, complétés plus tard si des articles manquants sont distribués, sans cycle de renouvellement annuel.
@@ -133,6 +156,8 @@ Kit d'outils remis en nature aux salariés de terrain, valorisé comme un avanta
 **Stock vivant** : un solde par outil (`Stock_Actuel` dans `Catalogue_Outillage`), décrémenté à chaque distribution actée, incrémenté à chaque réception de commande. Contrairement aux EPI, il n'y a **pas d'étape "fiche générée en attente"** : la distribution (`distribuer_outillage`) décrémente le stock directement dès l'enregistrement de la preuve photo — pas de fiche "orpheline" possible.
 
 **Vue "Ce qui reste à distribuer"** (besoin explicitement exprimé par William) : pour chaque outil du catalogue, nombre d'employés de son service qui ne l'ont pas encore reçu, calculé dynamiquement en soustrayant les lignes déjà reçues (`Lignes_Outillage`) de la grille du service — équivalent direct de la colonne "Manquant" du fichier Excel d'origine, mais toujours à jour.
+
+**Seuils d'alerte "stock bas" et suggestion de commande (ajouté août 2026)** : même principe que les EPI — `Catalogue_Outillage.Stock_Mini` par outil (action `maj_stock_mini_outillage`), seuil par défaut de 3 si non renseigné, pastille + carte récapitulative sur l'onglet Stock, nouvel onglet "🛒 Suggestion de commande" (quantité à commander = besoin restant à distribuer, calculé exactement comme "Ce qui reste à distribuer" ci-dessus, agrégé tous services confondus + seuil mini − stock actuel).
 
 **Distribution par employé** : sélection d'un employé → cases à cocher sur les articles manquants de son kit → génération d'une fiche imprimable ("PRIME D'OUTILLAGE", même gabarit HTML que les fiches EPI mais sans colonne Taille) → émargement (photo de la fiche signée), qui enregistre les lignes de distribution et décrémente le stock en une seule action.
 
@@ -190,3 +215,13 @@ Une fiche sans signature détectée dans la case prévue à cet effet ne peut pa
 Tout employé actif d'un service concerné par la dotation EPI (`Affectation_EPI` renseignée) doit recevoir sa fiche "Entree" dès son embauche, **peu importe la date** — ce n'est pas conditionné à une saisie manuelle proactive. L'onglet Dotations EPI affiche une carte dédiée listant ces employés, avec leur besoin en articles comparé au stock disponible, et un accès direct à la génération de leur fiche (même circuit de validation qu'une dotation annuelle classique).
 
 **Ajout d'un employé** (dashboard, onglet Utilisateurs) : le formulaire de création permet de saisir directement l'affectation EPI et les 5 tailles (au lieu de devoir repasser ensuite par sa fiche individuelle) — règle de saisie : la taille de veste se remplit par défaut sur celle du t-shirt (modifiable si différente, cf. mode de réception des demandes d'embauche par mail). Si le stock est insuffisant pour son profil, une alerte informative (non bloquante) liste les articles concernés juste après la création.
+
+## Recherche globale dashboard (ajoutée août 2026)
+
+Champ de recherche unique en en-tête du dashboard (raccourci clavier `/`, comme GitHub/Slack — n'intercepte pas la frappe si un autre champ a déjà le focus), cherchant simultanément dans les données déjà chargées en mémoire : immobilisations (code, libellé, n° série), employés (code, nom), articles EPI et outillage (type, référence, désignation/marque, taille pour les EPI). Résultats groupés par type, plafonnés à 8 par groupe pour rester lisible (pas de pagination — c'est un accès rapide, pas un écran de recherche exhaustive).
+
+**Aucune donnée supplémentaire chargée pour ce besoin** : purement client-side sur ce qui est déjà en mémoire pour l'onglet courant ou déjà visité (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`) — aucun nouvel appel Worker. Conséquence assumée : tant que les onglets EPI/Outillage n'ont jamais été ouverts dans la session, leurs catalogues ne sont pas encore en mémoire et n'apparaissent pas dans les résultats (les immos et employés, eux, sont chargés dès l'ouverture du dashboard, donc toujours cherchables).
+
+**Navigation à la sélection d'un résultat** : les immobilisations et employés ont une fiche existante (panneau latéral) qui s'ouvre directement, sans changer d'onglet. Les articles EPI/outillage n'ont pas de fiche individuelle : la sélection bascule vers l'onglet concerné (chargeant ses données si pas encore fait), force la sous-vue "Stock", et pré-remplit le champ de filtre déjà existant sur cette vue avec la référence de l'article — réutilise telle quelle la logique de filtrage déjà en place (`refreshEPIStockResults`/`refreshOutilStockResults`), aucun nouveau mécanisme de recherche par article.
+
+**Aucun nouveau droit** : la recherche elle-même est disponible à tout utilisateur connecté au dashboard (elle ne fait que filtrer des données déjà visibles pour lui) ; la navigation vers un article EPI/outillage revérifie `peutVoirEPI`/`peutVoirOutillage` au moment du clic (au cas où le rôle aurait changé depuis le chargement de la page), cohérent avec le contrôle déjà appliqué à l'ouverture normale de ces onglets.

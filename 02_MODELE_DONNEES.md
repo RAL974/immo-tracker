@@ -146,6 +146,35 @@ Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour
 
 ⚠️ Le dashboard **ne compare pas** une campagne à la précédente (pas d'écart calculé) : chaque campagne restitue simplement l'état du stock à l'instant T (regroupé par Zone + Site + Référence). Pour une entreprise du bâtiment, il n'y a pas de stock minimum fixe ni de continuité garantie entre deux campagnes (chantiers qui se terminent, nature des chantiers qui change) — comparer à décembre 2025 n'a pas de sens métier. Voir `04_HISTORIQUE_DECISIONS.md`.
 
+## Liste `Campagnes_Inventaire_Immos` (ajoutée août 2026)
+
+*Campagnes de comptage physique des **immobilisations elles-mêmes** par scan QR (roadmap item A1) — à ne pas confondre avec `Campagnes_Inventaire`/`Lignes_Inventaire` ci-dessus, qui portent sur le stock d'articles/consommables. Deux sujets, deux paires de listes, deux onglets dashboard distincts. Mêmes noms de colonnes que `Campagnes_Inventaire` par cohérence (même gabarit de cycle de vie), mais des listes SharePoint physiquement séparées, pour ne jamais mélanger les deux jeux de données.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de la campagne (ex. `Inventaire physique immos 2026`) |
+| `Date_Debut` | Date | |
+| `Date_Fin` | Date | Optionnelle, indicative |
+| `Statut` | Texte | `En cours` / `Clôturée` |
+| `Cree_Par` | Texte | Code employé (résolu depuis le jeton de session — `requireAdmin`) |
+| `Cloture_Par` | Texte | Code employé (vide tant qu'en cours) |
+| `Date_Cloture` | Date/heure | ISO |
+
+## Liste `Scans_Inventaire_Immos` (ajoutée août 2026)
+
+*Une ligne = un événement "immo vue physiquement" pendant une campagne : qui, où, quand. **Ne crée jamais de `Mouvement`** — aucun effet sur le détenteur courant d'une immo (toujours déduit du dernier `Mouvement` réel, ailleurs dans l'app). Le rapport d'écarts se calcule à la lecture, en comparant ces scans à la localisation théorique déjà connue (`immoMeta` côté dashboard), jamais en modifiant les données de possession.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code de l'immo scannée, ex. `IM000123` |
+| `Campagne` | Texte | Nom de la campagne (référence texte simple, pas de colonne Lookup — cohérent avec `Lignes_Inventaire`/`Lignes_Dotation_EPI`) |
+| `Code_Employe` | Texte | Auteur du scan (reçu depuis le corps de la requête, comme `reserver`/`transfert` — cette action est **partagée avec la PWA terrain**, profils admin uniquement mais sans mot de passe, donc pas de jeton de session possible ici, voir `03_REGLES_METIER_ET_ROLES.md`) |
+| `Nom_Employe` | Texte | |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Horodatage` | Date/heure | ISO |
+
+⚠️ Une même immo peut être scannée plusieurs fois pendant une campagne (erreur, contrôle redondant) : toutes les occurrences sont conservées, le rapport d'écarts ne retient que le scan le plus récent par immo pour le détail affiché, mais compte chaque scan dans le total brut.
+
 ## Module EPI — extension de la liste `Employes` (ajoutée août 2026)
 
 6 nouvelles colonnes, permettant de générer automatiquement les fiches de dotation EPI :
@@ -173,6 +202,7 @@ Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour
 | `Designation` | Texte | |
 | `Fournisseur` | Texte | |
 | `Stock_Actuel` | Nombre | Solde vivant : décrémenté à l'émargement d'une fiche de dotation, incrémenté à la réception d'une commande |
+| `Stock_Mini` | Nombre | Ajoutée août 2026 — seuil d'alerte "stock bas" propre à cet article/taille. `0` ou vide = pas de seuil personnalisé : le dashboard applique alors un seuil par défaut (5) pour ne pas casser le comportement déjà en place. Éditable depuis l'onglet EPI → Stock (bouton "🎚️ Seuil"). |
 
 ⚠️ La correspondance taille salarié → référence a été importée telle quelle depuis le fichier Excel source (`Liste EPI.xlsx` / onglet "Correspondance tailles articles"), **confirmée exacte par William** malgré des apparences de doublons de référence entre tailles voisines (ex. Pantalon 46 et 48 pointent vers la même référence) — ne pas "corriger" cette table sans revalider avec lui.
 
@@ -235,6 +265,7 @@ Recherche d'un article pour une taille employé donnée : `Type_Article` = X **e
 | `Prix_Unitaire` | Nombre | Prix final négocié (et non le prix catalogue TTC) |
 | `Stock_Actuel` | Nombre | Solde vivant : décrémenté à chaque distribution, incrémenté à chaque réception de commande |
 | `Duree_Amortissement_Mois` | Nombre | Durée retenue (12 à 60 mois selon l'article), ajoutée août 2026 — pilote le calcul de la prime annuelle versée en paie de décembre (voir `03_REGLES_METIER_ET_ROLES.md`) |
+| `Stock_Mini` | Nombre | Ajoutée août 2026 — seuil d'alerte "stock bas" propre à cet outil. `0` ou vide = pas de seuil personnalisé : le dashboard applique alors un seuil par défaut (3). Éditable depuis l'onglet Prime d'outillage → Stock (bouton "🎚️ Seuil"). |
 
 ## Liste `Grille_Outillage` (ajoutée août 2026)
 
@@ -323,6 +354,10 @@ Recherche d'un article pour une taille employé donnée : `Type_Article` = X **e
 Mêmes colonnes et même principe que `Mouvements_Materiel_IT` (`Title` = code de la ligne, `Code_Employe`, `Nom_Detenteur`, `Note`, `Horodatage`).
 
 ⚠️ `Materiel_IT` conserve ses colonnes `N_Telephone`/`Operateur`/etc. telles quelles en base (pas de suppression) mais le dashboard n'écrit plus dedans pour les nouveaux appareils — ces champs sont désormais l'affaire de `Lignes_Telephoniques`. Une migration one-shot (bouton dans l'onglet Lignes) crée une ligne pour chaque téléphone existant ayant déjà un numéro, en reprenant son détenteur actuel comme point de départ de l'historique.
+
+## Recherche globale dashboard (ajoutée août 2026)
+
+Aucun nouveau modèle de données : la recherche du header (voir `03_REGLES_METIER_ET_ROLES.md`) lit exclusivement les structures déjà chargées en mémoire côté dashboard (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`) — aucune colonne SharePoint ni action Worker ajoutée.
 
 ## Fichiers JSON associés
 

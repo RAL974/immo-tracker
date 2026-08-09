@@ -404,12 +404,41 @@ async function handleRequest(request) {
     }));
   }
 
+  // ── Campagne d'inventaire physique des IMMOBILISATIONS par scan QR (à ne pas confondre avec
+  // Campagnes_Inventaire/Lignes_Inventaire ci-dessus, qui portent sur le stock d'articles/
+  // consommables — deux sujets distincts, voir 04_HISTORIQUE_DECISIONS.md). Une ligne de
+  // Scans_Inventaire_Immos = un événement "vu, par untel, à telle date" ; jamais de Mouvement créé
+  // (pas d'effet sur le détenteur courant, purement un relevé de présence physique comparé après
+  // coup à la localisation théorique déjà déduite du dernier Mouvement ailleurs dans l'app).
+  if (p.get('campagnes_inventaire_immos') === '1') {
+    const [campItems, scanItems] = await Promise.all([
+      paginate(GL + '/Campagnes_Inventaire_Immos/items?$expand=fields&$orderby=fields/Created%20desc&$top=200', 5),
+      paginate(GL + '/Scans_Inventaire_Immos/items?$expand=fields($select=Title,Campagne)&$top=5000', 15)
+    ]);
+    const counts = {};
+    scanItems.forEach(i => { const c = (i.fields || {}).Campagne || ''; counts[c] = (counts[c] || 0) + 1; });
+    return json(campItems.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, nom: f.Title || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut: f.Statut || 'En cours', cree_par: f.Cree_Par || '', cloture_par: f.Cloture_Par || '', date_cloture: f.Date_Cloture || '', nb_scans: counts[f.Title || ''] || 0 };
+    }));
+  }
+
+  // Scans d'une campagne donnée (nom passé tel quel, filtré côté Worker comme pour lignes_inventaire)
+  if (p.get('scans_inventaire_immos')) {
+    const nom = p.get('scans_inventaire_immos');
+    const items = await paginate(GL + '/Scans_Inventaire_Immos/items?$expand=fields&$top=5000', 15);
+    return json(items.filter(i => (i.fields || {}).Campagne === nom).map(i => {
+      const f = i.fields || {};
+      return { id: i.id, code_im: f.Title || '', campagne: f.Campagne || '', code_employe: f.Code_Employe || '', nom_employe: f.Nom_Employe || '', site: f.Site || '', horodatage: f.Horodatage || f.Created || '' };
+    }));
+  }
+
   // ── Module EPI : catalogue, grille de dotation, fiches ──────────────────────
   if (p.get('catalogue_epi') === '1') {
     const items = await paginate(GL + '/Catalogue_Articles_EPI/items?$expand=fields&$top=200', 5);
     return json(items.map(i => {
       const f = i.fields || {};
-      return { id: i.id, type_article: f.Type_Article || f.Title || '', taille_salarie: f.Taille_Salarie || '', taille_affichage: f.Taille_Affichage || '', reference: f.Reference || '', designation: f.Designation || '', fournisseur: f.Fournisseur || '', stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0 };
+      return { id: i.id, type_article: f.Type_Article || f.Title || '', taille_salarie: f.Taille_Salarie || '', taille_affichage: f.Taille_Affichage || '', reference: f.Reference || '', designation: f.Designation || '', fournisseur: f.Fournisseur || '', stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, stock_mini: f.Stock_Mini != null ? f.Stock_Mini : 0 };
     }));
   }
 
@@ -458,7 +487,7 @@ async function handleRequest(request) {
     const items = await paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5);
     return json(items.map(i => {
       const f = i.fields || {};
-      return { id: i.id, type_article: f.Title || '', reference: f.Reference || '', distributeur: f.Distributeur || '', marque: f.Marque || '', prix_unitaire: f.Prix_Unitaire != null ? f.Prix_Unitaire : 0, stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, duree_amortissement_mois: f.Duree_Amortissement_Mois || 0 };
+      return { id: i.id, type_article: f.Title || '', reference: f.Reference || '', distributeur: f.Distributeur || '', marque: f.Marque || '', prix_unitaire: f.Prix_Unitaire != null ? f.Prix_Unitaire : 0, stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, stock_mini: f.Stock_Mini != null ? f.Stock_Mini : 0, duree_amortissement_mois: f.Duree_Amortissement_Mois || 0 };
     }));
   }
 
@@ -1371,6 +1400,40 @@ async function handleRequest(request) {
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
+    // ── Campagne d'inventaire physique des immos par scan (distincte de la campagne stock
+    // ci-dessus) — lancement/clôture réservés au dashboard (requireAdmin), identité toujours
+    // résolue depuis le jeton (_auth.session.code), jamais depuis le corps de la requête.
+    if (action === 'creer_campagne_inventaire_immos') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const nom = (body.nom || '').trim();
+      if (!nom) return json({ success: false, error: 'nom_manquant' });
+      try {
+        const r = await fetch(GL + '/Campagnes_Inventaire_Immos/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: nom, Date_Debut: body.date_debut || new Date().toISOString().slice(0, 10), Date_Fin: body.date_fin || null,
+          Statut: 'En cours', Cree_Par: _auth.session.code
+        } }) });
+        const rd = await r.json();
+        if (r.ok) return json({ success: true, id: rd.id });
+        return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    if (action === 'cloturer_campagne_inventaire_immos') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const nom = (body.nom || '').trim();
+      if (!nom) return json({ success: false, error: 'nom_manquant' });
+      try {
+        const cur = await fetch(GL + "/Campagnes_Inventaire_Immos/items?$expand=fields&$filter=fields/Title eq '" + nom.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const curData = await cur.json();
+        const itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
+        if (!itemId) return json({ success: false, error: 'campagne_introuvable' });
+        const r = await fetch(GL + '/Campagnes_Inventaire_Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({
+          Statut: 'Clôturée', Cloture_Par: _auth.session.code, Date_Cloture: new Date().toISOString()
+        }) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
     if (action === 'ajouter_ligne_inventaire') {
       const campagne = (body.campagne || '').trim();
       if (!campagne || !body.reference) return json({ success: false, error: 'donnees_invalides' });
@@ -1380,6 +1443,28 @@ async function handleRequest(request) {
           Fabricant: body.fabriquant || '', Reference: String(body.reference || ''), Designation: body.designation || '',
           Quantite: parseFloat(body.quantite) || 0, Chute_Cable: body.chute_cable ? 'Oui' : '',
           Observations: body.observations || '', Code_Employe: body.code_employe || '', Horodatage: new Date().toISOString()
+        } }) });
+        const rd = await r.json();
+        if (r.ok) return json({ success: true, id: rd.id });
+        return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture', details: rd });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Scan d'une immo pendant une campagne d'inventaire physique (PWA, profil admin terrain —
+    // badge scanné sans mot de passe, même modèle de confiance que reserver/transfert/
+    // ajouter_ligne_inventaire ci-dessus : jamais de jeton de session côté PWA, donc identité
+    // reçue du corps de la requête comme pour toutes les actions partagées avec la PWA). Ne crée
+    // jamais de Mouvement : un simple relevé "vu, par untel, à telle date", sans effet sur le
+    // détenteur courant de l'immo (comparé après coup à la localisation théorique côté rapport
+    // d'écarts, calculée comme partout ailleurs depuis le dernier Mouvement réel).
+    if (action === 'enregistrer_scan_inventaire_immo') {
+      const campagne = (body.campagne || '').trim();
+      const codeIm = (body.code_im || '').trim().toUpperCase();
+      if (!campagne || !codeIm) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Scans_Inventaire_Immos/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: codeIm, Campagne: campagne, Code_Employe: body.code_employe || '', Nom_Employe: body.nom_employe || '',
+          Site: body.site || 'Reunion', Horodatage: new Date().toISOString()
         } }) });
         const rd = await r.json();
         if (r.ok) return json({ success: true, id: rd.id });
@@ -1591,6 +1676,20 @@ async function handleRequest(request) {
         headers: { 'Content-Type': 'application/json' }, body: { Stock_Actuel: parseFloat(x.quantite) || 0 }
       }));
       try { return json(await graphBatch(requests)); } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Seuil d'alerte "stock bas" par article — édité un par un (moins fréquent qu'une réception,
+    // pas besoin d'un lot comme bulk_maj_stock_epi). 0/absent côté lecture = pas de seuil
+    // personnalisé, le dashboard applique alors un seuil par défaut (voir 03_REGLES_METIER_ET_ROLES.md).
+    if (action === 'maj_stock_mini_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const catId = body.id;
+      const seuil = parseFloat(body.stock_mini);
+      if (!catId || isNaN(seuil) || seuil < 0) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Catalogue_Articles_EPI/items/' + catId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Stock_Mini: seuil }) });
+        return json({ success: r.ok, nouveau_seuil: seuil });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
     // Réception d'une commande fournisseur : incrémente le stock d'une ligne catalogue
@@ -1912,6 +2011,18 @@ async function handleRequest(request) {
       try {
         const r = await fetch(GL + '/Catalogue_Outillage/items/' + catId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Stock_Actuel: qte }) });
         return json({ success: r.ok, nouveau_stock: qte });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Seuil d'alerte "stock bas" par outil — même principe que maj_stock_mini_epi.
+    if (action === 'maj_stock_mini_outillage') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const catId = body.id;
+      const seuil = parseFloat(body.stock_mini);
+      if (!catId || isNaN(seuil) || seuil < 0) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Catalogue_Outillage/items/' + catId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Stock_Mini: seuil }) });
+        return json({ success: r.ok, nouveau_seuil: seuil });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 

@@ -175,6 +175,9 @@
       <button class="btn btn-outline" onclick="showScreen('screen-force-attribution')" style="font-size:13px">⚡ Attribution forcée</button>
       <button class="btn btn-outline" onclick="initReservationScreen(true)" style="font-size:13px">📅 Réserver pour...</button>
     </div>
+    <!-- Campagne d'inventaire physique des immobilisations (scan QR) — distincte de la campagne
+         d'inventaire de stock ci-dessus, réservée aux profils admin (voir 03_REGLES...). -->
+    <button class="btn btn-outline" onclick="showScreen('screen-inventaire-immos')" style="font-size:13px">📸 Inventaire immos (scan)</button>
   </div>
 
   <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
@@ -488,6 +491,33 @@
   <p class="scanner-hint">Vise le code-barres (EAN) sur l'emballage du fabricant</p>
   <div id="scanner-inventaire-ref" class="scanner-box"></div>
   <button class="btn btn-outline" onclick="showScreen('screen-inventaire-stock',true)">Annuler</button>
+</div>
+
+<!-- ══════════════ CAMPAGNE D'INVENTAIRE PHYSIQUE DES IMMOS (SCAN QR) ══════════════ -->
+<!-- Distincte de la campagne d'inventaire de stock (articles/consommables) plus haut : ici on
+     recense les IMMOBILISATIONS elles-mêmes par scan QR, réservé aux profils admin. -->
+<div id="screen-inventaire-immos" class="screen">
+  <h2>📸 Inventaire immos (scan)</h2>
+  <div id="invim-sans-campagne" class="hidden" style="text-align:center;color:var(--grey);padding:20px 10px">Aucune campagne d'inventaire physique n'est en cours actuellement. Elle se lance depuis le dashboard.</div>
+  <div id="invim-avec-campagne" class="hidden">
+    <p id="invim-nom-campagne" style="font-weight:700;color:var(--blue);font-size:15px"></p>
+    <p style="color:var(--grey);font-size:13px">Chaque immo scannée pendant cette campagne est enregistrée comme "vue" avec ton code, le site et l'horodatage — sans effet sur son détenteur actuel (ce mode ne crée aucun mouvement).</p>
+    <button class="btn btn-secondary" onclick="demarrerScanInventaireImmos()">📷 Démarrer le scan</button>
+  </div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ SCAN EN CONTINU — INVENTAIRE IMMOS ══════════════ -->
+<div id="screen-scan-inventaire-immo" class="screen">
+  <h2>📸 Scan en continu</h2>
+  <p class="scanner-hint">Vise le QR code de chaque immo, l'un après l'autre</p>
+  <div id="scanner-inventaire-immo" class="scanner-box"></div>
+  <div style="text-align:center;margin:14px 0">
+    <p style="font-size:28px;font-weight:800;color:var(--blue);margin:0"><span id="invim-compteur">0</span></p>
+    <p style="color:var(--grey);font-size:13px;margin:2px 0 0">immo(s) scannée(s) cette session</p>
+    <p id="invim-dernier" style="min-height:20px;font-weight:700;color:var(--green,#1E9E5A);margin-top:6px"></p>
+  </div>
+  <button class="btn btn-outline" onclick="showScreen('screen-inventaire-immos',true)">✅ Terminer</button>
 </div>
 
 <!-- ══════════════ RÉSERVATION ══════════════ -->

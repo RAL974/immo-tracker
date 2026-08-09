@@ -52,10 +52,12 @@
 - Campagne d'inventaire de stock d'articles/consommables (août 2026, distinct de l'inventaire des immobilisations — voir `04_HISTORIQUE_DECISIONS.md`)
 - Autorisation côté serveur des actions sensibles du Worker + tests automatisés + garde-fous avant push (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Module Matériel IT — téléphones, puis ordinateurs — hors circuit immobilisations (août 2026, code livré, **en attente de la création des 2 listes SharePoint par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`)
+- Seuils d'alerte stock EPI + Outillage, avec suggestion de commande (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
+- Campagne d'inventaire physique des immobilisations par scan QR — roadmap item A1 (août 2026, code livré, **en attente de la création des 2 listes SharePoint par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`)
+- Recherche globale dashboard, raccourci clavier `/` (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier
-- Inventaire physique annuel des immobilisations par scan QR (projet séparé, non validé par la direction)
 - Photos et constat d'état en image
 - Demandes de matériel planifiées à l'avance
 - Interface simplifiée pour Mayotte
@@ -75,7 +77,6 @@ Ce projet contient plusieurs documents complémentaires :
 | `05_ROADMAP_EVOLUTIONS_FUTURES.md` | Idées d'évolution non encore développées |
 
 **Conseil d'usage avec Claude :** quand une conversation démarre sur ce projet, ces documents donnent tout le contexte nécessaire sans avoir à tout réexpliquer. Après chaque évolution significative, penser à mettre à jour `04_HISTORIQUE_DECISIONS.md` (et les autres documents concernés) pour que la base de connaissance reste fidèle au code réel.
-
 
 ---
 
@@ -174,7 +175,6 @@ Le bouton "📁 Générer les PDF" (dashboard → EPI → Dotations) écrit les 
 - **Tests automatisés (ajouté août 2026)** : `npm test` (Node.js natif, `node --test`, zéro dépendance à installer) — voir `tests/` dans le dépôt et le `README.md`. Couvre la logique des jetons de session (signature/vérification HMAC, expiration, falsification), la cohérence entre les actions protégées côté Worker et la liste `GATED_ACTIONS` côté dashboard (anti-régression sur l'oubli d'un des deux côtés), et un test d'intégration bout-en-bout de `handleRequest()` avec Microsoft Graph entièrement mocké (aucun appel réseau réel, zéro risque sur les données). `npm run check` reprend les vérifications de syntaxe existantes (`node --check` sur les 3 fichiers). `npm run verify` = les deux. Un hook `pre-push` (`.githooks/`, installé via `git config core.hooksPath .githooks`) bloque le push local si `npm run verify` échoue ; un workflow GitHub Actions (`.github/workflows/tests.yml`) relance la même vérification à chaque push sur `main` en filet de sécurité (n'empêche pas le déploiement, qui reste indépendant — seulement une alerte rapide).
 - Génération de documents Word via la librairie `docx` (Node.js) — scripts `gen_doc.js` (helpers) + `build.js`/`build_note.js` (contenu), conversion PDF de vérification via LibreOffice avant livraison.
 - Migration EBP : lecture des fichiers `.xls` via `xlrd` (Python), écriture SharePoint par lots de 20 via l'action Worker `bulk_patch_immos` (Graph `$batch`).
-
 
 ---
 
@@ -326,6 +326,35 @@ Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour
 
 ⚠️ Le dashboard **ne compare pas** une campagne à la précédente (pas d'écart calculé) : chaque campagne restitue simplement l'état du stock à l'instant T (regroupé par Zone + Site + Référence). Pour une entreprise du bâtiment, il n'y a pas de stock minimum fixe ni de continuité garantie entre deux campagnes (chantiers qui se terminent, nature des chantiers qui change) — comparer à décembre 2025 n'a pas de sens métier. Voir `04_HISTORIQUE_DECISIONS.md`.
 
+## Liste `Campagnes_Inventaire_Immos` (ajoutée août 2026)
+
+*Campagnes de comptage physique des **immobilisations elles-mêmes** par scan QR (roadmap item A1) — à ne pas confondre avec `Campagnes_Inventaire`/`Lignes_Inventaire` ci-dessus, qui portent sur le stock d'articles/consommables. Deux sujets, deux paires de listes, deux onglets dashboard distincts. Mêmes noms de colonnes que `Campagnes_Inventaire` par cohérence (même gabarit de cycle de vie), mais des listes SharePoint physiquement séparées, pour ne jamais mélanger les deux jeux de données.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de la campagne (ex. `Inventaire physique immos 2026`) |
+| `Date_Debut` | Date | |
+| `Date_Fin` | Date | Optionnelle, indicative |
+| `Statut` | Texte | `En cours` / `Clôturée` |
+| `Cree_Par` | Texte | Code employé (résolu depuis le jeton de session — `requireAdmin`) |
+| `Cloture_Par` | Texte | Code employé (vide tant qu'en cours) |
+| `Date_Cloture` | Date/heure | ISO |
+
+## Liste `Scans_Inventaire_Immos` (ajoutée août 2026)
+
+*Une ligne = un événement "immo vue physiquement" pendant une campagne : qui, où, quand. **Ne crée jamais de `Mouvement`** — aucun effet sur le détenteur courant d'une immo (toujours déduit du dernier `Mouvement` réel, ailleurs dans l'app). Le rapport d'écarts se calcule à la lecture, en comparant ces scans à la localisation théorique déjà connue (`immoMeta` côté dashboard), jamais en modifiant les données de possession.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code de l'immo scannée, ex. `IM000123` |
+| `Campagne` | Texte | Nom de la campagne (référence texte simple, pas de colonne Lookup — cohérent avec `Lignes_Inventaire`/`Lignes_Dotation_EPI`) |
+| `Code_Employe` | Texte | Auteur du scan (reçu depuis le corps de la requête, comme `reserver`/`transfert` — cette action est **partagée avec la PWA terrain**, profils admin uniquement mais sans mot de passe, donc pas de jeton de session possible ici, voir `03_REGLES_METIER_ET_ROLES.md`) |
+| `Nom_Employe` | Texte | |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Horodatage` | Date/heure | ISO |
+
+⚠️ Une même immo peut être scannée plusieurs fois pendant une campagne (erreur, contrôle redondant) : toutes les occurrences sont conservées, le rapport d'écarts ne retient que le scan le plus récent par immo pour le détail affiché, mais compte chaque scan dans le total brut.
+
 ## Module EPI — extension de la liste `Employes` (ajoutée août 2026)
 
 6 nouvelles colonnes, permettant de générer automatiquement les fiches de dotation EPI :
@@ -353,6 +382,7 @@ Cette distinction "immo d'activité" vs "immo administrative" est utilisée pour
 | `Designation` | Texte | |
 | `Fournisseur` | Texte | |
 | `Stock_Actuel` | Nombre | Solde vivant : décrémenté à l'émargement d'une fiche de dotation, incrémenté à la réception d'une commande |
+| `Stock_Mini` | Nombre | Ajoutée août 2026 — seuil d'alerte "stock bas" propre à cet article/taille. `0` ou vide = pas de seuil personnalisé : le dashboard applique alors un seuil par défaut (5) pour ne pas casser le comportement déjà en place. Éditable depuis l'onglet EPI → Stock (bouton "🎚️ Seuil"). |
 
 ⚠️ La correspondance taille salarié → référence a été importée telle quelle depuis le fichier Excel source (`Liste EPI.xlsx` / onglet "Correspondance tailles articles"), **confirmée exacte par William** malgré des apparences de doublons de référence entre tailles voisines (ex. Pantalon 46 et 48 pointent vers la même référence) — ne pas "corriger" cette table sans revalider avec lui.
 
@@ -415,6 +445,7 @@ Recherche d'un article pour une taille employé donnée : `Type_Article` = X **e
 | `Prix_Unitaire` | Nombre | Prix final négocié (et non le prix catalogue TTC) |
 | `Stock_Actuel` | Nombre | Solde vivant : décrémenté à chaque distribution, incrémenté à chaque réception de commande |
 | `Duree_Amortissement_Mois` | Nombre | Durée retenue (12 à 60 mois selon l'article), ajoutée août 2026 — pilote le calcul de la prime annuelle versée en paie de décembre (voir `03_REGLES_METIER_ET_ROLES.md`) |
+| `Stock_Mini` | Nombre | Ajoutée août 2026 — seuil d'alerte "stock bas" propre à cet outil. `0` ou vide = pas de seuil personnalisé : le dashboard applique alors un seuil par défaut (3). Éditable depuis l'onglet Prime d'outillage → Stock (bouton "🎚️ Seuil"). |
 
 ## Liste `Grille_Outillage` (ajoutée août 2026)
 
@@ -504,6 +535,10 @@ Mêmes colonnes et même principe que `Mouvements_Materiel_IT` (`Title` = code d
 
 ⚠️ `Materiel_IT` conserve ses colonnes `N_Telephone`/`Operateur`/etc. telles quelles en base (pas de suppression) mais le dashboard n'écrit plus dedans pour les nouveaux appareils — ces champs sont désormais l'affaire de `Lignes_Telephoniques`. Une migration one-shot (bouton dans l'onglet Lignes) crée une ligne pour chaque téléphone existant ayant déjà un numéro, en reprenant son détenteur actuel comme point de départ de l'historique.
 
+## Recherche globale dashboard (ajoutée août 2026)
+
+Aucun nouveau modèle de données : la recherche du header (voir `03_REGLES_METIER_ET_ROLES.md`) lit exclusivement les structures déjà chargées en mémoire côté dashboard (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`) — aucune colonne SharePoint ni action Worker ajoutée.
+
 ## Fichiers JSON associés
 
 - **`immos.json`** (tableau) : catalogue léger utilisé par la PWA et le Dashboard pour les libellés/catégories/comptes en lecture rapide. Généré à partir de SharePoint, redéployé après modifications importantes.
@@ -518,7 +553,6 @@ Mêmes colonnes et même principe que `Mouvements_Materiel_IT` (`Title` = code d
 - **`outillage_lignes.json`** (tableau, ajouté août 2026) : ~1895 lignes de distribution historique (une ligne = un outil déjà remis à un employé), issues des matrices 0/1 des onglets "Tx Neufs"/"Maintenance". Utilisés une seule fois par l'outil de migration (`importerDonneesOutillage()` dans le dashboard).
 - **`materiel_it_catalogue.json`** (tableau, ajouté août 2026) : 40 téléphones, issu de `1.5.3. Matériel et utilisateurs 2026.05.23.xlsx` (onglet "2"). Coût mensuel (23,22€ HT, tarif plat Free Pro constaté sur facture) appliqué uniquement aux appareils actifs avec une ligne téléphonique FREE en cours.
 - **`materiel_it_mouvements.json`** (tableau, ajouté août 2026) : 40 lignes d'historique initial (un mouvement par appareil, détenteur actuel), issues du même fichier. Date de détention = date d'entrée si connue, sinon date du fichier source (23/05/2026) en repli — voir `04_HISTORIQUE_DECISIONS.md` pour la limite assumée de cette approximation. 3 codes détenteurs (`ADWI`, `HOAL`, `VIMA`) non retrouvés dans `Employes` au moment de la migration, importés tels quels — à corriger par William si nécessaire.
-
 
 ---
 
@@ -619,6 +653,27 @@ Deux nouvelles capacités `ROLE_CAPS` :
 
 Détail technique dans `02_MODELE_DONNEES.md` et l'historique dans `04_HISTORIQUE_DECISIONS.md`.
 
+## Campagne d'inventaire physique des immobilisations par scan (roadmap item A1, ajouté août 2026)
+
+*À ne pas confondre avec la campagne d'inventaire de stock ci-dessus (articles/consommables, sans code) : ici on recense les **immobilisations elles-mêmes**, une par une, par scan de leur QR code. Deux paires de listes SharePoint séparées (`Campagnes_Inventaire_Immos`/`Scans_Inventaire_Immos`), deux onglets distincts.*
+
+**Lancement/clôture réservés au dashboard, requireAdmin** : contrairement à la campagne de stock (ouverte à plusieurs rôles terrain pour la saisie), le lancement (`creer_campagne_inventaire_immos`) et la clôture (`cloturer_campagne_inventaire_immos`) d'une campagne physique sont strictement Admin — cohérent avec le fait qu'une seule campagne à la fois doit être active et que sa clôture déclenche le calcul définitif du rapport d'écarts. `Cree_Par`/`Cloture_Par` sont toujours résolus depuis le jeton de session vérifié (`_auth.session.code`), jamais depuis le corps de la requête.
+
+**Le scan lui-même reste une action PWA, profils admin uniquement, sans mot de passe** : `enregistrer_scan_inventaire_immo` suit le même modèle de confiance que `reserver`/`transfert`/`ajouter_ligne_inventaire` (badge scanné, pas de jeton de session possible côté terrain) — volontairement **non protégée** par le mécanisme `requireAdmin`/`requireGarant` (elle casserait pour tout le monde sinon, voir `security.gated-actions.test.js`). L'accès à l'écran de scan lui-même est filtré côté PWA aux seuls codes admin (`CONFIG.admins`), comme le reste de la "Section admin" déjà présente sur l'écran d'accueil terrain.
+
+**Un scan n'est jamais un mouvement** : contrairement à toute autre action de l'app, scanner une immo pendant une campagne d'inventaire n'écrit **aucune** ligne dans `Mouvements` et ne change ni le détenteur courant ni la localisation affichée ailleurs dans l'app — c'est un simple relevé de présence physique ("vu, ici, par untel, à telle date"), isolé dans `Scans_Inventaire_Immos`. Ce choix protège la logique métier existante ("détenteur = dernier Mouvement", utilisée partout : circulation, dépôt, analyses, amortissement) de tout effet de bord.
+
+**Scan en continu** : contrairement aux écrans de scan classiques (un scan → une action → retour à l'accueil), l'écran d'inventaire physique ré-arme la caméra automatiquement après chaque scan enregistré, pour enchaîner sur l'immo suivante sans repasser par un menu — geste terrain répétitif par nature (on scanne toutes les immos d'un dépôt ou d'un chantier à la suite).
+
+**Rapport d'écarts, calculé à la clôture (ou à tout moment en cours de campagne)** : comparaison entre les scans enregistrés et la localisation théorique déjà connue (`immoMeta`, alimentée par `Immos.Site`/`Immos.Actif` — jamais par un nouveau champ). Deux catégories d'écart, construites uniquement à partir de données déjà fiables (pas de nouvelle source de vérité) :
+- **Immo scannée mais sortie du parc** (`Immos.Actif = Non`, ex. hors service/perdue/volée) — anomalie potentielle : soit le statut est erroné, soit une immo réformée est encore utilisée sur le terrain.
+- **Site du scan ≠ site théorique** (`Immos.Site`) — signale une immo mal localisée entre Réunion et Mayotte, exactement le type d'écart qui avait motivé la migration EBP de juillet 2026 (véhicules mal affectés).
+- **Immos non scannées** (actives, absentes de tous les scans de la campagne) : listées séparément comme "manquantes possibles", sans affirmer qu'elles sont réellement perdues — une immo peut simplement ne pas avoir été présentée au scan (chantier isolé, oubli), ce rapport est une aide au contrôle, pas un verdict.
+
+Ce rapport ne calcule **aucun taux au sens strict de "immos perdues"** : le taux de couverture affiché ("Immos vues") ne compte que les immos actives réellement scannées au moins une fois, rapporté au total des immos actives — une immo scannée mais déjà sortie du parc est comptée dans les écarts, pas dans "vues", pour ne pas gonfler artificiellement le taux de couverture.
+
+Détail des colonnes dans `02_MODELE_DONNEES.md`, raisonnement complet dans `04_HISTORIQUE_DECISIONS.md`.
+
 ## Module EPI — dotation & stock (ajouté août 2026)
 
 Chaque salarié "hors bureau" (poste chantier, maintenance, atelier, conducteur de travaux) reçoit un paquetage d'EPI à son entrée puis à chaque nouvelle année civile, dont le contenu dépend uniquement de son `Affectation_EPI` (C/M/Z/A — voir `02_MODELE_DONNEES.md`).
@@ -642,6 +697,8 @@ Chaque salarié "hors bureau" (poste chantier, maintenance, atelier, conducteur 
 
 **Correspondance taille salarié → article** : chaque type d'article consulte un champ de taille précis sur la fiche employé (`Taille_Pantalon`, `Taille_Tshirt`, `Taille_Veste`, `Pointure_Chaussures`, `Taille_Gants`) — Polos, T-shirts manches longues et Ensemble pluie réutilisent l'échelle `Taille_Tshirt`, faute de champ dédié pour ces articles annexes. Si aucun article du catalogue ne correspond à la taille recherchée pour un type donné, la ligne est omise de la fiche et signalée à l'utilisateur (`non_trouves` dans la réponse), plutôt que de générer une ligne incomplète silencieusement.
 
+**Seuils d'alerte "stock bas" (ajouté août 2026)** : chaque référence du catalogue (`Catalogue_Articles_EPI.Stock_Mini`) peut avoir un seuil d'alerte personnalisé, édité un par un depuis l'onglet Stock (bouton "🎚️ Seuil", action `maj_stock_mini_epi`). Sans seuil personnalisé (valeur `0`/vide), le dashboard applique un seuil par défaut de 5 — comportement identique à avant cette fonctionnalité, pour ne rien casser tant que William n'a pas encore renseigné de seuils par article. Sous ce seuil, une pastille "stock bas" (`.badge bu`) s'affiche sur la ligne et l'article remonte dans une carte récapitulative en tête de l'onglet Stock. Un nouvel onglet **"🛒 Suggestion de commande"** calcule, pour chaque article dont le stock ne couvre plus le besoin, une quantité à commander = besoin restant à distribuer aux nouveaux entrants de l'année sans fiche encore générée + seuil mini − stock actuel (jamais négatif) — le "besoin restant" est calculé exactement comme la carte "Nouveaux entrants sans dotation", agrégé par article plutôt que par employé.
+
 ## Module Prime d'outillage (ajouté août 2026)
 
 Kit d'outils remis en nature aux salariés de terrain, valorisé comme un avantage — distinct des EPI (vêtements/protection) : les outils sont des articles durables donnés **une seule fois**, complétés plus tard si des articles manquants sont distribués, sans cycle de renouvellement annuel.
@@ -657,6 +714,8 @@ Kit d'outils remis en nature aux salariés de terrain, valorisé comme un avanta
 **Stock vivant** : un solde par outil (`Stock_Actuel` dans `Catalogue_Outillage`), décrémenté à chaque distribution actée, incrémenté à chaque réception de commande. Contrairement aux EPI, il n'y a **pas d'étape "fiche générée en attente"** : la distribution (`distribuer_outillage`) décrémente le stock directement dès l'enregistrement de la preuve photo — pas de fiche "orpheline" possible.
 
 **Vue "Ce qui reste à distribuer"** (besoin explicitement exprimé par William) : pour chaque outil du catalogue, nombre d'employés de son service qui ne l'ont pas encore reçu, calculé dynamiquement en soustrayant les lignes déjà reçues (`Lignes_Outillage`) de la grille du service — équivalent direct de la colonne "Manquant" du fichier Excel d'origine, mais toujours à jour.
+
+**Seuils d'alerte "stock bas" et suggestion de commande (ajouté août 2026)** : même principe que les EPI — `Catalogue_Outillage.Stock_Mini` par outil (action `maj_stock_mini_outillage`), seuil par défaut de 3 si non renseigné, pastille + carte récapitulative sur l'onglet Stock, nouvel onglet "🛒 Suggestion de commande" (quantité à commander = besoin restant à distribuer, calculé exactement comme "Ce qui reste à distribuer" ci-dessus, agrégé tous services confondus + seuil mini − stock actuel).
 
 **Distribution par employé** : sélection d'un employé → cases à cocher sur les articles manquants de son kit → génération d'une fiche imprimable ("PRIME D'OUTILLAGE", même gabarit HTML que les fiches EPI mais sans colonne Taille) → émargement (photo de la fiche signée), qui enregistre les lignes de distribution et décrémente le stock en une seule action.
 
@@ -715,6 +774,15 @@ Tout employé actif d'un service concerné par la dotation EPI (`Affectation_EPI
 
 **Ajout d'un employé** (dashboard, onglet Utilisateurs) : le formulaire de création permet de saisir directement l'affectation EPI et les 5 tailles (au lieu de devoir repasser ensuite par sa fiche individuelle) — règle de saisie : la taille de veste se remplit par défaut sur celle du t-shirt (modifiable si différente, cf. mode de réception des demandes d'embauche par mail). Si le stock est insuffisant pour son profil, une alerte informative (non bloquante) liste les articles concernés juste après la création.
 
+## Recherche globale dashboard (ajoutée août 2026)
+
+Champ de recherche unique en en-tête du dashboard (raccourci clavier `/`, comme GitHub/Slack — n'intercepte pas la frappe si un autre champ a déjà le focus), cherchant simultanément dans les données déjà chargées en mémoire : immobilisations (code, libellé, n° série), employés (code, nom), articles EPI et outillage (type, référence, désignation/marque, taille pour les EPI). Résultats groupés par type, plafonnés à 8 par groupe pour rester lisible (pas de pagination — c'est un accès rapide, pas un écran de recherche exhaustive).
+
+**Aucune donnée supplémentaire chargée pour ce besoin** : purement client-side sur ce qui est déjà en mémoire pour l'onglet courant ou déjà visité (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`) — aucun nouvel appel Worker. Conséquence assumée : tant que les onglets EPI/Outillage n'ont jamais été ouverts dans la session, leurs catalogues ne sont pas encore en mémoire et n'apparaissent pas dans les résultats (les immos et employés, eux, sont chargés dès l'ouverture du dashboard, donc toujours cherchables).
+
+**Navigation à la sélection d'un résultat** : les immobilisations et employés ont une fiche existante (panneau latéral) qui s'ouvre directement, sans changer d'onglet. Les articles EPI/outillage n'ont pas de fiche individuelle : la sélection bascule vers l'onglet concerné (chargeant ses données si pas encore fait), force la sous-vue "Stock", et pré-remplit le champ de filtre déjà existant sur cette vue avec la référence de l'article — réutilise telle quelle la logique de filtrage déjà en place (`refreshEPIStockResults`/`refreshOutilStockResults`), aucun nouveau mécanisme de recherche par article.
+
+**Aucun nouveau droit** : la recherche elle-même est disponible à tout utilisateur connecté au dashboard (elle ne fait que filtrer des données déjà visibles pour lui) ; la navigation vers un article EPI/outillage revérifie `peutVoirEPI`/`peutVoirOutillage` au moment du clic (au cas où le rôle aurait changé depuis le chargement de la page), cohérent avec le contrôle déjà appliqué à l'ouverture normale de ces onglets.
 
 ---
 
@@ -1045,9 +1113,43 @@ Nouveau lot de retours après le lot précédent (historique EPI/Outillage, impo
 - **Vérification systématique à 380px** : les 12 écrans les plus représentatifs testés un par un (`document.documentElement.scrollWidth` vs `clientWidth`) — aucun débordement horizontal détecté sur aucun.
 - **Mode sombre dashboard : non traité cette session**, comme convenu — les variables `--ds-*` sombres restent prêtes (préparées la session précédente) mais sans bascule fonctionnelle. À faire dans une session dédiée si confirmé.
 
+## Seuils d'alerte stock EPI + Outillage (août 2026)
+
+- **Demande de William** : trois fonctionnalités indépendantes dans une même session (seuils d'alerte stock, campagne d'inventaire physique par scan, recherche globale dashboard), livrées une par une avec `npm run verify` entre chaque. Cette entrée couvre la première.
+- **Colonne `Stock_Mini`** ajoutée sur `Catalogue_Articles_EPI` et `Catalogue_Outillage` (Nombre) — créée par William en tout début de session, avant même que le code ne soit écrit (étape bloquante communiquée en premier, comme pour chaque nouveau module).
+- **Repli sur les seuils historiques codés en dur** : `0`/vide sur `Stock_Mini` → seuil par défaut de 5 (EPI) / 3 (Outillage), exactement les valeurs déjà utilisées avant cette fonctionnalité pour colorer les badges de stock. Décision pour que la fonctionnalité soit utile dès le déploiement (badges déjà corrects) sans obliger William à renseigner 40+ seuils avant que quoi que ce soit ne s'affiche, et sans changer le comportement des articles pas encore configurés.
+- **Deux nouvelles actions Worker** (`maj_stock_mini_epi`, `maj_stock_mini_outillage`), protégées `requireGarant` (même population que les actions de stock existantes `editer_stock_outillage`/`bulk_maj_stock_epi`), ajoutées à `GATED_ACTIONS`. Édition un par un via `prompt()`, même pattern que l'édition de stock existante — pas de saisie en masse, jugée inutile pour un réglage ponctuel.
+- **Suggestion de commande — réutilisation exacte de la logique "reste à distribuer"** plutôt qu'un nouveau calcul : côté Outillage, `calculerManquantsOutillage()` (déjà utilisé par l'onglet du même nom) est directement réemployé, juste agrégé par article. Côté EPI, qui n'a pas d'équivalent direct (la dotation est annuelle, pas un kit one-shot comme l'outillage), une nouvelle fonction `calculerManquantsEPI(annee)` reproduit le même principe que la carte "Nouveaux entrants sans dotation" déjà existante (même source : `epiEmployesSansFiche`, même calcul par employé via `epiCalculerBesoinStock`), simplement agrégée par article plutôt que listée par employé.
+- Formule de suggestion (identique EPI/Outillage) : `à commander = besoin restant à distribuer + seuil mini − stock actuel`, plafonnée à 0. Vérifiée par calcul manuel sur un jeu de données factices avant d'être considérée correcte (pas seulement relue).
+- **Carte récapitulative "articles sous seuil"** en tête de chaque onglet Stock (EPI et Outillage), cliquable pour filtrer directement la liste sur l'article concerné.
+- **Nouvel onglet "🛒 Suggestion de commande"** ajouté aux deux modules, même emplacement dans la barre de sous-onglets (juste après "Stock").
+- Aucune nouvelle capacité `ROLE_CAPS`/droit : réutilise `peutGererEPI`/`peutGererOutillage` déjà en place.
+
+## Campagne d'inventaire physique des immobilisations par scan (roadmap item A1, août 2026)
+
+- **Deuxième des trois fonctionnalités de la session** (voir entrée précédente pour le cadrage global). Reprend la roadmap item A1 (`05_ROADMAP_EVOLUTIONS_FUTURES.md`), jamais développée jusqu'ici, jugée dépendante de la pose préalable de QR codes/plaques sur les immos — supposée déjà en place ou en cours côté William pour que cette fonctionnalité ait un sens à l'usage.
+- **Décision structurante : isolation totale vis-à-vis de `Mouvements`**. La logique "détenteur courant = dernier Mouvement" est le cœur de tout le reste de l'app (circulation, dépôt, analyses, amortissement, export comptable) — y toucher pour un scan d'inventaire aurait été le risque le plus élevé de cette fonctionnalité. Choix : deux nouvelles listes entièrement séparées (`Campagnes_Inventaire_Immos`, `Scans_Inventaire_Immos`), un scan n'écrit jamais de `Mouvement`, review explicite de ce point avant d'écrire la moindre ligne de code.
+- **Deux nouvelles listes SharePoint annoncées avant codage** (colonnes exactes dans `02_MODELE_DONNEES.md`), même principe bloquant que pour chaque module précédent — création confirmée par William avant la mise en service réelle (le code est livré et testé en isolation dans l'intervalle, comme d'habitude).
+- **Écarts calculés uniquement à partir de données déjà fiables** : par manque de signal de "détenteur théorique" au sens propre (rien dans le modèle actuel ne dit qui est censé avoir une immo à un instant T, hors dernier mouvement réel), le rapport se limite à deux écarts défendables avec les données existantes — site du scan ≠ `Immos.Site`, et immo scannée alors que `Immos.Actif = Non` (sortie du parc). Pas de tentative de deviner un "détenteur théorique" qui n'existe pas dans le modèle de données — aurait produit un rapport trompeur.
+- **Bug trouvé par test en navigateur avant livraison, pas par relecture de code** : la première version du calcul du taux de couverture ("Immos vues") comptait toutes les immos scannées (y compris celles hors service/sorties) au numérateur, contre le total des immos actives au dénominateur — avec un jeu de données factice (2 immos actives, 1 sortie ; 1 active scannée, 1 active non scannée, la sortie scannée), affichait à tort "2/2 (100%)" au lieu de "1/2 (50%)". Corrigé en ne comptant au numérateur que les immos **actives** effectivement vues — une immo sortie scannée reste un écart, pas une preuve de couverture.
+- **Scan PWA volontairement non protégé par jeton de session**, cohérent avec la contrainte du sujet ("respecte le modèle de confiance de la PWA terrain, pas de mot de passe") : `enregistrer_scan_inventaire_immo` suit exactement le même modèle que `reserver`/`transfert`/`ajouter_ligne_inventaire` (identité reçue du corps de la requête, pas de jeton), ajoutée à `PWA_SHARED_ACTIONS` dans `security.gated-actions.test.js` pour que le garde-fou anti-régression ne la signale pas à tort comme un oubli de protection. Accès à l'écran filtré côté PWA aux codes admin uniquement (`CONFIG.admins`), comme le reste de la section admin déjà présente sur l'écran d'accueil.
+- **Lancement/clôture de campagne, à l'inverse, strictement `requireAdmin`** côté dashboard : une seule campagne active à la fois, sa clôture fige le rapport d'écarts — identité (`Cree_Par`/`Cloture_Par`) toujours résolue depuis `_auth.session.code`, jamais depuis le corps de la requête, conformément à la contrainte explicite du sujet.
+- **Scan en continu côté PWA** : contrairement à tous les autres écrans de scan de l'app (un scan → une action → navigation), l'écran d'inventaire ré-arme la caméra automatiquement après chaque scan enregistré (`startScanner` gère déjà lui-même l'arrêt/redémarrage du flux vidéo précédent, réutilisé tel quel) — le geste terrain (scanner toutes les immos d'un dépôt à la suite) est répétitif par nature, contrairement aux autres flux qui traitent une immo puis reviennent à un menu.
+- **Petit oubli corrigé au passage** : `ajouter_ligne_inventaire` (campagne de stock, déjà existante) manquait de `PWA_SHARED_ACTIONS` dans le test de garde-fou — gap pré-existant sans lien avec cette fonctionnalité, repéré en modifiant ce même fichier de test, corrigé dans la foulée plutôt que laissé de côté.
+- Aucune nouvelle capacité `ROLE_CAPS` : l'accès dashboard réutilise `estAdmin()` (déjà utilisé pour d'autres actions strictement admin), l'accès PWA réutilise `CONFIG.admins` (déjà utilisé pour la section admin existante).
+
+## Recherche globale dashboard (août 2026)
+
+- **Troisième et dernière des trois fonctionnalités de la session** (voir les deux entrées précédentes pour le cadrage global). La plus petite des trois par surface de code, volontairement : sujet spécifié comme "purement client-side, aucune nouvelle action Worker" dès le départ, donc pas de nouvelle liste SharePoint ni de nouveau garde-fou de sécurité à concevoir.
+- **Décision de conception principale : réutiliser plutôt qu'inventer**. Les immobilisations et employés ont déjà une fiche (panneau latéral `ouvrirFiche`) : la recherche s'y branche directement, aucun nouvel écran de détail. Les articles EPI/outillage n'ont pas de fiche individuelle et n'en ont jamais eu besoin ailleurs dans l'app — plutôt que d'en créer une pour ce seul usage, la sélection redirige vers l'onglet Stock déjà existant, pré-rempli avec la référence dans le champ de filtre déjà en place. Zéro nouvelle UI de détail construite.
+- **Compromis assumé sur la fraîcheur des catalogues EPI/outillage** : la recherche lit `epiCatalogue`/`outilCatalogue`, qui ne sont chargés en mémoire qu'à la première ouverture de leur onglet respectif dans la session (comportement de chargement paresseux déjà en place, pas modifié par cette fonctionnalité). Un article EPI ne sera donc pas trouvable tant que l'onglet EPI n'a pas été ouvert au moins une fois — accepté plutôt que de forcer le chargement anticipé de toutes les données au démarrage du dashboard (coût réseau non justifié pour un gain marginal, les immos/employés étant de toute façon déjà chargés en premier).
+- **Raccourci `/` avec garde anti-collision** : n'intercepte la frappe que si aucun autre champ texte n'a le focus (input/textarea/select/contenteditable), sur le modèle de GitHub/Slack — testé explicitement (frappe `/` dans le champ PIN de connexion ne détourne pas le focus).
+- **Vérifié en navigateur avant livraison** (pas seulement relu) : recherche par n° de série d'immo, par nom d'employé, par référence EPI et par marque d'outillage, chacune retournant le bon groupe ; état vide correct ; seuil de 2 caractères minimum respecté (pas de recherche sur un caractère isolé, trop bruyant sur ~1000 immos) ; `/` focalise bien le champ ; Échap ferme le panneau et vide le champ.
+- Aucune nouvelle capacité `ROLE_CAPS`/droit dashboard : la recherche elle-même est ouverte à tout utilisateur connecté (elle ne fait que filtrer des données déjà chargées pour lui), la navigation vers un article EPI/outillage revérifie `peutVoirEPI`/`peutVoirOutillage` au moment du clic.
+- **Session terminée** : les trois fonctionnalités demandées sont livrées, chacune vérifiée par `npm run verify` (33/33 tests) avant de passer à la suivante. Deux nouvelles listes SharePoint restent à créer par William (`Campagnes_Inventaire_Immos`, `Scans_Inventaire_Immos`, colonnes détaillées dans `02_MODELE_DONNEES.md`) avant mise en service réelle de la campagne d'inventaire physique — étape bloquante communiquée en cours de session, comme pour chaque nouveau module.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
-
 
 ---
 
@@ -1070,7 +1172,7 @@ Ajouter une entrée à chaque décision structurante : la date approximative, ce
 
 ### A. Inventaire physique annuel assisté — deux sujets distincts, à ne pas confondre
 
-**A1. Immobilisations (scan QR codes)** — toujours **non fait**, projet séparé non encore validé par la direction. Mode "campagne d'inventaire" : lancement d'une campagne, chaque gestionnaire scanne les QR codes du matériel physiquement présent, l'application calcule l'écart entre le théorique (SharePoint) et le constaté (scans), et liste les manquants / mal localisés / retrouvés. Répondrait au problème vécu par William (véhicules mal localisés pendant un an entre Réunion et Mayotte). Nécessite au préalable la pose de QR codes/plaques sur les immos.
+**A1. Immobilisations (scan QR codes) — ✅ FAIT (août 2026)**, code livré et vérifié : lancement/clôture de campagne côté dashboard (`requireAdmin`), mode scan continu côté PWA (profils admin uniquement), rapport d'écarts (site ≠ théorique, immo sortie du parc scannée, immos non scannées) construit sans jamais créer de `Mouvement` — isolation totale vis-à-vis de la logique de détenteur courant existante. **En attente de la création de 2 listes SharePoint par William** (`Campagnes_Inventaire_Immos`, `Scans_Inventaire_Immos`, voir `02_MODELE_DONNEES.md`) avant mise en service réelle — suppose aussi la pose préalable de QR codes/plaques sur les immos. Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
 
 **A2. Stock d'articles/consommables — ✅ FAIT (août 2026)**, développé après clarification que le besoin réel décrit ci-dessus (au moment de la première rédaction de cette roadmap) concernait en fait ce sujet, distinct des immobilisations. Campagne de comptage manuel (pas de QR/codes-barres sur les articles), dépôt + chantiers actifs, comparaison quantités vs comptage précédent (import du comptage décembre 2025 comme référence). Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
 
@@ -1091,10 +1193,10 @@ Aujourd'hui : un email par mouvement (flux Power Automate existant). Évolution 
 
 ## Priorisation suggérée (à valider avec William)
 
-1. **A — Inventaire physique** : consolide la fiabilité de toute la base de données, sur laquelle s'appuient déjà l'amortissement, l'export comptable et la maintenance préventive.
+1. ~~**A — Inventaire physique**~~ : **fait (août 2026)**, code livré pour les deux volets (stock A2, immobilisations A1) — consolide la fiabilité de la base de données sur laquelle s'appuient déjà l'amortissement, l'export comptable et la maintenance préventive.
 2. **Module temps chantier** (cadré comme suivi opérationnel, pas RH) : valeur métier forte pour le pilotage des coûts de chantier.
 3. **B — Photos / constat d'état** : effort modéré, réduit les litiges au quotidien.
-4. **C — Coûts de réparation + seuil de réforme** : extension naturelle de l'axe 3 déjà en place.
+4. ~~**C — Coûts de réparation + seuil de réforme**~~ : **fait (août 2026)**.
 5. **D, E, F** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
 
 ## Note pour toute reprise de ce document

@@ -43,10 +43,12 @@
 - Campagne d'inventaire de stock d'articles/consommables (août 2026, distinct de l'inventaire des immobilisations — voir `04_HISTORIQUE_DECISIONS.md`)
 - Autorisation côté serveur des actions sensibles du Worker + tests automatisés + garde-fous avant push (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Module Matériel IT — téléphones, puis ordinateurs — hors circuit immobilisations (août 2026, code livré, **en attente de la création des 2 listes SharePoint par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`)
+- Seuils d'alerte stock EPI + Outillage, avec suggestion de commande (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
+- Campagne d'inventaire physique des immobilisations par scan QR — roadmap item A1 (août 2026, code livré, **en attente de la création des 2 listes SharePoint par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`)
+- Recherche globale dashboard, raccourci clavier `/` (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier
-- Inventaire physique annuel des immobilisations par scan QR (projet séparé, non validé par la direction)
 - Photos et constat d'état en image
 - Demandes de matériel planifiées à l'avance
 - Interface simplifiée pour Mayotte

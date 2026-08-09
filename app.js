@@ -425,6 +425,7 @@ function showScreen(id, skipInit) {
     case 'screen-mes-reservations':   afficherMesReservations(); break;
     case 'screen-reserver':           if (!skipInit) initReservationScreen(false); break;
     case 'screen-inventaire-stock':   if (!skipInit) ouvrirEcranInventaire(); break;
+    case 'screen-inventaire-immos':   if (!skipInit) ouvrirEcranInventaireImmos(); break;
   }
 }
 
@@ -1828,6 +1829,69 @@ function onScanReferenceInventaire(code) {
   stopScanner(); vib(150);
   document.getElementById('inv-reference').value = (code || '').trim();
   showScreen('screen-inventaire-stock', true);
+}
+
+// ── Campagne d'inventaire PHYSIQUE des immobilisations (scan QR — distincte de la campagne de
+// stock ci-dessus, qui compte des articles/consommables sans code). Réservée aux profils admin
+// (roadmap item A1) : chaque scan enregistre juste "vu, ici, par untel, à telle date" dans
+// Scans_Inventaire_Immos, sans jamais créer de Mouvement ni toucher au détenteur courant d'une
+// immo (le rapport d'écart se construit côté dashboard à la clôture, voir 04_HISTORIQUE...).
+S.invImmosCampagne = null;
+S.invImmosCompteur = 0;
+
+async function ouvrirEcranInventaireImmos() {
+  S.invImmosCompteur = 0;
+  document.getElementById('invim-sans-campagne').classList.add('hidden');
+  document.getElementById('invim-avec-campagne').classList.add('hidden');
+  document.getElementById('invim-compteur').textContent = '0';
+  document.getElementById('invim-dernier').textContent = '';
+  try {
+    const r = await fetch(CONFIG.proxy + '?campagnes_inventaire_immos=1');
+    const camps = await r.json();
+    const active = (camps || []).find(c => c.statut !== 'Clôturée');
+    if (!active) { document.getElementById('invim-sans-campagne').classList.remove('hidden'); return; }
+    S.invImmosCampagne = active;
+    document.getElementById('invim-avec-campagne').classList.remove('hidden');
+    document.getElementById('invim-nom-campagne').textContent = '📸 ' + active.nom;
+  } catch (e) {
+    document.getElementById('invim-sans-campagne').classList.remove('hidden');
+  }
+}
+
+function demarrerScanInventaireImmos() {
+  if (!S.invImmosCampagne) { toast('Aucune campagne active', 'error'); return; }
+  showScreen('screen-scan-inventaire-immo', true);
+  startScanner('scanner-inventaire-immo', onScanInventaireImmo);
+}
+
+// Scan en continu : contrairement aux autres écrans de scan, on ne navigue JAMAIS ailleurs après
+// un scan réussi — on ré-arme juste la caméra (startScanner gère lui-même l'arrêt du flux
+// précédent) pour enchaîner sur l'immo suivante, geste terrain répétitif par nature.
+async function onScanInventaireImmo(code) {
+  const codeIm = (code || '').trim().toUpperCase();
+  if (!codeIm) { startScanner('scanner-inventaire-immo', onScanInventaireImmo); return; }
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=enregistrer_scan_inventaire_immo', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campagne: S.invImmosCampagne.nom, code_im: codeIm,
+        code_employe: S.employe.code, nom_employe: S.employe.nom,
+        site: normSite(S.siteByCode && S.siteByCode[S.employe.code]),
+      }),
+    });
+    const d = await r.json();
+    if (d.success !== false) {
+      S.invImmosCompteur++;
+      document.getElementById('invim-compteur').textContent = String(S.invImmosCompteur);
+      document.getElementById('invim-dernier').textContent = '✅ ' + codeIm + ' enregistrée';
+    } else {
+      document.getElementById('invim-dernier').textContent = '';
+      toast('Erreur : ' + (d.error || 'inconnue'), 'error');
+    }
+  } catch (e) {
+    toast('Erreur réseau : ' + e.message, 'error');
+  }
+  setTimeout(() => startScanner('scanner-inventaire-immo', onScanInventaireImmo), 700);
 }
 
 // ══════════════════════════════════════════════════════════
