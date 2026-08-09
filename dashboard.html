@@ -9,7 +9,43 @@
      via une plainte utilisateur (voir 04_HISTORIQUE_DECISIONS.md) — DSN pas un secret, prévu pour
      être embarqué côté client. Chargé tôt pour capter les erreurs des scripts suivants aussi. -->
 <script src="https://browser.sentry-cdn.com/10.69.0/bundle.min.js" crossorigin="anonymous"></script>
-<script>if(window.Sentry)Sentry.init({dsn:"https://8823eceab72dee7235becd4b7bd40e26@o4511863564533760.ingest.de.sentry.io/4511863574560848",environment:"dashboard"});</script>
+<!-- Scrubbing PII (ajouté août 2026, audit de sécurité) : avant durcissement, Sentry.init() n'avait
+     aucun beforeBreadcrumb/beforeSend. Vecteur le plus concret ici : les nombreux éléments
+     .link-emp/.link-im du dashboard portent des attributs data-emp/data-cim/data-nom/data-lib
+     (code employé, nom, code immo, libellé) — un clic dessus pourrait faire remonter ces valeurs
+     via un breadcrumb "ui.click" automatique. Aucun Sentry.setUser() n'est appelé nulle part dans
+     le projet (vérifié) : pas de fuite directe via l'identité "user". Voir SECURITE_ETAT.md pour
+     le détail des vecteurs couverts et les limites assumées de cette approche heuristique. -->
+<script>
+function sentryScrubPII(v){
+  if(v==null)return v;
+  if(typeof v==='string'){
+    return v
+      .replace(/([?&](?:code|employe|par_code|code_employe|mes_reservations|code_donneur|code_receveur|nom_employe|nom_donneur|nom_receveur|code_valideur)=)[^&\s]+/gi,'$1[SCRUBBED]')
+      .replace(/\b[A-ZÀ-Ÿ]{2,}\s[A-ZÀ-Ÿ][a-zà-ÿ]+\b/g,'[SCRUBBED_NOM]')
+      .replace(/\b[A-ZÀ-Ÿ][a-zà-ÿ]+\s[A-ZÀ-Ÿ]{2,}\b/g,'[SCRUBBED_NOM]');
+  }
+  if(Array.isArray(v))return v.map(sentryScrubPII);
+  if(typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=sentryScrubPII(v[k]);});return o;}
+  return v;
+}
+if(window.Sentry)Sentry.init({
+  dsn:"https://8823eceab72dee7235becd4b7bd40e26@o4511863564533760.ingest.de.sentry.io/4511863574560848",
+  environment:"dashboard",
+  beforeBreadcrumb:function(bc){
+    if(bc&&bc.category==='ui.click')return null; // évite tout risque via un attribut data-* du DOM (data-emp, data-cim...)
+    if(bc){ if(bc.message)bc.message=sentryScrubPII(bc.message); if(bc.data)bc.data=sentryScrubPII(bc.data); }
+    return bc;
+  },
+  beforeSend:function(event){
+    if(event.message)event.message=sentryScrubPII(event.message);
+    if(event.request)event.request=sentryScrubPII(event.request);
+    if(event.extra)event.extra=sentryScrubPII(event.extra);
+    if(event.exception&&event.exception.values)event.exception.values.forEach(function(ev){if(ev.value)ev.value=sentryScrubPII(ev.value);});
+    return event;
+  }
+});
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- Génération massive de PDF locaux (dotations annuelles EPI, août 2026) : rasterisation de la fiche HTML -->
@@ -1034,6 +1070,14 @@ function retourIdentite(){
   document.getElementById('pin-step2').style.display='block';
 }
 
+// Message explicite en cas de verrou anti brute-force côté Worker (voir SECURITE_ETAT.md) —
+// formate la durée d'attente restante de façon lisible (secondes ou minutes selon l'ordre de grandeur).
+function msgTropDeTentatives(retryAfterS){
+  var s=parseInt(retryAfterS,10)||30;
+  var txt=s<60?(s+' seconde'+(s>1?'s':'')):(Math.ceil(s/60)+' minute'+(Math.ceil(s/60)>1?'s':''));
+  return '🔒 Trop de tentatives incorrectes. Réessayez dans '+txt+'.';
+}
+
 // Valider le mot de passe (création ou vérification)
 async function validerMotDePasse(){
   var pwd=document.getElementById('pwd-input').value;
@@ -1049,6 +1093,7 @@ async function validerMotDePasse(){
       var r=await fetch(W+'?action=set_password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:LOGIN_CODE,password:pwd})});
       var res=await r.json();
       if(res.success){finaliserConnexion(LOGIN_CODE,res.token);}
+      else if(res.error==='trop_de_tentatives'){err.textContent=msgTropDeTentatives(res.retry_after_s);btn.disabled=false;btn.textContent='Créer et se connecter →';}
       else{err.textContent='Échec de la création. Réessayez.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
     }catch(e){err.textContent='Erreur réseau.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
   }else{
@@ -1058,6 +1103,7 @@ async function validerMotDePasse(){
       var res=await r.json();
       if(res.success){finaliserConnexion(LOGIN_CODE,res.token);}
       else if(res.needs_setup){LOGIN_NEEDS_SETUP=true;etapeMotDePasse();}
+      else if(res.error==='trop_de_tentatives'){err.textContent=msgTropDeTentatives(res.retry_after_s);btn.disabled=false;btn.textContent='Se connecter →';document.getElementById('pwd-input').value='';}
       else{err.textContent='Mot de passe incorrect.';btn.disabled=false;btn.textContent='Se connecter →';document.getElementById('pwd-input').value='';}
     }catch(e){err.textContent='Erreur réseau.';btn.disabled=false;btn.textContent='Se connecter →';}
   }
@@ -3918,10 +3964,16 @@ var matItVue='telephones';
 
 async function loadMaterielIT(){
   dataLoaded.materielIt=true;
+  // Ces deux endpoints renvoient des codes PIN/PUK/RIO SIM réels — protégés requireGarant côté
+  // Worker depuis l'audit de sécurité (août 2026), jeton transmis en paramètre d'URL comme
+  // ?export_liste= (GET, pas de corps JSON possible). Voir SECURITE_ETAT.md.
+  var tok='&token='+encodeURIComponent(ADMIN_SESSION.token||'');
   try{
-    var r=await fetch(W+'?materiel_it=1'),r2=await fetch(W+'?lignes_telephoniques=1');
+    var r=await fetch(W+'?materiel_it=1'+tok),r2=await fetch(W+'?lignes_telephoniques=1'+tok);
     materielItList=await r.json();
     lignesTelList=await r2.json();
+    if(materielItList&&materielItList.error==='droits_insuffisants'){materielItList=[];toast('🔒 Accès Matériel IT réservé aux gestionnaires dépôt.','error');}
+    if(lignesTelList&&lignesTelList.error){lignesTelList=[];}
   }catch(e){materielItList=[];lignesTelList=[];}
   renderMaterielIT();
 }

@@ -58,14 +58,81 @@ async function requireGarantWith(reqBody, secret, gestionnaires) {
   if (!estGarantSessionPure(session, gestionnaires)) return { ok: false, error: 'droits_insuffisants' };
   return { ok: true, session: session };
 }
+
+// ── Limitation de débit sur les tentatives de mot de passe (verify_password, et l'ancien mot de
+// passe côté set_password — même secret deviné dans les deux cas) ──────────────────────────────
+// Verrou progressif par code employé : compteur en mémoire du Worker (Map au niveau module, donc
+// partagée entre les requêtes tant que l'isolate Cloudflare est réutilisé). C'est un "best effort",
+// pas une garantie : un isolate peut être recyclé (compteur remis à zéro) et une requête peut
+// atterrir sur un autre nœud edge avec son propre compteur — pas de KV/Durable Object provisionné
+// pour rester dans la philosophie "zéro infrastructure" du projet (voir 01_ARCHITECTURE_TECHNIQUE.md
+// et SECURITE_ETAT.md). Suffisant pour dissuader un brute-force scripté basique contre un mot de
+// passe court (minimum 4 caractères) ; pas une garantie cryptographique.
+const LOGIN_ATTEMPTS = new Map(); // code -> { fails: n, lockedUntil: timestampMs }
+// Paliers croissants : à partir de N échecs, verrouillage pour la durée indiquée. Le premier palier
+// atteint (dans l'ordre décroissant de N) l'emporte — évite de complexifier avec une formule.
+const LOGIN_LOCK_THRESHOLDS = [
+  [10, 15 * 60 * 1000], // 10e échec et suivants : 15 min
+  [7, 5 * 60 * 1000],   // 7e-9e échec : 5 min
+  [5, 30 * 1000],       // 5e-6e échec : 30s (laisse passer une faute de frappe sans blocage)
+];
+// Chaîne envoyée par dashboard.html (etapeMotDePasse()) pour savoir si un mot de passe existe déjà
+// AVANT que l'utilisateur ait tapé quoi que ce soit — ne doit jamais compter comme une tentative
+// réelle ni être bloquée par un verrou en cours, sinon chaque connexion légitime consommerait un
+// essai (ou resterait bloquée à l'étape "êtes-vous déjà inscrit ?") avant même d'avoir commencé.
+const LOGIN_PROBE_SENTINEL = '__probe__';
+function loginLockStatus(code) {
+  const e = LOGIN_ATTEMPTS.get(code);
+  if (!e || !e.lockedUntil || e.lockedUntil <= Date.now()) return { locked: false };
+  return { locked: true, retryAfterS: Math.ceil((e.lockedUntil - Date.now()) / 1000) };
+}
+function registerLoginFailure(code) {
+  const e = LOGIN_ATTEMPTS.get(code) || { fails: 0, lockedUntil: 0 };
+  e.fails++;
+  const palier = LOGIN_LOCK_THRESHOLDS.find(t => e.fails >= t[0]);
+  if (palier) e.lockedUntil = Date.now() + palier[1];
+  LOGIN_ATTEMPTS.set(code, e);
+}
+function clearLoginAttempts(code) { LOGIN_ATTEMPTS.delete(code); }
+
+// ── Origines autorisées à appeler ce Worker depuis du JS navigateur (fetch/XHR) ─────────────────
+// Avant durcissement : Access-Control-Allow-Origin: '*' — n'importe quel site tiers pouvait lire
+// les réponses du Worker depuis du JS embarqué sur une page piégée (moissonnage à grande échelle
+// des endpoints GET publics, ou requêtes faites "au nom" d'une victime dont le navigateur a déjà
+// un jeton de session en mémoire). Resserré à l'origine GitHub Pages réelle de la PWA/du dashboard.
+// N'affecte PAS les visites directes d'URL (ex. `?debug_immos=1` tapé dans la barre d'adresse, ou
+// le téléchargement d'une photo/FDS) : le CORS ne s'applique qu'aux requêtes cross-origin
+// initiées par du JavaScript (fetch/XHR), jamais à la navigation classique — voir SECURITE_ETAT.md.
+const ALLOWED_ORIGINS = ['https://ral974.github.io'];
+function corsOriginFor(request, allowedOrigins) {
+  const origin = (request && request.headers && request.headers.get('Origin')) || '';
+  const list = allowedOrigins || ALLOWED_ORIGINS;
+  return list.indexOf(origin) !== -1 ? origin : list[0];
+}
+function securityHeadersFor(request, allowedOrigins) {
+  return {
+    'Access-Control-Allow-Origin': corsOriginFor(request, allowedOrigins),
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin', // la valeur d'ACAO dépend de l'Origin de la requête : ne jamais mettre ceci en cache partagé entre origines différentes
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'X-Frame-Options': 'DENY',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  };
+}
+
 // N'existe pas dans le runtime Cloudflare Worker (pas de CommonJS) : ce bloc ne s'exécute
 // jamais en production, uniquement quand le fichier est chargé via require() par les tests.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { signSessionWith, verifySessionWith, estAdminSessionPure, estGarantSessionPure, roleNorm, requireAdminWith, requireGarantWith, b64url, b64urlToBytes, GESTIONNAIRES, SESSION_DUREE_MS, handleRequest };
+  module.exports = { signSessionWith, verifySessionWith, estAdminSessionPure, estGarantSessionPure, roleNorm, requireAdminWith, requireGarantWith, b64url, b64urlToBytes, GESTIONNAIRES, SESSION_DUREE_MS, handleRequest,
+    LOGIN_ATTEMPTS, loginLockStatus, registerLoginFailure, clearLoginAttempts, LOGIN_LOCK_THRESHOLDS, LOGIN_PROBE_SENTINEL,
+    ALLOWED_ORIGINS, corsOriginFor, securityHeadersFor };
 }
 
 async function handleRequest(request) {
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+  const cors = securityHeadersFor(request);
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
   const TENANT_ID    = 'c7875e38-b2b0-4c10-a8c5-687c5a214e44';
@@ -211,7 +278,16 @@ async function handleRequest(request) {
   }
   if (p.get('debug_resa')     === '1') { const r = await fetch(GL + '/Reservations/items?$expand=fields&$top=2', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
   if (p.get('debug_transferts')=== '1') { const r = await fetch(GL + '/Transferts_En_Attente/items?$expand=fields&$top=5', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
-  if (p.get('debug_employes') === '1') { const r = await fetch(GL + '/Employes/items?$expand=fields&$top=3', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
+  if (p.get('debug_employes') === '1') {
+    const r = await fetch(GL + '/Employes/items?$expand=fields&$top=3', { headers: H });
+    const d = await r.json();
+    // Endpoint de diagnostic non authentifié par conception (comme les autres ?debug_*) : ne
+    // jamais faire écho au hash de mot de passe (MotDePasse), même en diagnostic — un hash PBKDF2
+    // reste une donnée sensible (brute-force hors-ligne possible, hors de portée du verrou anti
+    // brute-force appliqué à verify_password/set_password). Voir SECURITE_ETAT.md.
+    (d.value || []).forEach(it => { if (it.fields && 'MotDePasse' in it.fields) it.fields.MotDePasse = '[redacted]'; });
+    return json(d);
+  }
   if (p.get('debug_mouvements')=== '1') { const r = await fetch(GL + '/Mouvements/items?$expand=fields&$top=3&$orderby=fields/Created desc', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
   // Noms internes réels des colonnes (peuvent différer du nom affiché après un renommage dans SharePoint)
   if (p.get('debug_inventaire_columns') === '1') {
@@ -513,7 +589,16 @@ async function handleRequest(request) {
   // ── Module Matériel IT (téléphones, puis ordinateurs) — hors circuit immobilisations,
   // détenteur courant dérivé du dernier Mouvement_Materiel_IT par appareil (même principe que
   // Mouvements/Immos, mais sans le workflow panne/réservation, pas nécessaire ici) ───────────
+  // Protégé requireGarant (jeton en paramètre `&token=`, GET sans corps JSON — même mécanisme que
+  // `?export_liste=`) : contrairement aux autres endpoints GET publics de ce fichier, celui-ci
+  // renvoie des codes PIN/PUK/RIO/déverrouillage SIM réels (Materiel_IT.Code_PIN etc.), une classe
+  // de sensibilité différente d'une simple donnée de localisation d'immo — un tiers connaissant
+  // ces codes peut usurper une ligne (portabilité RIO) ou débloquer une carte SIM. Ce module est
+  // 100% dashboard (aucun écran PWA), donc ce garde-fou ne touche jamais le modèle de confiance de
+  // la PWA terrain. Voir SECURITE_ETAT.md et l'audit de sécurité du 9 août 2026.
   if (p.get('materiel_it') === '1') {
+    const _auth = await requireGarant({ token: p.get('token') });
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
     const [items, mouvements] = await Promise.all([
       paginate(GL + '/Materiel_IT/items?$expand=fields&$top=500', 8),
       paginate(GL + '/Mouvements_Materiel_IT/items?$expand=fields&$top=2000', 10)
@@ -569,7 +654,10 @@ async function handleRequest(request) {
   // ── Lignes téléphoniques (ajouté août 2026) — entité indépendante du téléphone (Materiel_IT) :
   // un employé peut garder sa ligne en changeant d'appareil, ou l'inverse. Même principe de
   // détenteur courant dérivé du dernier mouvement, calqué sur Materiel_IT/Mouvements_Materiel_IT.
+  // Même garde-fou que `?materiel_it=1` ci-dessus (mêmes champs sensibles : PIN/PUK/RIO SIM).
   if (p.get('lignes_telephoniques') === '1') {
+    const _auth = await requireGarant({ token: p.get('token') });
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
     const [items, mouvements] = await Promise.all([
       paginate(GL + '/Lignes_Telephoniques/items?$expand=fields&$top=500', 8),
       paginate(GL + '/Mouvements_Lignes_Telephoniques/items?$expand=fields&$top=2000', 10)
@@ -817,8 +905,15 @@ async function handleRequest(request) {
       // Un mot de passe est-il défini (sur au moins une occurrence) ?
       const withHash = items.find(it => it.hash);
       if (!withHash) return json({ success: false, needs_setup: true });
+      // Sonde du dashboard (etapeMotDePasse()) pour savoir si un mot de passe existe déjà, avant
+      // même que l'utilisateur ait tapé quoi que ce soit — ne doit ni compter comme une tentative,
+      // ni être bloquée par un verrou déjà en cours (voir LOGIN_PROBE_SENTINEL plus haut).
+      if (body.password === LOGIN_PROBE_SENTINEL) return json({ success: false, needs_setup: false });
+      const lock = loginLockStatus(code);
+      if (lock.locked) return json({ success: false, error: 'trop_de_tentatives', retry_after_s: lock.retryAfterS }, 429);
       const ok = await verifyPassword(body.password || '', withHash.hash);
-      if (!ok) return json({ success: false, needs_setup: false });
+      if (!ok) { registerLoginFailure(code); return json({ success: false, needs_setup: false }); }
+      clearLoginAttempts(code);
       const token = await signSession(code, withHash.role);
       return json({ success: true, needs_setup: false, token: token, role: withHash.role || '' });
     }
@@ -830,11 +925,20 @@ async function handleRequest(request) {
       if (!code || pwd.length < 4) return json({ success: false, error: 'invalide' });
       const items = await getEmployeAuth(code);
       if (!items.length) return json({ success: false, error: 'employe_introuvable' });
-      // Si un mot de passe existe déjà, exiger l'ancien (sauf réinitialisation admin via reset_password)
+      // Si un mot de passe existe déjà, exiger l'ancien pour pouvoir le changer soi-même. La SEULE
+      // façon légitime de contourner cette vérification est qu'un admin l'ait déjà effacé au
+      // préalable via l'action `reset_password` (requireAdmin, ci-dessous) — auquel cas `withHash`
+      // est naturellement absent ici, sans avoir besoin d'un indicateur envoyé par le client.
+      // Avant durcissement, un flag `body.is_reset` non authentifié permettait de sauter cette
+      // vérification sans passer par `reset_password` : n'importe qui connaissant le code d'un
+      // employé pouvait écraser son mot de passe sans connaître l'ancien. Retiré (voir SECURITE_ETAT.md).
       const withHash = items.find(it => it.hash);
-      if (withHash && !body.is_reset) {
+      if (withHash) {
+        const lock = loginLockStatus(code);
+        if (lock.locked) return json({ success: false, error: 'trop_de_tentatives', retry_after_s: lock.retryAfterS }, 429);
         const ok = await verifyPassword(body.old_password || '', withHash.hash);
-        if (!ok) return json({ success: false, error: 'ancien_incorrect' });
+        if (!ok) { registerLoginFailure(code); return json({ success: false, error: 'ancien_incorrect' }); }
+        clearLoginAttempts(code);
       }
       const newHash = await hashPassword(pwd);
       // Écrire le hash sur TOUTES les occurrences du code (robuste aux doublons résiduels)
@@ -843,9 +947,6 @@ async function handleRequest(request) {
         try { const r = await fetch(GL + '/Employes/items/' + it.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ MotDePasse: newHash }) }); if (r.ok) okCount++; } catch (e) {}
       }
       if (okCount === 0) return json({ success: false });
-      // is_reset = un admin réinitialise le mot de passe de quelqu'un d'autre : pas de jeton pour la
-      // session de l'admin appelant (le code concerné n'est pas forcément le sien).
-      if (body.is_reset) return json({ success: true });
       const role = (items.find(it => it.role) || {}).role || '';
       const token = await signSession(code, role);
       return json({ success: true, token: token, role: role });
@@ -862,6 +963,9 @@ async function handleRequest(request) {
       for (const it of items) {
         try { const r = await fetch(GL + '/Employes/items/' + it.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ MotDePasse: '' }) }); if (r.ok) okCount++; } catch (e) {}
       }
+      // Un admin qui réinitialise le mot de passe efface aussi un éventuel verrou en cours sur ce
+      // code : sinon l'employé resterait bloqué par ses propres échecs même après l'intervention.
+      if (okCount > 0) clearLoginAttempts(code);
       return json({ success: okCount > 0 });
     }
 
@@ -1048,20 +1152,14 @@ async function handleRequest(request) {
 
     if (action === 'bulk_maj_immos') { return json({ success: false, error: 'deprecated' }); }
 
-    if (action === 'maj_duree_amort') {
-      const code = (body.code_im || '').trim();
-      if (!code) return json({ success: false, error: 'code_manquant' });
-      const duree = parseInt(body.duree, 10);
-      const cur = await fetch(GL + "/Immos/items?$expand=fields&$filter=fields/Title eq '" + code + "'&$top=10", { headers: H });
-      const curData = await cur.json();
-      const ids = (curData.value || []).map(i => i.id);
-      if (!ids.length) return json({ success: false, error: 'immo_introuvable' });
-      let okCount = 0;
-      for (const id of ids) {
-        try { const r = await fetch(GL + '/Immos/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Duree_Amortissement: (duree > 0 ? duree : null) }) }); if (r.ok) okCount++; } catch (e) {}
-      }
-      return json({ success: okCount > 0, duree: duree });
-    }
+    // Orpheline (0 appel côté dashboard.html/app.js) depuis le passage à la durée d'amortissement
+    // 100% automatique par compte d'amortissement (voir 02_MODELE_DONNEES.md/04_HISTORIQUE...) —
+    // laissée exécutable et sans authentification jusqu'à l'audit de sécurité d'août 2026
+    // (ARCHITECTURE_GLOBALE.md § 7), qui a signalé un endpoint d'écriture public sans utilité
+    // fonctionnelle. Retirée sur le même modèle que `bulk_maj_immos` ci-dessus plutôt que
+    // supprimée : le nom d'action reste réservé (au cas où un appel resterait en cache quelque
+    // part) mais ne fait plus rien.
+    if (action === 'maj_duree_amort') { return json({ success: false, error: 'deprecated' }); }
 
     if (action === 'maj_site_immo') {
       const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);

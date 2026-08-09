@@ -1,0 +1,50 @@
+# Immo Tracker — État de la sécurité
+
+*Rapport de synthèse de l'audit et durcissement du 9-10 août 2026. Complète `ARCHITECTURE_GLOBALE.md` § 8 (détail technique) et `04_HISTORIQUE_DECISIONS.md` (raisonnement complet). À relire et mettre à jour à chaque futur changement touchant l'authentification, les droits ou les données exposées.*
+
+## Ce qui est protégé
+
+| Domaine | Mécanisme |
+|---|---|
+| Actions Worker sensibles (62 actions POST) | `requireAdmin`/`requireGarant` — jeton HMAC-SHA256 signé à la connexion, vérifié côté serveur. Audité exhaustivement le 9 août : 0 écart avec `GATED_ACTIONS` (dashboard.html), garde-fou automatisé (`security.gated-actions.test.js`) à chaque `npm test`. |
+| Connexion dashboard (`verify_password`/`set_password`) | Hash PBKDF2-SHA256 (100k itérations, sel par utilisateur) — jamais stocké/transmis en clair. **Verrou anti brute-force** (ajouté cette session) : 30s/5min/15min après 5/7/10 échecs par code, compteur en mémoire du Worker. |
+| Changement de mot de passe sans authentification forte | **Bypass `is_reset` corrigé** cette session (voir `04_HISTORIQUE_DECISIONS.md`) — l'ancien mot de passe est désormais systématiquement exigé dès qu'un hash existe, sans dépendre d'un indicateur fourni par le client. |
+| Codes PIN/PUK/RIO/déverrouillage SIM réels (`?materiel_it=1`, `?lignes_telephoniques=1`) | Protégés `requireGarant` cette session (étaient auparavant lisibles sans authentification). |
+| Hash de mot de passe sur l'endpoint de diagnostic `?debug_employes=1` | Redacté cette session (`[redacted]`), le reste de la réponse (utile au diagnostic) reste intact. |
+| Origines autorisées à appeler le Worker en JS (CORS) | Resserré cette session : `https://ral974.github.io` uniquement (repli sur cette valeur si origine inconnue, jamais de `*`). |
+| En-têtes de réponse HTTP | `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, `Referrer-Policy`, `Strict-Transport-Security` ajoutés cette session sur toutes les réponses du Worker. |
+| Événements Sentry | `beforeBreadcrumb`/`beforeSend` ajoutés cette session : breadcrumbs `ui.click` supprimés entièrement, scrubbing heuristique du reste (codes en paramètre d'URL, motifs de nom). Aucun `setUser`/`captureException` explicite nulle part dans le projet (vérifié). |
+| Secret Azure (`CLIENT_SECRET_ENV`) | Variable d'environnement Cloudflare chiffrée, jamais dans le code — vérifié qu'il n'a jamais existé en clair dans l'historique git de `worker.js` (premier commit déjà conforme). |
+| Secret de session (`SESSION_SECRET_ENV`) | Idem, distinct du secret Azure. Si absent : échec explicite (`session_secret_manquant`) plutôt que faille silencieuse. |
+| Identité des mouvements sur les actions gated | Toujours résolue depuis `_auth.session.code` (le jeton vérifié), jamais depuis le corps de la requête — corrigé lors d'une session précédente, revérifié ici. |
+
+## Ouvert par choix de conception (et pourquoi)
+
+| Élément | Pourquoi c'est accepté |
+|---|---|
+| 15 actions POST partagées avec la PWA terrain sans jeton (`reserver`, `transfert`, `declarer_panne`...) | Modèle de confiance assumé depuis le début du projet : les 97 collaborateurs terrain s'identifient par simple scan de badge, sans mot de passe (friction minimale). Protéger ces actions casserait le scan de badge pour tout le monde — hors scope de ce durcissement par consigne explicite. Garanti par test (`security.gated-actions.test.js`, "aucune action partagée avec la PWA terrain n'est protégée par erreur"). |
+| ~35 endpoints GET publics sans authentification (`?dashboard=1`, `?employes=1`, `?catalogue_epi=1`...) | Données de fonctionnement courant (localisation d'immo, stock, dotations...), pas de secret au sens strict. Cohérent avec le choix de conception documenté (friction minimale, coût d'hébergement ≈0€, pas d'infrastructure d'auth pour de la lecture). Seules les données réellement sensibles (mots de passe, codes SIM) ont été spécifiquement sorties de ce principe cette session. |
+| Verrou anti brute-force en mémoire (pas de KV/Durable Object Cloudflare) | "Best effort", pas une garantie cryptographique : un isolate Cloudflare peut être recyclé (compteur remis à zéro), une requête peut atterrir sur un autre nœud edge. Choix délibéré pour ne pas ajouter de nouvelle dépendance d'infrastructure payante/à provisionner (cohérent avec la philosophie "zéro infrastructure" du projet). Suffisant pour dissuader un script de brute-force basique ; voir "reste à faire" pour un renforcement possible. |
+| `employes.json`/`immos.json` publics sur GitHub Pages (noms, codes, catégories) | Catalogues de lecture rapide nécessaires au fonctionnement hors-ligne/dégradé de la PWA — décision architecturale de fond du projet (voir `01_ARCHITECTURE_TECHNIQUE.md`), pas remise en cause par cette session. Ce ne sont pas des secrets, mais restent des données personnelles (noms) publiquement lisibles ; pas de changement d'architecture proposé ici (sortirait largement du cadre "audit et durcissement" pour devenir une refonte). |
+| Tenant ID / Client ID Azure, Site ID Graph, DSN Sentry | Documentés de longue date comme non-secrets (valeurs conçues pour être embarquées côté client). Revérifié : toujours exact, rien à changer. |
+| Historique git de `materiel_it_catalogue.json` | **Réécrit** cette session (`git filter-repo`, puis force-push) : le commit `b48a4f7` qui avait introduit les PIN/PUK/RIO/déverrouillage réels n'existe plus sous son SHA d'origine dans aucun historique du dépôt distant. Voir "Limites assumées" ci-dessous pour ce que cette opération garantit et ne garantit pas. |
+| Code d'accès partagé `PIN='ES974'` (dashboard.html) | **Décision de William : conservé tel quel.** Assumé explicitement comme un filtre cosmétique contre les visiteurs curieux, pas une barrière de sécurité réelle — la protection effective reste le mot de passe individuel par employé (haché, désormais rate-limité). Documenté ici pour que ce choix reste traçable si la question revient. |
+
+## Limites assumées de la réécriture d'historique
+
+La réécriture (`git filter-repo --path materiel_it_catalogue.json --invert-paths`) supprime le fichier de tous les commits du dépôt réécrit et remplace tous les SHA en aval — le commit `b48a4f7` original n'est plus atteignable via `git log`/GitHub sur ce dépôt après le force-push. Ce que ça **ne** garantit **pas** :
+- Toute copie déjà clonée du dépôt (un autre poste, un fork, un mirroir) conserve l'ancien historique intact tant qu'elle n'est pas elle-même réécrite ou resynchronisée depuis zéro. Aucun autre clone connu à ce jour (dépôt à usage interne, un seul mainteneur) — mais non vérifiable à 100% depuis ce dépôt.
+- Les caches internes de GitHub (recherche de code, éventuels forks silencieux, objets déjà indexés) peuvent conserver une trace au-delà du contrôle direct du dépôt ; GitHub propose un formulaire dédié de purge de cache pour les secrets exposés si un doute subsiste.
+- **La réécriture ne remplace pas la rotation des codes eux-mêmes** (voir ci-dessous) : elle réduit la surface de découverte future, elle ne rend pas les anciens PIN/PUK/RIO à nouveau secrets.
+
+## Reste à faire (décisions ou actions hors de portée de cette session)
+
+1. **🔴 Urgent, non fait par cette session — rotation des codes SIM déjà exposés.** Les PIN/PUK/RIO/déverrouillage réels de ~40 téléphones sont restés publiquement lisibles sur GitHub depuis leur ajout jusqu'à la réécriture d'historique de cette session. **Recommandation indépendante du sort de l'historique git** : traiter ces codes comme compromis et les faire changer auprès de l'opérateur (Free Pro) — la correction du dépôt (même avec réécriture d'historique) ne suffit pas si les valeurs elles-mêmes ne sont jamais renouvelées. Action côté William, hors de portée technique de cette session.
+2. **Renforcement possible du verrou anti brute-force** si le "best effort" en mémoire s'avère insuffisant à l'usage : Cloudflare KV (gratuit dans les volumes de ce projet) donnerait un compteur persistant et partagé entre tous les nœuds edge. Non fait cette session pour éviter d'ajouter une dépendance d'infrastructure sans besoin démontré.
+3. **Politique de mot de passe minimale inchangée** (4 caractères minimum, `set_password`). Le verrou anti brute-force réduit le risque pratique, mais un mot de passe de 4 caractères reste intrinsèquement faible en cas de fuite de hash. Non modifié cette session (hors périmètre de la consigne, qui portait sur la limitation de débit, pas la politique de mot de passe) — à évaluer séparément si souhaité.
+4. **Écarts de documentation déjà signalés le 9 août** (`ARCHITECTURE_GLOBALE.md` § 7, points 1/2/5 : module Absences non documenté dans 00-05, liste `Chantiers` fantôme, `ROLE_CAPS` incomplet dans la doc) — sans lien avec la sécurité, toujours en attente d'une passe de documentation dédiée.
+5. **Historique git non audité au-delà de `worker.js` et `materiel_it_catalogue.json`.** Ces deux cas ont été vérifiés spécifiquement (le premier par nécessité — c'est le fichier qui gère les secrets — le second parce que trouvé lors de l'audit). Un balayage exhaustif de tout l'historique du dépôt (tous fichiers, tous commits) à la recherche d'autres secrets n'a pas été fait ; risque jugé faible vu la nature du projet (pas d'autre fichier de migration contenant des identifiants système trouvé), mais non garanti à 100%.
+
+## Comment vérifier que ça tient dans le temps
+
+`npm run verify` (`npm run check` + `npm test`) avant chaque push — bloqué par le hook `pre-push` si un test échoue. Les tests de sécurité vivent dans `tests/security.*.test.js` et `tests/worker.rate-limit.test.js`/`tests/worker.security-headers.test.js` : ils échoueront explicitement si une régression réintroduit un des problèmes corrigés ici (action gated oubliée, `is_reset` réintroduit, CORS rouvert au wildcard, endpoint Matériel IT dégatté...). Toute nouvelle action Worker sensible doit être ajoutée à `GATED_ACTIONS` **et** à `requireAdmin`/`requireGarant` — sinon `security.gated-actions.test.js` le signale immédiatement.

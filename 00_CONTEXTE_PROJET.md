@@ -44,8 +44,9 @@
 - Autorisation côté serveur des actions sensibles du Worker + tests automatisés + garde-fous avant push (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Module Matériel IT — téléphones, puis ordinateurs — hors circuit immobilisations (août 2026, code livré, **en attente de la création des 2 listes SharePoint par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`)
 - Seuils d'alerte stock EPI + Outillage, avec suggestion de commande (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
-- Campagne d'inventaire physique des immobilisations par scan QR — roadmap item A1 (août 2026, code livré, **en attente de la création des 2 listes SharePoint par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`)
+- Campagne d'inventaire physique des immobilisations par scan QR — roadmap item A1 (août 2026, listes SharePoint créées et fonctionnalité en service, voir `04_HISTORIQUE_DECISIONS.md`)
 - Recherche globale dashboard, raccourci clavier `/` (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
+- Audit et durcissement de sécurité — limitation de débit sur la connexion, en-têtes CORS/sécurité resserrés, scrubbing PII Sentry, secrets retirés du dépôt public (août 2026, voir `SECURITE_ETAT.md` et `04_HISTORIQUE_DECISIONS.md`)
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier
