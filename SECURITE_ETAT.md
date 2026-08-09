@@ -32,10 +32,11 @@
 
 ## Limites assumées de la réécriture d'historique
 
-La réécriture (`git filter-repo --path materiel_it_catalogue.json --invert-paths`) supprime le fichier de tous les commits du dépôt réécrit et remplace tous les SHA en aval — le commit `b48a4f7` original n'est plus atteignable via `git log`/GitHub sur ce dépôt après le force-push. Ce que ça **ne** garantit **pas** :
-- Toute copie déjà clonée du dépôt (un autre poste, un fork, un mirroir) conserve l'ancien historique intact tant qu'elle n'est pas elle-même réécrite ou resynchronisée depuis zéro. Aucun autre clone connu à ce jour (dépôt à usage interne, un seul mainteneur) — mais non vérifiable à 100% depuis ce dépôt.
-- Les caches internes de GitHub (recherche de code, éventuels forks silencieux, objets déjà indexés) peuvent conserver une trace au-delà du contrôle direct du dépôt ; GitHub propose un formulaire dédié de purge de cache pour les secrets exposés si un doute subsiste.
-- **La réécriture ne remplace pas la rotation des codes eux-mêmes** (voir ci-dessous) : elle réduit la surface de découverte future, elle ne rend pas les anciens PIN/PUK/RIO à nouveau secrets.
+La réécriture (`git filter-repo --path materiel_it_catalogue.json --invert-paths`) supprime le fichier de tous les commits du dépôt réécrit et remplace tous les SHA en aval. Vérifié après le force-push :
+- **`git log --all`/`git branch --contains` sur le dépôt** : le commit `b48a4f7` n'est plus atteignable depuis aucune branche ou tag distant — un `git clone` ou `git pull` normal ne le récupère plus.
+- **⚠️ Constaté, pas seulement théorique : GitHub sert toujours la page du commit par son SHA direct** (`github.com/RAL974/immo-tracker/commit/b48a4f7`), avec la mention "This commit does not belong to any branch on this repository, and may belong to a fork outside of the repository." — comportement GitHub connu après une réécriture d'historique (rétention interne le temps de leur propre nettoyage, pas instantané, parfois plusieurs semaines). Le fichier reste donc potentiellement récupérable via cette URL directe tant que GitHub n'a pas purgé ses objets orphelins. **Action recommandée à William** : ouvrir une demande auprès du support GitHub (formulaire dédié "supprimer des données sensibles", accessible depuis les paramètres de sécurité du dépôt) pour forcer la purge immédiate de ce commit précis — je ne peux pas soumettre cette demande à sa place (nécessite son compte GitHub).
+- Toute copie déjà clonée du dépôt (un autre poste, un fork, un mirroir) conserverait l'ancien historique intact tant qu'elle n'est pas elle-même réécrite ou resynchronisée depuis zéro. Aucun autre clone connu à ce jour (dépôt à usage interne, un seul mainteneur) — mais non vérifiable à 100% depuis ce dépôt.
+- **La réécriture ne remplace pas la rotation des codes eux-mêmes** (voir ci-dessous) : elle réduit la surface de découverte future, elle ne rend pas les anciens PIN/PUK/RIO à nouveau secrets — d'autant plus tant que la page GitHub du commit reste servie.
 
 ## Reste à faire (décisions ou actions hors de portée de cette session)
 
