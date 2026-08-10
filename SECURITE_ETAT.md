@@ -17,6 +17,7 @@
 | Secret Azure (`CLIENT_SECRET_ENV`) | Variable d'environnement Cloudflare chiffrée, jamais dans le code — vérifié qu'il n'a jamais existé en clair dans l'historique git de `worker.js` (premier commit déjà conforme). |
 | Secret de session (`SESSION_SECRET_ENV`) | Idem, distinct du secret Azure. Si absent : échec explicite (`session_secret_manquant`) plutôt que faille silencieuse. |
 | Identité des mouvements sur les actions gated | Toujours résolue depuis `_auth.session.code` (le jeton vérifié), jamais depuis le corps de la requête — corrigé lors d'une session précédente, revérifié ici. |
+| Export/sauvegarde des listes (`?export_liste=`, GET, jeton en `&token=`) | Reste `requireAdmin` (jamais partagé avec la PWA terrain). Whitelist `EXPORTABLE_LISTS` complétée aux 21 listes réellement utilisées (ajout de `Campagnes_Inventaire_Immos`/`Scans_Inventaire_Immos`) ; synchro worker.js ↔ dashboard.html et couverture de toutes les listes Graph vérifiées automatiquement par `tests/backup.export-structure.test.js`. |
 
 ## Ouvert par choix de conception (et pourquoi)
 

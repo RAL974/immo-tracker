@@ -209,6 +209,22 @@ async function handleRequest(request) {
     return items;
   }
 
+  // Variante de paginate() qui signale si la pagination s'est arrêtée AVANT la fin de la liste
+  // (plafond de pages atteint alors qu'un @odata.nextLink reste). Utilisée par la sauvegarde
+  // (?export_liste=) pour ne JAMAIS présenter une liste tronquée comme complète.
+  async function paginateStatus(url, max) {
+    let items = [], next = url, pages = 0;
+    const cap = max || 10;
+    while (next && pages < cap) {
+      const r = await fetch(next, { headers: H });
+      const d = await r.json();
+      items = items.concat(d.value || []);
+      next = d['@odata.nextLink'] || null;
+      pages++;
+    }
+    return { items: items, complete: !next };
+  }
+
   // Exécute un lot Graph $batch (max 20 requêtes) et résume le résultat — réutilisé par les imports EPI
   async function graphBatch(requests) {
     const r = await fetch('https://graph.microsoft.com/v1.0/$batch', { method: 'POST', headers: H, body: JSON.stringify({ requests }) });
@@ -309,18 +325,16 @@ async function handleRequest(request) {
   if (p.get('export_liste')) {
     const _auth = await requireAdmin({ token: p.get('token') });
     if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
-    // Uniquement des listes réellement lues/écrites via Graph ailleurs dans ce fichier (voir GL + '/NomListe').
-    // Pas de "Chantiers" : malgré 02_MODELE_DONNEES.md, aucune liste SharePoint de ce nom n'est utilisée
-    // (Code_Chantier/Nom_Chantier sont des champs texte libre sur Reservations/Mouvements) — voir
-    // ARCHITECTURE_GLOBALE.md, section écarts constatés.
+    // Toutes les listes Graph du modèle ; rester synchro avec dashboard.html (garde-fou tests/backup.export-structure.test.js).
     const EXPORTABLE_LISTS = ['Immos', 'Employes', 'Mouvements', 'Transferts_En_Attente', 'Reservations', 'Absences',
       'Campagnes_Inventaire', 'Lignes_Inventaire', 'Catalogue_Articles_EPI', 'Grille_Dotation_EPI', 'Dotations_EPI',
       'Lignes_Dotation_EPI', 'Catalogue_Outillage', 'Grille_Outillage', 'Lignes_Outillage', 'Materiel_IT',
-      'Mouvements_Materiel_IT', 'Lignes_Telephoniques', 'Mouvements_Lignes_Telephoniques'];
+      'Mouvements_Materiel_IT', 'Lignes_Telephoniques', 'Mouvements_Lignes_Telephoniques',
+      'Campagnes_Inventaire_Immos', 'Scans_Inventaire_Immos'];
     const nomListe = p.get('export_liste');
     if (EXPORTABLE_LISTS.indexOf(nomListe) === -1) return json({ success: false, error: 'liste_inconnue', listes_valides: EXPORTABLE_LISTS }, 400);
-    const items = await paginate(GL + '/' + encodeURIComponent(nomListe) + '/items?$expand=fields&$top=200', 60);
-    return json({ success: true, liste: nomListe, exporte_le: new Date().toISOString(), count: items.length, items: items.map(i => Object.assign({ id: i.id }, i.fields)) });
+    const res = await paginateStatus(GL + '/' + encodeURIComponent(nomListe) + '/items?$expand=fields&$top=200', 45);
+    return json({ success: true, liste: nomListe, exporte_le: new Date().toISOString(), count: res.items.length, complete: res.complete, items: res.items.map(i => Object.assign({ id: i.id }, i.fields)) });
   }
 
   // ── Métadonnées achat (valeur + date) ──────────────────────────────────────

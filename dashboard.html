@@ -681,7 +681,7 @@ var W='https://immo-proxy.ral-85d.workers.dev/';
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
 // Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
-var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques'];
+var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos'];
 var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques'];
 (function(){
   var origFetch=window.fetch.bind(window);
@@ -5640,6 +5640,7 @@ function renderUsers(){
         EXPORTABLE_LISTS.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')+
       '</select>'+
       '<button onclick="exporterListeSauvegarde()" style="padding:8px 14px;background:#2E7D32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">💾 Exporter une liste (sauvegarde)</button>'+
+      '<button onclick="sauvegardeComplete()" style="padding:8px 14px;background:#1B5E20;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">🗄️ Sauvegarde complète (toutes les listes)</button>'+
       '<div id="ebp-statut" style="flex-basis:100%;font-size:12px;color:var(--grey);margin-top:6px"></div>'+
       '</div></details>';
   }
@@ -5788,6 +5789,37 @@ async function exporterListeSauvegarde(){
     var url=URL.createObjectURL(blob);
     var a2=document.createElement('a');a2.href=url;a2.download='Backup_'+nom+'_'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
   }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+async function sauvegardeComplete(){
+  if(!ADMIN_SESSION.code||!estAdmin(ADMIN_SESSION.code)){alert('Réservé aux administrateurs.');return;}
+  if(!(await confirmModal('Générer une sauvegarde complète des '+EXPORTABLE_LISTS.length+' listes SharePoint ?\n\nUne requête par liste, cela peut prendre une minute. Un seul fichier JSON sera téléchargé à la fin.')))return;
+  var statut=document.getElementById('ebp-statut');
+  var out={date:new Date().toISOString(),genere_par:ADMIN_SESSION.code||'',source:'immo-tracker/sauvegardeComplete',nb_listes:EXPORTABLE_LISTS.length,listes:{},meta:{}};
+  var erreurs=[],tronquees=[],i;
+  for(i=0;i<EXPORTABLE_LISTS.length;i++){
+    var nom=EXPORTABLE_LISTS[i];
+    if(statut)statut.textContent='🗄️ Sauvegarde en cours… '+(i+1)+'/'+EXPORTABLE_LISTS.length+' : '+nom;
+    try{
+      var r=await fetch(W+'?export_liste='+encodeURIComponent(nom)+'&token='+encodeURIComponent(ADMIN_SESSION.token||''));
+      var res=await r.json();
+      if(!res||!res.success){erreurs.push(nom+' ('+((res&&res.error)||('HTTP '+r.status))+')');out.listes[nom]=[];out.meta[nom]={count:0,complete:false,erreur:(res&&res.error)||('HTTP '+r.status)};continue;}
+      out.listes[nom]=res.items||[];
+      out.meta[nom]={count:res.count||(res.items?res.items.length:0),complete:res.complete!==false,exporte_le:res.exporte_le||''};
+      if(res.complete===false)tronquees.push(nom);
+    }catch(e){erreurs.push(nom+' (réseau: '+e.message+')');out.listes[nom]=[];out.meta[nom]={count:0,complete:false,erreur:e.message};}
+  }
+  out.complete=(erreurs.length===0&&tronquees.length===0);
+  var totalItems=Object.keys(out.meta).reduce(function(s,k){return s+(out.meta[k].count||0);},0);
+  out.total_items=totalItems;
+  var blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Sauvegarde_ImmoTracker_'+new Date().toISOString().slice(0,10)+(out.complete?'':'_INCOMPLETE')+'.json';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
+  var msg;
+  if(out.complete){msg='✅ Sauvegarde complète : '+EXPORTABLE_LISTS.length+' listes, '+totalItems+' éléments. Fichier téléchargé. Conservez-le hors du poste (OneDrive/clé USB).';}
+  else{msg='⚠️ Sauvegarde INCOMPLÈTE téléchargée quand même (à ne pas considérer comme fiable).';if(erreurs.length)msg+='\n\nListes en échec : '+erreurs.join(', ');if(tronquees.length)msg+='\n\nListes tronquées (>9000 lignes, plafond du plan gratuit atteint) : '+tronquees.join(', ')+'. Exportez ces listes séparément ou passez le Worker en plan payant.';}
+  if(statut)statut.textContent=out.complete?('✅ Sauvegarde terminée ('+totalItems+' éléments).'):'⚠️ Sauvegarde incomplète — voir le message.';
+  alert(msg);
 }
 
 async function resetPasswordUtilisateur(code){

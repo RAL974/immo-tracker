@@ -48,6 +48,7 @@
 - Recherche globale dashboard, raccourci clavier `/` (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Audit et durcissement de sécurité — limitation de débit sur la connexion, en-têtes CORS/sécurité resserrés, scrubbing PII Sentry, secrets retirés du dépôt public (août 2026, voir `SECURITE_ETAT.md` et `04_HISTORIQUE_DECISIONS.md`)
 - Mode sombre du dashboard, nettoyage de code mort, cohérence visuelle des vues EPI/Outillage (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
+- Sauvegarde complète des listes SharePoint (bouton dashboard, un fichier JSON de toutes les listes, orchestrée liste par liste pour rester sous les limites du plan gratuit Cloudflare) + procédure de restauration documentée (PROCEDURE_RESTAURATION.md) — août 2026
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier
