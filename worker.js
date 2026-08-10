@@ -95,6 +95,44 @@ function registerLoginFailure(code) {
 }
 function clearLoginAttempts(code) { LOGIN_ATTEMPTS.delete(code); }
 
+// ── Limitation de débit sur la résolution de noms employés (?noms_employes=1, ajoutée lors de la
+// pseudonymisation d'employes.json, voir 04_HISTORIQUE_DECISIONS.md) ───────────────────────────
+// Endpoint volontairement non authentifié : la PWA terrain n'a aucune session (scan de badge sans
+// mot de passe, voir 03_REGLES_METIER_ET_ROLES.md § Autorisation côté serveur) et ne peut donc pas
+// présenter de jeton. Seuls freins possibles : un verrou par IP ("best effort" comme LOGIN_ATTEMPTS
+// ci-dessus — Map en mémoire, pas de garantie entre isolates/nœuds edge Cloudflare) et la
+// vérification de l'en-tête Origin (voir origineReconnue plus bas). Aucun des deux n'est une
+// garantie cryptographique — un attaquant déterminé qui forge ses en-têtes contourne les deux —
+// mais ça ferme la porte "un simple GET sans rien d'autre renvoie tout instantanément", cohérent
+// avec le reste des protections "best effort" déjà documentées dans SECURITE_ETAT.md.
+const NOM_LOOKUP_ATTEMPTS = new Map(); // ip -> { count, windowStart }
+const NOM_LOOKUP_WINDOW_MS = 60 * 1000;
+// Seuil volontairement large : un dépôt/atelier avec plusieurs téléphones terrain derrière la même
+// IP partagée (NAT opérateur mobile ou Wifi dépôt) ne doit jamais être bloqué par un usage normal —
+// seul un appel en boucle (scraping automatisé) dépasse ce seuil en pratique.
+const NOM_LOOKUP_MAX_PER_WINDOW = 20;
+function clientIpFrom(request) {
+  return (request && request.headers && (request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For'))) || 'ip-inconnue';
+}
+function nomLookupRateLimited(ip) {
+  const now = Date.now();
+  const e = NOM_LOOKUP_ATTEMPTS.get(ip);
+  if (!e || now - e.windowStart > NOM_LOOKUP_WINDOW_MS) { NOM_LOOKUP_ATTEMPTS.set(ip, { count: 1, windowStart: now }); return false; }
+  e.count++;
+  return e.count > NOM_LOOKUP_MAX_PER_WINDOW;
+}
+// Best effort également (voir plus haut) : accepte si l'en-tête Origin correspond à une origine
+// connue, ou à défaut si Referer commence par une origine connue (certaines requêtes GET peuvent
+// omettre Origin mais garder Referer). Filtre malgré tout la visite directe d'URL et les scripts
+// sans navigateur qui n'envoient ni l'un ni l'autre.
+function origineReconnue(request, allowedOrigins) {
+  const list = allowedOrigins || ALLOWED_ORIGINS;
+  const origin = (request && request.headers && request.headers.get('Origin')) || '';
+  if (origin && list.indexOf(origin) !== -1) return true;
+  const referer = (request && request.headers && request.headers.get('Referer')) || '';
+  return list.some(function (o) { return referer.indexOf(o) === 0; });
+}
+
 // ── Journal d'audit des actions sensibles (liste SharePoint Journal_Audit, ajoutée août 2026) ──
 // Périmètre : exactement les 62 actions POST protégées requireAdmin/requireGarant (mêmes noms que
 // GATED_ACTIONS côté dashboard.html) + les échecs de connexion (verify_password, voir plus bas).
@@ -209,6 +247,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = { signSessionWith, verifySessionWith, estAdminSessionPure, estGarantSessionPure, roleNorm, requireAdminWith, requireGarantWith, b64url, b64urlToBytes, GESTIONNAIRES, SESSION_DUREE_MS, handleRequest,
     LOGIN_ATTEMPTS, loginLockStatus, registerLoginFailure, clearLoginAttempts, LOGIN_LOCK_THRESHOLDS, LOGIN_PROBE_SENTINEL,
     ALLOWED_ORIGINS, corsOriginFor, securityHeadersFor,
+    NOM_LOOKUP_ATTEMPTS, NOM_LOOKUP_WINDOW_MS, NOM_LOOKUP_MAX_PER_WINDOW, clientIpFrom, nomLookupRateLimited, origineReconnue,
     GATED_ACTIONS_AUDIT, AUDIT_AUTH_ERRORS, AUDIT_DETAIL_EXCLUDED_KEYS, auditDetailFrom, auditCibleFrom, reportAuditFailureToSentry };
 }
 
@@ -908,6 +947,28 @@ async function handleRequest(request) {
       // Préférer celle avec un rôle défini, puis mot de passe, puis site
       const score = (x) => (x.role ? 4 : 0) + (x.has_password ? 2 : 0) + (x.site ? 1 : 0);
       if (score(e) > score(ex)) byCode[e.code] = e;
+    });
+    return json(Object.values(byCode));
+  }
+
+  // ── Résolution de noms (endpoint dédié, minimal) — ajouté lors de la pseudonymisation
+  // d'employes.json (voir 04_HISTORIQUE_DECISIONS.md) ────────────────────────────────────────
+  // Sépare la résolution code→nom (seul besoin des menus déroulants terrain de la PWA et de
+  // l'affichage dashboard une fois employes.json/immos.json réduits aux codes) du reste des
+  // données de ?employes=1 (rôle, site, actif, mot de passe défini...), qui n'ont pas à transiter
+  // par ce chemin volontairement minimal. Toujours non authentifié (contrainte terrain, voir
+  // NOM_LOOKUP_ATTEMPTS ci-dessus) mais protégé par la vérification d'origine + le verrou par IP —
+  // ?employes=1 lui n'a aucune de ces deux protections, à traiter séparément si besoin.
+  if (p.get('noms_employes') === '1') {
+    if (!origineReconnue(request)) return json({ error: 'origine_non_reconnue' }, 403);
+    if (nomLookupRateLimited(clientIpFrom(request))) return json({ error: 'trop_de_requetes' }, 429);
+    const items = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
+    const byCode = {};
+    items.forEach(i => {
+      const f = i.fields || {};
+      const code = f.Title || f.Code || f.Code_Employe || '';
+      if (!code || byCode[code]) return;
+      byCode[code] = { code: code, nom: f.field_1 || f.Nom || f.Nom_Employe || f.Name || '' };
     });
     return json(Object.values(byCode));
   }

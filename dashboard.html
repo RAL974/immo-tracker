@@ -851,8 +851,41 @@ var immoMeta={}; // { code_im: { valeur_achat: 0, date_achat: '' } }
 var employesList=[]; // [{Code, Nom, Poste}]
 var employesByCode={}; // { CODE: {Nom, Poste} }
 
+// ── Résolution de noms (endpoint dédié ?noms_employes=1, ajouté lors de la pseudonymisation
+// d'employes.json — voir 01_ARCHITECTURE_TECHNIQUE.md et 04_HISTORIQUE_DECISIONS.md) ───────────
+// Cache localStorage, dupliqué de app.js (pas de build partagé entre PWA et dashboard, cohérent
+// avec le reste du projet). Le dashboard n'a pas de service worker/mode hors-ligne conçu — ce
+// cache sert surtout de résilience si le Worker répond mais que ?noms_employes=1 est
+// temporairement limité en débit, pas d'un vrai usage déconnecté comme côté PWA.
+var NOMS_CACHE_KEY='immo_noms_resolus';
+function chargerNomsCache(){
+  try{
+    var raw=localStorage.getItem(NOMS_CACHE_KEY);
+    var obj=raw?JSON.parse(raw):null;
+    return (obj&&obj.noms)?obj.noms:{};
+  }catch(e){return {};}
+}
+function sauvegarderNomsCache(noms){
+  try{localStorage.setItem(NOMS_CACHE_KEY,JSON.stringify({ts:Date.now(),noms:noms}));}catch(e){}
+}
+async function chargerNomsResolus(){
+  var noms=chargerNomsCache();
+  try{
+    var r=await fetch(W+'?noms_employes=1');
+    var data=await r.json();
+    if(Array.isArray(data)){
+      var map={};
+      data.forEach(function(e){if(e.code)map[e.code]=e.nom||'';});
+      noms=map;
+      sauvegarderNomsCache(noms);
+    }
+  }catch(e){/* Worker indisponible ou limité en débit : on garde le cache existant */}
+  return noms;
+}
+
 async function loadEmployes(force){
   if(employesList.length>0&&!force)return;
+  var nomsPromise=chargerNomsResolus(); // en parallèle, jamais bloquant pour le reste
   // 1. Priorité : endpoint Worker (contient le champ Droits + itemId, données à jour)
   try{
     var r=await fetch(W+'?employes=1');
@@ -861,6 +894,12 @@ async function loadEmployes(force){
       employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,HasPwd:!!e.has_password,itemId:e.itemId||null,
         AffectationEPI:e.affectation_epi||'',TaillePantalon:e.taille_pantalon||'',TailleTshirt:e.taille_tshirt||'',TailleVeste:e.taille_veste||'',PointureChaussures:e.pointure_chaussures||'',TailleGants:e.taille_gants||'',
         ServiceOutillage:e.service_outillage||''};});
+      // Résolution de noms dédiée, prioritaire sur le champ Nom ci-dessus quand elle a abouti.
+      // Transitoire : ?employes=1 porte encore un champ nom aujourd'hui, gardé en repli tant que
+      // la bascule finale (retrait du nom de cette réponse) n'a pas été validée — voir
+      // 04_HISTORIQUE_DECISIONS.md.
+      var noms1=await nomsPromise;
+      employesList.forEach(function(e){e.Nom=noms1[e.Code]||e.Nom||e.Code;});
       employesByCode={};
       employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site,actif:e.Actif,itemId:e.itemId,
         affectationEpi:e.AffectationEPI,taillePantalon:e.TaillePantalon,tailleTshirt:e.TailleTshirt,tailleVeste:e.TailleVeste,pointureChaussures:e.PointureChaussures,tailleGants:e.TailleGants,
@@ -873,7 +912,8 @@ async function loadEmployes(force){
   try{
     var r2=await fetch('employes.json');
     var arr=await r2.json();
-    employesList=arr.map(function(e){return{Code:e.Code,Nom:e.Nom,Poste:e.Poste||'',Droits:'',Site:'',itemId:null};});
+    var noms2=await nomsPromise;
+    employesList=arr.map(function(e){return{Code:e.Code,Nom:noms2[e.Code]||e.Nom||e.Code,Poste:e.Poste||'',Droits:'',Site:'',itemId:null};});
     employesByCode={};
     employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste||'',droits:'',site:''};});
   }catch(e){employesList=[];employesByCode={};}

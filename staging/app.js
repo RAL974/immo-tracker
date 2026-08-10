@@ -470,6 +470,40 @@ function marquerSyncReussie() {
   if (navigator.onLine) localStorage.setItem('lastSync', new Date().toISOString());
 }
 
+// ── Résolution de noms (endpoint dédié ?noms_employes=1, ajouté lors de la pseudonymisation
+// d'employes.json — voir 01_ARCHITECTURE_TECHNIQUE.md et 04_HISTORIQUE_DECISIONS.md) ───────────
+// Cache localStorage, PAS le service worker : sw.js n'intercepte jamais les appels cross-origine
+// au Worker (autre origine que ral974.github.io, voir sw.js), donc ce cache applicatif est le seul
+// moyen d'avoir des noms résolus hors-ligne. Peuplé opportunistement à chaque chargement réussi ;
+// en cas d'échec (hors-ligne, endpoint indisponible), on garde le contenu de la dernière
+// synchronisation plutôt que de tout vider — dégradation gracieuse vers le code seul uniquement si
+// aucune résolution n'a jamais eu lieu sur cet appareil (ex. toute première visite hors-ligne).
+const NOMS_CACHE_KEY = 'immo_noms_resolus';
+function chargerNomsCache() {
+  try {
+    const raw = localStorage.getItem(NOMS_CACHE_KEY);
+    const obj = raw ? JSON.parse(raw) : null;
+    return (obj && obj.noms) ? obj.noms : {};
+  } catch (e) { return {}; }
+}
+function sauvegarderNomsCache(noms) {
+  try { localStorage.setItem(NOMS_CACHE_KEY, JSON.stringify({ ts: Date.now(), noms })); } catch (e) {}
+}
+async function chargerNomsResolus() {
+  let noms = chargerNomsCache();
+  try {
+    const r = await fetch(CONFIG.proxy + '?noms_employes=1');
+    const data = await r.json();
+    if (Array.isArray(data)) {
+      const map = {};
+      data.forEach(e => { if (e.code) map[e.code] = e.nom || ''; });
+      noms = map;
+      sauvegarderNomsCache(noms);
+    }
+  } catch (e) { /* hors-ligne, endpoint indisponible ou limité en débit : on garde le cache existant */ }
+  return noms;
+}
+
 async function chargerImmos() {
   try {
     const r = await fetch('immos.json');
@@ -491,6 +525,7 @@ async function chargerEmployes() {
   try {
     // 1. Priorité : endpoint Worker (contient le champ Droits, à jour en temps réel)
     let arr = null;
+    const nomsPromise = chargerNomsResolus(); // en parallèle, jamais bloquant pour le reste
     try {
       const rw = await fetch(CONFIG.proxy + '?employes=1');
       const data = await rw.json();
@@ -504,6 +539,12 @@ async function chargerEmployes() {
       const raw = await r.json();
       arr = raw.map(e => ({ Code: e.Code, Nom: e.Nom, Poste: e.Poste || '', Droits: '', Site: '', Actif: true }));
     }
+    // Résolution de noms dédiée (?noms_employes=1), prioritaire sur le champ Nom ci-dessus quand
+    // elle a abouti. Transitoire : ?employes=1/employes.json portent encore un champ Nom
+    // aujourd'hui, gardé en repli tant que la bascule finale (retrait des noms de ces deux
+    // sources) n'a pas été validée — voir 04_HISTORIQUE_DECISIONS.md.
+    const noms = await nomsPromise;
+    arr.forEach(e => { e.Nom = noms[e.Code] || e.Nom || e.Code; });
     S.employes = arr;
     marquerSyncReussie();
     // Index code → droits + site + actif (pour peutReserver / filtrage géographique / statut)
