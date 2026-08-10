@@ -13,4 +13,4 @@ compatibility_date = "2024-09-23"
 # la ressource "immo-proxy-staging" (Settings > Variables and Secrets), jamais dans ce fichier.
 [env.staging]
 name = "immo-proxy-staging"
-vars = { SITE_ID_ENV = "REMPLACER_PAR_L_ID_DU_SITE_SHAREPOINT_TEST", ENV_NAME_ENV = "staging" }
+vars = { SITE_ID_ENV = "espacesoleil97.sharepoint.com,e618958b-c297-4589-9e31-caea3879a290,bf66d86a-8ad0-4580-9dbb-649766bbd6f5", ENV_NAME_ENV = "staging" }
