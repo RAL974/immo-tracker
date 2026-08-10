@@ -573,6 +573,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
           <option value="En cours">En cours</option>
           <option value="En retard">En retard</option>
           <option value="Rendue">Rendue</option>
+          <option value="Refusee">Refusée</option>
           <option value="Annulee">Annulée</option>
         </select>
         <select id="resa-site" onchange="setSiteFilter('reservations',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
@@ -1088,8 +1089,8 @@ var dataLoaded={}; // tracks which lazy data is loaded
 var charts={};
 var activeTab='vue-generale';
 
-var SCOL={'Demandee':'#F39C12','Confirmee':'#27AE60','En cours':'#2980B9','En retard':'#E74C3C','Rendue':'#95A5A6','Annulee':'#BDC3C7'};
-var SLAB={'Demandee':'⏳ En attente','Confirmee':'✅ Confirmée','En cours':'🔄 En cours','En retard':'⚠️ En retard','Rendue':'📦 Rendue','Annulee':'❌ Annulée'};
+var SCOL={'Demandee':'#F39C12','Confirmee':'#27AE60','En cours':'#2980B9','En retard':'#E74C3C','Rendue':'#95A5A6','Refusee':'#E74C3C','Annulee':'#BDC3C7'};
+var SLAB={'Demandee':'⏳ En attente','Confirmee':'✅ Confirmée','En cours':'🔄 En cours','En retard':'⚠️ En retard','Rendue':'📦 Rendue','Refusee':'🚫 Refusée','Annulee':'❌ Annulée'};
 
 // ── Utilitaires ──────────────────────────────────────────
 function fmtD(s){if(!s)return'—';return new Date(s).toLocaleDateString('fr-FR',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric'});}
@@ -5037,8 +5038,8 @@ function renderResa(){
   var sf=(document.getElementById('resa-statut')||{}).value||'';
   var fs=SITE_FILTERS.reservations||'';
   var qu=q.trim().toUpperCase();
-  var data=reservations.filter(function(r){return(!qu||(r.code_im.includes(qu)||r.nom_employe.toUpperCase().includes(qu)||(r.nom_chantier||'').toUpperCase().includes(qu)||(getLib(r.code_im)).toUpperCase().includes(qu)))&&(!sf||r.statut===sf)&&(!fs||siteImmoDash(r.code_im)===fs);});
-  var order={'En retard':0,'Demandee':1,'Confirmee':2,'En cours':3,'Rendue':4,'Annulee':5};
+  var data=reservations.filter(function(r){return(!qu||(r.code_im.includes(qu)||r.nom_employe.toUpperCase().includes(qu)||(r.nom_chantier||'').toUpperCase().includes(qu)||(getLib(r.code_im)).toUpperCase().includes(qu)||(r.categorie||'').toUpperCase().includes(qu)||(r.libelle_libre||'').toUpperCase().includes(qu)))&&(!sf||r.statut===sf)&&(!fs||siteEffectifResa(r)===fs);});
+  var order={'En retard':0,'Demandee':1,'Confirmee':2,'En cours':3,'Rendue':4,'Refusee':5,'Annulee':6};
   data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9);});
   // Sous-totaux
   var counts={};reservations.forEach(function(r){counts[r.statut]=(counts[r.statut]||0)+1;});
@@ -5066,7 +5067,7 @@ function renderResa(){
   gh+='</tr></thead><tbody>';
   if(!ganttData.length)gh+='<tr><td colspan="'+(NB+1)+'" class="es">Aucune réservation sur cette période.</td></tr>';
   else ganttData.forEach(function(r){
-    var l=getLib(r.code_im).substring(0,22);var col=SCOL[r.statut]||'#999';
+    var l=(r.code_im?getLib(r.code_im):('🔧 '+(r.categorie||'Catégorie')+(r.libelle_libre?(' — '+r.libelle_libre):'')+' ×'+(r.quantite||1))).substring(0,22);var col=SCOL[r.statut]||'#999';
     gh+='<tr><td class="immo-col"><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+l+'</span><br><span class="link-emp" style="font-size:10px" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'">'+r.nom_employe+'</span></td>';
     cols.forEach(function(dd){var isT=dd.toDateString()===today.toDateString();var deb=r.date_debut?new Date(r.date_debut):null;var fin=r.date_fin?new Date(r.date_fin):null;var debJ=deb?new Date(deb.getFullYear(),deb.getMonth(),deb.getDate()):null;var finJ=fin?new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()):null;var inR=debJ&&finJ&&dd>=debJ&&dd<=finJ;gh+='<td style="background:'+(inR?col:(dd.getDay()===0||dd.getDay()===6?'#F8F8F8':'transparent'))+'"'+(isT?' class="today-cell"':'')+'></td>';});
     gh+='</tr>';
@@ -5081,8 +5082,10 @@ function renderResa(){
       sel.onchange=async function(){
         var val=this.value; if(!val)return; this.value='';
         var id=this.dataset.rid,cim=this.dataset.cim,nom=this.dataset.nom,deb=this.dataset.deb,fin=this.dataset.fin;
-        if(val==='Confirmee'||val==='Annulee'){
-          if(!(await confirmModal((val==='Confirmee'?'Confirmer':'Annuler')+' la réservation de '+nom+' pour '+getLib(cim)+' ?')))return;
+        if(val==='Confirmee'||val==='Annulee'||val==='Refusee'){
+          var lbl=val==='Confirmee'?'Confirmer':val==='Refusee'?'Refuser':'Annuler';
+          var cible=cim?getLib(cim):'cette demande';
+          if(!(await confirmModal(lbl+' la réservation de '+nom+' pour '+cible+' ?')))return;
           majStatutResa(id,val,this);
         } else if(val==='contre_prop'){
           ouvrirContreProposition(id,cim,nom,deb,fin);
@@ -5092,18 +5095,20 @@ function renderResa(){
   }, 50);
   document.getElementById('tb-resa').innerHTML=data.length===0?'<tr><td colspan="8" class="es">Aucune réservation.</td></tr>':
     data.map(function(r){
-      var l=getLib(r.code_im);
+      var estCat=!r.code_im;
+      var l=estCat?('🔧 '+(r.categorie||'Catégorie')+(r.libelle_libre?(' — '+r.libelle_libre):'')+' × '+(r.quantite||1)):getLib(r.code_im);
       var isU=r.statut==='En retard',isD=r.statut==='Demandee';
       var isImm=isImminenteSansReponse(r);
       var tr='<tr class="'+(isImm||isU?'urgent-row':isD?'warn-row':'')+'">';
       tr+='<td>'+rsLabel(r.statut)+(isImm?' <span style="display:block;margin-top:2px;font-size:10px;font-weight:800;color:var(--red)">⏰ DÉPART IMMINENT</span>':'')+'</td>';
-      tr+='<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+r.code_im+'</span>'+drapImmoDash(r.code_im)+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:9px;color:var(--orange);white-space:nowrap">✏️ initial : <span class="link-im" data-cim="'+r.code_im_initial+'" data-lib="'+getLib(r.code_im_initial).replace(/"/g,'')+'">'+r.code_im_initial+'</span></span>':'')+'</td>';
+      tr+='<td>'+(estCat?'<span style="font-size:11px;color:var(--grey)">— demande par catégorie —</span>':('<span class="link-im" data-cim="'+r.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+r.code_im+'</span>'+drapImmoDash(r.code_im)+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:9px;color:var(--orange);white-space:nowrap">✏️ initial : <span class="link-im" data-cim="'+r.code_im_initial+'" data-lib="'+getLib(r.code_im_initial).replace(/"/g,'')+'">'+r.code_im_initial+'</span></span>':'')))+'</td>';
       tr+='<td style="font-size:12px">'+l+((r.code_im_initial&&r.code_im_initial!==r.code_im)?'<br><span style="font-size:10px;color:var(--grey)">au lieu de : '+getLib(r.code_im_initial)+'</span>':'')+'</td>';
       tr+='<td><span class="link-emp" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'"><b style="font-size:12px">'+r.nom_employe+'</b></span></td>';
       tr+='<td style="font-size:12px">'+(r.nom_chantier||'—')+'</td>';
       tr+='<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_debut)+'</td>';
       tr+='<td style="font-size:11px;white-space:nowrap">'+fmtD(r.date_fin)+'</td>';
-      tr+='<td><select class="resa-action-sel" data-rid="'+r.id+'" data-cim="'+r.code_im+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'" data-deb="'+r.date_debut+'" data-fin="'+r.date_fin+'" style="font-size:11px;padding:3px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px"><option value="">Action...</option><option value="Confirmee">✅ Confirmer</option><option value="Annulee">❌ Annuler</option><option value="contre_prop">✏️ Proposer modification</option></select></td>';
+      var actionOpts='<option value="">Action...</option><option value="Confirmee">✅ Confirmer</option><option value="Refusee">🚫 Refuser</option><option value="Annulee">❌ Annuler</option>'+(estCat?'':'<option value="contre_prop">✏️ Proposer modification</option>');
+      tr+='<td><select class="resa-action-sel" data-rid="'+r.id+'" data-cim="'+r.code_im+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'" data-deb="'+r.date_debut+'" data-fin="'+r.date_fin+'" style="font-size:11px;padding:3px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px">'+actionOpts+'</select></td>';
       tr+='</tr>';return tr;
     }).join('');
 }
@@ -5472,6 +5477,9 @@ function drapeauSiteD(site){return normSiteD(site)==='Mayotte'?FLAG_MAYOTTE_D:FL
 function badgeSiteD(site){var s=normSiteD(site);var bg=s==='Mayotte'?'#E0F2F1':'#E3F2FD';var fg=s==='Mayotte'?'#00695C':'#0D47A1';var lbl=s==='Mayotte'?'MAYOTTE':'RÉUNION';return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:'+bg+';color:'+fg+';vertical-align:middle">'+drapeauSiteD(s)+' '+lbl+'</span>';}
 // Site d'une immo (depuis immoMeta chargé, défaut Reunion)
 function siteImmoDash(codeIM){return normSiteD(immoMeta[codeIM]&&immoMeta[codeIM].site);}
+// Une demande de réservation sans immo précise (catégorie) n'a pas de site propre à lire dans
+// immoMeta — on retombe sur le site du demandeur (cohérent avec le filtre bi-site des rôles).
+function siteEffectifResa(r){if(r.code_im)return siteImmoDash(r.code_im);var e=employesList.find(function(x){return x.Code===r.code_employe;});return normSiteD(e&&e.Site);}
 // Petit badge drapeau seul (sans texte) pour les tableaux denses
 function drapImmoDash(codeIM){return '<span title="'+siteImmoDash(codeIM)+'" style="display:inline-flex;vertical-align:middle;margin-left:4px">'+drapeauSiteD(siteImmoDash(codeIM))+'</span>';}
 

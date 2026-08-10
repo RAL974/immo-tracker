@@ -310,8 +310,8 @@ function ebadge(e) {
 // Hex litéral obligatoire ici (pas var(...)) : rsLabel() suffixe un canal alpha ("22") directement
 // sur la chaîne — valeurs alignées sur les tokens --ds-warning/--ds-success/--ds-info/--ds-danger/
 // --ds-neutral du design system (design-system.css), recopiées car var() ne supporte pas ce suffixe.
-const SCOL = { 'Demandee': '#E8912C', 'Confirmee': '#1E9E5A', 'En cours': '#2F80C9', 'En retard': '#DC3545', 'Rendue': '#4B5261', 'Annulee': '#9AA3B1' };
-const SLAB = { 'Demandee': '⏳ En attente', 'Confirmee': '✅ Confirmée', 'En cours': '🔄 En cours', 'En retard': '⚠️ En retard', 'Rendue': '📦 Rendue', 'Annulee': '❌ Annulée' };
+const SCOL = { 'Demandee': '#E8912C', 'Confirmee': '#1E9E5A', 'En cours': '#2F80C9', 'En retard': '#DC3545', 'Rendue': '#4B5261', 'Refusee': '#B71C1C', 'Annulee': '#9AA3B1' };
+const SLAB = { 'Demandee': '⏳ En attente', 'Confirmee': '✅ Confirmée', 'En cours': '🔄 En cours', 'En retard': '⚠️ En retard', 'Rendue': '📦 Rendue', 'Refusee': '🚫 Refusée', 'Annulee': '❌ Annulée' };
 function rsLabel(s) { const c = SCOL[s] || '#999'; const l = SLAB[s] || s; return `<span style="padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;background:${c}22;color:${c}">${l}</span>`; }
 
 // ── Catégories ────────────────────────────────────────────
@@ -684,7 +684,7 @@ async function majBadgeResas() {
       // Utilisateur : ses propres réservations actives
       const r = await fetch(CONFIG.proxy + '?mes_reservations=' + S.employe.code);
       resas = await r.json();
-      const actives = resas.filter(function(r) { return r.statut !== 'Rendue' && r.statut !== 'Annulee'; });
+      const actives = resas.filter(function(r) { return r.statut !== 'Rendue' && r.statut !== 'Annulee' && r.statut !== 'Refusee'; });
       const retards = actives.filter(function(r) { return r.statut === 'En retard'; });
       const el = document.getElementById('badge-resa');
       if (el) {
@@ -1433,11 +1433,32 @@ function initReservationScreen(pourQuelquunDautre) {
   document.getElementById('resa-date-fin').value = '';
   document.getElementById('resa-chantier').value = '';
   document.getElementById('resa-note').value = '';
+  const modeCb = document.getElementById('resa-mode-categorie');
+  if (modeCb) modeCb.checked = false;
+  document.getElementById('resa-immo-bloc')?.classList.remove('hidden');
+  document.getElementById('resa-cat-bloc')?.classList.add('hidden');
+  const qteEl = document.getElementById('resa-quantite');
+  if (qteEl) qteEl.value = '1';
+  const libLibreEl = document.getElementById('resa-libelle-libre');
+  if (libLibreEl) libLibreEl.value = '';
   const isAdmin = S.employe && CONFIG.admins.includes(S.employe.code);
   const sectionPourQui = document.getElementById('resa-pour-qui-section');
   if (sectionPourQui) sectionPourQui.classList.toggle('hidden', !isAdmin);
   buildCatSelect('resa-categorie', rechercherImmoResa);
-  showScreen('screen-reserver');
+  showScreen('screen-reserver', true); // true = ne pas relancer initReservationScreen (déjà en cours) — sinon boucle infinie avec le dispatch de showScreen
+}
+
+// Bascule entre "je cherche une immo précise" et "je demande une catégorie, sans savoir laquelle"
+// (roadmap item D — planification logistique, la réservation immédiate seule ne couvrait que le 1er cas).
+function toggleModeResaCategorie() {
+  const modeCategorie = !!document.getElementById('resa-mode-categorie')?.checked;
+  document.getElementById('resa-immo-bloc')?.classList.toggle('hidden', modeCategorie);
+  document.getElementById('resa-cat-bloc')?.classList.toggle('hidden', !modeCategorie);
+  if (modeCategorie) {
+    S.resaImmoCode = null; S.resaImmoLibelle = null;
+    const elInfo = document.getElementById('resa-immo-info');
+    if (elInfo) elInfo.textContent = '';
+  }
 }
 
 function rechercherImmoResa() {
@@ -1496,22 +1517,32 @@ function scannerPourResa() {
 }
 
 async function soumettreReservation(btn) {
-  if (!S.resaImmoCode) { toast('Sélectionne une immo', 'error'); return; }
+  const modeCategorie = !!document.getElementById('resa-mode-categorie')?.checked;
+  let categorieVal = '', quantiteVal = 1, libelleLibreVal = '';
+  if (modeCategorie) {
+    categorieVal = document.getElementById('resa-categorie')?.value || '';
+    if (!categorieVal) { toast('Choisis une catégorie', 'error'); return; }
+    quantiteVal = parseInt(document.getElementById('resa-quantite')?.value, 10) || 1;
+    libelleLibreVal = (document.getElementById('resa-libelle-libre')?.value || '').trim();
+  } else if (!S.resaImmoCode) { toast('Sélectionne une immo', 'error'); return; }
   const debut = document.getElementById('resa-date-debut').value;
   const fin   = document.getElementById('resa-date-fin').value;
   if (!debut || !fin) { toast('Indique les dates', 'error'); return; }
   if (new Date(fin) <= new Date(debut)) { toast('La date de retour doit être après le départ', 'error'); return; }
   if (!setBusy(btn, 'Vérification...')) return;
-  // Vérifier conflits
-  try {
-    const r = await fetch(CONFIG.proxy + '?reservations=1');
-    const resas = await r.json();
-    const conflits = resas.filter(r => r.code_im === S.resaImmoCode && r.statut !== 'Annulee' && r.statut !== 'Rendue' && !(new Date(fin) < new Date(r.date_debut) || new Date(debut) > new Date(r.date_fin)));
-    if (conflits.length > 0) {
-      const msg = conflits.map(c => `${c.nom_employe} (${fmt(c.date_debut)} → ${fmt(c.date_fin)})`).join(' | ');
-      if (!confirm(`Cette immo est déjà réservée : ${msg}. Envoyer quand même ?`)) { clearBusy(btn); return; }
-    }
-  } catch (e) {}
+  // Vérifier conflits — n'a de sens que pour une immo précise ; une demande par catégorie n'a
+  // rien à comparer (c'est justement le cas où on ne sait pas encore laquelle sera fournie).
+  if (!modeCategorie) {
+    try {
+      const r = await fetch(CONFIG.proxy + '?reservations=1');
+      const resas = await r.json();
+      const conflits = resas.filter(r => r.code_im === S.resaImmoCode && r.statut !== 'Annulee' && r.statut !== 'Rendue' && !(new Date(fin) < new Date(r.date_debut) || new Date(debut) > new Date(r.date_fin)));
+      if (conflits.length > 0) {
+        const msg = conflits.map(c => `${c.nom_employe} (${fmt(c.date_debut)} → ${fmt(c.date_fin)})`).join(' | ');
+        if (!confirm(`Cette immo est déjà réservée : ${msg}. Envoyer quand même ?`)) { clearBusy(btn); return; }
+      }
+    } catch (e) {}
+  }
 
   const selPQ = document.getElementById('resa-pour-qui');
   const pourQCode = selPQ?.value || '';
@@ -1521,17 +1552,21 @@ async function soumettreReservation(btn) {
 
   btn.innerHTML = '⏳ Envoi...';
   try {
-    const r = await fetch(CONFIG.proxy + '?action=reserver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      code_im: S.resaImmoCode, code_employe: codeEmp, nom_employe: nomEmp,
+    const body = {
+      code_employe: codeEmp, nom_employe: nomEmp,
       code_chantier: document.getElementById('resa-chantier').value,
       nom_chantier:  document.getElementById('resa-chantier').value,
       date_debut: reunionISO(debut, 7), date_fin: reunionISO(fin, 15), // 07h00 départ / 15h00 retour max
       note: document.getElementById('resa-note').value,
-    }) });
+    };
+    if (modeCategorie) { body.categorie = categorieVal; body.quantite = quantiteVal; body.libelle_libre = libelleLibreVal; }
+    else { body.code_im = S.resaImmoCode; }
+    const r = await fetch(CONFIG.proxy + '?action=reserver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json();
     if (d.success) {
       vib(300); toast('✅ Demande de réservation envoyée !', 'success', 3500);
-      document.getElementById('recap').innerHTML = `<strong>✅ Demande envoyée !</strong><br><strong>Immo :</strong> ${S.resaImmoLibelle}<br>${pourQNom ? `<strong>Pour :</strong> ${pourQNom}<br>` : ''}<strong>Du :</strong> ${fmt(debut)}<br><strong>Au :</strong> ${fmt(fin)}<br><em style="color:var(--grey)">En attente de confirmation logistique</em>`;
+      const titreRecap = modeCategorie ? `${categorieVal}${libelleLibreVal ? ' — ' + libelleLibreVal : ''} × ${quantiteVal}` : S.resaImmoLibelle;
+      document.getElementById('recap').innerHTML = `<strong>✅ Demande envoyée !</strong><br><strong>${modeCategorie ? 'Catégorie' : 'Immo'} :</strong> ${titreRecap}<br>${pourQNom ? `<strong>Pour :</strong> ${pourQNom}<br>` : ''}<strong>Du :</strong> ${fmt(debut)}<br><strong>Au :</strong> ${fmt(fin)}<br><em style="color:var(--grey)">En attente de confirmation logistique</em>`;
       document.getElementById('alerte-degradation')?.classList.add('hidden');
       showScreen('screen-confirmation');
       majBadgeResas();
@@ -1553,17 +1588,18 @@ async function afficherMesReservations() {
     const r = await fetch(CONFIG.proxy + '?mes_reservations=' + S.employe.code);
     const resas = await r.json();
     if (!resas.length) { div.innerHTML = '<p class="empty-msg">Aucune réservation.</p>'; return; }
-    const actives  = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee');
-    const terminees= resas.filter(r => r.statut === 'Rendue' || r.statut === 'Annulee');
+    const actives  = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee' && r.statut !== 'Refusee');
+    const terminees= resas.filter(r => r.statut === 'Rendue' || r.statut === 'Annulee' || r.statut === 'Refusee');
     const retards  = actives.filter(r => r.statut === 'En retard');
     let html = '';
     if (retards.length) html += `<div style="background:#FFEBEE;border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid var(--red)"><strong style="color:var(--red)">⚠️ ${retards.length} retard(s) — retourne le matériel au dépôt</strong></div>`;
     const carte = r => {
       const c = SCOL[r.statut] || '#999';
       const canEdit = r.statut === 'Demandee' || r.statut === 'Confirmee' || r.statut === 'En cours' || r.statut === 'En retard';
+      const titre = r.code_im ? (lib(r.code_im) || '—') : `🔧 ${r.categorie || 'Catégorie'}${r.libelle_libre ? ' — ' + r.libelle_libre : ''} × ${r.quantite || 1}`;
       return `<div class="materiel-card" style="border-left-color:${c}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <strong style="color:var(--blue)">${lib(r.code_im) || '—'}</strong>
+          <strong style="color:var(--blue)">${titre}</strong>
           ${rsLabel(r.statut)}
         </div>
         ${r.code_im ? `<span class="chantier-tag">${r.code_im}</span><br>` : ''}
@@ -1572,7 +1608,7 @@ async function afficherMesReservations() {
         ${r.note ? `<div style="font-size:12px;color:var(--grey)">📝 ${r.note}</div>` : ''}
         ${r.statut === 'Contre-proposition' ? `<div style="background:#EDE7F6;border-radius:8px;padding:8px;margin-top:6px;font-size:12px;color:#4527A0"><strong>✏️ Proposition de la logistique :</strong> voir les nouvelles dates ci-dessus<br><div style="display:flex;gap:8px;margin-top:6px"><button onclick="accepterContreProp('${r.id}')" style="flex:1;padding:7px;background:#27AE60;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">✅ Accepter</button><button onclick="annulerResa('${r.id}')" style="flex:1;padding:7px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">❌ Refuser</button></div></div>` : ''}
         ${canEdit && r.statut !== 'Contre-proposition' ? `<div style="display:flex;gap:8px;margin-top:8px">
-          <button onclick="ouvrirModifResa('${r.id}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>
+          ${r.code_im ? `<button onclick="ouvrirModifResa('${r.id}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>` : ''}
           <button onclick="annulerResa('${r.id}')" style="flex:1;padding:8px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">❌ Annuler</button>
         </div>` : ''}
       </div>`;
@@ -2021,7 +2057,7 @@ async function afficherReservationsAdmin() {
   try {
     const r = await fetch(CONFIG.proxy + '?reservations=1');
     const resas = await r.json();
-    const actives = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee');
+    const actives = resas.filter(r => r.statut !== 'Rendue' && r.statut !== 'Annulee' && r.statut !== 'Refusee');
     actives.sort((a, b) => {
       const aImm = isImminenteSansReponse(a) ? 0 : 1;
       const bImm = isImminenteSansReponse(b) ? 0 : 1;
@@ -2040,7 +2076,7 @@ async function afficherReservationsAdmin() {
     });
     html += '</div>';
     html += actives.map(r => {
-      const l = lib(r.code_im) || '—';
+      const l = r.code_im ? (lib(r.code_im) || '—') : `🔧 ${r.categorie || 'Catégorie'}${r.libelle_libre ? ' — ' + r.libelle_libre : ''} × ${r.quantite || 1}`;
       const s = STATUT_COLORS[r.statut] || { bg: '#F5F5F5', color: '#999', label: r.statut };
       const dDebut = r.date_debut ? fmtDate(r.date_debut) : '—';
       const dFin   = r.date_fin   ? fmtDate(r.date_fin)   : '—';
@@ -2051,13 +2087,14 @@ async function afficherReservationsAdmin() {
           <span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${s.bg};color:${s.color}">${s.label}</span>
         </div>
         ${isImm ? '<div style="background:var(--red);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:800;margin-bottom:6px;text-align:center">⏰ DÉPART IMMINENT — RÉPONSE REQUISE</div>' : ''}
-        <strong>${l}</strong> <span style="font-size:11px;color:#999;font-family:monospace">${r.code_im}</span>
+        <strong>${l}</strong>${r.code_im ? ` <span style="font-size:11px;color:#999;font-family:monospace">${r.code_im}</span>` : ''}
         <div style="font-size:13px;margin-top:4px">📅 ${dDebut} → ${dFin}</div>
         ${r.nom_chantier ? `<div style="font-size:12px;color:var(--grey)">🏗️ ${r.nom_chantier}</div>` : ''}
         ${r.note ? `<div style="font-size:12px;color:var(--orange)">📝 ${r.note}</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
           ${r.statut === 'Demandee' ? `<button onclick="actionResaPWA('${r.id}','Confirmee','${r.nom_employe.replace(/'/g,"\\'")}','${r.code_im}')" style="flex:1;padding:8px;background:#E8F5E9;color:#1B5E20;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✅ Confirmer</button>` : ''}
-          <button onclick="proposerModifPWA('${r.id}','${r.code_im}','${r.nom_employe.replace(/'/g,"\\'")}','${r.date_debut ? r.date_debut.slice(0,10) : ''}','${r.date_fin ? r.date_fin.slice(0,10) : ''}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>
+          ${r.statut === 'Demandee' ? `<button onclick="actionResaPWA('${r.id}','Refusee','${r.nom_employe.replace(/'/g,"\\'")}','${r.code_im}')" style="flex:1;padding:8px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">🚫 Refuser</button>` : ''}
+          ${r.code_im ? `<button onclick="proposerModifPWA('${r.id}','${r.code_im}','${r.nom_employe.replace(/'/g,"\\'")}','${r.date_debut ? r.date_debut.slice(0,10) : ''}','${r.date_fin ? r.date_fin.slice(0,10) : ''}')" style="flex:1;padding:8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">✏️ Modifier</button>` : ''}
           <button onclick="actionResaPWA('${r.id}','Annulee','${r.nom_employe.replace(/'/g,"\\'")}','${r.code_im}')" style="flex:1;padding:8px;background:#FFEBEE;color:var(--red);border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">❌ Annuler</button>
         </div>
       </div>`;
@@ -2069,14 +2106,15 @@ async function afficherReservationsAdmin() {
 }
 
 async function actionResaPWA(id, statut, nomEmp, codeIM) {
-  const action = statut === 'Confirmee' ? 'Confirmer' : 'Annuler';
-  if (!confirm(`${action} la réservation de ${nomEmp} pour ${lib(codeIM)} ?`)) return;
+  const action = statut === 'Confirmee' ? 'Confirmer' : statut === 'Refusee' ? 'Refuser' : 'Annuler';
+  const cible = codeIM ? lib(codeIM) : 'cette demande';
+  if (!confirm(`${action} la réservation de ${nomEmp} pour ${cible} ?`)) return;
   try {
     await fetch(CONFIG.proxy + '?action=statut_resa', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, statut }),
     });
-    toast(action === 'Confirmer' ? '✅ Réservation confirmée' : '❌ Réservation annulée', 'success');
+    toast(action === 'Confirmer' ? '✅ Réservation confirmée' : action === 'Refuser' ? '🚫 Réservation refusée' : '❌ Réservation annulée', 'success');
     afficherReservationsAdmin();
   } catch (e) { toast('Erreur', 'error'); }
 }
@@ -2159,6 +2197,7 @@ const STATUT_COLORS = {
   'En cours':           { bg: '#E3F2FD', color: '#0D47A1', label: '🔄 En cours' },
   'Rendue':             { bg: '#F5F5F5', color: '#757575', label: '📦 Rendue' },
   'En retard':          { bg: '#FFEBEE', color: '#B71C1C', label: '⚠️ En retard' },
+  'Refusee':            { bg: '#FFEBEE', color: '#B71C1C', label: '🚫 Refusée' },
   'Annulee':            { bg: '#F5F5F5', color: '#9E9E9E', label: '❌ Annulée' },
   'Contre-proposition': { bg: '#EDE7F6', color: '#4527A0', label: '✏️ Contre-proposition' },
 };

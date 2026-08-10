@@ -980,12 +980,12 @@ async function handleRequest(request) {
       const f = item.fields || {};
       const fin = f.Date_Fin ? new Date(f.Date_Fin) : null;
       let statut = f.Statut || 'Demandee';
-      if (statut !== 'Rendue' && statut !== 'Annulee' && fin && fin < now) statut = 'En retard';
+      if (statut !== 'Rendue' && statut !== 'Annulee' && statut !== 'Refusee' && fin && fin < now) statut = 'En retard';
       const noteRaw = f.Note || '';
       const initMatch = noteRaw.match(/##INIT:([^#]+)##/);
       const codeInitial = initMatch ? initMatch[1] : '';
       const noteClean = noteRaw.replace(/##INIT:[^#]+##/g, '').trim();
-      return { id: item.id, code_im: f.Code_IM || '', code_im_initial: codeInitial, code_employe: f.Title || '', nom_employe: f.Nom_Employe || '', code_chantier: f.Code_Chantier || '', nom_chantier: f.Nom_Chantier || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut, note: noteClean, created: f.Created || '' };
+      return { id: item.id, code_im: f.Code_IM || '', code_im_initial: codeInitial, code_employe: f.Title || '', nom_employe: f.Nom_Employe || '', code_chantier: f.Code_Chantier || '', nom_chantier: f.Nom_Chantier || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut, note: noteClean, created: f.Created || '', categorie: f.Categorie || '', quantite: f.Quantite != null ? f.Quantite : null, libelle_libre: f.Libelle_Libre || '' };
     }));
   }
 
@@ -1258,10 +1258,10 @@ async function handleRequest(request) {
       const f = item.fields || {};
       const fin = f.Date_Fin ? new Date(f.Date_Fin) : null;
       let statut = f.Statut || 'Demandee';
-      if (statut !== 'Rendue' && statut !== 'Annulee' && fin && fin < now) statut = 'En retard';
+      if (statut !== 'Rendue' && statut !== 'Annulee' && statut !== 'Refusee' && fin && fin < now) statut = 'En retard';
       const noteRaw = f.Note || '';
       const initMatch = noteRaw.match(/##INIT:([^#]+)##/);
-      return { id: item.id, code_im: f.Code_IM || '', code_im_initial: initMatch ? initMatch[1] : '', code_employe: f.Title || '', nom_employe: f.Nom_Employe || '', code_chantier: f.Code_Chantier || '', nom_chantier: f.Nom_Chantier || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut, note: noteRaw.replace(/##INIT:[^#]+##/g, '').trim() };
+      return { id: item.id, code_im: f.Code_IM || '', code_im_initial: initMatch ? initMatch[1] : '', code_employe: f.Title || '', nom_employe: f.Nom_Employe || '', code_chantier: f.Code_Chantier || '', nom_chantier: f.Nom_Chantier || '', date_debut: f.Date_Debut || '', date_fin: f.Date_Fin || '', statut, note: noteRaw.replace(/##INIT:[^#]+##/g, '').trim(), categorie: f.Categorie || '', quantite: f.Quantite != null ? f.Quantite : null, libelle_libre: f.Libelle_Libre || '' };
     }));
   }
 
@@ -1907,11 +1907,22 @@ async function handleRequest(request) {
 
     if (action === 'reserver') {
       if (!(await estEmployeActifServeur(body.code_employe))) return json({ success: false, error: 'employe_inactif', message: 'Cet employé est inactif — réservation impossible.' });
-      const r = await fetch(GL + '/Reservations/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_employe || '', Nom_Employe: body.nom_employe || '', Code_Chantier: body.code_chantier || '', Nom_Chantier: body.nom_chantier || '', Date_Debut: body.date_debut, Date_Fin: body.date_fin, Statut: 'Demandee', Note: body.note || '', Code_IM: body.code_im || '' } }) });
+      // Une demande cible soit une immo précise (Code_IM), soit une catégorie + quantité (roadmap
+      // item D, "planification logistique") — jamais aucune des deux, sinon rien à préparer.
+      if (!body.code_im && !body.categorie) return json({ success: false, error: 'destination_manquante', message: 'Précise une immo ou une catégorie.' });
+      const r = await fetch(GL + '/Reservations/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+        Title: body.code_employe || '', Nom_Employe: body.nom_employe || '', Code_Chantier: body.code_chantier || '', Nom_Chantier: body.nom_chantier || '',
+        Date_Debut: body.date_debut, Date_Fin: body.date_fin, Statut: 'Demandee', Note: body.note || '', Code_IM: body.code_im || '',
+        Categorie: body.code_im ? '' : (body.categorie || ''), Quantite: body.code_im ? null : (parseInt(body.quantite, 10) || 1), Libelle_Libre: body.code_im ? '' : (body.libelle_libre || '')
+      } }) });
       return json({ success: r.ok, status: r.status, detail: await r.text() });
     }
 
     if (action === 'statut_resa') {
+      // Liste blanche : ce PATCH acceptait n'importe quelle chaîne jusqu'ici — resserré au passage
+      // (voir 04_HISTORIQUE_DECISIONS.md, item D) sans changer le comportement des valeurs déjà utilisées.
+      const STATUTS_RESA_VALIDES = ['Demandee', 'Confirmee', 'Refusee', 'Rendue', 'Annulee', 'Contre-proposition'];
+      if (!STATUTS_RESA_VALIDES.includes(body.statut)) return json({ success: false, error: 'statut_invalide' });
       const r = await fetch(GL + '/Reservations/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Statut: body.statut }) });
       return json({ success: r.ok });
     }

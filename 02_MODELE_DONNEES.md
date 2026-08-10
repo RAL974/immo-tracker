@@ -57,12 +57,32 @@ Content-type de la liste : `Item`.
 
 ⚠️ **Marqueur transitoire sur `Transferts_En_Attente.Note`** : cette liste (retours/transferts en attente de validation, voir plus bas) n'a pas sa propre colonne `Photos` — pas nécessaire, le mécanisme est déjà bien couvert par le texte libre existant (même logique que les marqueurs `##COUT:X##`/`##PRESTA:X##` déjà utilisés ailleurs, voir `04_HISTORIQUE_DECISIONS.md`). Le nom des photos prises par le déclarant à ce stade est porté par un marqueur `##PHOTOS:fichier1;fichier2##` ajouté à `Note`, retiré et reporté vers la colonne structurée `Photos` de `Mouvements` au moment de la validation (`?action=valider`) — jamais affiché tel quel à l'utilisateur (le Worker le retire avant toute restitution en lecture, `?dashboard=1` compris).
 
+## Liste `Reservations`
+
+*Réservation de matériel, immédiate ou planifiée à l'avance. Étendue en août 2026 (roadmap item D, "planification logistique") pour couvrir aussi la **demande par catégorie sans immo précise** — voir `04_HISTORIQUE_DECISIONS.md` pour le raisonnement (extension de cette liste existante plutôt que création d'une liste séparée, après relecture de ce qui existait déjà : conflit de dates, Gantt planning, contre-proposition).*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code employé demandeur |
+| `Nom_Employe` | Texte | |
+| `Code_Chantier` / `Nom_Chantier` | Texte | Optionnel |
+| `Date_Debut` / `Date_Fin` | Date | Départ prévu / retour prévu — peut être une date future, c'est ce qui permet la planification |
+| `Statut` | Texte | `Demandee` / `Confirmee` / `Refusee` (ajoutée août 2026) / `Rendue` / `Annulee` / `Contre-proposition`. Liste blanche vérifiée côté Worker (`statut_resa`) depuis août 2026 — ce PATCH acceptait n'importe quelle chaîne auparavant. `En retard` est calculé à la lecture (jamais stocké), et jamais posé sur une ligne `Refusee` (une demande refusée n'est pas "en retard"). |
+| `Note` | Texte | Commentaire libre + marqueur transitoire `##INIT:code_im##` (immo initialement demandée, avant une contre-proposition de la logistique) |
+| `Code_IM` | Texte | Immo précise demandée. **Optionnel depuis août 2026** — vide pour une demande par catégorie |
+| `Categorie` | Texte | Ajoutée août 2026. Renseignée uniquement si `Code_IM` est vide — catégorie recherchée (mêmes valeurs que les catégories dérivées des comptes) |
+| `Quantite` | Nombre | Ajoutée août 2026. Défaut 1, pertinente seulement quand `Code_IM` est vide (une immo précise = toujours 1) |
+| `Libelle_Libre` | Texte | Ajoutée août 2026. Précision optionnelle (ex. "échafaudage 6m") pour une demande par catégorie |
+
+⚠️ **Une demande cible toujours soit une immo précise, soit une catégorie — jamais aucune des deux** : `reserver` refuse la création (`destination_manquante`) si `code_im` et `categorie` sont tous les deux absents.
+
+⚠️ **Aucun mouvement n'est jamais créé à partir de `Reservations`, quel que soit le statut** (y compris `Confirmee`/`Rendue`) — la remise physique réelle passe exclusivement par `transfert`/`valider`, ailleurs. Voir `04_HISTORIQUE_DECISIONS.md`.
+
 ## Autres listes
 
 | Liste | Rôle |
 |---|---|
 | `Transferts_En_Attente` | Transferts et retours dépôt en attente de validation |
-| `Reservations` | Réservations de matériel |
 | `Chantiers` | Référentiel des chantiers |
 
 ## Catégories dérivées du compte d'immobilisation

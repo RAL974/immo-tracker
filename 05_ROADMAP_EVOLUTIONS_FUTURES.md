@@ -27,8 +27,8 @@ Développé et déployé : jusqu'à 3 photos par mouvement (Retour, Transfert, R
 ### C. Coûts de réparation structurés + seuil de réforme — ✅ FAIT (août 2026)
 Développé et déployé : coût structuré (colonne SharePoint `Cout_Reparation` sur `Mouvements`), saisie possible à la résolution d'une panne ou indépendamment (entretien, nouveau type de mouvement `Entretien`), double ratio (valeur d'achat ET VNC), seuil de réforme réglable (40/60/80%, défaut 60%) dans l'onglet Analyses. Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
 
-### D. Demandes de matériel planifiées à l'avance
-Un CT peut demander du matériel pour une date future (ex. "2 perceuses + 1 échafaudage semaine 32 sur tel chantier"), au lieu du mode réactif actuel (réservation immédiate uniquement). Le gestionnaire dépôt voit un planning de demandes à préparer. Fait passer l'app du suivi réactif à la planification logistique — cohérent avec le métier de William (achats/logistique).
+### D. Demandes de matériel planifiées à l'avance — 🔧 Lot 1 fait (août 2026), Lot 2 à venir
+Un CT peut demander du matériel pour une date future (ex. "2 perceuses semaine 32 sur tel chantier"), au lieu du mode réactif d'origine (réservation immédiate d'une immo précise uniquement). **Lot 1 livré** : demande par catégorie+quantité sans immo précise (extension de la liste `Reservations` existante plutôt qu'une nouvelle liste — voir `04_HISTORIQUE_DECISIONS.md`), statut `Refusee` formalisé, vue liste côté gestionnaire (dashboard) avec Confirmer/Refuser. **Lot 2 restant** : planning visuel dédié par semaine/chantier (au-delà du Gantt actuel groupé par immo) + extension du digest hebdomadaire (item F) avec les demandes en attente de traitement. Détail complet dans `04_HISTORIQUE_DECISIONS.md` et `03_REGLES_METIER_ET_ROLES.md`.
 
 ### E. Interface simplifiée pour Mayotte
 Constat : le référent matériel à Mayotte (Logistique_Mayotte) est peu à l'aise avec l'informatique (imprime des documents, envoie des photos par email plutôt que d'utiliser l'app). Évolution : une vue ultra-simplifiée à 3 actions principales ("Je reçois", "Je rends", "Signaler panne"), sans les fonctions avancées, pour ce profil spécifiquement. Petit effort de développement, gain d'adoption potentiellement important sur le terrain à Mayotte.
@@ -43,7 +43,8 @@ Développé et déployé : nouvel endpoint `?digest=1` (Worker, protégé par `D
 3. ~~**B — Photos / constat d'état**~~ : **fait (août 2026)**.
 4. ~~**C — Coûts de réparation + seuil de réforme**~~ : **fait (août 2026)**.
 5. ~~**F — Digest hebdomadaire**~~ : **fait (août 2026)**.
-6. **D, E** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
+6. **D — Demandes planifiées** : Lot 1 fait (août 2026), Lot 2 (planning visuel + digest) à livrer après retour d'usage de William sur le Lot 1.
+7. **E** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
 
 ## Note pour toute reprise de ce document
 

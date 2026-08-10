@@ -89,6 +89,54 @@ test('reserver (action partagée avec la PWA terrain) fonctionne sans jeton', as
   assert.equal(res.status, 200, "les actions PWA ne doivent jamais recevoir de 401/403 pour absence de jeton");
 });
 
+test('reserver par catégorie (sans code_im, roadmap item D) écrit Categorie/Quantite/Libelle_Libre', async (t) => {
+  let writtenFields = null;
+  mockGraphFetch(t, { onCall: (u, opts) => { if (u.includes('/Reservations/items') && opts && opts.method === 'POST') writtenFields = JSON.parse(opts.body).fields; } });
+  const res = await W.handleRequest(postRequest('reserver', { categorie: 'Electroportatif', quantite: 2, libelle_libre: 'perceuses', code_employe: 'ABCD', nom_employe: 'Test', code_chantier: 'C1', date_debut: new Date().toISOString(), date_fin: new Date().toISOString() }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(writtenFields.Code_IM, '');
+  assert.equal(writtenFields.Categorie, 'Electroportatif');
+  assert.equal(writtenFields.Quantite, 2);
+  assert.equal(writtenFields.Libelle_Libre, 'perceuses');
+});
+
+test('reserver sans code_im ni categorie -> refusé, rien écrit', async (t) => {
+  let wroteToSharepoint = false;
+  mockGraphFetch(t, { onCall: (u, opts) => { if (u.includes('/Reservations/items') && opts && opts.method === 'POST') wroteToSharepoint = true; } });
+  const res = await W.handleRequest(postRequest('reserver', { code_employe: 'ABCD', nom_employe: 'Test', date_debut: new Date().toISOString(), date_fin: new Date().toISOString() }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'destination_manquante');
+  assert.equal(wroteToSharepoint, false);
+});
+
+test('statut_resa avec une valeur hors liste blanche -> refusé, rien écrit', async (t) => {
+  let wroteToSharepoint = false;
+  mockGraphFetch(t, { onCall: (u, opts) => { if (u.includes('/Reservations/items/') && opts && opts.method === 'PATCH') wroteToSharepoint = true; } });
+  const res = await W.handleRequest(postRequest('statut_resa', { id: 'fake-id', statut: 'Servie' }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'statut_invalide');
+  assert.equal(wroteToSharepoint, false);
+});
+
+test('statut_resa avec Refusee (nouveau statut du planning dépôt) -> accepté', async (t) => {
+  let writtenFields = null;
+  mockGraphFetch(t, { onCall: (u, opts) => { if (u.includes('/Reservations/items/') && opts && opts.method === 'PATCH') writtenFields = JSON.parse(opts.body); } });
+  const res = await W.handleRequest(postRequest('statut_resa', { id: 'fake-id', statut: 'Refusee' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(writtenFields.Statut, 'Refusee');
+});
+
+test('statut_resa avec Contre-proposition (statut historique) -> toujours accepté (non-régression)', async (t) => {
+  mockGraphFetch(t);
+  const res = await W.handleRequest(postRequest('statut_resa', { id: 'fake-id', statut: 'Contre-proposition' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+});
+
 test('creer_retour_direct_garant (action partagée avec la PWA terrain) fonctionne sans jeton et écrit un mouvement Retour/DEPOT', async (t) => {
   let writtenFields = null;
   mockGraphFetch(t, { onCall: (u, opts) => { if (u.includes('/Mouvements/items') && opts && opts.method === 'POST') writtenFields = JSON.parse(opts.body).fields; } });

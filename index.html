@@ -569,16 +569,28 @@
 <div id="screen-reserver" class="screen">
   <h2>📅 Réserver une immo</h2>
   <p id="resa-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;min-height:20px"></p>
+  <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-weight:600;min-height:48px">
+    <input type="checkbox" id="resa-mode-categorie" onchange="toggleModeResaCategorie()" style="width:20px;height:20px;flex:none">
+    📋 Je ne sais pas encore quelle immo précise — demande par catégorie
+  </label>
   <label class="field-label">Catégorie</label>
   <select id="resa-categorie" class="select-input" onchange="rechercherImmoResa()">
     <option value="">Toutes catégories</option>
   </select>
-  <label class="field-label">Immo</label>
-  <div class="search-row">
-    <input type="text" id="resa-immo-search" class="select-input" placeholder="Code IM ou libellé..." oninput="rechercherImmoResa()">
-    <button class="btn btn-primary" onclick="scannerPourResa()">📷</button>
+  <div id="resa-immo-bloc">
+    <label class="field-label">Immo</label>
+    <div class="search-row">
+      <input type="text" id="resa-immo-search" class="select-input" placeholder="Code IM ou libellé..." oninput="rechercherImmoResa()">
+      <button class="btn btn-primary" onclick="scannerPourResa()">📷</button>
+    </div>
+    <div id="resa-immo-suggestions" class="liste-materiel"></div>
   </div>
-  <div id="resa-immo-suggestions" class="liste-materiel"></div>
+  <div id="resa-cat-bloc" class="hidden">
+    <label class="field-label">Quantité</label>
+    <input type="number" id="resa-quantite" class="select-input" min="1" value="1">
+    <label class="field-label">Précision (optionnel)</label>
+    <input type="text" id="resa-libelle-libre" class="select-input" placeholder="Ex: échafaudage 6m...">
+  </div>
   <div id="resa-pour-qui-section" class="admin-only hidden">
     <label class="field-label">Pour qui (admin)</label>
     <select id="resa-pour-qui" class="select-input">
