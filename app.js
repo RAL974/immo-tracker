@@ -721,9 +721,27 @@ async function activationManuelle() {
   const code = (prompt('Code employé (ex : AIWI) :') || '').trim().toUpperCase();
   if (!code) return;
   let nom = '';
-  try { const noms = await chargerNomsResolus(); nom = noms[code] || ''; } catch (e) {}
+  let verifieEnLigne = false; // true = le serveur a répondu — un code absent est alors fiable, pas juste "pas encore vérifié"
+  try {
+    const r = await fetch(CONFIG.proxy + '?noms_employes=1');
+    const data = await r.json();
+    if (Array.isArray(data)) {
+      verifieEnLigne = true;
+      const map = {};
+      data.forEach(e => { if (e.code) map[e.code] = e.nom || ''; });
+      sauvegarderNomsCache(map);
+      nom = map[code] || '';
+    }
+  } catch (e) { /* hors-ligne ou endpoint indisponible : repli sur le cache local ci-dessous */ }
+  if (!nom && !verifieEnLigne) nom = chargerNomsCache()[code] || ''; // dernier recours : cache d'une synchro précédente
   if (!nom) {
-    if (!confirm('Code "' + code + '" introuvable dans la liste des employés. Continuer quand même avec un nom saisi manuellement ?')) return;
+    if (verifieEnLigne) {
+      // Le serveur a répondu et ne connaît pas ce code : pas de repli sur une saisie libre, sinon
+      // n'importe qui pourrait s'activer sous un code entièrement inventé (constaté en test par William).
+      alert('Code "' + code + '" introuvable dans la liste des employés. Vérifie le code ou contacte le dépôt.');
+      return;
+    }
+    if (!confirm('Impossible de vérifier le code "' + code + '" (hors-ligne). Continuer quand même avec un nom saisi manuellement ?')) return;
     nom = (prompt('Nom complet :') || '').trim();
     if (!nom) return;
   }
