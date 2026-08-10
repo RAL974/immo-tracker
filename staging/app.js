@@ -712,11 +712,21 @@ function onScanActivation(code) {
 
 // Activation manuelle (sans carte QR) — utile pour le personnel temporaire (intérim, accompagnants)
 // lors d'une campagne d'inventaire, qui n'a pas de carte BTP imprimée.
-function activationManuelle() {
+// Le nom vient toujours de la fiche employé réelle (?noms_employes=1), jamais d'une saisie libre :
+// les codes terrain ne sont pas secrets (imprimés sur les cartes BTP), donc accepter n'importe quel
+// nom pour un code existant permettrait de s'activer sous l'identité de quelqu'un d'autre avec un
+// nom de son choix — bug réel signalé par William (code d'un vrai employé + nom inventé, accepté
+// sans vérification). Voir 04_HISTORIQUE_DECISIONS.md.
+async function activationManuelle() {
   const code = (prompt('Code employé (ex : AIWI) :') || '').trim().toUpperCase();
   if (!code) return;
-  const nom = (prompt('Nom complet :') || '').trim();
-  if (!nom) return;
+  let nom = '';
+  try { const noms = await chargerNomsResolus(); nom = noms[code] || ''; } catch (e) {}
+  if (!nom) {
+    if (!confirm('Code "' + code + '" introuvable dans la liste des employés. Continuer quand même avec un nom saisi manuellement ?')) return;
+    nom = (prompt('Nom complet :') || '').trim();
+    if (!nom) return;
+  }
   activerEmploye(code, nom);
 }
 
