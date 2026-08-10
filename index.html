@@ -174,6 +174,22 @@
   <p class="subtitle">Suivi des immobilisations</p>
   <div id="user-info" class="user-badge hidden"></div>
 
+<!-- ── Accueil simplifié (roadmap item E) — profils avec ROLE_CAPS.modeSimplifie ────────────────
+     Couche de présentation uniquement : les 3 boutons appellent les mêmes écrans/actions que le
+     mode normal. Voir 03_REGLES_METIER_ET_ROLES.md. -->
+<div id="accueil-simple" class="hidden">
+  <h2 id="simple-greeting" style="text-align:center;color:var(--blue)"></h2>
+  <div id="simple-badge-attente" class="badge-attente hidden" onclick="ouvrirEcranSimpleRecevoir()"></div>
+  <div class="btn-group">
+    <button class="btn btn-connecte btn-simple-accueil" onclick="ouvrirEcranSimpleRecevoir()">✅ Je reçois</button>
+    <button class="btn btn-primary btn-simple-accueil" onclick="startMouvement('Transfert')">📤 Je rends</button>
+    <button class="btn btn-danger btn-simple-accueil" onclick="scannerPourPanne()">🔧 Signaler une panne</button>
+  </div>
+  <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
+  <button class="btn btn-link" onclick="demanderAutresActions()" style="font-size:12px;color:var(--grey)">🔧 Autres actions</button>
+</div>
+
+<div id="accueil-normal">
   <!-- Badge transferts en attente (cliquable) -->
   <div id="badge-attente" class="badge-attente hidden" onclick="showScreen('screen-transferts-attente')">
     ⚠️ Transfert(s) en attente de validation
@@ -227,6 +243,7 @@
 
   <button class="btn btn-link" onclick="changerUtilisateur()">🔁 Changer d'utilisateur</button>
   <button class="btn btn-link" onclick="showScreen('screen-activation')" style="font-size:12px;color:var(--grey)">Première utilisation / Réactiver</button>
+</div>
 </div>
 
 <!-- ══════════════ ACTIVATION ══════════════ -->
@@ -283,16 +300,21 @@
 <div id="screen-etat" class="screen">
   <h2>État du matériel</h2>
   <p id="etat-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
-  <label class="field-label">État général</label>
-  <select id="select-etat" class="select-input">
-    <option value="Neuf">⭐ Neuf</option>
-    <option value="Bon état" selected>✅ Bon état</option>
-    <option value="Usé">🔶 Usé</option>
-    <option value="Abîmé">⚠️ Abîmé</option>
-    <option value="Hors service">🔴 Hors service</option>
-  </select>
-  <label class="field-label">Note (optionnel)</label>
-  <textarea id="note-texte" class="note-textarea" placeholder="Ex : câble abîmé, manque une pièce..."></textarea>
+  <!-- Mode simplifié (roadmap item E) : mêmes champs, boutons au lieu d'un menu déroulant. Le
+       clic soumet directement (confirmerAvecEtat) — masqué/vide pour les autres profils. -->
+  <div id="etat-simple-boutons" class="etat-simple-grid hidden"></div>
+  <div id="etat-normal-champs">
+    <label class="field-label">État général</label>
+    <select id="select-etat" class="select-input">
+      <option value="Neuf">⭐ Neuf</option>
+      <option value="Bon état" selected>✅ Bon état</option>
+      <option value="Usé">🔶 Usé</option>
+      <option value="Abîmé">⚠️ Abîmé</option>
+      <option value="Hors service">🔴 Hors service</option>
+    </select>
+    <label class="field-label">Note (optionnel)</label>
+    <textarea id="note-texte" class="note-textarea" placeholder="Ex : câble abîmé, manque une pièce..."></textarea>
+  </div>
   <div class="photo-zone">
     <p>📷 Photos optionnelles (jusqu'à 3) — utile pour prouver l'état constaté</p>
     <label class="photo-btn-label">
@@ -302,7 +324,7 @@
     <div id="photo-etat-preview" style="margin-top:8px"></div>
   </div>
   <div class="sticky-actions">
-    <button class="btn btn-secondary" onclick="confirmerAvecEtat()">✅ Confirmer</button>
+    <button class="btn btn-secondary" id="etat-btn-confirmer" onclick="confirmerAvecEtat()">✅ Confirmer</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 </div>
@@ -344,12 +366,20 @@
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
 </div>
 
+<!-- ══════════════ JE REÇOIS (mode simplifié, roadmap item E) ══════════════ -->
+<div id="screen-simple-recevoir" class="screen">
+  <h2>✅ Je reçois</h2>
+  <div id="simple-liste-attente" class="liste-materiel"></div>
+  <button class="btn btn-primary btn-simple-accueil" onclick="startMouvement('Retour')">📷 Autre chose à réceptionner</button>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
 <!-- ══════════════ SCAN VALIDATION ══════════════ -->
 <div id="screen-scan-validation" class="screen">
   <h2>Scanner pour valider</h2>
   <p class="scanner-hint">Scanne le QR code du matériel reçu</p>
   <div id="scanner-validation" class="scanner-box"></div>
-  <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">Annuler</button>
+  <button class="btn btn-outline" onclick="retourEcranAttente()">Annuler</button>
 </div>
 
 <!-- ══════════════ ACCEPTER TRANSFERT ══════════════ -->
@@ -358,16 +388,21 @@
   <p id="accepter-texte" style="font-size:16px;font-weight:700;color:var(--blue);text-align:center"></p>
   <div id="accepter-etat-donneur" class="localisation-badge hidden"></div>
   <div id="accepter-note-donneur"></div>
-  <label class="field-label">Ton constat à la réception</label>
-  <select id="accepter-etat" class="select-input">
-    <option value="Neuf">⭐ Neuf</option>
-    <option value="Bon état" selected>✅ Bon état</option>
-    <option value="Usé">🔶 Usé</option>
-    <option value="Abîmé">⚠️ Abîmé</option>
-    <option value="Hors service">🔴 Hors service</option>
-  </select>
-  <label class="field-label">Note (optionnel)</label>
-  <textarea id="accepter-note" class="note-textarea" placeholder="Observations à la réception..."></textarea>
+  <!-- Mode simplifié (roadmap item E) : mêmes champs, boutons au lieu d'un menu déroulant. Le
+       clic soumet directement (accepterTransfert) — masqué/vide pour les autres profils. -->
+  <div id="accepter-simple-boutons" class="etat-simple-grid hidden"></div>
+  <div id="accepter-normal-champs">
+    <label class="field-label">Ton constat à la réception</label>
+    <select id="accepter-etat" class="select-input">
+      <option value="Neuf">⭐ Neuf</option>
+      <option value="Bon état" selected>✅ Bon état</option>
+      <option value="Usé">🔶 Usé</option>
+      <option value="Abîmé">⚠️ Abîmé</option>
+      <option value="Hors service">🔴 Hors service</option>
+    </select>
+    <label class="field-label">Note (optionnel)</label>
+    <textarea id="accepter-note" class="note-textarea" placeholder="Observations à la réception..."></textarea>
+  </div>
   <div class="photo-zone">
     <p>📷 Photos optionnelles (jusqu'à 3) — état à la réception</p>
     <label class="photo-btn-label">
@@ -377,8 +412,8 @@
     <div id="photo-reception-preview" style="margin-top:8px"></div>
   </div>
   <div class="sticky-actions">
-    <button class="btn btn-secondary" onclick="accepterTransfert(this)">✅ Accepter et valider</button>
-    <button class="btn btn-outline" onclick="showScreen('screen-transferts-attente')">← Retour</button>
+    <button class="btn btn-secondary" id="accepter-btn-confirmer" onclick="accepterTransfert(this)">✅ Accepter et valider</button>
+    <button class="btn btn-outline" onclick="retourEcranAttente()">← Retour</button>
   </div>
 </div>
 

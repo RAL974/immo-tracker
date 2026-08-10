@@ -73,7 +73,10 @@ var SUPER_ADMIN_CODES = ['AIWI'];
 var ROLE_CAPS = {
   'Admin':              { reserver:true, bisite:true,  garant:true,  voitTout:true, admin:true, absences:true, voitAbsences:true, gererInventaire:true, compterInventaire:true },
   'Logistique':         { reserver:true, bisite:true,  garant:true,  voitTout:true, absences:true, gererInventaire:true, compterInventaire:true },            // Gestionnaire Dépôt RUN
-  'Logistique_Mayotte': { reserver:true, bisite:false, garant:true,  voitTout:false, comptesExtra:['2182'], absences:true, gererInventaire:true, compterInventaire:true }, // mono-Mayotte, voit AUSSI les véhicules (entretien sur place)
+  // modeSimplifie (roadmap item E) : accueil PWA réduit à 3 actions (Je reçois/Je rends/Signaler une
+  // panne), couche de présentation uniquement — voir modeSimplifieActif() plus bas. Simple flag,
+  // activable pour d'autres rôles plus tard sans autre changement.
+  'Logistique_Mayotte': { reserver:true, bisite:false, garant:true,  voitTout:false, comptesExtra:['2182'], absences:true, gererInventaire:true, compterInventaire:true, modeSimplifie:true }, // mono-Mayotte, voit AUSSI les véhicules (entretien sur place)
   'RA':                 { reserver:true, bisite:true, absences:true, compterInventaire:true },
   'CT_Specialise':      { reserver:true, bisite:true, absences:true, compterInventaire:true },
   'CT':                 { reserver:true, bisite:false, absences:true, compterInventaire:true },
@@ -234,7 +237,77 @@ const S = {
   immos:               {},
   employes:            [],
   scanner:             null,
+  modeSimplifieOverride: false, // "Autres actions" — session en cours seulement, jamais persisté
 };
+
+// ── Mode simplifié (roadmap item E) — couche de présentation uniquement : mêmes actions Worker,
+// mêmes règles, juste un accueil et des écrans réduits pour un profil peu à l'aise avec l'informatique
+// (Logistique_Mayotte). Voir 03_REGLES_METIER_ET_ROLES.md.
+function modeSimplifieActif() {
+  return !!(S.employe && caps(S.employe.code).modeSimplifie && !S.modeSimplifieOverride);
+}
+function demanderAutresActions() {
+  if (!confirm('Voir toutes les actions ?')) return;
+  S.modeSimplifieOverride = true;
+  afficherEmploye();
+}
+function retourEcranAttente() { showScreen(modeSimplifieActif() ? 'screen-simple-recevoir' : 'screen-transferts-attente'); }
+
+const ETATS_SIMPLE = [
+  { v: 'Neuf', l: '⭐ Neuf', c: 'etat-neuf' },
+  { v: 'Bon état', l: '✅ Bon état', c: 'etat-bon' },
+  { v: 'Usé', l: '🔶 Usé', c: 'etat-use' },
+  { v: 'Abîmé', l: '⚠️ Abîmé', c: 'etat-abime' },
+  { v: 'Hors service', l: '🔴 Hors service', c: 'etat-horsservice' },
+];
+function boutonsEtatSimpleHtml() {
+  return ETATS_SIMPLE.map((e, i) => `<button type="button" class="btn-etat-simple ${e.c}"${i === 4 ? ' style="grid-column:1/-1"' : ''} data-val="${e.v}">${e.l}</button>`).join('');
+}
+function initBoutonsEtatSimple() {
+  const host1 = document.getElementById('etat-simple-boutons');
+  if (host1 && !host1.dataset.built) {
+    host1.innerHTML = boutonsEtatSimpleHtml();
+    host1.dataset.built = '1';
+    host1.querySelectorAll('button').forEach(b => { b.onclick = function() { document.getElementById('select-etat').value = this.dataset.val; confirmerAvecEtat(); }; });
+  }
+  const host2 = document.getElementById('accepter-simple-boutons');
+  if (host2 && !host2.dataset.built) {
+    host2.innerHTML = boutonsEtatSimpleHtml();
+    host2.dataset.built = '1';
+    host2.querySelectorAll('button').forEach(b => { b.onclick = function() { document.getElementById('accepter-etat').value = this.dataset.val; accepterTransfert(this); }; });
+  }
+}
+// Bascule boutons/champs normaux sur screen-etat et screen-accepter — appelée à chaque changement
+// d'écran (voir showScreen). Sans effet pour les profils sans modeSimplifie (les blocs "normaux"
+// restent visibles, exactement comme avant cette fonctionnalité).
+function syncEcransModeSimplifie() {
+  const simple = modeSimplifieActif();
+  [['etat-simple-boutons', 'etat-normal-champs', 'etat-btn-confirmer'],
+   ['accepter-simple-boutons', 'accepter-normal-champs', 'accepter-btn-confirmer']].forEach(([sbId, ncId, cfId]) => {
+    const sb = document.getElementById(sbId), nc = document.getElementById(ncId), cf = document.getElementById(cfId);
+    if (sb) sb.classList.toggle('hidden', !simple);
+    if (nc) nc.classList.toggle('hidden', simple);
+    if (cf) cf.classList.toggle('hidden', simple);
+  });
+}
+
+function ouvrirEcranSimpleRecevoir() { showScreen('screen-simple-recevoir'); }
+async function afficherSimpleRecevoir() {
+  const div = document.getElementById('simple-liste-attente');
+  if (!div) return;
+  div.innerHTML = '<p class="empty-msg">Chargement...</p>';
+  try {
+    const r = await fetch(CONFIG.proxy + '?transferts=' + S.employe.code);
+    const trs = await r.json();
+    if (!trs.length) { div.innerHTML = '<p class="empty-msg">Rien à confirmer pour le moment.</p>'; return; }
+    div.innerHTML = trs.map(t => `
+      <div class="materiel-card">
+        <strong>${lib(t.code_im)}</strong><br>
+        <small>De : <strong>${t.nom_donneur}</strong></small>
+        <br><button class="btn btn-connecte" style="margin-top:8px" onclick="demarrerValidation('${t.id}','${t.code_im}')">📷 Recevoir</button>
+      </div>`).join('');
+  } catch (e) { div.innerHTML = '<p class="empty-msg">Erreur de connexion.</p>'; }
+}
 
 // ── Utilitaires ───────────────────────────────────────────
 function vib(ms) { if (navigator.vibrate) navigator.vibrate(ms || 150); }
@@ -431,6 +504,7 @@ function showScreen(id, skipInit) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const sc = document.getElementById(id);
   if (sc) sc.classList.add('active');
+  syncEcransModeSimplifie(); // sans effet en dehors de screen-etat/screen-accepter
 
   switch (id) {
     case 'screen-activation':
@@ -438,6 +512,7 @@ function showScreen(id, skipInit) {
       break;
     case 'screen-mon-materiel':       afficherMonMateriel(); break;
     case 'screen-transferts-attente': afficherTransfertsEnAttente(); break;
+    case 'screen-simple-recevoir':    afficherSimpleRecevoir(); break;
     case 'screen-mes-reservations':   afficherMesReservations(); break;
     case 'screen-reserver':           if (!skipInit) initReservationScreen(false); break;
     case 'screen-inventaire-stock':   if (!skipInit) ouvrirEcranInventaire(); break;
@@ -447,6 +522,7 @@ function showScreen(id, skipInit) {
 
 // ── Init au chargement ────────────────────────────────────
 window.addEventListener('load', async () => {
+  initBoutonsEtatSimple();
   const saved = localStorage.getItem('employe');
   // Valeur défensive : une entrée localStorage corrompue/invalide (ex. littéralement "null", JSON
   // malformé, ou un objet sans code) ne doit jamais planter le chargement — juste repartir comme
@@ -609,14 +685,24 @@ function afficherEmploye() {
   // Case "Campagne d'inventaire" — Admin / Logistique / CT / RA / Compteur_Inventaire
   const btnInventaire = document.getElementById('btn-inventaire-stock');
   if (btnInventaire) btnInventaire.classList.toggle('hidden', !peutCompterInventaire(S.employe.code));
+
+  // Mode simplifié (roadmap item E) — bascule d'affichage uniquement, voir modeSimplifieActif().
+  const simple = modeSimplifieActif();
+  document.getElementById('accueil-normal')?.classList.toggle('hidden', simple);
+  document.getElementById('accueil-simple')?.classList.toggle('hidden', !simple);
+  if (simple) {
+    const g = document.getElementById('simple-greeting');
+    if (g) g.textContent = 'Bonjour ' + S.employe.nom;
+  }
 }
 
 function changerUtilisateur() {
   if (!confirm('Changer d\'utilisateur ?')) return;
   localStorage.removeItem('employe');
   S.employe = null;
+  S.modeSimplifieOverride = false; // "Autres actions" ne doit jamais survivre à un changement d'utilisateur
   // Reset tous les badges
-  ['user-info','badge-attente','badge-mon-mat','badge-materiel','badge-resa'].forEach(function(id) {
+  ['user-info','badge-attente','badge-mon-mat','badge-materiel','badge-resa','simple-badge-attente'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.classList.add('hidden');
   });
   document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.add('hidden'); });
@@ -659,6 +745,13 @@ async function majBadgeTransferts() {
         el.textContent = '⚠️ ' + n + ' transfert' + (n > 1 ? 's' : '') + ' en attente — Cliquer pour valider';
         el.classList.remove('hidden');
       } else { el.classList.add('hidden'); }
+    }
+    const elSimple = document.getElementById('simple-badge-attente');
+    if (elSimple) {
+      if (n > 0) {
+        elSimple.textContent = '🔔 ' + n + ' livraison' + (n > 1 ? 's' : '') + ' à confirmer';
+        elSimple.classList.remove('hidden');
+      } else { elSimple.classList.add('hidden'); }
     }
   } catch (e) {}
 }

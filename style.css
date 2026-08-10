@@ -269,6 +269,12 @@ label.field-label {
 .etat-abime     { background: var(--ds-danger-bg,#FBE9E7); color: var(--ds-danger-dark,#B71C1C); }
 .etat-horsservice { background: var(--ds-neutral-100,#ECEFF1); color: var(--ds-neutral-600,#37474F); }
 
+/* Mode simplifié (roadmap item E) — grille de gros boutons d'état à la place d'un menu déroulant,
+   et boutons d'accueil plus grands. Réutilise les couleurs .etat-* ci-dessus. */
+.etat-simple-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.btn-etat-simple { border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; padding: 16px 8px; min-height: 56px; }
+.btn-simple-accueil { font-size: 19px; padding: 22px; min-height: 68px; }
+
 .empty-msg {
   color: var(--grey);
   font-size: 14px;

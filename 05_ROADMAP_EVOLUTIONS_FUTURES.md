@@ -30,8 +30,8 @@ Développé et déployé : coût structuré (colonne SharePoint `Cout_Reparation
 ### D. Demandes de matériel planifiées à l'avance — ✅ FAIT (août 2026)
 Un CT peut demander du matériel pour une date future (ex. "2 perceuses semaine 32 sur tel chantier"), au lieu du mode réactif d'origine (réservation immédiate d'une immo précise uniquement). Développé et livré en 2 lots : **Lot 1** — demande par catégorie+quantité sans immo précise (extension de la liste `Reservations` existante plutôt qu'une nouvelle liste — voir `04_HISTORIQUE_DECISIONS.md`), statut `Refusee` formalisé, vue liste côté gestionnaire (dashboard) avec Confirmer/Refuser. **Lot 2** — sous-onglet "📅 Planning" (demandes actionnables groupées par semaine puis chantier) + extension du digest hebdomadaire (item F) avec les demandes en attente de traitement depuis plus de 5 jours. Détail complet dans `04_HISTORIQUE_DECISIONS.md` et `03_REGLES_METIER_ET_ROLES.md`.
 
-### E. Interface simplifiée pour Mayotte
-Constat : le référent matériel à Mayotte (Logistique_Mayotte) est peu à l'aise avec l'informatique (imprime des documents, envoie des photos par email plutôt que d'utiliser l'app). Évolution : une vue ultra-simplifiée à 3 actions principales ("Je reçois", "Je rends", "Signaler panne"), sans les fonctions avancées, pour ce profil spécifiquement. Petit effort de développement, gain d'adoption potentiellement important sur le terrain à Mayotte.
+### E. Interface simplifiée pour Mayotte — ✅ FAIT (août 2026)
+Constat : le référent matériel à Mayotte (Logistique_Mayotte) est peu à l'aise avec l'informatique (imprime des documents, envoie des photos par email plutôt que d'utiliser l'app). Développé : un accueil PWA réduit à 3 gros boutons ("✅ Je reçois", "📤 Je rends", "🔧 Signaler une panne"), déclenché automatiquement pour ce rôle (nouvelle capacité `ROLE_CAPS.modeSimplifie`, extensible à d'autres profils plus tard). Couche de présentation uniquement — mêmes actions Worker, mêmes règles, aucun nouvel endpoint. Détail complet dans `03_REGLES_METIER_ET_ROLES.md` et `04_HISTORIQUE_DECISIONS.md`.
 
 ### F. Digest de notifications hebdomadaire — ✅ FAIT (août 2026)
 Développé et déployé : nouvel endpoint `?digest=1` (Worker, protégé par `DIGEST_TOKEN_ENV`) calculé et envoyé chaque lundi par un nouveau flux Power Automate planifié, en complément du flux "Notification_Mouvement_Immo" existant (qui reste inchangé — un email par mouvement continue d'être envoyé). Récapitule 5 points d'action : transferts/retours en attente > 7 jours, garanties expirant sous 30 jours, pannes non résolues > 7 jours, stock bas EPI/Outillage (seuils déjà en place), campagnes d'inventaire immos ouvertes à faible couverture (< 50%, ouvertes depuis > 14 jours) — les 3 derniers points ajoutés par l'assistant en complément de la demande initiale de William, à sa validation lors du cadrage. Digest vide = pas d'email (décision prise côté flux Power Automate, via une Condition sur le champ `vide`). Détail complet dans `01_ARCHITECTURE_TECHNIQUE.md` § Digest hebdomadaire et `04_HISTORIQUE_DECISIONS.md`.
@@ -44,7 +44,9 @@ Développé et déployé : nouvel endpoint `?digest=1` (Worker, protégé par `D
 4. ~~**C — Coûts de réparation + seuil de réforme**~~ : **fait (août 2026)**.
 5. ~~**F — Digest hebdomadaire**~~ : **fait (août 2026)**.
 6. ~~**D — Demandes planifiées**~~ : **fait (août 2026)**, Lot 1 et Lot 2 livrés.
-7. **E** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place. Reste la seule évolution de cette liste non encore développée, avec le module temps chantier (point 2).
+7. ~~**E — Interface simplifiée Mayotte**~~ : **fait (août 2026)**, en attente du test d'acceptation par le référent Mayotte lui-même (scénario guidé fourni à William).
+
+Seul le module temps chantier (point 2) reste non développé à ce stade.
 
 ## Note pour toute reprise de ce document
 
