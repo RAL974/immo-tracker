@@ -891,7 +891,7 @@ async function loadEmployes(force){
     var r=await fetch(W+'?employes=1');
     var data=await r.json();
     if(Array.isArray(data)&&data.length){
-      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom,Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,HasPwd:!!e.has_password,itemId:e.itemId||null,
+      employesList=data.map(function(e){return{Code:e.code,Nom:e.nom||e.code||'',Poste:e.poste||'',Droits:e.role||'',Site:e.site||'',Actif:e.actif!==false,HasPwd:!!e.has_password,itemId:e.itemId||null,
         AffectationEPI:e.affectation_epi||'',TaillePantalon:e.taille_pantalon||'',TailleTshirt:e.taille_tshirt||'',TailleVeste:e.taille_veste||'',PointureChaussures:e.pointure_chaussures||'',TailleGants:e.taille_gants||'',
         ServiceOutillage:e.service_outillage||''};});
       // Résolution de noms dédiée, prioritaire sur le champ Nom ci-dessus quand elle a abouti.
