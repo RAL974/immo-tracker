@@ -594,7 +594,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
           <div class="tbl-wrap"><table><thead><tr><th>Statut</th><th>Code IM</th><th>Libellé</th><th>Demandeur</th><th>Chantier</th><th>Du</th><th>Au</th><th>Action</th></tr></thead><tbody id="tb-resa"></tbody></table></div>
         </div>
       </div>
-      <div id="resa-vue-planning" class="hidden"></div>
+      <div id="resa-vue-planning" style="display:none"></div>
     </div>
 
     <!-- Documents -->
@@ -5045,8 +5045,8 @@ var resaVue='liste'; // 'liste' | 'planning'
 function changerVueResa(v){ resaVue=v; renderReservationsPane(); }
 function renderReservationsPane(){
   var vl=document.getElementById('resa-vue-liste'), vp=document.getElementById('resa-vue-planning');
-  if(vl)vl.classList.toggle('hidden', resaVue!=='liste');
-  if(vp)vp.classList.toggle('hidden', resaVue!=='planning');
+  if(vl)vl.style.display=(resaVue==='liste')?'':'none';
+  if(vp)vp.style.display=(resaVue==='planning')?'':'none';
   var bl=document.getElementById('resa-nav-liste'), bp=document.getElementById('resa-nav-planning');
   if(bl){bl.style.background=resaVue==='liste'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)';bl.style.color=resaVue==='liste'?'#fff':'var(--ds-text,#444)';}
   if(bp){bp.style.background=resaVue==='planning'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)';bp.style.color=resaVue==='planning'?'#fff':'var(--ds-text,#444)';}
