@@ -909,13 +909,16 @@ async function handleRequest(request) {
   }
 
   // ── Liste des employés (avec rôle/statut) ─────────────────────────────────────
+  // Ne renvoie plus de nom depuis le 4cb2990+1 (pseudonymisation d'employes.json, voir
+  // 04_HISTORIQUE_DECISIONS.md) : la résolution nom<->code passe désormais exclusivement par
+  // l'endpoint dédié ?noms_employes=1 (protégé par vérification d'origine + limitation de débit),
+  // pas par cet endpoint-ci qui reste public et sans aucune de ces deux protections.
   if (p.get('employes') === '1') {
     const items = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
     const mapped = items.map(i => {
       const f = i.fields || {};
       return {
         code: f.Title || f.Code || f.Code_Employe || '',
-        nom: f.field_1 || f.Nom || f.Nom_Employe || f.Name || '',
         poste: f.Poste || '',
         // Code_CT réutilisé comme champ "Droits"
         role: f.Code_CT || f.Droits || '',
