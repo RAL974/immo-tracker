@@ -36,11 +36,24 @@ tenant-wide (`Sites.ReadWrite.All`), donc un accès automatique au nouveau site.
 
 ### 2. Listes SharePoint à créer sur ce nouveau site
 
-**Mêmes 21 listes que la production, mêmes noms internes, mêmes colonnes.** Pour chaque liste
-ci-dessous dont le détail des colonnes est déjà documenté dans `02_MODELE_DONNEES.md`, reprenez-le
-tel quel. Pour les 3 listes marquées ⚠️ (schéma non intégralement documenté), obtenez le détail
-exact et fiable en interrogeant la **production en lecture seule** (aucun risque, endpoint de
-diagnostic déjà existant) :
+**Méthode recommandée (rapide, quelques minutes) : dupliquer la structure depuis la production,
+sans copier les données.** SharePoint moderne sait créer une liste à partir d'une liste existante,
+même située sur un autre site :
+
+1. Sur le nouveau site de recette : **+ Nouveau → Liste**.
+2. Choisissez **"À partir d'une liste existante"**.
+3. Recherchez/parcourez jusqu'au site de production `Logistique-Immos` et sélectionnez la liste réelle.
+4. Donnez le **même nom exact** à la nouvelle liste (sans préfixe — le code y fait référence par ce nom).
+5. Validez → colonnes identiques, **aucune donnée copiée**.
+
+Répétez pour chacune des 21 listes ci-dessous (dupliquer une 22ᵉ liste présente sur le site source
+mais non listée ici ne pose aucun problème — elle sera simplement inutilisée).
+
+**Méthode de repli** (si cette fonctionnalité n'est pas disponible sur votre tenant) : recréez
+chaque liste colonne par colonne. Pour chaque liste ci-dessous dont le détail est déjà documenté
+dans `02_MODELE_DONNEES.md`, reprenez-le tel quel. Pour les 3 listes marquées ⚠️ (schéma non
+intégralement documenté), obtenez le détail exact en interrogeant la **production en lecture
+seule** (aucun risque, endpoint de diagnostic déjà existant) :
 
 ```
 https://immo-proxy.ral-85d.workers.dev/?debug_columns=<NomDeLaListe>
@@ -77,20 +90,33 @@ un champ texte libre) — voir l'écart documenté dans `04_HISTORIQUE_DECISIONS
 
 1. Dans Cloudflare, créez une nouvelle ressource Worker nommée `immo-proxy-staging`.
 2. Connectez-la au **même dépôt GitHub** (`RAL974/immo-tracker`), branche `main`.
-3. Dans les réglages de build de cette ressource (Settings → Build), définissez la commande de
-   déploiement : `npx wrangler deploy --env staging` (au lieu de la commande par défaut).
+3. ⚠️ **Point à ne pas manquer** : dans les réglages de build de cette ressource (Settings → Build →
+   "Build configuration", icône crayon), remplacez **à la fois** "Deploy command" et "Version
+   command" par : `npx wrangler deploy --env staging` (au lieu de `npx wrangler deploy` par défaut).
+   Sans ça, Cloudflare déploie quand même un Worker nommé "immo-proxy-staging", mais avec la
+   configuration de **premier niveau** de `wrangler.toml` — donc sans `SITE_ID_ENV`, avec repli
+   silencieux sur le site de **production**. Le journal de build signale cette erreur explicitement
+   ("Failed to match Worker name... Overriding using the CI provided Worker name") si vous l'avez
+   ratée : dans ce cas, corrigez la commande puis redéclenchez un déploiement (un simple commit,
+   même vide, sur `main` suffit à relancer le build).
 4. Dans `wrangler.toml` (déjà commité), remplacez `REMPLACER_PAR_L_ID_DU_SITE_SHAREPOINT_TEST` dans
-   le bloc `[env.staging]` par l'identifiant obtenu à l'étape 1.
+   le bloc `[env.staging]` par l'identifiant obtenu à l'étape 1 (format
+   `hostname,guid-collection,guid-web` — s'obtient via Graph Explorer,
+   `https://graph.microsoft.com/v1.0/sites/espacesoleil97.sharepoint.com:/sites/<nom-du-site>`,
+   champ `id` de la réponse).
 5. Dans Settings → Variables and Secrets **de cette ressource `immo-proxy-staging`** (pas celle de
    `immo-proxy`), ajoutez :
-   - `CLIENT_SECRET_ENV` : peut être la **même valeur** que la production (même app Azure AD).
+   - `CLIENT_SECRET_ENV` : la même valeur que la production si vous l'avez encore sous la main,
+     sinon un **nouveau** secret créé sur la même application Azure AD "Immo Tracker" (Azure Portal
+     → App registrations → Immo Tracker → Certificates & secrets → New client secret — copier la
+     valeur immédiatement, elle ne sera plus jamais affichée).
    - `SESSION_SECRET_ENV` : une **valeur différente** de la production (texte aléatoire, 32+
      caractères) — pour qu'un jeton de session émis par la recette ne soit jamais valide côté prod.
-6. Poussez un commit (n'importe lequel touchant le dépôt) pour déclencher le premier déploiement, ou
-   déclenchez un déploiement manuel depuis Cloudflare.
-7. Vérifiez : `https://immo-proxy-staging.<votre-sous-domaine>.workers.dev/?debug_immos=1` doit
-   répondre (liste vide au départ, c'est normal). L'en-tête de réponse `X-Immo-Env: staging` confirme
-   que vous parlez bien au bon Worker (visible dans l'onglet Réseau des devtools du navigateur).
+6. **Vérification obligatoire avant d'aller plus loin** : ouvrez
+   `https://immo-proxy-staging.<votre-sous-domaine>.workers.dev/?debug_immos=1` dans un navigateur.
+   La production contient 1023 immos ; la recette doit répondre une liste **vide** (`"value":[]`).
+   Si de vraies immos apparaissent, **ne continuez pas** — le point 3 ci-dessus n'a probablement pas
+   été appliqué correctement.
 
 ### 4. Bootstrap du premier compte (obligatoire, dans cet ordre)
 
