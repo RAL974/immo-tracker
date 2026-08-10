@@ -59,6 +59,35 @@ async function requireGarantWith(reqBody, secret, gestionnaires) {
   return { ok: true, session: session };
 }
 
+// ── Photos de mouvement (retour/transfert/panne/résolution) ─────────────────────────────────────
+// Fonctions pures, testables indépendamment (voir tests/worker.photos.test.js). `upload_photo`
+// reste volontairement partagé avec la PWA terrain sans jeton de session (même modèle de confiance
+// que reserver/transfert, voir PWA_SHARED_ACTIONS dans security.gated-actions.test.js) : ces
+// vérifications (taille, signature JPEG réelle, nom de fichier) sont la seule protection contre
+// l'abus de cette action non authentifiée — pas de quota/rate-limit dédié (infra disproportionnée
+// pour un risque déjà accepté sur les autres actions partagées PWA).
+const MAX_PHOTO_BYTES = 1500000; // 1,5 Mo décodés — marge au-dessus de la cible de compression client (500 Ko)
+const PHOTO_MAX_COUNT = 3;
+const PHOTO_FILENAME_RE = /^[A-Za-z0-9_.-]{1,120}\.(jpg|jpeg|png|webp)$/i;
+function isValidPhotoFilename(name) { return typeof name === 'string' && PHOTO_FILENAME_RE.test(name); }
+// Le Content-Type déclaré par le client n'est jamais fiable en soi (voir upload_photo) : on vérifie
+// la signature réelle des octets (FF D8 FF, en-tête JPEG) avant d'écrire quoi que ce soit sur le drive.
+function isValidJpegBytes(bytes) { return !!bytes && bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF; }
+function sanitizePhotoList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(f => (f || '').toString().trim()).filter(isValidPhotoFilename).slice(0, PHOTO_MAX_COUNT);
+}
+function joinPhotos(list) { return sanitizePhotoList(list).join(';'); }
+function parsePhotosField(text) { return (text || '').split(';').map(s => s.trim()).filter(Boolean); }
+// Marqueur transitoire porté par Transferts_En_Attente.Note le temps qu'un retour/transfert soit
+// validé — cette liste n'a pas sa propre colonne Photos (contrairement à Mouvements, seule liste
+// permanente) : le marqueur est retiré du texte à la validation (stripPhotosMarker), jamais affiché
+// tel quel à l'utilisateur, même pattern que ##PRESTA:##/##COUT:## déjà utilisés ailleurs.
+const PHOTOS_MARKER_RE = /##PHOTOS:([^#]*)##/;
+function buildPhotosMarker(list) { const j = joinPhotos(list); return j ? '##PHOTOS:' + j + '##' : ''; }
+function extractPhotosMarker(note) { const m = PHOTOS_MARKER_RE.exec(note || ''); return m ? parsePhotosField(m[1]) : []; }
+function stripPhotosMarker(note) { return (note || '').replace(PHOTOS_MARKER_RE, '').replace(/\s{2,}/g, ' ').trim(); }
+
 // ── Limitation de débit sur les tentatives de mot de passe (verify_password, et l'ancien mot de
 // passe côté set_password — même secret deviné dans les deux cas) ──────────────────────────────
 // Verrou progressif par code employé : compteur en mémoire du Worker (Map au niveau module, donc
@@ -319,7 +348,9 @@ if (typeof module !== 'undefined' && module.exports) {
     PASSWORD_MIN_LENGTH,
     ALLOWED_ORIGINS, corsOriginFor, securityHeadersFor,
     NOM_LOOKUP_ATTEMPTS, NOM_LOOKUP_WINDOW_MS, NOM_LOOKUP_MAX_PER_WINDOW, clientIpFrom, nomLookupRateLimited, origineReconnue,
-    GATED_ACTIONS_AUDIT, AUDIT_AUTH_ERRORS, AUDIT_DETAIL_EXCLUDED_KEYS, auditDetailFrom, auditCibleFrom, reportAuditFailureToSentry };
+    GATED_ACTIONS_AUDIT, AUDIT_AUTH_ERRORS, AUDIT_DETAIL_EXCLUDED_KEYS, auditDetailFrom, auditCibleFrom, reportAuditFailureToSentry,
+    MAX_PHOTO_BYTES, PHOTO_MAX_COUNT, isValidPhotoFilename, isValidJpegBytes, sanitizePhotoList, joinPhotos, parsePhotosField,
+    buildPhotosMarker, extractPhotosMarker, stripPhotosMarker };
 }
 
 async function handleRequest(request) {
@@ -1058,13 +1089,15 @@ async function handleRequest(request) {
     // Résolveur de noms (résout les doublons type "CONI" vs "COUTAREL Nicolas")
     const vraiNom = await getNomResolver();
 
-    const allMovRaw = (movData.value || []).map(i => { const code = i.fields.Code_Employe || ''; return { code_im: i.fields.Title || '', code_employe: code, nom_employe: vraiNom(code, i.fields.Commentaire || ''), type_mouvement: i.fields.Type_Mouvement || '', code_chantier: i.fields.Code_Chantier || '', etat: i.fields.Etat || '', note: i.fields.Note || '', cout_reparation: (i.fields.Cout_Reparation!=null && i.fields.Cout_Reparation!=='')?i.fields.Cout_Reparation:null, horodatage: i.fields.Horodatage || i.fields.Created || '' }; });
+    const allMovRaw = (movData.value || []).map(i => { const code = i.fields.Code_Employe || ''; return { code_im: i.fields.Title || '', code_employe: code, nom_employe: vraiNom(code, i.fields.Commentaire || ''), type_mouvement: i.fields.Type_Mouvement || '', code_chantier: i.fields.Code_Chantier || '', etat: i.fields.Etat || '', note: i.fields.Note || '', cout_reparation: (i.fields.Cout_Reparation!=null && i.fields.Cout_Reparation!=='')?i.fields.Cout_Reparation:null, photos: parsePhotosField(i.fields.Photos), horodatage: i.fields.Horodatage || i.fields.Created || '' }; });
     const allMov = allMovRaw.sort((a, b) => new Date(b.horodatage) - new Date(a.horodatage));
 
     // Filtrer les transferts en attente côté JS (évite les problèmes OData)
     const pending = (pendData.value || [])
       .filter(i => { const s = (i.fields || {}).Statut || ''; return s !== 'Validé' && s !== 'Valide' && s !== 'Refused'; })
-      .map(i => ({ id: i.id, code_im: i.fields.Title || '', donneur_code: i.fields.Code_Employe_Donneur || '', donneur_nom: i.fields.Nom_Donneur || '', receveur_code: i.fields.Code_Employe_Receveur || '', receveur_nom: i.fields.Nom_Receveur || '', etat: i.fields.Etat || '', note: i.fields.Note || '', statut: i.fields.Statut || 'En attente', horodatage: i.fields.Created || '' }));
+      // note : marqueur ##PHOTOS:...## (voir action `transfert`) retiré de l'affichage, jamais montré tel
+      // quel — les noms de fichiers sont exposés séparément dans `photos` pour un futur usage éventuel.
+      .map(i => ({ id: i.id, code_im: i.fields.Title || '', donneur_code: i.fields.Code_Employe_Donneur || '', donneur_nom: i.fields.Nom_Donneur || '', receveur_code: i.fields.Code_Employe_Receveur || '', receveur_nom: i.fields.Nom_Receveur || '', etat: i.fields.Etat || '', note: stripPhotosMarker(i.fields.Note || ''), photos: extractPhotosMarker(i.fields.Note), statut: i.fields.Statut || 'En attente', horodatage: i.fields.Created || '' }));
 
     // ── Inventaire courant : dernier mouvement de POSSESSION par immo ──────────
     // Important : une déclaration de panne (Panne / Suivi_Panne) ou un enregistrement
@@ -1144,7 +1177,7 @@ async function handleRequest(request) {
     if (transferts) {
       const r = await fetch(GL + "/Transferts_En_Attente/items?$expand=fields&$filter=fields/Code_Employe_Receveur eq '" + transferts + "'&$top=50", { headers: H });
       const d = await r.json();
-      return json((d.value || []).filter(i => { const s = (i.fields || {}).Statut || ''; return s !== 'Validé' && s !== 'Valide'; }).map(i => ({ id: i.id, code_im: i.fields.Title || '', code_employe_donneur: i.fields.Code_Employe_Donneur || '', nom_donneur: i.fields.Nom_Donneur || '', etat: i.fields.Etat || '', note: i.fields.Note || '', horodatage: i.fields.Created || '' })));
+      return json((d.value || []).filter(i => { const s = (i.fields || {}).Statut || ''; return s !== 'Validé' && s !== 'Valide'; }).map(i => ({ id: i.id, code_im: i.fields.Title || '', code_employe_donneur: i.fields.Code_Employe_Donneur || '', nom_donneur: i.fields.Nom_Donneur || '', etat: i.fields.Etat || '', note: stripPhotosMarker(i.fields.Note || ''), horodatage: i.fields.Created || '' })));
     }
 
     if (immo) {
@@ -1274,10 +1307,20 @@ async function handleRequest(request) {
 
     if (action === 'upload_photo') {
       try {
+        const codeImP = (body.code_im || '').trim();
+        const filename = (body.filename || (Date.now() + '.jpg')).toString().trim();
+        if (!codeImP || !isValidPhotoFilename(filename)) return json({ success: false, error: 'nom_fichier_invalide' });
         const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos/' + encodeURIComponent(body.code_im) + '/' + encodeURIComponent(body.filename || (Date.now() + '.jpg')) + ':/content', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'image/jpeg' }, body: bytes.buffer });
-        return json({ success: r.ok, url: r.ok ? 'https://immo-proxy.ral-85d.workers.dev/?photo=' + encodeURIComponent(body.code_im + '/' + body.filename) : null });
+        if (!b64) return json({ success: false, error: 'donnees_invalides' });
+        let bytes;
+        try { bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); } catch (e) { return json({ success: false, error: 'donnees_invalides' }); }
+        // Garde-fous contre l'abus de cette action non authentifiée (voir commentaire plus haut,
+        // section "Photos de mouvement") : taille max stricte + signature JPEG réelle vérifiée,
+        // le Content-Type déclaré par le client n'étant jamais fiable en soi.
+        if (bytes.length > MAX_PHOTO_BYTES) return json({ success: false, error: 'fichier_trop_volumineux', max_bytes: MAX_PHOTO_BYTES });
+        if (!isValidJpegBytes(bytes)) return json({ success: false, error: 'type_fichier_invalide' });
+        const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Photos_Immos/' + encodeURIComponent(codeImP) + '/' + encodeURIComponent(filename) + ':/content', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'image/jpeg' }, body: bytes.buffer });
+        return json({ success: r.ok, url: r.ok ? 'https://immo-proxy.ral-85d.workers.dev/?photo=' + encodeURIComponent(codeImP + '/' + filename) : null });
       } catch (e) { return json({ success: false, error: e.message }); }
     }
 
@@ -1653,7 +1696,11 @@ async function handleRequest(request) {
       if (body.code_employe_receveur !== 'DEPOT' && !(await estEmployeActifServeur(body.code_employe_receveur))) {
         return json({ success: false, error: 'employe_inactif', message: 'Cet employé est inactif — transfert impossible.' });
       }
-      const r = await fetch(GL + '/Transferts_En_Attente/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe_Donneur: body.code_employe_donneur, Nom_Donneur: body.nom_donneur, Code_Employe_Receveur: body.code_employe_receveur, Nom_Receveur: body.nom_receveur, Statut: 'En attente', Etat: body.etat || '', Note: body.note || '' } }) });
+      // Transferts_En_Attente n'a pas sa propre colonne Photos (seule Mouvements en a une) : le nom
+      // des photos prises par le donneur à la déclaration voyage dans Note via un marqueur transitoire
+      // (##PHOTOS:...##), retiré et reporté vers la colonne structurée à la validation (action `valider`).
+      const noteAvecPhotos = (body.note || '') + (buildPhotosMarker(body.photos) ? (body.note ? ' ' : '') + buildPhotosMarker(body.photos) : '');
+      const r = await fetch(GL + '/Transferts_En_Attente/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe_Donneur: body.code_employe_donneur, Nom_Donneur: body.nom_donneur, Code_Employe_Receveur: body.code_employe_receveur, Nom_Receveur: body.nom_receveur, Statut: 'En attente', Etat: body.etat || '', Note: noteAvecPhotos } }) });
       return json({ success: r.ok, status: r.status });
     }
 
@@ -1701,7 +1748,7 @@ async function handleRequest(request) {
       const itemId = rid.value && rid.value[0] ? rid.value[0].id : null;
       if (itemId) await fetch(GL + '/Immos/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Etat: 'En panne' }) });
       // Créer un mouvement de type Panne
-      const rp = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: body.code_employe || '', Type_Mouvement: 'Panne', Commentaire: body.nom_employe || '', Etat: 'En panne', Note: body.motif || '', Horodatage: new Date().toISOString() } }) });
+      const rp = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: body.code_im, Code_Employe: body.code_employe || '', Type_Mouvement: 'Panne', Commentaire: body.nom_employe || '', Etat: 'En panne', Note: body.motif || '', Horodatage: new Date().toISOString(), Photos: joinPhotos(body.photos) } }) });
       return json({ success: rp.ok });
     }
 
@@ -1724,7 +1771,7 @@ async function handleRequest(request) {
       const mvFields = {
         Title: body.code_im, Code_Employe: body.par_code || '', Type_Mouvement: 'Réparation',
         Commentaire: body.par_nom || body.par_code || '', Etat: body.etat_resolution || 'Bon état',
-        Note: noteRep, Horodatage: new Date().toISOString()
+        Note: noteRep, Horodatage: new Date().toISOString(), Photos: joinPhotos(body.photos)
       };
       if (coutNum > 0) mvFields.Cout_Reparation = coutNum;
       await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: mvFields }) });
@@ -2734,6 +2781,11 @@ async function handleRequest(request) {
       await fetch(GL + '/Transferts_En_Attente/items/' + body.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Statut: 'Validé' }) });
       // Si le receveur est le DÉPÔT → c'est un retour dépôt validé (mouvement Retour), sinon un transfert classique
       const versDepot = (f.Code_Employe_Receveur || '') === 'DEPOT';
+      // Photos du déclarant (donneur), portées par le marqueur transitoire de Transferts_En_Attente.Note
+      // (voir action `transfert`) + photos éventuelles prises par le validateur/receveur lui-même au
+      // moment de cette validation — combinées dans la colonne structurée Photos du mouvement final.
+      const photosDonneur = extractPhotosMarker(f.Note);
+      const photosFinal = joinPhotos([...photosDonneur, ...sanitizePhotoList(body.photos)]);
       let mouvFields;
       if (versDepot) {
         // Retour dépôt validé : l'AUTEUR du mouvement est le déclarant terrain (celui qui a ramené la machine),
@@ -2742,9 +2794,9 @@ async function handleRequest(request) {
         const declNom  = f.Nom_Donneur || '';
         const valCode  = body.code_employe || '';
         const valNom   = body.nom_employe || 'gestionnaire';
-        mouvFields = { Title: f.Title || body.code_im || '', Code_Employe: declCode, Type_Mouvement: 'Retour', Code_Chantier: 'DEPOT|' + valCode + '|' + valNom, Commentaire: declNom, Etat: body.etat_reception || f.Etat || '', Note: (f.Note || '') + (body.note_reception && body.note_reception !== 'Validé depuis le tableau de bord' ? ' — ' + body.note_reception : '') + ' [validé par ' + valNom + ']', Horodatage: new Date().toISOString() };
+        mouvFields = { Title: f.Title || body.code_im || '', Code_Employe: declCode, Type_Mouvement: 'Retour', Code_Chantier: 'DEPOT|' + valCode + '|' + valNom, Commentaire: declNom, Etat: body.etat_reception || f.Etat || '', Note: stripPhotosMarker(f.Note || '') + (body.note_reception && body.note_reception !== 'Validé depuis le tableau de bord' ? ' — ' + body.note_reception : '') + ' [validé par ' + valNom + ']', Horodatage: new Date().toISOString(), Photos: photosFinal };
       } else {
-        mouvFields = { Title: f.Title || body.code_im || '', Code_Employe: f.Code_Employe_Receveur || body.code_employe || '', Type_Mouvement: 'Transfert', Code_Chantier: (f.Code_Employe_Donneur || '') + '|' + (f.Nom_Donneur || ''), Commentaire: f.Nom_Receveur || body.nom_employe || '', Etat: body.etat_reception || f.Etat || '', Note: body.note_reception || '', Horodatage: new Date().toISOString() };
+        mouvFields = { Title: f.Title || body.code_im || '', Code_Employe: f.Code_Employe_Receveur || body.code_employe || '', Type_Mouvement: 'Transfert', Code_Chantier: (f.Code_Employe_Donneur || '') + '|' + (f.Nom_Donneur || ''), Commentaire: f.Nom_Receveur || body.nom_employe || '', Etat: body.etat_reception || f.Etat || '', Note: body.note_reception || '', Horodatage: new Date().toISOString(), Photos: photosFinal };
       }
       const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: mouvFields }) });
       return json({ success: r.ok, vers_depot: versDepot });

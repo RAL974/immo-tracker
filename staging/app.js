@@ -222,8 +222,10 @@ const S = {
   codeReceveur:        null,
   nomReceveur:         null,
   transfertEnCours:    null,
-  photoEtatBase64:     null,
-  photoReceptionBase64:null,
+  photosEtat:          [],
+  photosReception:     [],
+  photosPanne:         [],
+  photosResolution:    [],
   resaImmoCode:        null,
   resaImmoLibelle:     null,
   resaEnCoursId:       null,
@@ -748,7 +750,7 @@ function startMouvement(type) {
   if (!S.employe) { showScreen('screen-activation'); return; }
   S.typeMouvement = type;
   S.codeIM = null; S.codeReceveur = null; S.nomReceveur = null;
-  S.photoEtatBase64 = null;
+  S.photosEtat = [];
   document.getElementById('titre-mouvement').textContent = type === 'Retour' ? '📥 Retour au dépôt' : '🔄 Transférer';
   document.getElementById('immo-result')?.classList.add('hidden');
   showScreen('screen-scan-immo');
@@ -770,7 +772,7 @@ async function onScanImmo(code) {
     document.getElementById('select-etat').value = 'Bon état';
     document.getElementById('note-texte').value = '';
     document.getElementById('photo-etat-preview').innerHTML = '';
-    S.photoEtatBase64 = null;
+    S.photosEtat = [];
     showScreen('screen-etat');
     return;
   }
@@ -791,7 +793,7 @@ async function onScanImmo(code) {
       document.getElementById('accepter-etat').value = pending.etat || 'Bon état';
       document.getElementById('accepter-note').value = '';
       document.getElementById('photo-reception-preview').innerHTML = '';
-      S.photoReceptionBase64 = null;
+      S.photosReception = [];
       showScreen('screen-accepter');
       return;
     }
@@ -820,7 +822,7 @@ function scannerCarteReceveur() {
     document.getElementById('select-etat').value = 'Bon état';
     document.getElementById('note-texte').value = '';
     document.getElementById('photo-etat-preview').innerHTML = '';
-    S.photoEtatBase64 = null;
+    S.photosEtat = [];
     showScreen('screen-etat');
   });
 }
@@ -835,15 +837,20 @@ function validerReceveur() {
   document.getElementById('select-etat').value = 'Bon état';
   document.getElementById('note-texte').value = '';
   document.getElementById('photo-etat-preview').innerHTML = '';
-  S.photoEtatBase64 = null;
+  S.photosEtat = [];
   showScreen('screen-etat');
 }
 
-// ── Photos inline ─────────────────────────────────────────
-function previewPhoto(input, previewId, stateKey) {
-  if (!input.files?.[0]) return;
-  const reader = new FileReader();
-  reader.onload = e => {
+// ── Photos inline (jusqu'à PHOTO_MAX_COUNT par mouvement) ──
+// previewPhoto() gérait une seule photo (remplacée à chaque sélection) ; les mouvements pouvant
+// désormais recevoir plusieurs preuves visuelles (retour/transfert/réception/panne/résolution)
+// utilisent S[stateKey] comme un TABLEAU de data-URL, avec vignettes + bouton de suppression.
+const PHOTO_MAX_COUNT = 3;
+const PHOTO_TARGET_BYTES = 500 * 1024; // cible de compression : sous 500 Ko (photo smartphone brute : 3-5 Mo)
+const PHOTO_QUALITY_STEPS = [0.75, 0.6, 0.5, 0.4]; // paliers de qualité JPEG essayés jusqu'à passer sous la cible
+
+function compressPhotoDataUrl(dataUrl) {
+  return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -851,23 +858,65 @@ function previewPhoto(input, previewId, stateKey) {
       canvas.width  = Math.round(img.width  * ratio);
       canvas.height = Math.round(img.height * ratio);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      const b64 = canvas.toDataURL('image/jpeg', 0.75);
-      S[stateKey] = b64;
-      const prev = document.getElementById(previewId);
-      if (prev) prev.innerHTML = `<img src="${b64}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;margin-top:6px">`;
+      let out = canvas.toDataURL('image/jpeg', PHOTO_QUALITY_STEPS[0]);
+      for (const q of PHOTO_QUALITY_STEPS) {
+        out = canvas.toDataURL('image/jpeg', q);
+        if (out.length * 0.75 <= PHOTO_TARGET_BYTES) break; // taille approx des octets décodés = 3/4 de la longueur base64
+      }
+      resolve(out);
     };
-    img.src = e.target.result;
+    img.src = dataUrl;
+  });
+}
+
+function renderPhotoThumbs(stateKey, previewId) {
+  const prev = document.getElementById(previewId);
+  if (!prev) return;
+  const list = S[stateKey] || [];
+  prev.innerHTML = list.map((b64, i) => `
+    <span style="position:relative;display:inline-block;margin:4px 6px 0 0">
+      <img src="${b64}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;display:block">
+      <button type="button" onclick="removePhotoMulti('${stateKey}','${previewId}',${i})"
+        style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;background:var(--red);color:#fff;border:none;font-size:14px;line-height:1;cursor:pointer">×</button>
+    </span>`).join('');
+}
+
+function removePhotoMulti(stateKey, previewId, idx) {
+  (S[stateKey] || []).splice(idx, 1);
+  renderPhotoThumbs(stateKey, previewId);
+}
+
+async function addPhotoMulti(input, stateKey, previewId) {
+  if (!input.files?.[0]) return;
+  if (!S[stateKey]) S[stateKey] = [];
+  if (S[stateKey].length >= PHOTO_MAX_COUNT) { toast('Maximum ' + PHOTO_MAX_COUNT + ' photos', 'error'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const b64 = await compressPhotoDataUrl(e.target.result);
+    S[stateKey].push(b64);
+    renderPhotoThumbs(stateKey, previewId);
+    input.value = ''; // permet de reprendre immédiatement une nouvelle photo (même input, même fichier ou non)
   };
   reader.readAsDataURL(input.files[0]);
 }
 
-async function uploadPhotoSiPresente(codeIM, b64) {
-  if (!b64) return;
+function genererNomPhoto(idx) {
   const now = new Date();
-  const fn  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.jpg`;
-  try {
-    await fetch(CONFIG.proxy + '?action=upload_photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code_im: codeIM, data: b64, filename: fn }) });
-  } catch (e) {}
+  return `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}_${idx}.jpg`;
+}
+
+// Génère les noms de fichiers et lance les uploads en tâche de fond, SANS jamais les attendre — un
+// mouvement ne doit jamais être bloqué ni retardé par l'envoi des photos (mode dégradé : si hors
+// ligne, l'upload échoue silencieusement mais le mouvement reste possible). Retourne immédiatement
+// la liste des noms à transmettre à l'action qui crée/valide le mouvement.
+function preparerPhotosMouvement(codeIM, stateKey) {
+  const list = S[stateKey] || [];
+  if (!list.length) return [];
+  const noms = list.map((_, i) => genererNomPhoto(i));
+  list.forEach((b64, i) => {
+    fetch(CONFIG.proxy + '?action=upload_photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code_im: codeIM, data: b64, filename: noms[i] }) }).catch(() => {});
+  });
+  return noms;
 }
 
 // ── Confirmer état ────────────────────────────────────────
@@ -875,19 +924,28 @@ async function confirmerAvecEtat() {
   const etat = document.getElementById('select-etat').value;
   const note = document.getElementById('note-texte').value.trim();
 
+  // Nudge non bloquant : un retour dégradé sans photo reste possible (jamais d'obligation), mais on
+  // encourage la preuve visuelle avant de continuer — c'est le cas d'usage principal du dispositif.
+  if (S.typeMouvement === 'Retour' && (etat === 'Abîmé' || etat === 'Hors service') && !(S.photosEtat || []).length) {
+    if (!confirm('Aucune photo ajoutée pour un état dégradé (' + etat + ').\n\nUne photo aide à prouver l\'état constaté en cas de litige.\n\nContinuer sans photo ?')) return;
+  }
+
+  // Génère les noms de fichiers et lance l'upload en tâche de fond dès maintenant (jamais attendu) —
+  // le mouvement lui-même part immédiatement après, indépendamment du succès de l'upload.
+  const noms = preparerPhotosMouvement(S.codeIM, 'photosEtat');
+
   if (S.typeMouvement === 'Retour') {
     // Un garant (Admin, Gestionnaire Dépôt RUN, Logistique Mayotte) valide directement.
     // Un rôle terrain crée un retour EN ATTENTE de validation par un garant.
     if (estGarant(S.employe.code)) {
       const noteTrace = (note ? note + ' — ' : '') + '[retour validé par ' + S.employe.nom + ']';
-      const mouv = { code_im: S.codeIM, code_employe: S.employe.code, nom_employe: S.employe.nom, type_mouvement: 'Retour', code_chantier: 'DEPOT', etat, note: noteTrace, horodatage: new Date().toISOString() };
+      const mouv = { code_im: S.codeIM, code_employe: S.employe.code, nom_employe: S.employe.nom, type_mouvement: 'Retour', code_chantier: 'DEPOT', etat, note: noteTrace, horodatage: new Date().toISOString(), photos: noms };
       showRecap('📥 Retour enregistré', mouv, null);
       enregistrerMouvement(mouv);
-      uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
     } else {
       // Retour en attente : stocké comme un "transfert vers le dépôt" à valider
       const noteTrace = (note ? note + ' — ' : '') + '[retour déclaré par ' + S.employe.nom + ']';
-      const payload = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: 'DEPOT', nom_receveur: 'Dépôt', etat, note: noteTrace };
+      const payload = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: 'DEPOT', nom_receveur: 'Dépôt', etat, note: noteTrace, photos: noms };
       showRecap('📥 Retour déclaré', { code_im: S.codeIM, nom_employe: 'Dépôt', type_mouvement: 'Retour', etat, note }, 'En attente de validation par un gestionnaire de dépôt.');
       try {
         const r = await fetch(CONFIG.proxy + '?action=transfert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -895,14 +953,13 @@ async function confirmerAvecEtat() {
         if (!d.success) toast('Erreur lors de la déclaration du retour', 'error');
         else toast('✅ Retour déclaré — en attente de validation dépôt', 'success', 3500);
       } catch (e) { toast('Erreur réseau', 'error'); }
-      uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
     }
     return;
   }
 
   // Transfert
   const transfertNote = (note ? note + ' — ' : '') + '[transfert initié par ' + S.employe.nom + ']';
-  const transfert = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: S.codeReceveur, nom_receveur: S.nomReceveur, etat, note: transfertNote };
+  const transfert = { code_im: S.codeIM, code_employe_donneur: S.employe.code, nom_donneur: S.employe.nom, code_employe_receveur: S.codeReceveur, nom_receveur: S.nomReceveur, etat, note: transfertNote, photos: noms };
   showRecap('🔄 Transfert envoyé', { code_im: S.codeIM, nom_employe: S.nomReceveur, type_mouvement: 'Transfert', etat, note }, 'En attente de validation par ' + S.nomReceveur);
   try {
     const r = await fetch(CONFIG.proxy + '?action=transfert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transfert) });
@@ -910,7 +967,6 @@ async function confirmerAvecEtat() {
     if (!d.success) toast('Erreur lors de la création du transfert', 'error');
     else toast('✅ Transfert créé — en attente de ' + S.nomReceveur, 'success', 3500);
   } catch (e) { toast('Erreur réseau', 'error'); }
-  uploadPhotoSiPresente(S.codeIM, S.photoEtatBase64);
 }
 
 function showRecap(titre, mouv, mention) {
@@ -940,8 +996,9 @@ async function accepterTransfert(btn) {
   const note = document.getElementById('accepter-note').value.trim();
   const dRank = CONFIG.etats[t?.etat] || 4;
   const rRank = CONFIG.etats[etat] || 4;
+  const noms = preparerPhotosMouvement(t.code_im, 'photosReception');
   try {
-    const r = await fetch(CONFIG.proxy + '?action=valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, code_im: t.code_im, code_employe: S.employe.code, nom_employe: S.employe.nom, etat_reception: etat, note_reception: note, etat_donneur: t.etat || '' }) });
+    const r = await fetch(CONFIG.proxy + '?action=valider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, code_im: t.code_im, code_employe: S.employe.code, nom_employe: S.employe.nom, etat_reception: etat, note_reception: note, etat_donneur: t.etat || '', photos: noms }) });
     const d = await r.json();
     if (d.success !== false) {
       const alertDiv = document.getElementById('alerte-degradation');
@@ -949,7 +1006,6 @@ async function accepterTransfert(btn) {
       if (rRank < dRank) { alertDiv.textContent = `⚠️ Dégradation constatée : déclaré "${t.etat}" → reçu "${etat}"`; alertDiv.classList.remove('hidden'); }
       else alertDiv?.classList.add('hidden');
       vib(300); showScreen('screen-confirmation');
-      uploadPhotoSiPresente(t.code_im, S.photoReceptionBase64);
       rafraichirBadges();
     } else { toast('Erreur lors de la validation', 'error'); }
   } catch (e) { toast('Erreur réseau', 'error'); }
@@ -1000,7 +1056,7 @@ function demarrerValidation(tid, codeIM) {
       document.getElementById('accepter-etat').value = t.etat || 'Bon état';
       document.getElementById('accepter-note').value = '';
       document.getElementById('photo-reception-preview').innerHTML = '';
-      S.photoReceptionBase64 = null;
+      S.photosReception = [];
       showScreen('screen-accepter');
     }).catch(() => { S.transfertEnCours = { id: tid, code_im: code, nom_donneur: '—', etat: '', note: '' }; showScreen('screen-accepter'); });
   });
@@ -2120,6 +2176,8 @@ function ouvrirEcranPanne(codeIM) {
   if (el) el.textContent = PANNE_STATE.libelle + ' (' + codeIM + ')';
   const ta = document.getElementById('panne-motif');
   if (ta) ta.value = '';
+  document.getElementById('photo-panne-preview').innerHTML = '';
+  S.photosPanne = [];
   showScreen('screen-signaler-panne', true);
 }
 
@@ -2132,6 +2190,7 @@ async function soumettrePanne(btn) {
     toast('Décrivez la panne (5 caractères minimum)', 'error'); return;
   }
   if (!setBusy(btn, 'Envoi...')) return;
+  const nomsPanne = preparerPhotosMouvement(PANNE_STATE.codeIM, 'photosPanne');
   try {
     const r = await fetch(CONFIG.proxy + '?action=declarer_panne', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2140,6 +2199,7 @@ async function soumettrePanne(btn) {
         code_employe: S.employe.code,
         nom_employe: S.employe.nom,
         motif: motif.trim() + ' [signalé par ' + S.employe.nom + ']',
+        photos: nomsPanne,
       }),
     });
     const d = await r.json();
@@ -2170,6 +2230,8 @@ function ouvrirEcranResolution(codeIM) {
     const el2 = document.getElementById(id);
     if (el2) el2.value = id === 'resolution-etat' ? 'Bon état' : '';
   });
+  document.getElementById('photo-resolution-preview').innerHTML = '';
+  S.photosResolution = [];
   showScreen('screen-resoudre-panne', true);
 }
 
@@ -2185,6 +2247,7 @@ async function soumettreResolution(btn) {
     toast('La note de résolution est obligatoire (10 car. min.)', 'error'); return;
   }
   if (!setBusy(btn, 'Envoi...')) return;
+  const nomsResolution = preparerPhotosMouvement(PANNE_STATE.codeIM, 'photosResolution');
   try {
     const r = await fetch(CONFIG.proxy + '?action=resoudre_panne', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2192,6 +2255,7 @@ async function soumettreResolution(btn) {
         code_im: PANNE_STATE.codeIM, etat_resolution: etat,
         prestataire: prest, cout_reel: cout, note,
         par_code: S.employe.code, par_nom: S.employe.nom,
+        photos: nomsResolution,
       }),
     });
     const d = await r.json();

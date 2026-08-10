@@ -50,9 +50,12 @@ Content-type de la liste : `Item`.
 | `Etat` | État constaté à ce mouvement |
 | `Note` | Commentaire libre + traçabilité automatique (ex. `[retour validé par COUTAREL Nicolas]`) |
 | `Cout_Reparation` | Nombre (ajoutée août 2026) — coût structuré d'une réparation/entretien. Source de vérité pour les calculs de ratio (voir `03_REGLES_METIER_ET_ROLES.md`) ; le dashboard se replie sur l'ancien format texte (`##COUT:X##` dans `Note`) pour les mouvements créés avant l'ajout de cette colonne. |
+| `Photos` | Texte (ajoutée août 2026) — noms de fichiers photo liés à ce mouvement, séparés par `;` (jusqu'à 3), ex. `20260810_143000_0.jpg;20260810_143000_1.jpg`. Toujours écrite (vide si aucune photo) par les actions `declarer_panne`/`resoudre_panne` (directement) et `transfert`→`valider` (voir plus bas, mécanisme en deux temps). Les fichiers eux-mêmes vivent dans `Photos_Immos/{code_im}/` sur le drive (même emplacement que les photos "documentaires" ajoutées hors mouvement depuis le dashboard/l'écran PWA dédié) — cette colonne ne fait que pointer vers un sous-ensemble de ces fichiers, celui pris au moment de ce mouvement précis. Voir `03_REGLES_METIER_ET_ROLES.md` § Photos de mouvement. |
 | `Horodatage` | Date et heure ISO |
 
 ⚠️ **`Entretien` vs `Réparation`** : un mouvement `Réparation` (créé lors de la résolution d'une panne) signifie que l'immo **revient au dépôt** — il est traité comme un changement de possession dans le calcul de localisation. Un mouvement `Entretien` (créé via le bouton "🔧 Enregistrer réparation", indépendant d'une panne déclarée — entretien préventif, réparation ponctuelle) **n'affecte pas** la localisation courante de l'immo, au même titre que `Panne`/`Suivi_Panne`. Les deux types comptent dans le cumul de coûts utilisé pour le seuil de réforme.
+
+⚠️ **Marqueur transitoire sur `Transferts_En_Attente.Note`** : cette liste (retours/transferts en attente de validation, voir plus bas) n'a pas sa propre colonne `Photos` — pas nécessaire, le mécanisme est déjà bien couvert par le texte libre existant (même logique que les marqueurs `##COUT:X##`/`##PRESTA:X##` déjà utilisés ailleurs, voir `04_HISTORIQUE_DECISIONS.md`). Le nom des photos prises par le déclarant à ce stade est porté par un marqueur `##PHOTOS:fichier1;fichier2##` ajouté à `Note`, retiré et reporté vers la colonne structurée `Photos` de `Mouvements` au moment de la validation (`?action=valider`) — jamais affiché tel quel à l'utilisateur (le Worker le retire avant toute restitution en lecture, `?dashboard=1` compris).
 
 ## Autres listes
 

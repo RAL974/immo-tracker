@@ -49,6 +49,24 @@ Principe : un retour déclaré par un rôle **terrain** doit être validé par u
 
 Seuls les garants voient le bouton de validation dans le dashboard (`estGarant()`).
 
+## Photos de mouvement (ajouté août 2026, roadmap item B)
+
+*Reprend l'item B de `05_ROADMAP_EVOLUTIONS_FUTURES.md` : joindre une preuve visuelle à un retour/transfert/panne, pour éviter les litiges "c'était déjà abîmé avant". Réutilise le proxy photos déjà existant depuis le socle applicatif (`Photos_Immos/{code_im}/` sur le drive, actions Worker `upload_photo`/`delete_photo`, jamais documenté jusqu'ici) — aucun nouveau stockage créé pour ce chantier.*
+
+**Écrans concernés** (PWA terrain) : Retour, Transfert (donneur), Réception d'un transfert (receveur), Déclaration de panne, Résolution de panne/réparation. **Jusqu'à 3 photos par mouvement**, chacune ajoutée en un geste (bouton → appareil photo mobile via `capture="environment"` → vignette avec bouton de suppression).
+
+**Toujours optionnelle, jamais bloquante** — y compris en mode dégradé/hors-ligne : l'upload d'une photo est une tâche de fond, jamais attendue avant l'enregistrement du mouvement lui-même (`preparerPhotosMouvement()` dans `app.js`). Si le réseau tombe pendant l'upload, le mouvement reste enregistré normalement ; seule la photo peut manquer. Seule exception à "toujours optionnelle" : un **message de confirmation non bloquant** (pas un blocage réel) s'affiche si l'état saisi à un Retour est Abîmé/Hors service sans aucune photo jointe — l'utilisateur peut toujours continuer sans photo.
+
+**Compression côté client** : redimensionnement à 1200px max + paliers de qualité JPEG (0.75 → 0.6 → 0.5 → 0.4) jusqu'à passer sous 500 Ko, pour limiter le volume/temps d'upload en 4G chantier (`compressPhotoDataUrl()` dans `app.js`).
+
+**Lien photo ↔ mouvement** : la colonne structurée `Mouvements.Photos` (voir `02_MODELE_DONNEES.md`) est la source de vérité — même principe déjà retenu pour `Cout_Reparation` (structuré plutôt qu'inféré). Deux mécanismes selon le type de mouvement :
+- **Déclaration/résolution de panne** (`declarer_panne`/`resoudre_panne`) : les noms de fichiers sont transmis directement dans le corps de la requête qui crée le `Mouvement`, écrits dans `Photos` en une seule opération.
+- **Retour/Transfert** (`transfert` → `valider`, en deux temps car un garant peut valider bien après la déclaration terrain) : le nom des photos prises au moment de la déclaration voyage via un marqueur transitoire dans `Transferts_En_Attente.Note` (`##PHOTOS:...##`), extrait et reporté vers `Mouvements.Photos` à la validation — combiné avec les photos prises par le validateur/receveur lui-même à ce moment-là. Le marqueur n'est jamais montré tel quel à l'utilisateur (retiré de tout affichage, y compris `?dashboard=1`).
+
+**Affichage dashboard** : un badge "🖼️ N" apparaît sur la ligne d'un mouvement (onglets Historique et Transferts en attente) dès qu'il a des photos liées, ouvrant une galerie filtrée à ce mouvement précis (`ouvrirPhotosMouvementModal`) — à distinguer de la galerie complète par immo déjà existante (`ouvrirPhotosModal`, bouton "🖼️ Photos" sur la fiche immo/onglet Documents), qui montre toutes les photos de l'immo sans distinction de mouvement. Comme pour les FDS, jamais d'URL SharePoint directe exposée : toujours via le proxy `?photo=code/fichier`.
+
+**Sécurité de `upload_photo`** : action volontairement **non protégée par jeton de session**, comme `reserver`/`transfert` (identité = badge scanné côté PWA terrain, sans mot de passe — voir § Autorisation côté serveur ci-dessus). Cette absence d'authentification est un choix de conception assumé depuis le socle applicatif, pas une faille propre aux photos ; en revanche, avant août 2026 cette action n'avait **aucun garde-fou serveur** (ni taille, ni type réel du fichier). Ajoutés à cette occasion : taille max stricte (1,5 Mo décodés, marge au-dessus de la cible de compression 500 Ko), vérification de la signature réelle des octets (JPEG, `FF D8 FF` — le `Content-Type` déclaré par le client n'est jamais fiable en soi), validation du nom de fichier. Pas de quota/rate-limit dédié construit (infra disproportionnée, risque résiduel équivalent aux autres actions déjà partagées avec la PWA) — voir `04_HISTORIQUE_DECISIONS.md` pour le raisonnement complet.
+
 ## Immos "d'activité" vs "administratives"
 
 Distinction utilisée pour filtrer l'onglet "Au dépôt" et les statistiques d'Analyses (top mouvementées, pannes, taux d'utilisation par catégorie, coûts de réparation) : on exclut par défaut les immos dont le compte d'immobilisation est administratif (voir liste dans `02_MODELE_DONNEES.md`), sauf les étiqueteuses. Un bouton permet de révéler ponctuellement les immos administratives dans l'onglet dépôt.

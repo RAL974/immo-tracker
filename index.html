@@ -294,10 +294,10 @@
   <label class="field-label">Note (optionnel)</label>
   <textarea id="note-texte" class="note-textarea" placeholder="Ex : câble abîmé, manque une pièce..."></textarea>
   <div class="photo-zone">
-    <p>📷 Photo optionnelle</p>
+    <p>📷 Photos optionnelles (jusqu'à 3) — utile pour prouver l'état constaté</p>
     <label class="photo-btn-label">
       Prendre / Choisir
-      <input type="file" id="photo-etat-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(this,'photo-etat-preview','photoEtatBase64')">
+      <input type="file" id="photo-etat-input" accept="image/*" capture="environment" style="display:none" onchange="addPhotoMulti(this,'photosEtat','photo-etat-preview')">
     </label>
     <div id="photo-etat-preview" style="margin-top:8px"></div>
   </div>
@@ -369,10 +369,10 @@
   <label class="field-label">Note (optionnel)</label>
   <textarea id="accepter-note" class="note-textarea" placeholder="Observations à la réception..."></textarea>
   <div class="photo-zone">
-    <p>📷 Photo optionnelle — état à la réception</p>
+    <p>📷 Photos optionnelles (jusqu'à 3) — état à la réception</p>
     <label class="photo-btn-label">
       Prendre / Choisir
-      <input type="file" id="photo-reception-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(this,'photo-reception-preview','photoReceptionBase64')">
+      <input type="file" id="photo-reception-input" accept="image/*" capture="environment" style="display:none" onchange="addPhotoMulti(this,'photosReception','photo-reception-preview')">
     </label>
     <div id="photo-reception-preview" style="margin-top:8px"></div>
   </div>
@@ -640,6 +640,14 @@
   <p id="panne-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
   <label class="field-label">Description du problème <span style="color:var(--red)">*</span></label>
   <textarea id="panne-motif" class="note-textarea" placeholder="Décrivez précisément la panne, le dysfonctionnement... (5 car. min.)" style="min-height:120px"></textarea>
+  <div class="photo-zone">
+    <p>📷 Photos optionnelles (jusqu'à 3) — dégât constaté</p>
+    <label class="photo-btn-label">
+      Prendre / Choisir
+      <input type="file" id="photo-panne-input" accept="image/*" capture="environment" style="display:none" onchange="addPhotoMulti(this,'photosPanne','photo-panne-preview')">
+    </label>
+    <div id="photo-panne-preview" style="margin-top:8px"></div>
+  </div>
   <div class="sticky-actions">
     <button class="btn btn-secondary" onclick="soumettrePanne(this)">📢 Confirmer le signalement</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
@@ -663,6 +671,14 @@
   <input type="number" id="resolution-cout" class="select-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
   <label class="field-label">Note de résolution <span style="color:var(--red)">*</span></label>
   <textarea id="resolution-note" class="note-textarea" placeholder="Décrivez la réparation effectuée... (10 car. min.)" style="min-height:100px"></textarea>
+  <div class="photo-zone">
+    <p>📷 Photos optionnelles (jusqu'à 3) — preuve de la réparation</p>
+    <label class="photo-btn-label">
+      Prendre / Choisir
+      <input type="file" id="photo-resolution-input" accept="image/*" capture="environment" style="display:none" onchange="addPhotoMulti(this,'photosResolution','photo-resolution-preview')">
+    </label>
+    <div id="photo-resolution-preview" style="margin-top:8px"></div>
+  </div>
   <div class="sticky-actions">
     <button class="btn btn-secondary" onclick="soumettreResolution(this)">✅ Valider le retour dans le parc</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>

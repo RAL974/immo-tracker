@@ -21,8 +21,8 @@
 
 **A2. Stock d'articles/consommables — ✅ FAIT (août 2026)**, développé après clarification que le besoin réel décrit ci-dessus (au moment de la première rédaction de cette roadmap) concernait en fait ce sujet, distinct des immobilisations. Campagne de comptage manuel (pas de QR/codes-barres sur les articles), dépôt + chantiers actifs, comparaison quantités vs comptage précédent (import du comptage décembre 2025 comme référence). Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
 
-### B. Photos et constat d'état en image
-À la réception ou au retour d'un matériel, possibilité de joindre une photo (stockage SharePoint). Utile en particulier pour les retours en mauvais état validés par un garant : preuve visuelle qui évite les litiges "c'était déjà abîmé avant". Techniquement : accès à l'appareil photo du navigateur mobile + stockage lié au mouvement.
+### B. Photos et constat d'état en image — ✅ FAIT (août 2026)
+Développé et déployé : jusqu'à 3 photos par mouvement (Retour, Transfert, Réception, Déclaration de panne, Résolution), compression client sous 500 Ko, toujours optionnel/jamais bloquant (mode dégradé compris), lien structuré vers le mouvement via une nouvelle colonne `Mouvements.Photos`. Réutilise le mécanisme de proxy photos déjà présent (mais jusque-là non documenté) depuis le socle applicatif — aucun nouveau stockage créé. Détail complet dans `03_REGLES_METIER_ET_ROLES.md` § Photos de mouvement et `04_HISTORIQUE_DECISIONS.md`.
 
 ### C. Coûts de réparation structurés + seuil de réforme — ✅ FAIT (août 2026)
 Développé et déployé : coût structuré (colonne SharePoint `Cout_Reparation` sur `Mouvements`), saisie possible à la résolution d'une panne ou indépendamment (entretien, nouveau type de mouvement `Entretien`), double ratio (valeur d'achat ET VNC), seuil de réforme réglable (40/60/80%, défaut 60%) dans l'onglet Analyses. Détail complet dans `04_HISTORIQUE_DECISIONS.md`.
@@ -40,7 +40,7 @@ Aujourd'hui : un email par mouvement (flux Power Automate existant). Évolution 
 
 1. ~~**A — Inventaire physique**~~ : **fait (août 2026)**, code livré pour les deux volets (stock A2, immobilisations A1) — consolide la fiabilité de la base de données sur laquelle s'appuient déjà l'amortissement, l'export comptable et la maintenance préventive.
 2. **Module temps chantier** (cadré comme suivi opérationnel, pas RH) : valeur métier forte pour le pilotage des coûts de chantier.
-3. **B — Photos / constat d'état** : effort modéré, réduit les litiges au quotidien.
+3. ~~**B — Photos / constat d'état**~~ : **fait (août 2026)**.
 4. ~~**C — Coûts de réparation + seuil de réforme**~~ : **fait (août 2026)**.
 5. **D, E, F** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
 
