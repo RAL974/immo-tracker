@@ -95,6 +95,75 @@ function registerLoginFailure(code) {
 }
 function clearLoginAttempts(code) { LOGIN_ATTEMPTS.delete(code); }
 
+// ── Persistance optionnelle du verrou ci-dessus via Cloudflare KV (ajoutée août 2026) ───────────
+// Le compteur en mémoire ci-dessus (LOGIN_ATTEMPTS) reste le seul mécanisme pour set_password et
+// reste le repli automatique de verify_password : un isolate Cloudflare recyclé perd son historique,
+// et deux requêtes successives peuvent atterrir sur deux isolates différents. Un binding KV nommé
+// LOGIN_ATTEMPTS_KV, s'il est provisionné (voir wrangler.toml et SECURITE_ETAT.md — étape manuelle
+// requise côté tableau de bord Cloudflare, jamais supposée exister), rend ce compteur persistant et
+// partagé entre tous les nœuds edge. Repli gracieux total si le binding est absent ou qu'un appel KV
+// échoue (quota dépassé, incident réseau) : on retombe alors silencieusement sur le comportement
+// actuel (Map en mémoire), jamais d'échec de connexion à cause de KV. Reste un "best effort" — KV est
+// éventuellement cohérent (propagation entre nœuds edge non instantanée), pas une garantie stricte,
+// dans la même philosophie que le reste des protections déjà documentées dans SECURITE_ETAT.md.
+//
+// Volontairement scopé à verify_password uniquement (pas set_password, pas reset_password ni aucune
+// autre action) : c'est le seul chemin appelé à chaque tentative de connexion réelle, celui qui doit
+// bénéficier de la protection renforcée. Ajouter KV ailleurs n'apporterait rien tant que ces autres
+// chemins sont peu fréquents (set_password : uniquement à la création initiale d'un compte) ou déjà
+// protégés autrement (reset_password : requireAdmin) — et ajouterait une latence réseau inutile.
+function loginAttemptsKv() {
+  if (typeof LOGIN_ATTEMPTS_KV !== 'undefined' && LOGIN_ATTEMPTS_KV) return LOGIN_ATTEMPTS_KV;
+  return (typeof globalThis !== 'undefined' && globalThis.LOGIN_ATTEMPTS_KV) || null;
+}
+const LOGIN_ATTEMPTS_KV_PREFIX = 'login:';
+// TTL généreux (1h), très supérieur au plus long palier (15 min) : la clé s'auto-nettoie côté KV
+// même si clearLoginAttempts n'est jamais appelé (ex. compte jamais réutilisé après un pic d'échecs).
+const LOGIN_ATTEMPTS_KV_TTL_S = 3600;
+// Lecture : source de vérité KV si disponible (et alors recopiée en mémoire locale, pour que set_password
+// — qui ne lit que la mémoire — voie lui aussi l'état le plus récent connu sur cet isolate). Sinon,
+// repli sur l'état mémoire local tel quel (comportement strictement identique à avant cette migration).
+async function loginLockStatusAsync(code) {
+  const kv = loginAttemptsKv();
+  if (!kv) return loginLockStatus(code);
+  try {
+    const raw = await kv.get(LOGIN_ATTEMPTS_KV_PREFIX + code);
+    if (!raw) return loginLockStatus(code);
+    const e = JSON.parse(raw);
+    LOGIN_ATTEMPTS.set(code, e);
+    if (!e || !e.lockedUntil || e.lockedUntil <= Date.now()) return { locked: false };
+    return { locked: true, retryAfterS: Math.ceil((e.lockedUntil - Date.now()) / 1000) };
+  } catch (e) {
+    return loginLockStatus(code); // KV indisponible/quota dépassé : repli gracieux
+  }
+}
+// Écriture : toujours appliquée en mémoire d'abord (garantie inchangée, coût négligeable), puis
+// répercutée sur KV en best-effort — un échec d'écriture KV ne doit jamais faire échouer la connexion.
+async function registerLoginFailureAsync(code) {
+  registerLoginFailure(code);
+  const kv = loginAttemptsKv();
+  if (!kv) return;
+  try {
+    const e = LOGIN_ATTEMPTS.get(code);
+    await kv.put(LOGIN_ATTEMPTS_KV_PREFIX + code, JSON.stringify(e), { expirationTtl: LOGIN_ATTEMPTS_KV_TTL_S });
+  } catch (e) {}
+}
+async function clearLoginAttemptsAsync(code) {
+  clearLoginAttempts(code);
+  const kv = loginAttemptsKv();
+  if (!kv) return;
+  try { await kv.delete(LOGIN_ATTEMPTS_KV_PREFIX + code); } catch (e) {}
+}
+
+// ── Politique de longueur minimale du mot de passe (set_password, ajoutée août 2026) ────────────
+// Relevé de 4 à 8 caractères — un mot de passe de 4 caractères reste intrinsèquement faible en cas
+// de fuite de hash, même haché en PBKDF2-SHA256 100k itérations (voir SECURITE_ETAT.md "reste à
+// faire" #3). Ne s'applique qu'aux NOUVEAUX mots de passe (création ou changement, action
+// set_password) : les comptes déjà créés avec un mot de passe plus court restent utilisables tels
+// quels à la connexion (verify_password ne vérifie jamais la longueur, seulement le hash) — aucune
+// migration forcée, aucun compte cassé rétroactivement.
+const PASSWORD_MIN_LENGTH = 8;
+
 // ── Limitation de débit sur la résolution de noms employés (?noms_employes=1, ajoutée lors de la
 // pseudonymisation d'employes.json, voir 04_HISTORIQUE_DECISIONS.md) ───────────────────────────
 // Endpoint volontairement non authentifié : la PWA terrain n'a aucune session (scan de badge sans
@@ -246,6 +315,8 @@ function securityHeadersFor(request, allowedOrigins) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { signSessionWith, verifySessionWith, estAdminSessionPure, estGarantSessionPure, roleNorm, requireAdminWith, requireGarantWith, b64url, b64urlToBytes, GESTIONNAIRES, SESSION_DUREE_MS, handleRequest,
     LOGIN_ATTEMPTS, loginLockStatus, registerLoginFailure, clearLoginAttempts, LOGIN_LOCK_THRESHOLDS, LOGIN_PROBE_SENTINEL,
+    loginAttemptsKv, loginLockStatusAsync, registerLoginFailureAsync, clearLoginAttemptsAsync, LOGIN_ATTEMPTS_KV_PREFIX, LOGIN_ATTEMPTS_KV_TTL_S,
+    PASSWORD_MIN_LENGTH,
     ALLOWED_ORIGINS, corsOriginFor, securityHeadersFor,
     NOM_LOOKUP_ATTEMPTS, NOM_LOOKUP_WINDOW_MS, NOM_LOOKUP_MAX_PER_WINDOW, clientIpFrom, nomLookupRateLimited, origineReconnue,
     GATED_ACTIONS_AUDIT, AUDIT_AUTH_ERRORS, AUDIT_DETAIL_EXCLUDED_KEYS, auditDetailFrom, auditCibleFrom, reportAuditFailureToSentry };
@@ -1127,15 +1198,17 @@ async function handleRequest(request) {
       // même que l'utilisateur ait tapé quoi que ce soit — ne doit ni compter comme une tentative,
       // ni être bloquée par un verrou déjà en cours (voir LOGIN_PROBE_SENTINEL plus haut).
       if (body.password === LOGIN_PROBE_SENTINEL) return json({ success: false, needs_setup: false });
-      const lock = loginLockStatus(code);
+      // Verrou anti brute-force persistant (Cloudflare KV si provisionné, sinon repli mémoire
+      // automatique — voir loginLockStatusAsync/SECURITE_ETAT.md). Seul verify_password lit KV.
+      const lock = await loginLockStatusAsync(code);
       // Échec de connexion journalisé sans identité vérifiée (aucune session n'existe à ce stade) :
       // Code_Employe reste vide, `code` (celui tapé, pas garanti être le bon employé) va dans Cible
       // — cohérent avec la règle "Code_Employe jamais depuis le corps de la requête", qui porte sur
       // l'ATTRIBUTION d'une action, pas sur le suivi d'une tentative de connexion anonyme par nature.
       if (lock.locked) { await logAudit({ code: '', action: 'verify_password', cible: code, detail: { motif: 'verrou_actif' }, success: false }); return json({ success: false, error: 'trop_de_tentatives', retry_after_s: lock.retryAfterS }, 429); }
       const ok = await verifyPassword(body.password || '', withHash.hash);
-      if (!ok) { registerLoginFailure(code); await logAudit({ code: '', action: 'verify_password', cible: code, detail: { motif: 'mot_de_passe_incorrect' }, success: false }); return json({ success: false, needs_setup: false }); }
-      clearLoginAttempts(code);
+      if (!ok) { await registerLoginFailureAsync(code); await logAudit({ code: '', action: 'verify_password', cible: code, detail: { motif: 'mot_de_passe_incorrect' }, success: false }); return json({ success: false, needs_setup: false }); }
+      await clearLoginAttemptsAsync(code);
       const token = await signSession(code, withHash.role);
       return json({ success: true, needs_setup: false, token: token, role: withHash.role || '' });
     }
@@ -1144,7 +1217,11 @@ async function handleRequest(request) {
     if (action === 'set_password') {
       const code = (body.code || '').trim();
       const pwd = body.password || '';
-      if (!code || pwd.length < 4) return json({ success: false, error: 'invalide' });
+      if (!code) return json({ success: false, error: 'invalide' });
+      // Règle relevée à 8 caractères (voir PASSWORD_MIN_LENGTH) : ne s'applique qu'ici, à la création
+      // ou au changement d'un mot de passe — jamais à la vérification (verify_password, plus haut),
+      // pour ne jamais casser un compte existant créé avant ce durcissement.
+      if (pwd.length < PASSWORD_MIN_LENGTH) return json({ success: false, error: 'mot_de_passe_trop_court', min_length: PASSWORD_MIN_LENGTH });
       const items = await getEmployeAuth(code);
       if (!items.length) return json({ success: false, error: 'employe_introuvable' });
       // Si un mot de passe existe déjà, exiger l'ancien pour pouvoir le changer soi-même. La SEULE
@@ -1187,7 +1264,11 @@ async function handleRequest(request) {
       }
       // Un admin qui réinitialise le mot de passe efface aussi un éventuel verrou en cours sur ce
       // code : sinon l'employé resterait bloqué par ses propres échecs même après l'intervention.
-      if (okCount > 0) clearLoginAttempts(code);
+      // Efface mémoire ET KV (voir clearLoginAttemptsAsync) : un verrou posé par verify_password
+      // peut désormais vivre dans KV, pas seulement en mémoire — une action admin ponctuelle comme
+      // celle-ci n'est pas concernée par la contrainte "pas de latence KV hors verify_password"
+      // (elle ne s'exécute qu'à la demande explicite d'un admin, jamais à chaque connexion).
+      if (okCount > 0) await clearLoginAttemptsAsync(code);
       return json({ success: okCount > 0 });
     }
 

@@ -2,6 +2,17 @@ name = "immo-proxy"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 
+# ── Verrou anti brute-force persistant (Cloudflare KV, ajouté et activé le 10 août 2026) ────────
+# Binding optionnel : worker.js fonctionne aussi sans lui (repli automatique et silencieux sur le
+# compteur en mémoire, comportement d'avant août 2026) — voir loginAttemptsKv() dans worker.js et
+# SECURITE_ETAT.md. Namespace "immo_tracker_login_attempts" créé par William dans le tableau de
+# bord Cloudflare (Storage & databases → Workers KV → Create Instance) ; le binding ci-dessous
+# n'a d'effet que sur cette ressource Worker précise ("immo-proxy") — pas sur immo-proxy-staging,
+# qui reste en repli mémoire tant qu'un second namespace dédié n'y est pas branché séparément.
+kv_namespaces = [
+  { binding = "LOGIN_ATTEMPTS_KV", id = "a2dffe7879df4fd8bbfe288275a88d87" }
+]
+
 # ── Environnement de recette (staging) ──────────────────────────────────────────────────
 # Déployé comme une ressource Cloudflare Worker séparée ("immo-proxy-staging"), connectée au même
 # dépôt Git mais avec une commande de build dédiée : npx wrangler deploy --env staging (réglage

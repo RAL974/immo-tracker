@@ -1175,7 +1175,7 @@ async function etapeMotDePasse(){
   document.getElementById('pwd-input').value='';
   document.getElementById('pwd-input2').value='';
   if(LOGIN_NEEDS_SETUP){
-    document.getElementById('pwd-consigne').textContent='Première connexion : créez votre mot de passe personnel (min. 4 caractères).';
+    document.getElementById('pwd-consigne').textContent='Première connexion : créez votre mot de passe personnel (min. 8 caractères).';
     document.getElementById('pwd-input').placeholder='Nouveau mot de passe';
     document.getElementById('pwd-input2').style.display='block';
     document.getElementById('pin-btn3').textContent='Créer et se connecter →';
@@ -1210,7 +1210,7 @@ async function validerMotDePasse(){
   if(!pwd){err.textContent='Veuillez saisir un mot de passe.';return;}
   if(LOGIN_NEEDS_SETUP){
     var pwd2=document.getElementById('pwd-input2').value;
-    if(pwd.length<4){err.textContent='Le mot de passe doit contenir au moins 4 caractères.';return;}
+    if(pwd.length<8){err.textContent='Le mot de passe doit contenir au moins 8 caractères.';return;}
     if(pwd!==pwd2){err.textContent='Les deux mots de passe ne correspondent pas.';return;}
     btn.disabled=true;btn.textContent='Création…';
     try{
@@ -1218,6 +1218,7 @@ async function validerMotDePasse(){
       var res=await r.json();
       if(res.success){finaliserConnexion(LOGIN_CODE,res.token);}
       else if(res.error==='trop_de_tentatives'){err.textContent=msgTropDeTentatives(res.retry_after_s);btn.disabled=false;btn.textContent='Créer et se connecter →';}
+      else if(res.error==='mot_de_passe_trop_court'){err.textContent='Le mot de passe doit contenir au moins '+(res.min_length||8)+' caractères.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
       else{err.textContent='Échec de la création. Réessayez.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
     }catch(e){err.textContent='Erreur réseau.';btn.disabled=false;btn.textContent='Créer et se connecter →';}
   }else{

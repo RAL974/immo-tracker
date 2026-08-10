@@ -1,7 +1,9 @@
 // Limitation de débit sur les tentatives de mot de passe (verify_password / set_password ancien
 // mot de passe) — voir SECURITE_ETAT.md et le commentaire au-dessus de LOGIN_ATTEMPTS dans
-// worker.js. Deux familles de tests : les fonctions pures du verrou (Map en mémoire), puis le
-// branchement réel dans handleRequest() via Microsoft Graph entièrement mocké.
+// worker.js. Trois familles de tests : les fonctions pures du verrou en mémoire (Map), le
+// verrou persistant via Cloudflare KV (mocké — paliers, persistance simulée entre "isolates",
+// repli mémoire si KV échoue, scope limité à verify_password), puis le branchement réel dans
+// handleRequest() via Microsoft Graph entièrement mocké.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,6 +13,33 @@ const CLIENT_SECRET = 'fake-client-secret';
 const SESSION_SECRET = 'fake-session-secret';
 global.CLIENT_SECRET_ENV = CLIENT_SECRET;
 global.SESSION_SECRET_ENV = SESSION_SECRET;
+
+// ── Mock KV (namespace Cloudflare Workers KV) ────────────────────────────────────────────────
+// Un vrai binding KV expose get/put/delete asynchrones — suffisant à mocker sans dépendance
+// externe. `createMockKv()` simule un namespace qui fonctionne normalement ; son `_store` est
+// délibérément exposé (objet Map partagé) pour simuler la persistance ENTRE deux "isolates"
+// Cloudflare : on réutilise la même instance de mock à travers plusieurs `loadWorker()` (qui,
+// lui, réinitialise LOGIN_ATTEMPTS à chaque appel, simulant un isolate recyclé côté mémoire).
+function createMockKv() {
+  const store = new Map();
+  return {
+    _store: store,
+    async get(key) { return store.has(key) ? store.get(key) : null; },
+    async put(key, value) { store.set(key, value); },
+    async delete(key) { store.delete(key); },
+  };
+}
+// Simule un binding KV provisionné mais indisponible (quota dépassé, incident réseau...) : chaque
+// opération rejette, pour vérifier que le repli mémoire s'active silencieusement sans jamais
+// remonter d'erreur ni bloquer la connexion.
+function createFailingMockKv() {
+  return {
+    async get() { throw new Error('KV indisponible (simulation de test)'); },
+    async put() { throw new Error('KV indisponible (simulation de test)'); },
+    async delete() { throw new Error('KV indisponible (simulation de test)'); },
+  };
+}
+function clearMockKvBinding() { delete global.LOGIN_ATTEMPTS_KV; }
 
 // ── Fonctions pures (Map en mémoire) ─────────────────────────────────────────────────────────
 test('loginLockStatus : pas de verrou pour un code jamais vu', () => {
@@ -57,6 +86,134 @@ test('clearLoginAttempts : lève le verrou et remet le compteur à zéro', () =>
 test('LOGIN_PROBE_SENTINEL : constante non vide, distincte d\'un mot de passe plausible', () => {
   const W = loadWorker();
   assert.ok(W.LOGIN_PROBE_SENTINEL && W.LOGIN_PROBE_SENTINEL.length > 4);
+});
+
+// ── Verrou persistant via Cloudflare KV (mock) ───────────────────────────────────────────────
+test('loginAttemptsKv : renvoie null si aucun binding LOGIN_ATTEMPTS_KV n\'est configuré', () => {
+  clearMockKvBinding();
+  const W = loadWorker();
+  assert.equal(W.loginAttemptsKv(), null);
+});
+
+test('loginLockStatusAsync/registerLoginFailureAsync : sans KV, se comportent exactement comme les fonctions mémoire', async () => {
+  clearMockKvBinding();
+  const W = loadWorker();
+  const code = 'KVABSENT1';
+  for (let i = 0; i < 5; i++) await W.registerLoginFailureAsync(code);
+  const st = await W.loginLockStatusAsync(code);
+  assert.equal(st.locked, true, 'palier des 5 échecs toujours actif sans KV');
+  assert.ok(st.retryAfterS > 0 && st.retryAfterS <= 30);
+});
+
+test('registerLoginFailureAsync : écrit dans KV avec le préfixe attendu et un TTL', async (t) => {
+  const kv = createMockKv();
+  global.LOGIN_ATTEMPTS_KV = kv;
+  t.after(clearMockKvBinding);
+  const W = loadWorker();
+  const code = 'KVWRITE1';
+  await W.registerLoginFailureAsync(code);
+  const raw = kv._store.get(W.LOGIN_ATTEMPTS_KV_PREFIX + code);
+  assert.ok(raw, 'une entrée doit être écrite dans KV sous la clé préfixée');
+  const parsed = JSON.parse(raw);
+  assert.equal(parsed.fails, 1);
+});
+
+test('clearLoginAttemptsAsync : efface aussi bien la mémoire que la clé KV', async (t) => {
+  const kv = createMockKv();
+  global.LOGIN_ATTEMPTS_KV = kv;
+  t.after(clearMockKvBinding);
+  const W = loadWorker();
+  const code = 'KVCLEAR1';
+  for (let i = 0; i < 5; i++) await W.registerLoginFailureAsync(code);
+  assert.ok(kv._store.has(W.LOGIN_ATTEMPTS_KV_PREFIX + code));
+  await W.clearLoginAttemptsAsync(code);
+  assert.equal(kv._store.has(W.LOGIN_ATTEMPTS_KV_PREFIX + code), false);
+  assert.equal((await W.loginLockStatusAsync(code)).locked, false);
+});
+
+test('KV persiste le verrou entre deux "isolates" simulés (paliers 30s/5min/15min)', async (t) => {
+  // Une seule instance de mock KV, réutilisée à travers deux loadWorker() successifs — chaque
+  // loadWorker() vide le require-cache et donc réinitialise LOGIN_ATTEMPTS (Map en mémoire),
+  // exactement comme le ferait un recyclage d'isolate Cloudflare. Si le verrou survit malgré ce
+  // "reset mémoire", c'est la preuve que KV (et non la mémoire) porte l'état entre les deux.
+  const kv = createMockKv();
+  t.after(clearMockKvBinding);
+  const code = 'KVPERSIST1';
+
+  global.LOGIN_ATTEMPTS_KV = kv;
+  const isolateA = loadWorker();
+  for (let i = 0; i < 7; i++) await isolateA.registerLoginFailureAsync(code); // palier 7e échec : 5min
+
+  global.LOGIN_ATTEMPTS_KV = kv; // même mock, "nouvel isolate"
+  const isolateB = loadWorker();
+  assert.equal(isolateB.LOGIN_ATTEMPTS.has(code), false, 'le nouvel isolate ne doit rien avoir en mémoire locale avant lecture KV');
+  const st = await isolateB.loginLockStatusAsync(code);
+  assert.equal(st.locked, true, 'le verrou posé par le premier isolate doit être visible depuis le second, via KV');
+  assert.ok(st.retryAfterS > 30, 'palier 7e échec (5 min) doit dépasser le palier 30s');
+});
+
+test('KV indisponible (erreurs sur get/put) : repli gracieux sur la mémoire, verrou toujours appliqué', async (t) => {
+  global.LOGIN_ATTEMPTS_KV = createFailingMockKv();
+  t.after(clearMockKvBinding);
+  const W = loadWorker();
+  const code = 'KVFAIL1';
+  for (let i = 0; i < 5; i++) {
+    await assert.doesNotReject(W.registerLoginFailureAsync(code), 'un échec KV ne doit jamais remonter d\'exception');
+  }
+  const st = await W.loginLockStatusAsync(code); // rejetterait ici si le repli n'absorbait pas l'erreur KV
+  assert.equal(st.locked, true, 'le repli mémoire doit continuer à appliquer les paliers malgré KV en panne');
+});
+
+test('verify_password (intégration) : le verrou KV bloque bien avec HTTP 429, et la clé KV est écrite', async (t) => {
+  const kv = createMockKv();
+  global.LOGIN_ATTEMPTS_KV = kv;
+  t.after(clearMockKvBinding);
+  const W = loadWorker();
+  mockGraphFetchWithHash(t, FAKE_HASH);
+  const code = 'KVBRUTEFORCE1';
+  let lastRes, lastData;
+  for (let i = 0; i < 6; i++) {
+    lastRes = await W.handleRequest(postRequest('verify_password', { code, password: 'mauvais' + i }));
+    lastData = await lastRes.json();
+  }
+  assert.equal(lastRes.status, 429);
+  assert.equal(lastData.error, 'trop_de_tentatives');
+  assert.ok(kv._store.has(W.LOGIN_ATTEMPTS_KV_PREFIX + code), 'verify_password doit avoir persisté le compteur dans KV');
+});
+
+test('set_password (intégration) : ne lit/n\'écrit jamais KV, même avec un binding présent (scope limité à verify_password)', async (t) => {
+  let kvCalls = 0;
+  const countingKv = {
+    async get() { kvCalls++; return null; },
+    async put() { kvCalls++; },
+    async delete() { kvCalls++; },
+  };
+  global.LOGIN_ATTEMPTS_KV = countingKv;
+  t.after(clearMockKvBinding);
+  const W = loadWorker();
+  mockGraphFetchWithHash(t, FAKE_HASH);
+  const code = 'KVSETPWD1';
+  for (let i = 0; i < 6; i++) {
+    await W.handleRequest(postRequest('set_password', { code, password: 'nouveau1234', old_password: 'mauvais' + i }));
+  }
+  assert.equal(kvCalls, 0, 'set_password doit rester memory-only : aucun appel KV, quel que soit le nombre de tentatives');
+});
+
+test('reset_password (admin) : lève aussi le verrou persisté dans KV, pas seulement en mémoire', async (t) => {
+  const kv = createMockKv();
+  global.LOGIN_ATTEMPTS_KV = kv;
+  t.after(clearMockKvBinding);
+  const W = loadWorker();
+  const code = 'KVRESETLOCK1';
+  for (let i = 0; i < 10; i++) await W.registerLoginFailureAsync(code);
+  assert.ok(kv._store.has(W.LOGIN_ATTEMPTS_KV_PREFIX + code));
+  mockGraphFetchWithHash(t, FAKE_HASH);
+  const token = await W.signSessionWith('AIWI', 'Admin', SESSION_SECRET);
+  const res = await W.handleRequest(postRequest('reset_password', { code, confirm: 'ESR-CONFIRME', token }));
+  const data = await res.json();
+  assert.equal(data.success, true);
+  assert.equal(kv._store.has(W.LOGIN_ATTEMPTS_KV_PREFIX + code), false, 'reset_password doit purger la clé KV pour ne pas laisser l\'employé bloqué après intervention admin');
+  assert.equal((await W.loginLockStatusAsync(code)).locked, false);
 });
 
 // ── Intégration : handleRequest() avec Microsoft Graph mocké ────────────────────────────────
