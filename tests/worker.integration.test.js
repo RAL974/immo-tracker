@@ -89,6 +89,30 @@ test('reserver (action partagée avec la PWA terrain) fonctionne sans jeton', as
   assert.equal(res.status, 200, "les actions PWA ne doivent jamais recevoir de 401/403 pour absence de jeton");
 });
 
+test('creer_retour_direct_garant (action partagée avec la PWA terrain) fonctionne sans jeton et écrit un mouvement Retour/DEPOT', async (t) => {
+  let writtenFields = null;
+  mockGraphFetch(t, { onCall: (u, opts) => { if (u.includes('/Mouvements/items') && opts && opts.method === 'POST') writtenFields = JSON.parse(opts.body).fields; } });
+  const res = await W.handleRequest(postRequest('creer_retour_direct_garant', { code_im: 'im000001', code_employe: 'coni', nom_employe: 'CONI Test', etat: 'Bon', note: 'note' }));
+  const data = await res.json();
+  assert.equal(res.status, 200, "les actions PWA ne doivent jamais recevoir de 401/403 pour absence de jeton");
+  assert.equal(data.success, true);
+  assert.ok(writtenFields, "un mouvement aurait dû être écrit");
+  assert.equal(writtenFields.Title, 'IM000001');
+  assert.equal(writtenFields.Code_Employe, 'CONI');
+  assert.equal(writtenFields.Type_Mouvement, 'Retour');
+  assert.equal(writtenFields.Code_Chantier, 'DEPOT');
+});
+
+test('creer_retour_direct_garant sans code_im/code_employe -> donnees_invalides, rien écrit', async (t) => {
+  let wroteToSharepoint = false;
+  mockGraphFetch(t, { onCall: (u, opts) => { if (u.includes('/Mouvements/items') && opts && opts.method === 'POST') wroteToSharepoint = true; } });
+  const res = await W.handleRequest(postRequest('creer_retour_direct_garant', { etat: 'Bon' }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'donnees_invalides');
+  assert.equal(wroteToSharepoint, false);
+});
+
 test('sans SESSION_SECRET_ENV configuré, une action protégée échoue explicitement (pas de faille silencieuse)', async (t) => {
   mockGraphFetch(t);
   const savedSecret = global.SESSION_SECRET_ENV;

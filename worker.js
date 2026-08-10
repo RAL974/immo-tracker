@@ -2826,6 +2826,33 @@ async function handleRequest(request) {
       return json({ success: r.ok, status: r.status });
     }
 
+    // ── Retour direct par un garant (PWA terrain) ──
+    // Même cas métier que la branche "Retour" de creer_mouvement_direct ci-dessus, mais côté PWA :
+    // un garant (Admin/Logistique/Logistique_Mayotte) qui rend lui-même du matériel enregistre son
+    // retour immédiatement, sans passer par le flux "en attente de validation" (réservé au retour
+    // déclaré par un rôle terrain, action `transfert`). La PWA s'identifie par badge scanné, sans
+    // mot de passe : pas de jeton de session possible ici, donc pas de requireGarant — même modèle
+    // de confiance que reserver/transfert/declarer_panne (voir PWA_SHARED_ACTIONS dans
+    // tests/security.gated-actions.test.js). Remplace l'ancien point d'entrée générique "Mouvement
+    // direct" (retiré par erreur du côté PWA lors de l'introduction de creer_mouvement_direct, voir
+    // 04_HISTORIQUE_DECISIONS.md). Type_Mouvement et Code_Chantier sont fixés côté serveur (jamais
+    // lus du corps de la requête) : cette action ne sert que ce seul cas, pas de généricité à
+    // protéger contre une valeur forgée. Photos (ajoutées en parallèle, voir "Photos de mouvement"
+    // dans 04_HISTORIQUE_DECISIONS.md) transmises directement dans ce même appel, comme
+    // declarer_panne/resoudre_panne — pas de flux "en attente" ici, donc pas besoin du marqueur
+    // transitoire utilisé par transfert/valider.
+    if (action === 'creer_retour_direct_garant') {
+      const code = (body.code_im || '').trim().toUpperCase();
+      const garantCode = (body.code_employe || '').trim().toUpperCase();
+      if (!code || !garantCode) return json({ success: false, error: 'donnees_invalides' });
+      const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+        Title: code, Code_Employe: garantCode, Type_Mouvement: 'Retour', Code_Chantier: 'DEPOT',
+        Commentaire: body.nom_employe || garantCode, Etat: body.etat || '', Note: body.note || '',
+        Horodatage: body.horodatage || new Date().toISOString(), Photos: joinPhotos(body.photos)
+      } }) });
+      return json({ success: r.ok, status: r.status });
+    }
+
       return null;
     };
 

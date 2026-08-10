@@ -982,8 +982,11 @@ function showRecap(titre, mouv, mention) {
   vib(300); showScreen('screen-confirmation');
 }
 
+// Retour déclaré directement par un garant (cf. confirmerAvecEtat) — action dédiée
+// `creer_retour_direct_garant`, non protégée par jeton de session (badge scanné, comme le
+// reste de la PWA terrain).
 function enregistrerMouvement(m) {
-  fetch(CONFIG.proxy, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) })
+  fetch(CONFIG.proxy + '?action=creer_retour_direct_garant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) })
     .then(() => rafraichirBadges())
     .catch(() => {});
 }
