@@ -95,6 +95,86 @@ function registerLoginFailure(code) {
 }
 function clearLoginAttempts(code) { LOGIN_ATTEMPTS.delete(code); }
 
+// ── Journal d'audit des actions sensibles (liste SharePoint Journal_Audit, ajoutée août 2026) ──
+// Périmètre : exactement les 62 actions POST protégées requireAdmin/requireGarant (mêmes noms que
+// GATED_ACTIONS côté dashboard.html) + les échecs de connexion (verify_password, voir plus bas).
+// Cette liste est DUPLIQUÉE ici plutôt que dérivée dynamiquement du code : le point d'insertion
+// unique (dispatchPost, dans handleRequest) doit savoir "dois-je journaliser cette action ?" à
+// partir du seul nom d'action, avant d'avoir inspecté le contenu du bloc exécuté. Synchronisation
+// garantie par un test dédié (tests/security.gated-actions.test.js) qui compare les trois listes
+// (ici, GATED_ACTIONS du dashboard, et les blocs réellement protégés dans worker.js).
+const GATED_ACTIONS_AUDIT = new Set([
+  'ajouter_employe', 'ajouter_immo', 'maj_droits', 'maj_actif', 'maj_site_employe', 'reset_password',
+  'dedupe_employes', 'seed_immo_sites', 'seed_roles_sites', 'bulk_patch_immos', 'importer_affectation_immo',
+  'bulk_import_tailles_epi', 'bulk_import_catalogue_epi', 'bulk_import_grille_dotation_epi',
+  'bulk_import_catalogue_outillage', 'bulk_import_grille_outillage', 'bulk_import_lignes_outillage',
+  'bulk_import_lignes_inventaire', 'bulk_maj_duree_outillage', 'marquer_statut_immo', 'enregistrer_reparation',
+  'maj_panne', 'creer_mouvement_direct', 'maj_transfert', 'annuler_transfert', 'maj_site_immo',
+  'ajouter_article_epi', 'maj_grille_dotation_epi', 'supprimer_grille_dotation_epi', 'reception_commande_epi',
+  'generer_dotation_epi', 'generer_remise_ponctuelle_epi', 'annuler_dotation_epi', 'emarger_dotation_epi',
+  'upload_fiche_epi', 'bulk_maj_stock_epi', 'maj_stock_mini_epi', 'maj_grille_outillage',
+  'supprimer_grille_outillage', 'reception_commande_outillage', 'editer_stock_outillage',
+  'maj_stock_mini_outillage', 'distribuer_outillage', 'upload_fiche_outillage', 'maj_service_outillage',
+  'annuler_ligne_outillage', 'cloturer_campagne_inventaire', 'creer_campagne_inventaire',
+  'cloturer_campagne_inventaire_immos', 'creer_campagne_inventaire_immos', 'upload_fds', 'maj_taille_employe',
+  'ajouter_materiel_it', 'maj_materiel_it', 'affecter_materiel_it', 'bulk_import_materiel_it',
+  'bulk_import_mouvements_materiel_it', 'ajouter_ligne_telephonique', 'maj_ligne_telephonique',
+  'affecter_ligne_telephonique', 'bulk_import_lignes_telephoniques', 'bulk_import_mouvements_lignes_telephoniques'
+]);
+// Réponses renvoyées par requireAdmin/requireGarant AVANT toute exécution métier : ne jamais
+// journaliser ces cas. Deux raisons : (1) aucune écriture n'a eu lieu, rien à auditer côté métier ;
+// (2) aucune identité vérifiée n'est disponible pour renseigner Code_Employe. Préserve aussi une
+// garantie déjà testée (tests/worker.integration.test.js) : "zéro écriture SharePoint si l'auth
+// échoue" — y compris pour le journal d'audit lui-même, qui aurait pu sinon devenir un vecteur de
+// spam en réponse à des jetons invalides envoyés en boucle par n'importe qui.
+const AUDIT_AUTH_ERRORS = new Set(['session_invalide', 'droits_insuffisants', 'session_secret_manquant']);
+// Clés jamais recopiées dans la colonne Detail, quelle que soit l'action (RGPD) : mots de passe,
+// codes PIN/PUK/RIO/déverrouillage des cartes SIM (voir Materiel_IT/Lignes_Telephoniques dans
+// 02_MODELE_DONNEES.md), le jeton de session lui-même, et toute charge de fichier encodée en
+// base64 (uploads photo/FDS/fiches EPI-Outillage, champ `data`).
+const AUDIT_DETAIL_EXCLUDED_KEYS = new Set(['password', 'old_password', 'new_password', 'pwd', 'token',
+  'code_pin', 'code_puk', 'code_rio', 'code_deverouillage', 'code_deverrouillage', 'data']);
+// Résumé best-effort du corps de la requête pour la colonne Detail. Les valeurs tableau/objet (les
+// actions bulk_import_*/bulk_patch_* notamment) ne sont jamais recopiées telles quelles — ça
+// dupliquerait les données de dizaines d'employés/immos dans une seule ligne d'audit — seulement
+// un compte d'éléments.
+function auditDetailFrom(body) {
+  const out = {};
+  Object.keys(body || {}).forEach(function (k) {
+    if (AUDIT_DETAIL_EXCLUDED_KEYS.has(k.toLowerCase())) return;
+    const v = body[k];
+    if (v === undefined) return;
+    if (v !== null && typeof v === 'object') { out[k] = { __count: Array.isArray(v) ? v.length : Object.keys(v).length }; return; }
+    out[k] = v;
+  });
+  return out;
+}
+// Meilleur identifiant disponible pour la colonne Cible — best-effort, pas garanti homogène d'une
+// action à l'autre (chaque action a ses propres champs de corps de requête).
+function auditCibleFrom(body) {
+  const b = body || {};
+  return String(b.code_im || b.code_employe || b.code || b.id || '').slice(0, 255);
+}
+
+// ── Trace Sentry best-effort en cas d'échec d'écriture du journal d'audit (jamais l'action métier
+// elle-même, voir logAudit plus bas) ── Même projet Sentry que dashboard.html/index.html (DSN non
+// sensible, voir 04_HISTORIQUE_DECISIONS.md), tag environment='worker' pour le distinguer. Utilise
+// l'API HTTP "Store" de Sentry (POST brut, sans SDK) plutôt que @sentry/cloudflare : ce Worker n'a
+// ni build ni npm install (voir 01_ARCHITECTURE_TECHNIQUE.md), et un SDK à bundler casserait ce
+// mode de déploiement "zéro build". Ne transmet jamais le corps de la requête ni de code employé —
+// seulement le nom de l'action et un message d'erreur généré par ce fichier (jamais un texte fourni
+// par le client) : rien à scruber ici, contrairement au scrubbing PII côté dashboard/PWA (voir
+// sentryScrubPII dans dashboard.html) qui protège des breadcrumbs/événements riches en contexte.
+const SENTRY_STORE_URL = 'https://o4511863564533760.ingest.de.sentry.io/api/4511863574560848/store/';
+const SENTRY_PUBLIC_KEY = '8823eceab72dee7235becd4b7bd40e26';
+async function reportAuditFailureToSentry(action, message) {
+  await fetch(SENTRY_STORE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Sentry-Auth': 'Sentry sentry_version=7, sentry_key=' + SENTRY_PUBLIC_KEY + ', sentry_client=immo-tracker-worker/1.0' },
+    body: JSON.stringify({ message: 'Échec écriture Journal_Audit', level: 'warning', environment: 'worker', tags: { action: action || 'inconnue' }, extra: { detail: String(message || '').slice(0, 300) } })
+  });
+}
+
 // ── Origines autorisées à appeler ce Worker depuis du JS navigateur (fetch/XHR) ─────────────────
 // Avant durcissement : Access-Control-Allow-Origin: '*' — n'importe quel site tiers pouvait lire
 // les réponses du Worker depuis du JS embarqué sur une page piégée (moissonnage à grande échelle
@@ -128,7 +208,8 @@ function securityHeadersFor(request, allowedOrigins) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { signSessionWith, verifySessionWith, estAdminSessionPure, estGarantSessionPure, roleNorm, requireAdminWith, requireGarantWith, b64url, b64urlToBytes, GESTIONNAIRES, SESSION_DUREE_MS, handleRequest,
     LOGIN_ATTEMPTS, loginLockStatus, registerLoginFailure, clearLoginAttempts, LOGIN_LOCK_THRESHOLDS, LOGIN_PROBE_SENTINEL,
-    ALLOWED_ORIGINS, corsOriginFor, securityHeadersFor };
+    ALLOWED_ORIGINS, corsOriginFor, securityHeadersFor,
+    GATED_ACTIONS_AUDIT, AUDIT_AUTH_ERRORS, AUDIT_DETAIL_EXCLUDED_KEYS, auditDetailFrom, auditCibleFrom, reportAuditFailureToSentry };
 }
 
 async function handleRequest(request) {
@@ -281,6 +362,29 @@ async function handleRequest(request) {
     return _actifParCode[code] !== false;
   }
 
+  // ── Journal d'audit (écriture) — best-effort ────────────────────────────────
+  // Un échec ici ne doit JAMAIS remonter à l'appelant ni empêcher l'action métier déjà exécutée
+  // (elle a déjà eu lieu quand cette fonction est appelée, voir le point d'insertion unique après
+  // dispatchPost plus bas, et les deux appels directs dans le bloc verify_password). Sentry ne
+  // reçoit que le nom de l'action et un message d'erreur généré ici (jamais body/code employé).
+  async function logAudit(opts) {
+    try {
+      const fields = {
+        Title: opts.action,
+        Horodatage: new Date().toISOString(),
+        Code_Employe: opts.code || '',
+        Action: opts.action,
+        Cible: String(opts.cible || '').slice(0, 255),
+        Detail: JSON.stringify(opts.detail || {}).slice(0, 800),
+        Resultat: opts.success ? 'Succès' : 'Échec'
+      };
+      const r = await fetch(GL + '/Journal_Audit/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: fields }) });
+      if (!r.ok) throw new Error('graph_status_' + r.status);
+    } catch (e) {
+      try { await reportAuditFailureToSentry(opts.action, e && e.message); } catch (e2) { /* best-effort jusqu'au bout */ }
+    }
+  }
+
   // ── Debugs ──────────────────────────────────────────────────────────────────
   if (p.get('debug_immos')    === '1') { const r = await fetch(GL + '/Immos/items?$expand=fields&$top=2', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
 
@@ -341,11 +445,28 @@ async function handleRequest(request) {
       'Campagnes_Inventaire', 'Lignes_Inventaire', 'Catalogue_Articles_EPI', 'Grille_Dotation_EPI', 'Dotations_EPI',
       'Lignes_Dotation_EPI', 'Catalogue_Outillage', 'Grille_Outillage', 'Lignes_Outillage', 'Materiel_IT',
       'Mouvements_Materiel_IT', 'Lignes_Telephoniques', 'Mouvements_Lignes_Telephoniques',
-      'Campagnes_Inventaire_Immos', 'Scans_Inventaire_Immos'];
+      'Campagnes_Inventaire_Immos', 'Scans_Inventaire_Immos', 'Journal_Audit'];
     const nomListe = p.get('export_liste');
     if (EXPORTABLE_LISTS.indexOf(nomListe) === -1) return json({ success: false, error: 'liste_inconnue', listes_valides: EXPORTABLE_LISTS }, 400);
     const res = await paginateStatus(GL + '/' + encodeURIComponent(nomListe) + '/items?$expand=fields&$top=200', 45);
     return json({ success: true, liste: nomListe, exporte_le: new Date().toISOString(), count: res.items.length, complete: res.complete, items: res.items.map(i => Object.assign({ id: i.id }, i.fields)) });
+  }
+
+  // ── Journal d'audit des actions sensibles (lecture) — Journal_Audit, ajoutée août 2026 ─────────
+  // PAS un endpoint GET public comme les ~35 autres (?dashboard=1, ?employes=1...) : ce n'est pas
+  // une donnée de fonctionnement courant, c'est un journal de qui a fait quoi (mots de passe,
+  // droits, suppressions...). Protégé requireAdmin, même mécanisme que ?export_liste= (jeton en
+  // paramètre de requête &token=, puisque c'est un GET sans corps JSON).
+  if (p.get('journal_audit') === '1') {
+    const _auth = await requireAdmin({ token: p.get('token') });
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+    const items = await paginate(GL + '/Journal_Audit/items?$expand=fields&$orderby=fields/Horodatage%20desc&$top=3000', 8);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      let detail = {};
+      try { detail = f.Detail ? JSON.parse(f.Detail) : {}; } catch (e) { detail = { __raw: f.Detail || '' }; }
+      return { id: i.id, horodatage: f.Horodatage || '', code_employe: f.Code_Employe || '', action: f.Action || f.Title || '', cible: f.Cible || '', detail: detail, resultat: f.Resultat || '' };
+    }));
   }
 
   // ── Métadonnées achat (valeur + date) ──────────────────────────────────────
@@ -921,6 +1042,14 @@ async function handleRequest(request) {
     const action = p.get('action');
     const body   = await request.json();
 
+    // Point d'insertion unique du journal d'audit (voir plus bas, juste après l'appel à
+    // dispatchPost()) : TOUS les blocs d'action ci-dessous restent EXACTEMENT comme avant, aucun
+    // n'a été modifié individuellement pour ce besoin — seule cette fonction englobante a été
+    // ajoutée. Elle capture la Response déjà produite par le bloc exécuté (clonée, jamais
+    // consommée deux fois) pour journaliser après coup sans toucher à la logique métier de chacun
+    // des 62 blocs gated. Voir 04_HISTORIQUE_DECISIONS.md pour le raisonnement complet.
+    const dispatchPost = async () => {
+
     // ── Vérifier un mot de passe (login dashboard) ──
     if (action === 'verify_password') {
       const code = (body.code || '').trim();
@@ -935,9 +1064,13 @@ async function handleRequest(request) {
       // ni être bloquée par un verrou déjà en cours (voir LOGIN_PROBE_SENTINEL plus haut).
       if (body.password === LOGIN_PROBE_SENTINEL) return json({ success: false, needs_setup: false });
       const lock = loginLockStatus(code);
-      if (lock.locked) return json({ success: false, error: 'trop_de_tentatives', retry_after_s: lock.retryAfterS }, 429);
+      // Échec de connexion journalisé sans identité vérifiée (aucune session n'existe à ce stade) :
+      // Code_Employe reste vide, `code` (celui tapé, pas garanti être le bon employé) va dans Cible
+      // — cohérent avec la règle "Code_Employe jamais depuis le corps de la requête", qui porte sur
+      // l'ATTRIBUTION d'une action, pas sur le suivi d'une tentative de connexion anonyme par nature.
+      if (lock.locked) { await logAudit({ code: '', action: 'verify_password', cible: code, detail: { motif: 'verrou_actif' }, success: false }); return json({ success: false, error: 'trop_de_tentatives', retry_after_s: lock.retryAfterS }, 429); }
       const ok = await verifyPassword(body.password || '', withHash.hash);
-      if (!ok) { registerLoginFailure(code); return json({ success: false, needs_setup: false }); }
+      if (!ok) { registerLoginFailure(code); await logAudit({ code: '', action: 'verify_password', cible: code, detail: { motif: 'mot_de_passe_incorrect' }, success: false }); return json({ success: false, needs_setup: false }); }
       clearLoginAttempts(code);
       const token = await signSession(code, withHash.role);
       return json({ success: true, needs_setup: false, token: token, role: withHash.role || '' });
@@ -2494,6 +2627,27 @@ async function handleRequest(request) {
       }
       const r = await fetch(GL + '/Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: mvFields }) });
       return json({ success: r.ok, status: r.status });
+    }
+
+      return null;
+    };
+
+    const resp = await dispatchPost();
+    if (resp) {
+      // Journal d'audit : point d'insertion unique pour les 62 actions gated (voir commentaire au
+      // début de ce bloc POST). On n'inspecte la réponse qu'après coup, sans jamais modifier ce
+      // que dispatchPost() a déjà renvoyé — resp.clone() garantit que resp reste lisible telle
+      // quelle par le retour ci-dessous, quoi qu'il arrive dans le bloc de journalisation.
+      if (GATED_ACTIONS_AUDIT.has(action)) {
+        try {
+          const cloned = await resp.clone().json();
+          if (!AUDIT_AUTH_ERRORS.has(cloned && cloned.error)) {
+            const auditSession = await verifySessionWith(body.token, SESSION_SECRET);
+            await logAudit({ code: auditSession && auditSession.code, action: action, cible: auditCibleFrom(body), detail: auditDetailFrom(body), success: !!(cloned && cloned.success) });
+          }
+        } catch (e) { /* réponse non-JSON ou parsing impossible : rien de fiable à journaliser, ne bloque jamais l'action */ }
+      }
+      return resp;
     }
   }
 

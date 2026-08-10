@@ -46,7 +46,7 @@ même située sur un autre site :
 4. Donnez le **même nom exact** à la nouvelle liste (sans préfixe — le code y fait référence par ce nom).
 5. Validez → colonnes identiques, **aucune donnée copiée**.
 
-Répétez pour chacune des 21 listes ci-dessous (dupliquer une 22ᵉ liste présente sur le site source
+Répétez pour chacune des 22 listes ci-dessous (dupliquer une 23ᵉ liste présente sur le site source
 mais non listée ici ne pose aucun problème — elle sera simplement inutilisée).
 
 **Méthode de repli** (si cette fonctionnalité n'est pas disponible sur votre tenant) : recréez
@@ -82,6 +82,7 @@ https://immo-proxy.ral-85d.workers.dev/?debug_columns=<NomDeLaListe>
 | `Mouvements_Materiel_IT` | `Title, Code_Employe, Nom_Detenteur, Note, Horodatage` | § Liste Mouvements_Materiel_IT |
 | `Lignes_Telephoniques` | `Title, N_Telephone, Operateur, N_Carte_SIM, Code_PIN, Code_PUK, Code_RIO, Site, Statut, Commentaire` | § Liste Lignes_Telephoniques |
 | `Mouvements_Lignes_Telephoniques` | `Title, Code_Employe, Nom_Detenteur, Note, Horodatage` | § Liste Mouvements_Lignes_Telephoniques |
+| `Journal_Audit` | `Title, Horodatage, Code_Employe, Action, Cible, Detail, Resultat` | § Liste Journal_Audit |
 
 Ne créez **pas** de liste `Chantiers` : elle n'existe pas réellement côté code (`Code_Chantier` est
 un champ texte libre) — voir l'écart documenté dans `04_HISTORIQUE_DECISIONS.md`.

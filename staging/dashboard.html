@@ -402,6 +402,12 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
   <div class="nav-item" data-tab="analyses"><span class="nav-icon">📈</span><span class="nav-label">Analyses</span></div>
   <div class="nav-item" data-tab="utilisateurs"><span class="nav-icon">👥</span><span class="nav-label">Utilisateurs</span></div>
+
+  <!-- Journal d'audit (ajouté août 2026) : masqué aux non-admins par appliquerVisibiliteJournal(),
+       appelée depuis afficherIdentiteConnectee() — voir 03_REGLES_METIER_ET_ROLES.md. L'endpoint
+       Worker est de toute façon protégé requireAdmin indépendamment de cet affichage. -->
+  <div class="nav-group" id="nav-group-admin" style="display:none">ADMINISTRATION</div>
+  <div class="nav-item" data-tab="journal" id="nav-item-journal" style="display:none"><span class="nav-icon">🗂️</span><span class="nav-label">Journal d'audit</span></div>
 </nav>
 <div id="sidebar-overlay" onclick="closeSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:89"></div>
 
@@ -652,6 +658,29 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     <div id="pane-analyses" class="tab-pane"><div id="analyse-content" style="padding:0"></div></div>
     <div id="pane-utilisateurs" class="tab-pane"><div id="users-content" style="padding:0"></div></div>
 
+    <!-- Journal d'audit des actions sensibles (ajouté août 2026) — réservé Admin, voir
+         appliquerVisibiliteJournal() et 03_REGLES_METIER_ET_ROLES.md. Lecture seule : aucune action
+         possible depuis cet onglet, seulement consultation/filtre. -->
+    <div id="pane-journal" class="tab-pane">
+      <div class="card"><div class="card-head"><h3>🗂️ Journal d'audit des actions sensibles</h3><span class="card-cnt" id="cnt-journal"></span></div>
+        <p style="padding:0 18px 8px;font-size:12px;color:var(--grey)">Trace des actions d'administration (mots de passe, droits, suppressions, modifications de fiches...) — les mouvements de matériel restent dans l'onglet Historique. Lecture seule.</p>
+        <div class="filters" style="padding:0 14px 12px">
+          <input type="text" id="journal-q-emp" oninput="renderJournalAudit()" placeholder="🔍 Code employé...">
+          <input type="text" id="journal-q-action" oninput="renderJournalAudit()" placeholder="🔍 Nom de l'action...">
+          <select id="journal-resultat" onchange="renderJournalAudit()">
+            <option value="">Tous résultats</option>
+            <option value="Succès">✅ Succès</option>
+            <option value="Échec">❌ Échec</option>
+          </select>
+          <input type="date" id="journal-depuis" onchange="renderJournalAudit()" title="Depuis le">
+          <input type="date" id="journal-jusqua" onchange="renderJournalAudit()" title="Jusqu'au">
+          <button class="filter-btn" onclick="renderJournalAudit()">Filtrer</button>
+          <button class="filter-btn" onclick="reinitialiserFiltres(['journal-q-emp','journal-q-action','journal-resultat','journal-depuis','journal-jusqua'],renderJournalAudit)">🔄 Réinitialiser</button>
+        </div>
+        <div id="journal-content"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -703,7 +732,7 @@ if(IS_RECETTE){
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
 // Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
-var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos'];
+var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit'];
 var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques'];
 (function(){
   var origFetch=window.fetch.bind(window);
@@ -836,6 +865,7 @@ async function loadEmployes(force){
       employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste,droits:e.Droits,site:e.Site,actif:e.Actif,itemId:e.itemId,
         affectationEpi:e.AffectationEPI,taillePantalon:e.TaillePantalon,tailleTshirt:e.TailleTshirt,tailleVeste:e.TailleVeste,pointureChaussures:e.PointureChaussures,tailleGants:e.TailleGants,
         serviceOutillage:e.ServiceOutillage};});
+      appliquerVisibiliteJournal(); // employesByCode vient d'être (re)peuplé — revalider maintenant que estAdmin() peut lire le rôle réel
       return;
     }
   }catch(e){/* fallback ci-dessous */}
@@ -847,6 +877,7 @@ async function loadEmployes(force){
     employesByCode={};
     employesList.forEach(function(e){employesByCode[e.Code]={nom:e.Nom,poste:e.Poste||'',droits:'',site:''};});
   }catch(e){employesList=[];employesByCode={};}
+  appliquerVisibiliteJournal();
 }
 // Résout le vrai nom d'un employé à partir de son code (évite les doublons "CONI (CONI)")
 function nomEmploye(code){
@@ -1181,6 +1212,17 @@ function afficherIdentiteConnectee(){
   if(!ADMIN_SESSION.code)return;
   var el=document.getElementById('admin-identite-badge');
   if(el)el.textContent='👤 '+ADMIN_SESSION.nom;
+  appliquerVisibiliteJournal();
+}
+// Journal d'audit (ajouté août 2026) : réutilise estAdmin() déjà en place, n'invente pas de
+// nouveau mécanisme de droits. Le nav-item reste caché tant que employesByCode n'est pas encore
+// chargé (estAdmin lit ce cache) — appelé de nouveau une fois loadEmployes() résolu (voir plus
+// bas, reprise de session) donc pas de faux négatif permanent au premier chargement.
+function appliquerVisibiliteJournal(){
+  var admin=estAdmin(ADMIN_SESSION.code);
+  var grp=document.getElementById('nav-group-admin'), item=document.getElementById('nav-item-journal');
+  if(grp)grp.style.display=admin?'':'none';
+  if(item)item.style.display=admin?'':'none';
 }
 
 // Permet de changer d'identité (redemande le mot de passe de la nouvelle identité)
@@ -1290,6 +1332,7 @@ function renderTab(name){
     case 'utilisateurs':
       loadEmployes().then(function(){renderUsers();});
       break;
+    case 'journal': if(!dataLoaded.journal)loadJournalAudit(); else renderJournalAudit(); break;
   }
 }
 
@@ -1403,6 +1446,61 @@ function renderAbsences(){
   }).join('');
   document.getElementById('cnt-absences').textContent=absencesList.length+' signalement(s)';
   div.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Date absence</th><th>Employé</th><th>Signalé par</th><th>Site</th><th>Motif</th><th>Horodatage</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ── Journal d'audit des actions sensibles (ajouté août 2026) ─────────────────
+// Réservé Admin (voir appliquerVisibiliteJournal ci-dessus pour le nav-item ; l'endpoint Worker
+// lui-même est protégé requireAdmin indépendamment de cet affichage, source de vérité réelle).
+var journalAuditList=[];
+async function loadJournalAudit(){
+  dataLoaded.journal=true;
+  if(!estAdmin(ADMIN_SESSION.code)){renderJournalAudit();return;}
+  try{
+    var r=await fetch(W+'?journal_audit=1&token='+encodeURIComponent(ADMIN_SESSION.token||''));
+    var data=await r.json();
+    if(data&&data.error){journalAuditList=[];if(data.error==='droits_insuffisants')toast('🔒 Journal d\'audit réservé aux administrateurs.','error');}
+    else journalAuditList=Array.isArray(data)?data:[];
+  }catch(e){journalAuditList=[];}
+  renderJournalAudit();
+}
+function formatAuditDetail(detail){
+  if(!detail||typeof detail!=='object')return'—';
+  var parts=Object.keys(detail).map(function(k){
+    var v=detail[k];
+    if(v&&typeof v==='object'&&v.__count!=null)return k+': '+v.__count+' élément(s)';
+    return k+': '+v;
+  });
+  return parts.join(' · ')||'—';
+}
+function renderJournalAudit(){
+  var div=document.getElementById('journal-content');
+  if(!div)return;
+  if(!estAdmin(ADMIN_SESSION.code)){
+    div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé aux administrateurs.</p>';
+    document.getElementById('cnt-journal').textContent='';
+    return;
+  }
+  var qEmp=((document.getElementById('journal-q-emp')||{}).value||'').trim().toUpperCase();
+  var qAction=((document.getElementById('journal-q-action')||{}).value||'').trim().toLowerCase();
+  var resFilter=(document.getElementById('journal-resultat')||{}).value||'';
+  var depuis=(document.getElementById('journal-depuis')||{}).value||'';
+  var jusqua=(document.getElementById('journal-jusqua')||{}).value||'';
+  var rows=journalAuditList.filter(function(a){
+    if(qEmp&&(a.code_employe||'').toUpperCase().indexOf(qEmp)===-1)return false;
+    if(qAction&&(a.action||'').toLowerCase().indexOf(qAction)===-1)return false;
+    if(resFilter&&a.resultat!==resFilter)return false;
+    if(depuis&&a.horodatage&&a.horodatage<depuis)return false;
+    if(jusqua&&a.horodatage&&a.horodatage>jusqua+'T23:59:59')return false;
+    return true;
+  });
+  if(!rows.length){div.innerHTML='<p class="es" style="padding:40px">Aucune entrée d\'audit'+(journalAuditList.length?' pour ce filtre':'')+'.</p>';document.getElementById('cnt-journal').textContent='';return;}
+  document.getElementById('cnt-journal').textContent=rows.length+' / '+journalAuditList.length+' entrée(s)';
+  var trs=rows.map(function(a){
+    var detailStr=formatAuditDetail(a.detail);
+    return '<tr><td>'+fmtDT(a.horodatage)+'</td><td>'+(a.code_employe?nomEmploye(a.code_employe)+' ('+a.code_employe+')':'—')+'</td><td>'+(a.action||'—')+'</td><td>'+(a.cible||'—')+'</td>'+
+      '<td title="'+detailStr+'">'+detailStr+'</td><td><span class="badge '+(a.resultat==='Succès'?'bn':'ba')+'">'+(a.resultat||'—')+'</span></td></tr>';
+  }).join('');
+  div.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Horodatage</th><th>Employé</th><th>Action</th><th>Cible</th><th>Détail</th><th>Résultat</th></tr></thead><tbody>'+trs+'</tbody></table></div>';
 }
 
 // ── Inventaire de stock (articles/consommables — distinct de l'inventaire des immobilisations) ──

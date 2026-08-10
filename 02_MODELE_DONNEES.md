@@ -355,6 +355,22 @@ Mêmes colonnes et même principe que `Mouvements_Materiel_IT` (`Title` = code d
 
 ⚠️ `Materiel_IT` conserve ses colonnes `N_Telephone`/`Operateur`/etc. telles quelles en base (pas de suppression) mais le dashboard n'écrit plus dedans pour les nouveaux appareils — ces champs sont désormais l'affaire de `Lignes_Telephoniques`. Une migration one-shot (bouton dans l'onglet Lignes) crée une ligne pour chaque téléphone existant ayant déjà un numéro, en reprenant son détenteur actuel comme point de départ de l'historique.
 
+## Liste `Journal_Audit` (ajoutée août 2026)
+
+*Journal d'audit des actions sensibles d'administration — distinct de `Mouvements` (qui trace les mouvements de matériel, pas les actions d'administration : mots de passe, droits, suppressions, migrations en masse...). Une ligne = une tentative d'action (réussie ou non) parmi les 62 actions déjà protégées `requireAdmin`/`requireGarant`, plus les échecs de connexion. Détail complet du raisonnement et du mécanisme dans `03_REGLES_METIER_ET_ROLES.md` et `04_HISTORIQUE_DECISIONS.md`.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de l'action (ex. `reset_password`), dupliqué dans `Action` — permet un aperçu lisible par défaut dans SharePoint |
+| `Horodatage` | Date et heure | ISO |
+| `Code_Employe` | Texte | Auteur, résolu depuis le jeton de session vérifié — **jamais** depuis le corps de la requête. Vide pour un échec de connexion (`verify_password`, aucune session n'existe encore à ce stade) |
+| `Action` | Texte | Nom de l'action |
+| `Cible` | Texte | Meilleur identifiant disponible dans le corps de la requête (`code_im`, `code_employe`, `code`, `id`) — best-effort, pas garanti homogène d'une action à l'autre. Pour un échec de connexion : le code **tenté** (non vérifié) |
+| `Detail` | Texte multiligne | JSON court du reste du corps de la requête (~800 caractères max). Exclut mots de passe, codes PIN/PUK/RIO/déverrouillage SIM, jeton de session, charges de fichier base64 (RGPD). Les tableaux/objets (imports en masse) sont résumés en `{"__count": N}` plutôt que recopiés intégralement |
+| `Resultat` | Texte | `Succès` / `Échec` |
+
+⚠️ Aucune écriture n'a lieu si l'authentification échoue (`session_invalide`/`droits_insuffisants`/`session_secret_manquant`) — voir `03_REGLES_METIER_ET_ROLES.md` pour le raisonnement. `Journal_Audit` fait partie des listes couvertes par `?export_liste=` (sauvegarde admin, voir `PROCEDURE_ROLLBACK.md`).
+
 ## Recherche globale dashboard (ajoutée août 2026)
 
 Aucun nouveau modèle de données : la recherche du header (voir `03_REGLES_METIER_ET_ROLES.md`) lit exclusivement les structures déjà chargées en mémoire côté dashboard (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`) — aucune colonne SharePoint ni action Worker ajoutée.

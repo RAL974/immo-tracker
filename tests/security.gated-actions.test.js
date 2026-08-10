@@ -8,6 +8,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadWorker } = require('./helpers/loadWorker');
+
+global.CLIENT_SECRET_ENV = global.CLIENT_SECRET_ENV || 'fake-client-secret';
+global.SESSION_SECRET_ENV = global.SESSION_SECRET_ENV || 'fake-session-secret';
+const W = loadWorker();
 
 const workerSrc = fs.readFileSync(path.join(__dirname, '..', 'worker.js'), 'utf8');
 const dashboardSrc = fs.readFileSync(path.join(__dirname, '..', 'dashboard.html'), 'utf8');
@@ -60,4 +65,27 @@ test("aucune action partagée avec la PWA terrain (badge sans mot de passe) n'es
   const { protectedActions } = extractWorkerProtectedActions(workerSrc);
   const wronglyProtected = [...PWA_SHARED_ACTIONS].filter(a => protectedActions.has(a));
   assert.deepEqual(wronglyProtected, [], 'Ces actions sont utilisées par la PWA sans connexion — les protéger casserait le scan de badge pour les 97 collaborateurs terrain : ' + wronglyProtected.join(', '));
+});
+
+// ── Journal d'audit (ajouté août 2026) : GATED_ACTIONS_AUDIT (worker.js) doit rester le même
+// périmètre EXACT que GATED_ACTIONS_AUDIT (worker.js) === actions protégées (worker.js) ===
+// GATED_ACTIONS (dashboard.html) — sinon une action sensible pourrait être ajoutée sans jamais être
+// journalisée, ou le journal pourrait tenter de logger une action qui n'existe pas côté dashboard.
+test('GATED_ACTIONS_AUDIT (worker.js, utilisée par le journal d\'audit) reste synchronisée avec GATED_ACTIONS (dashboard.html)', () => {
+  const gatedDashboard = extractGatedActionsFromDashboard(dashboardSrc);
+  const gatedAudit = W.GATED_ACTIONS_AUDIT;
+  assert.ok(gatedAudit instanceof Set, 'GATED_ACTIONS_AUDIT doit être exporté par worker.js (module.exports)');
+  const missingFromAudit = [...gatedDashboard].filter(a => !gatedAudit.has(a));
+  const extraInAudit = [...gatedAudit].filter(a => !gatedDashboard.has(a));
+  assert.deepEqual(missingFromAudit, [], 'Actions dans GATED_ACTIONS (dashboard) mais absentes de GATED_ACTIONS_AUDIT (worker) — ne seraient jamais journalisées : ' + missingFromAudit.join(', '));
+  assert.deepEqual(extraInAudit, [], 'Actions dans GATED_ACTIONS_AUDIT (worker) mais absentes de GATED_ACTIONS (dashboard) — n\'existent pas côté client : ' + extraInAudit.join(', '));
+});
+
+test('GATED_ACTIONS_AUDIT (worker.js) reste synchronisée avec les actions réellement protégées requireAdmin/requireGarant', () => {
+  const { protectedActions } = extractWorkerProtectedActions(workerSrc);
+  const gatedAudit = W.GATED_ACTIONS_AUDIT;
+  const missingFromAudit = [...protectedActions].filter(a => !gatedAudit.has(a));
+  const extraInAudit = [...gatedAudit].filter(a => !protectedActions.has(a));
+  assert.deepEqual(missingFromAudit, [], 'Actions gated côté Worker mais absentes de GATED_ACTIONS_AUDIT : ' + missingFromAudit.join(', '));
+  assert.deepEqual(extraInAudit, [], 'Actions dans GATED_ACTIONS_AUDIT mais non gated côté Worker : ' + extraInAudit.join(', '));
 });
