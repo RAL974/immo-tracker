@@ -1,0 +1,22 @@
+[
+  { "Code_IM": "IM900001", "Libelle": "Perceuse-visseuse (test)", "Categorie": "Électroportatif", "N_Serie": "", "FDS_URL": "", "Compte": "21541" },
+  { "Code_IM": "IM900002", "Libelle": "Meuleuse (test)", "Categorie": "Électroportatif", "N_Serie": "", "FDS_URL": "", "Compte": "21541" },
+  { "Code_IM": "IM900003", "Libelle": "Multimètre (test)", "Categorie": "Mesure & test", "N_Serie": "", "FDS_URL": "", "Compte": "21542" },
+  { "Code_IM": "IM900004", "Libelle": "Pince ampèremétrique (test)", "Categorie": "Mesure & test", "N_Serie": "", "FDS_URL": "", "Compte": "21542" },
+  { "Code_IM": "IM900005", "Libelle": "Échafaudage roulant (test)", "Categorie": "Matériel de chantier", "N_Serie": "", "FDS_URL": "", "Compte": "21543" },
+  { "Code_IM": "IM900006", "Libelle": "Groupe électrogène (test)", "Categorie": "Matériel de chantier", "N_Serie": "", "FDS_URL": "", "Compte": "21543" },
+  { "Code_IM": "IM900007", "Libelle": "Coffret de chantier (test)", "Categorie": "Coffrets & armoires", "N_Serie": "", "FDS_URL": "", "Compte": "21544" },
+  { "Code_IM": "IM900008", "Libelle": "Camion benne (test)", "Categorie": "Véhicules", "N_Serie": "", "FDS_URL": "", "Compte": "2182" },
+  { "Code_IM": "IM900009", "Libelle": "Fourgon utilitaire (test)", "Categorie": "Véhicules", "N_Serie": "", "FDS_URL": "", "Compte": "2182" },
+  { "Code_IM": "IM900010", "Libelle": "Ordinateur portable (test)", "Categorie": "Informatique & bureautique", "N_Serie": "", "FDS_URL": "", "Compte": "2183" },
+  { "Code_IM": "IM900011", "Libelle": "Étiqueteuse (test)", "Categorie": "Informatique & bureautique", "N_Serie": "", "FDS_URL": "", "Compte": "2183" },
+  { "Code_IM": "IM900012", "Libelle": "Bureau réglable (test)", "Categorie": "Mobilier", "N_Serie": "", "FDS_URL": "", "Compte": "2184" },
+  { "Code_IM": "IM900013", "Libelle": "Armoire de rangement (test)", "Categorie": "Mobilier", "N_Serie": "", "FDS_URL": "", "Compte": "2184" },
+  { "Code_IM": "IM900014", "Libelle": "Logiciel de devis (test)", "Categorie": "Logiciels & licences", "N_Serie": "", "FDS_URL": "", "Compte": "205" },
+  { "Code_IM": "IM900015", "Libelle": "Niveau laser (test)", "Categorie": "Mesure & test", "N_Serie": "", "FDS_URL": "", "Compte": "21542" },
+  { "Code_IM": "IM900016", "Libelle": "Marteau-piqueur (test)", "Categorie": "Électroportatif", "N_Serie": "", "FDS_URL": "", "Compte": "21541" },
+  { "Code_IM": "IM900017", "Libelle": "Poste à souder (test)", "Categorie": "Électroportatif", "N_Serie": "", "FDS_URL": "", "Compte": "21541" },
+  { "Code_IM": "IM900018", "Libelle": "Compresseur (test)", "Categorie": "Matériel de chantier", "N_Serie": "", "FDS_URL": "", "Compte": "21543" },
+  { "Code_IM": "IM900019", "Libelle": "Caution locaux (test)", "Categorie": "Immobilisations financières", "N_Serie": "", "FDS_URL": "", "Compte": "2718" },
+  { "Code_IM": "IM900020", "Libelle": "Table à tréteaux (test)", "Categorie": "Mobilier", "N_Serie": "", "FDS_URL": "", "Compte": "2184" }
+]

@@ -1,0 +1,17 @@
+{
+  "name": "Immo Tracker – RECETTE (données fictives)",
+  "short_name": "Immo Tracker (test)",
+  "description": "Environnement de recette — aucune donnée réelle. Voir PROCEDURE_RECETTE.md.",
+  "start_url": "/immo-tracker/staging/",
+  "display": "standalone",
+  "background_color": "#f0f4f8",
+  "theme_color": "#c0392b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "logo-icon.jpg",
+      "sizes": "460x337",
+      "type": "image/jpeg"
+    }
+  ]
+}

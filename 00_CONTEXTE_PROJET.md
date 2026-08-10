@@ -49,6 +49,7 @@
 - Audit et durcissement de sécurité — limitation de débit sur la connexion, en-têtes CORS/sécurité resserrés, scrubbing PII Sentry, secrets retirés du dépôt public (août 2026, voir `SECURITE_ETAT.md` et `04_HISTORIQUE_DECISIONS.md`)
 - Mode sombre du dashboard, nettoyage de code mort, cohérence visuelle des vues EPI/Outillage (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Sauvegarde complète des listes SharePoint (bouton dashboard, un fichier JSON de toutes les listes, orchestrée liste par liste pour rester sous les limites du plan gratuit Cloudflare) + procédure de restauration documentée (PROCEDURE_RESTAURATION.md) — août 2026
+- Environnement de recette (staging) séparé de la production — Worker Cloudflare et site SharePoint dédiés, données 100% fictives, bandeau permanent, coût 0 € (août 2026, voir `PROCEDURE_RECETTE.md` et `01_ARCHITECTURE_TECHNIQUE.md`). **En attente de la création du site SharePoint de recette et de ses listes par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`.
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier

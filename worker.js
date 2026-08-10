@@ -141,8 +141,19 @@ async function handleRequest(request) {
   // Jamais écrit en dur → n'apparaît nulle part dans le code source.
   const CLIENT_SECRET= (typeof CLIENT_SECRET_ENV !== 'undefined' && CLIENT_SECRET_ENV) || (typeof globalThis !== 'undefined' && globalThis.CLIENT_SECRET_ENV) || '';
   if (!CLIENT_SECRET) return new Response(JSON.stringify({ error: 'config', message: 'La variable CLIENT_SECRET_ENV n\'est pas configurée dans le Worker.' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
-  const SITE_ID      = 'espacesoleil97.sharepoint.com,4157ffef-a5f6-4e7e-8a19-4f6ab57d7128,d15dad00-7bed-4e78-bb2f-d0156e6e49a7';
+  // SITE_ID : site SharePoint de production par défaut. Surchargeable par la variable d'environnement
+  // Cloudflare "SITE_ID_ENV" (Settings > Variables and Secrets, non sensible — un ID de site n'est pas
+  // un secret) — utilisée uniquement par le Worker de recette (immo-proxy-staging, [env.staging] dans
+  // wrangler.toml) pour pointer vers un site SharePoint TEST séparé, sans jamais toucher au
+  // comportement de ce Worker en production (repli sur la valeur ci-dessous si la variable est
+  // absente, exactement le même pattern que CLIENT_SECRET_ENV/SESSION_SECRET_ENV ci-dessus).
+  const SITE_ID      = (typeof SITE_ID_ENV !== 'undefined' && SITE_ID_ENV) || (typeof globalThis !== 'undefined' && globalThis.SITE_ID_ENV) || 'espacesoleil97.sharepoint.com,4157ffef-a5f6-4e7e-8a19-4f6ab57d7128,d15dad00-7bed-4e78-bb2f-d0156e6e49a7';
   const GL           = 'https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/lists';
+  // Nom d'environnement, exposé en en-tête de réponse (X-Immo-Env) — pur diagnostic, ne change aucun
+  // comportement métier. Permet au front (ou à William en devtools) de vérifier que le Worker appelé
+  // est bien celui attendu (staging vs production), même si l'URL a été mal configurée quelque part.
+  const ENV_NAME     = (typeof ENV_NAME_ENV !== 'undefined' && ENV_NAME_ENV) || (typeof globalThis !== 'undefined' && globalThis.ENV_NAME_ENV) || 'production';
+  cors['X-Immo-Env'] = ENV_NAME;
 
   const tok = await fetch('https://login.microsoftonline.com/' + TENANT_ID + '/oauth2/v2.0/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

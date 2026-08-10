@@ -1,3 +1,16 @@
 name = "immo-proxy"
 main = "worker.js"
 compatibility_date = "2024-09-23"
+
+# ── Environnement de recette (staging) ──────────────────────────────────────────────────
+# Déployé comme une ressource Cloudflare Worker séparée ("immo-proxy-staging"), connectée au même
+# dépôt Git mais avec une commande de build dédiée : npx wrangler deploy --env staging (réglage
+# Cloudflare Settings > Build, pas du code). SITE_ID_ENV pointe vers un site SharePoint TEST séparé
+# (créé manuellement, voir PROCEDURE_RECETTE.md pour la liste exacte des listes/colonnes à créer) —
+# jamais les vraies données de production. Valeur non sensible (un ID de site n'est pas un secret,
+# voir 01_ARCHITECTURE_TECHNIQUE.md), donc committée ici comme pour les autres environnements.
+# CLIENT_SECRET_ENV et SESSION_SECRET_ENV restent des secrets Cloudflare configurés séparément sur
+# la ressource "immo-proxy-staging" (Settings > Variables and Secrets), jamais dans ce fichier.
+[env.staging]
+name = "immo-proxy-staging"
+vars = { SITE_ID_ENV = "REMPLACER_PAR_L_ID_DU_SITE_SHAREPOINT_TEST", ENV_NAME_ENV = "staging" }

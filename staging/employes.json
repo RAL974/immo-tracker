@@ -1,0 +1,12 @@
+[
+  { "Code": "AIWI", "Nom": "Compte admin (recette)", "Poste": "Administration" },
+  { "Code": "FIC1", "Nom": "DUPONT Jean (test)", "Poste": "Gestionnaire dépôt" },
+  { "Code": "FIC2", "Nom": "MARTIN Alice (test)", "Poste": "Référente matériel Mayotte" },
+  { "Code": "FIC3", "Nom": "BERNARD Marc (test)", "Poste": "Responsable d'affaires" },
+  { "Code": "FIC4", "Nom": "PETIT Sophie (test)", "Poste": "Conductrice de travaux" },
+  { "Code": "FIC5", "Nom": "DURAND Paul (test)", "Poste": "CT spécialisé" },
+  { "Code": "FIC6", "Nom": "MOREAU Julie (test)", "Poste": "Ouvrier" },
+  { "Code": "FIC7", "Nom": "LEROY Thomas (test)", "Poste": "Ouvrier spécialisé" },
+  { "Code": "FIC8", "Nom": "SIMON Claire (test)", "Poste": "Encadrement" },
+  { "Code": "FIC9", "Nom": "MICHEL Paul (test)", "Poste": "Renfort inventaire" }
+]

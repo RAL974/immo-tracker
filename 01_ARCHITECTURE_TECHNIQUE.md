@@ -17,6 +17,8 @@ Les interfaces web ne parlent jamais directement à SharePoint : tout passe par 
 | PWA terrain | `app.js`, `index.html`, `sw.js` (ajouté août 2026, coquille hors-ligne) | GitHub Pages | https://ral974.github.io/immo-tracker/ |
 | Dashboard | `dashboard.html` (autonome HTML+CSS+JS) | GitHub Pages | https://ral974.github.io/immo-tracker/dashboard.html |
 | Worker (proxy sécurisé) | `worker.js` + `wrangler.toml` (dans le dépôt depuis août 2026, voir plus bas) | Cloudflare Workers | https://immo-proxy.ral-85d.workers.dev/ |
+| Worker de recette (ajouté août 2026) | même `worker.js`, environnement `[env.staging]` de `wrangler.toml` — voir § Environnement de recette plus bas et `PROCEDURE_RECETTE.md` | Cloudflare Workers (ressource séparée) | https://immo-proxy-staging.ral-85d.workers.dev/ |
+| Pages de recette (ajouté août 2026) | miroir de `index.html`/`dashboard.html`/`app.js`/... généré par `scripts/sync-staging.js`, jamais édité à la main | GitHub Pages (sous-dossier `staging/`) | https://ral974.github.io/immo-tracker/staging/ |
 | Catalogue immos (léger) | `immos.json` — **tableau** `[...]` de 1023 immos | GitHub Pages (racine) | .../immos.json |
 | Catalogue immos (complet, migration) | `immos_full.json` — **objet** `{...}` de 1167 immos | GitHub Pages (racine) | .../immos_full.json |
 | Base de données | Listes SharePoint | Microsoft 365 Electricité Services Réunion | espacesoleil97.sharepoint.com/sites/Logistique-Immos |
@@ -55,6 +57,44 @@ Le **secret client** (sensible) est stocké chiffré dans les variables Cloudfla
 4. **Vérification après un push** : onglet *Deployments* du Worker dans Cloudflare (statut du build), puis tester une lecture simple ex. `?debug_mouvements=1` dans un navigateur pour confirmer que l'API répond toujours.
 
 ⚠️ **Avant août 2026**, `worker.js` n'était jamais commité (l'app GitHub "Claude" n'avait pas les droits d'écriture nécessaires pour un dépôt gérant un secret, et le Worker n'était pas encore connecté en Git) : toute modification se faisait par copier-coller manuel dans l'éditeur Cloudflare. Cette contrainte n'existe plus, mais rester prudent : un déploiement Worker cassé coupe l'API pour tous les utilisateurs immédiatement (contrairement à un bug PWA/Dashboard, sans risque et facile à corriger).
+
+## Environnement de recette (staging, ajouté août 2026)
+
+*Procédure complète (mise en place + workflow quotidien) : `PROCEDURE_RECETTE.md`. Raisonnement et
+comparaison des options envisagées : `04_HISTORIQUE_DECISIONS.md`.*
+
+Avant août 2026, tout changement était testé directement contre les données de production (1023+
+immobilisations réelles) — risqué pour toute action d'écriture. Un second environnement, isolé au
+niveau des **données** (jamais du code, qui reste strictement identique), permet de tester sans
+conséquence :
+
+- **Worker** : `worker.js` accepte un environnement `[env.staging]` (`wrangler.toml`) déployé comme
+  une ressource Cloudflare séparée (`immo-proxy-staging`), connectée au même dépôt Git mais avec sa
+  propre commande de build (`npx wrangler deploy --env staging`) et ses propres secrets Cloudflare.
+  Le seul changement de code nécessaire : `SITE_ID` (et un `ENV_NAME` purement diagnostic, exposé en
+  en-tête de réponse `X-Immo-Env`) sont désormais lus depuis des variables d'environnement
+  (`SITE_ID_ENV`/`ENV_NAME_ENV`), avec repli sur les valeurs de production actuelles si elles sont
+  absentes — comportement de production strictement inchangé tant que ces variables ne sont pas
+  définies (vérifié par test, `tests/worker.staging-env.test.js`).
+- **Données** : un **second site SharePoint**, entièrement séparé (mêmes noms de liste que la
+  production, pas de préfixe) — préféré à l'alternative envisagée (mêmes listes préfixées `TEST_`
+  sur le même site), qui aurait exigé de paramétrer ~150 occurrences littérales de noms de liste
+  dispersées dans `worker.js`, avec un risque réel d'oubli (une seule occurrence non préfixée aurait
+  écrit dans une vraie liste). Voir `04_HISTORIQUE_DECISIONS.md` pour le détail du calcul.
+- **Pages web** : `staging/` est un sous-dossier du même dépôt/site GitHub Pages, miroir **strictement
+  identique** de `index.html`/`dashboard.html`/`app.js`/`style.css`/`design-system.css`/`sw.js`/les
+  logos (généré par `scripts/sync-staging.js`, jamais édité à la main — `npm run check` échoue si le
+  miroir a dérivé). Seuls `manifest.json` (nom/couleur/URL de démarrage distincts) et
+  `immos.json`/`employes.json` (catalogues **fictifs**) diffèrent volontairement.
+- **Bascule** : détectée par le **chemin** de la page (`/staging/`), jamais par un paramètre d'URL —
+  un chemin persiste au rechargement/partage/marque-page, un `?recette=1` se perd dès qu'on navigue
+  sans le reporter. Un bandeau rouge permanent (« 🧪 RECETTE ») s'affiche dès que ce chemin est
+  détecté, avant même la connexion au dashboard.
+- **Déploiement** : `staging/` et la production se déploient depuis le **même commit** sur `main`
+  (choix simple retenu plutôt qu'une branche git dédiée avec pipeline découplé — voir
+  `04_HISTORIQUE_DECISIONS.md`) — `deploy.yml` n'a **pas été modifié**, il uploade déjà tout le dépôt
+  tel quel. Le vrai test "avant que ce soit en ligne" se fait localement (serveur statique pointé sur
+  `/staging/`), avant de pousser.
 
 ## Pièges connus (vécus, à éviter)
 
