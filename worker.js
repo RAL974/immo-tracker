@@ -270,6 +270,11 @@ const DIGEST_SEUILS = {
                                 // que les 180 jours affichés dans l'onglet Maintenance — le digest ne
                                 // remonte que l'urgent)
   panneJours: 7,                // dernier mouvement d'une immo = Panne, non résolue depuis plus de N jours
+  demandeJours: 5,              // demande de matériel (Reservations, roadmap item D) restée "Demandee" (sans
+                                // Confirmee/Refusee) depuis plus de N jours — plus court que transfertJours
+                                // (7) : une demande de planification non traitée risque de bloquer un
+                                // chantier avant même que le matériel ne soit sorti, contrairement à un
+                                // transfert déjà en cours qui n'a "que" un retard de validation
   campagneCouverturePct: 50,   // % de couverture en-dessous duquel une campagne ouverte est signalée
   campagneMinJours: 14,         // ...et seulement si elle est ouverte depuis au moins N jours (ne pas
                                 // alerter une campagne qui vient de démarrer)
@@ -338,6 +343,20 @@ function digestPannesNonResolues(mouvements, nowMs, seuilJours) {
     .sort((a, b) => b.jours - a.jours);
 }
 
+// ── Règle 3bis : demandes de matériel (Reservations, roadmap item D) en attente de traitement ──
+// Une demande reste "Demandee" tant que le dépôt n'a pas Confirmé/Refusé — ce digest ne signale que
+// celles-là (Confirmee/Refusee/Rendue/Annulee sont déjà traitées, rien à faire). `reservations`
+// normalisé { code_im, categorie, libelle_libre, quantite, code_employe, nom_employe, nom_chantier,
+// statut, horodatage }, même principe que digestTransfertsEnAttente (horodatage = date de soumission,
+// pas la date de besoin — ce digest alerte sur un retard de DÉCISION, pas sur l'échéance elle-même).
+function digestDemandesReservationEnAttente(reservations, nowMs, seuilJours) {
+  return (reservations || [])
+    .filter(r => (r.statut || 'Demandee') === 'Demandee')
+    .map(r => Object.assign({}, r, { jours: Math.floor((nowMs - new Date(r.horodatage).getTime()) / 86400000) }))
+    .filter(r => Number.isFinite(r.jours) && r.jours >= seuilJours)
+    .sort((a, b) => b.jours - a.jours);
+}
+
 // ── Règle 4 : stock bas EPI/Outillage ──
 // Réutilise le seuil personnalisé Stock_Mini s'il est renseigné, sinon le défaut historique (5 EPI /
 // 3 Outillage) — mêmes valeurs que côté dashboard.html (STOCK_MINI_DEFAUT_EPI/OUTILLAGE).
@@ -384,8 +403,9 @@ function buildDigest(data, nowMs, seuils) {
   const pannes = digestPannesNonResolues(data.mouvements, nowMs, s.panneJours);
   const stock = digestStockBas(data.catalogueEpi, data.catalogueOutillage);
   const campagnes = digestCampagnesFaibleCouverture(data.campagnes, data.scans, immosActives, nowMs, s);
-  const vide = !transferts.length && !garanties.length && !pannes.length && !stock.epi.length && !stock.outillage.length && !campagnes.length;
-  return { genere_le: new Date(nowMs).toISOString(), vide, transferts, garanties, pannes, stock, campagnes, seuils: s };
+  const demandes = digestDemandesReservationEnAttente(data.reservations, nowMs, s.demandeJours);
+  const vide = !transferts.length && !garanties.length && !pannes.length && !stock.epi.length && !stock.outillage.length && !campagnes.length && !demandes.length;
+  return { genere_le: new Date(nowMs).toISOString(), vide, transferts, garanties, pannes, stock, campagnes, demandes, seuils: s };
 }
 
 function escapeHtmlDigest(s) {
@@ -420,11 +440,13 @@ function renderDigestHtml(digest, dashboardUrl) {
   body += section('Stock bas EPI/Outillage', '📦', digest.stock.epi.length + digest.stock.outillage.length, stockLignes.join(''));
   body += section('Campagnes d\'inventaire ouvertes, faible couverture', '📋', digest.campagnes.length,
     digest.campagnes.map(c => ligne(c.nom, c.vues + ' / ' + c.total_actives + ' immos vues (' + c.couverture_pct + '%), ouverte depuis ' + c.jours_ouverte + ' jour(s) — onglet Inventaire immos')).join(''));
+  body += section('Demandes de matériel en attente', '📅', digest.demandes.length,
+    digest.demandes.map(d => ligne((d.code_im || (d.categorie || 'Catégorie') + (d.libelle_libre ? ' — ' + d.libelle_libre : '')) + ' — ' + (d.nom_employe || d.code_employe || '?') + (d.nom_chantier ? ' · ' + d.nom_chantier : ''), d.jours + ' jour(s) sans décision — onglet Réservations')).join(''));
 
   if (digest.vide) {
     return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-family:Arial,Helvetica,sans-serif;padding:20px;color:#333">' +
       '<h2 style="color:#1A2B3C">📋 Digest hebdomadaire Immo Tracker</h2>' +
-      '<p>Rien à signaler cette semaine — aucun transfert en attente depuis plus de ' + digest.seuils.transfertJours + ' jours, aucune garantie proche, aucune panne non résolue, aucun stock bas, aucune campagne à faible couverture.</p>' +
+      '<p>Rien à signaler cette semaine — aucun transfert en attente depuis plus de ' + digest.seuils.transfertJours + ' jours, aucune garantie proche, aucune panne non résolue, aucun stock bas, aucune campagne à faible couverture, aucune demande de matériel en attente depuis plus de ' + digest.seuils.demandeJours + ' jours.</p>' +
       '</td></tr></table>';
   }
   return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;font-family:Arial,Helvetica,sans-serif">' +
@@ -556,7 +578,7 @@ if (typeof module !== 'undefined' && module.exports) {
     MAX_PHOTO_BYTES, PHOTO_MAX_COUNT, isValidPhotoFilename, isValidJpegBytes, sanitizePhotoList, joinPhotos, parsePhotosField,
     buildPhotosMarker, extractPhotosMarker, stripPhotosMarker,
     timingSafeEqualStr, requireDigestTokenWith, DIGEST_SEUILS, COMPTES_ADMIN_DIGEST, ETIQUETEUSES_DIGEST, estImmoActiviteDigest,
-    digestTransfertsEnAttente, digestGarantiesProches, digestPannesNonResolues, digestStockBas, digestCampagnesFaibleCouverture,
+    digestTransfertsEnAttente, digestGarantiesProches, digestPannesNonResolues, digestStockBas, digestCampagnesFaibleCouverture, digestDemandesReservationEnAttente,
     STOCK_MINI_DEFAUT_EPI, STOCK_MINI_DEFAUT_OUTILLAGE, buildDigest, escapeHtmlDigest, renderDigestHtml };
 }
 
@@ -835,7 +857,7 @@ async function handleRequest(request) {
     const _auth = requireDigestTokenWith(p.get('token'), DIGEST_TOKEN);
     if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'digest_token_manquant' ? 500 : 401);
 
-    const [immoItems, movR, pendItems, campItems, scanItems, epiItems, outilItems] = await Promise.all([
+    const [immoItems, movR, pendItems, campItems, scanItems, epiItems, outilItems, resaItems] = await Promise.all([
       paginate(GL + '/Immos/items?$expand=fields&$top=200', 6),
       fetch(GL + '/Mouvements/items?$expand=fields&$top=5000', { headers: H }),
       paginate(GL + '/Transferts_En_Attente/items?$expand=fields&$top=200', 5),
@@ -843,6 +865,7 @@ async function handleRequest(request) {
       paginate(GL + '/Scans_Inventaire_Immos/items?$expand=fields($select=Title,Campagne)&$top=5000', 15),
       paginate(GL + '/Catalogue_Articles_EPI/items?$expand=fields&$top=200', 5),
       paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5),
+      paginate(GL + '/Reservations/items?$expand=fields&$top=200', 5),
     ]);
     const movData = await movR.json();
 
@@ -858,9 +881,10 @@ async function handleRequest(request) {
     const scans = scanItems.map(i => { const f = i.fields || {}; return { code_im: f.Title || '', campagne: f.Campagne || '' }; });
     const catalogueEpi = epiItems.map(i => { const f = i.fields || {}; return { type_article: f.Type_Article || f.Title || '', designation: f.Designation || '', taille_affichage: f.Taille_Affichage || '', taille_salarie: f.Taille_Salarie || '', stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, stock_mini: f.Stock_Mini != null ? f.Stock_Mini : 0 }; });
     const catalogueOutillage = outilItems.map(i => { const f = i.fields || {}; return { title: f.Title || '', stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, stock_mini: f.Stock_Mini != null ? f.Stock_Mini : 0 }; });
+    const reservations = resaItems.map(i => { const f = i.fields || {}; return { code_im: f.Code_IM || '', categorie: f.Categorie || '', libelle_libre: f.Libelle_Libre || '', quantite: f.Quantite != null ? f.Quantite : null, code_employe: f.Title || '', nom_employe: f.Nom_Employe || '', nom_chantier: f.Nom_Chantier || '', statut: f.Statut || 'Demandee', horodatage: f.Created || '' }; });
 
-    const digest = buildDigest({ immos, mouvements, pending, campagnes, scans, catalogueEpi, catalogueOutillage }, Date.now(), DIGEST_SEUILS);
-    const nbPoints = digest.transferts.length + digest.garanties.length + digest.pannes.length + digest.stock.epi.length + digest.stock.outillage.length + digest.campagnes.length;
+    const digest = buildDigest({ immos, mouvements, pending, campagnes, scans, catalogueEpi, catalogueOutillage, reservations }, Date.now(), DIGEST_SEUILS);
+    const nbPoints = digest.transferts.length + digest.garanties.length + digest.pannes.length + digest.stock.epi.length + digest.stock.outillage.length + digest.campagnes.length + digest.demandes.length;
     const objet = digest.vide ? 'Immo Tracker — Digest hebdomadaire : rien à signaler' : 'Immo Tracker — Digest hebdomadaire : ' + nbPoints + ' point(s) à traiter';
     return json({ success: true, digest: digest, html: renderDigestHtml(digest), objet: objet, nb_points: nbPoints });
   }

@@ -564,30 +564,37 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 
     <!-- Réservations -->
     <div id="pane-reservations" class="tab-pane">
-      <div class="filters">
-        <input type="text" id="resa-q" placeholder="Immo, employé, chantier..." oninput="renderResa()">
-        <select id="resa-statut" onchange="renderResa()">
-          <option value="">Tous statuts</option>
-          <option value="Demandee">En attente</option>
-          <option value="Confirmee">Confirmée</option>
-          <option value="En cours">En cours</option>
-          <option value="En retard">En retard</option>
-          <option value="Rendue">Rendue</option>
-          <option value="Refusee">Refusée</option>
-          <option value="Annulee">Annulée</option>
-        </select>
-        <select id="resa-site" onchange="setSiteFilter('reservations',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
-        <button class="filter-btn" onclick="resetFiltresResa()">🔄 Réinitialiser</button>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button id="resa-nav-liste" onclick="changerVueResa('liste')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px">📋 Liste</button>
+        <button id="resa-nav-planning" onclick="changerVueResa('planning')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px">📅 Planning</button>
       </div>
-      <div id="resa-stats"></div>
-      <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>Calendrier — 6 semaines</h3></div><div class="gantt-wrap" id="resa-gantt" style="padding:14px"></div></div>
-      <div class="card"><div class="card-head"><h3>Liste des réservations</h3>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span class="card-cnt" id="cnt-resa"></span>
-          <button id="resa-add-btn" onclick="ouvrirAjoutReservation()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter une réservation</button>
-        </div></div>
-        <div class="tbl-wrap"><table><thead><tr><th>Statut</th><th>Code IM</th><th>Libellé</th><th>Demandeur</th><th>Chantier</th><th>Du</th><th>Au</th><th>Action</th></tr></thead><tbody id="tb-resa"></tbody></table></div>
+      <div id="resa-vue-liste">
+        <div class="filters">
+          <input type="text" id="resa-q" placeholder="Immo, employé, chantier..." oninput="renderResa()">
+          <select id="resa-statut" onchange="renderResa()">
+            <option value="">Tous statuts</option>
+            <option value="Demandee">En attente</option>
+            <option value="Confirmee">Confirmée</option>
+            <option value="En cours">En cours</option>
+            <option value="En retard">En retard</option>
+            <option value="Rendue">Rendue</option>
+            <option value="Refusee">Refusée</option>
+            <option value="Annulee">Annulée</option>
+          </select>
+          <select id="resa-site" onchange="setSiteFilter('reservations',this.value)"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
+          <button class="filter-btn" onclick="resetFiltresResa()">🔄 Réinitialiser</button>
+        </div>
+        <div id="resa-stats"></div>
+        <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>Calendrier — 6 semaines</h3></div><div class="gantt-wrap" id="resa-gantt" style="padding:14px"></div></div>
+        <div class="card"><div class="card-head"><h3>Liste des réservations</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="card-cnt" id="cnt-resa"></span>
+            <button id="resa-add-btn" onclick="ouvrirAjoutReservation()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:none">➕ Ajouter une réservation</button>
+          </div></div>
+          <div class="tbl-wrap"><table><thead><tr><th>Statut</th><th>Code IM</th><th>Libellé</th><th>Demandeur</th><th>Chantier</th><th>Du</th><th>Au</th><th>Action</th></tr></thead><tbody id="tb-resa"></tbody></table></div>
+        </div>
       </div>
+      <div id="resa-vue-planning" class="hidden"></div>
     </div>
 
     <!-- Documents -->
@@ -1358,7 +1365,7 @@ function renderTab(name){
       autoLoadHist(); // Toujours rafraîchir l'historique
       break;
     case 'transferts':     renderTransferts(); break;
-    case 'reservations':   renderResa(); break;
+    case 'reservations':   renderReservationsPane(); break;
     case 'documents':      if(!dataLoaded.docs)loadDocs(); else renderDocs(); break;
     case 'maintenance':    if(!dataLoaded.maint)loadMaint(); else renderMaint(); break;
     case 'absences':       if(!dataLoaded.absences)loadAbsences(); else renderAbsences(); break;
@@ -1424,7 +1431,7 @@ async function loadReservations(){
     reservations=await r.json();
     updateBadgesResa();
     updateBadgeAlertCount();
-    if(activeTab==='reservations')renderResa();
+    if(activeTab==='reservations')renderReservationsPane();
     if(activeTab==='alertes')renderAlertes();
   }catch(e){reservations=[];}
 }
@@ -5031,6 +5038,88 @@ async function validerTransfertDash(btn,tid,cim,rec,recNom,etat){
 }
 
 // ── Rendu — Réservations ─────────────────────────────────
+// Sous-onglets Liste/Planning (roadmap item D, Lot 2), même pattern que epiVue/outilVue : une
+// variable de vue + un dispatcher, mais boutons statiques (pas reconstruits à chaque rendu) —
+// plus simple ici puisqu'il n'y en a que deux, pas de liste dynamique de vues.
+var resaVue='liste'; // 'liste' | 'planning'
+function changerVueResa(v){ resaVue=v; renderReservationsPane(); }
+function renderReservationsPane(){
+  var vl=document.getElementById('resa-vue-liste'), vp=document.getElementById('resa-vue-planning');
+  if(vl)vl.classList.toggle('hidden', resaVue!=='liste');
+  if(vp)vp.classList.toggle('hidden', resaVue!=='planning');
+  var bl=document.getElementById('resa-nav-liste'), bp=document.getElementById('resa-nav-planning');
+  if(bl){bl.style.background=resaVue==='liste'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)';bl.style.color=resaVue==='liste'?'#fff':'var(--ds-text,#444)';}
+  if(bp){bp.style.background=resaVue==='planning'?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)';bp.style.color=resaVue==='planning'?'#fff':'var(--ds-text,#444)';}
+  if(resaVue==='planning')renderResaPlanning();else renderResa();
+}
+
+// Planning par semaine puis par chantier — ne montre que les demandes encore actionnables
+// (Demandee/Confirmee/En retard), à la différence du Gantt de la vue Liste qui montre tout
+// l'historique groupé par immo. Objectif : répondre à "qu'est-ce qu'il faut préparer, et quand"
+// plutôt qu'à "qu'est-ce qui est réservé sur telle immo" (roadmap item D).
+function renderResaPlanning(){
+  var div=document.getElementById('resa-vue-planning');
+  if(!div)return;
+  var actives=reservations.filter(function(r){return r.statut!=='Rendue'&&r.statut!=='Annulee'&&r.statut!=='Refusee';});
+  if(!actives.length){div.innerHTML='<div class="card"><p class="es" style="padding:40px">Aucune demande à planifier.</p></div>';return;}
+  var today=new Date();today.setHours(0,0,0,0);
+  var lundiDe=function(d){var x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x;};
+  var lundiToday=lundiDe(today);
+  var groups={};
+  actives.forEach(function(r){
+    var deb=r.date_debut?new Date(r.date_debut):null;
+    var key;
+    if(!deb||isNaN(deb.getTime()))key='__sans_date__';
+    else{var lundi=lundiDe(deb);key=(lundi<lundiToday)?'__passe__':lundi.toISOString().slice(0,10);}
+    (groups[key]=groups[key]||[]).push(r);
+  });
+  var semaines=Object.keys(groups).filter(function(k){return k!=='__passe__'&&k!=='__sans_date__';}).sort();
+  var orderedKeys=(groups['__passe__']?['__passe__']:[]).concat(semaines).concat(groups['__sans_date__']?['__sans_date__']:[]);
+  var moisFR=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var fmtSemaine=function(k){
+    if(k==='__passe__')return '⚠️ En retard / date dépassée';
+    if(k==='__sans_date__')return 'Sans date';
+    var lundi=new Date(k+'T00:00:00');var dim=new Date(lundi.getTime()+6*86400000);
+    return 'Semaine du '+lundi.getDate()+' '+moisFR[lundi.getMonth()]+' au '+dim.getDate()+' '+moisFR[dim.getMonth()];
+  };
+  var html='';
+  orderedKeys.forEach(function(k){
+    var items=groups[k].slice().sort(function(a,b){return new Date(a.date_debut||0)-new Date(b.date_debut||0);});
+    var parChantier={};
+    items.forEach(function(r){var ch=r.nom_chantier||'Sans chantier';(parChantier[ch]=parChantier[ch]||[]).push(r);});
+    html+='<div class="card" style="margin-bottom:12px'+(k==='__passe__'?';border-top:3px solid var(--red)':'')+'"><div class="card-head"><h3>'+fmtSemaine(k)+'</h3><span class="card-cnt">'+items.length+'</span></div><div style="padding:10px 14px">';
+    Object.keys(parChantier).sort().forEach(function(ch){
+      html+='<div style="margin-bottom:10px"><div style="font-weight:700;font-size:12px;color:var(--grey);margin-bottom:4px">🏗️ '+ch.replace(/</g,'&lt;')+'</div><table style="width:100%;border-collapse:collapse;font-size:12px">';
+      parChantier[ch].forEach(function(r){
+        var estCat=!r.code_im;
+        var lib=estCat?('🔧 '+(r.categorie||'Catégorie')+(r.libelle_libre?(' — '+r.libelle_libre):'')+' × '+(r.quantite||1)):getLib(r.code_im);
+        var actions=r.statut==='Demandee'?(
+          '<button class="planning-action-btn" data-rid="'+r.id+'" data-statut="Confirmee" data-cim="'+r.code_im+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'" style="padding:4px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">✅ Confirmer</button>'+
+          '<button class="planning-action-btn" data-rid="'+r.id+'" data-statut="Refusee" data-cim="'+r.code_im+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'" style="padding:4px 10px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🚫 Refuser</button>'
+        ):'';
+        html+='<tr><td style="padding:4px 6px">'+rsLabel(r.statut)+'</td><td style="padding:4px 6px">'+lib+'</td>'+
+          '<td style="padding:4px 6px"><span class="link-emp" data-emp="'+r.code_employe+'" data-nom="'+r.nom_employe.replace(/"/g,'')+'">'+r.nom_employe+'</span></td>'+
+          '<td style="padding:4px 6px;white-space:nowrap">'+fmtD(r.date_debut)+' → '+fmtD(r.date_fin)+'</td>'+
+          '<td style="padding:4px 6px;white-space:nowrap">'+actions+'</td></tr>';
+      });
+      html+='</table></div>';
+    });
+    html+='</div></div>';
+  });
+  div.innerHTML=html;
+  setTimeout(function(){
+    document.querySelectorAll('.planning-action-btn').forEach(function(btn){
+      btn.onclick=async function(){
+        var id=this.dataset.rid,statut=this.dataset.statut,cim=this.dataset.cim,nom=this.dataset.nom;
+        var lbl=statut==='Confirmee'?'Confirmer':'Refuser';
+        var cible=cim?getLib(cim):'cette demande';
+        if(!(await confirmModal(lbl+' la réservation de '+nom+' pour '+cible+' ?')))return;
+        majStatutResa(id,statut,this);
+      };
+    });
+  },50);
+}
+
 function renderResa(){
   var addBtn=document.getElementById('resa-add-btn');
   if(addBtn)addBtn.style.display=estGarant(ADMIN_SESSION.code)?'inline-block':'none';

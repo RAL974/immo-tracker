@@ -97,6 +97,28 @@ test('digestPannesNonResolues : un Transfert plus récent qu\'une Panne ferme l\
   assert.deepEqual(r, []);
 });
 
+// ── digestDemandesReservationEnAttente (roadmap item D, Lot 2) ──────────────────────────────────
+test('digestDemandesReservationEnAttente : retient une demande "Demandee" depuis plus de 5 jours', () => {
+  const reservations = [
+    { code_im: '', categorie: 'Electroportatif', code_employe: 'CTA1', statut: 'Demandee', horodatage: joursAvant(6) },
+    { code_im: 'IM000002', statut: 'Demandee', horodatage: joursAvant(2) },
+    { code_im: 'IM000003', statut: 'Confirmee', horodatage: joursAvant(20) },
+  ];
+  const r = W.digestDemandesReservationEnAttente(reservations, NOW, 5);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].categorie, 'Electroportatif');
+});
+
+test('digestDemandesReservationEnAttente : Refusee/Rendue/Annulee ne sont jamais retenues même très anciennes', () => {
+  const reservations = [
+    { code_im: 'IM000001', statut: 'Refusee', horodatage: joursAvant(60) },
+    { code_im: 'IM000002', statut: 'Rendue', horodatage: joursAvant(60) },
+    { code_im: 'IM000003', statut: 'Annulee', horodatage: joursAvant(60) },
+  ];
+  const r = W.digestDemandesReservationEnAttente(reservations, NOW, 5);
+  assert.deepEqual(r, []);
+});
+
 // ── digestStockBas ────────────────────────────────────────────────────────────────────────────
 test('digestStockBas : applique le seuil personnalisé Stock_Mini, sinon le défaut (5 EPI / 3 Outillage)', () => {
   const epi = [
@@ -152,7 +174,7 @@ test('digestCampagnesFaibleCouverture : une immo inactive scannée ne compte pas
 
 // ── buildDigest : cas vide et cas rempli ─────────────────────────────────────────────────────
 test('buildDigest : digest vide (vide=true) quand aucune règle ne matche', () => {
-  const d = W.buildDigest({ immos: [], mouvements: [], pending: [], campagnes: [], scans: [], catalogueEpi: [], catalogueOutillage: [] }, NOW, W.DIGEST_SEUILS);
+  const d = W.buildDigest({ immos: [], mouvements: [], pending: [], campagnes: [], scans: [], catalogueEpi: [], catalogueOutillage: [], reservations: [] }, NOW, W.DIGEST_SEUILS);
   assert.equal(d.vide, true);
   assert.deepEqual(d.transferts, []);
   assert.deepEqual(d.garanties, []);
@@ -160,6 +182,7 @@ test('buildDigest : digest vide (vide=true) quand aucune règle ne matche', () =
   assert.deepEqual(d.stock.epi, []);
   assert.deepEqual(d.stock.outillage, []);
   assert.deepEqual(d.campagnes, []);
+  assert.deepEqual(d.demandes, []);
 });
 
 test('buildDigest : vide=false dès qu\'une seule section a un résultat', () => {
@@ -169,6 +192,15 @@ test('buildDigest : vide=false dès qu\'une seule section a un résultat', () =>
   }, NOW, W.DIGEST_SEUILS);
   assert.equal(d.vide, false);
   assert.equal(d.transferts.length, 1);
+});
+
+test('buildDigest : vide=false quand seule une demande de matériel en attente dépasse le seuil', () => {
+  const d = W.buildDigest({
+    immos: [], mouvements: [], catalogueEpi: [], catalogueOutillage: [], campagnes: [], scans: [], pending: [],
+    reservations: [{ code_im: '', categorie: 'Electroportatif', statut: 'Demandee', horodatage: joursAvant(10) }],
+  }, NOW, W.DIGEST_SEUILS);
+  assert.equal(d.vide, false);
+  assert.equal(d.demandes.length, 1);
 });
 
 test('renderDigestHtml : digest vide produit un message "rien à signaler", pas d\'erreur', () => {
@@ -186,6 +218,16 @@ test('renderDigestHtml : digest rempli contient un lien vers le dashboard et éc
   assert.match(html, /ral974\.github\.io\/immo-tracker\/dashboard\.html/);
   assert.doesNotMatch(html, /<script>x<\/script>/);
   assert.match(html, /&lt;script&gt;/);
+});
+
+test('renderDigestHtml : section "Demandes de matériel en attente" affiche la catégorie pour une demande sans immo', () => {
+  const d = W.buildDigest({
+    immos: [], mouvements: [], catalogueEpi: [], catalogueOutillage: [], campagnes: [], scans: [], pending: [],
+    reservations: [{ code_im: '', categorie: 'Electroportatif', libelle_libre: 'perceuses', nom_employe: 'Test CT', statut: 'Demandee', horodatage: joursAvant(10) }],
+  }, NOW, W.DIGEST_SEUILS);
+  const html = W.renderDigestHtml(d);
+  assert.match(html, /Demandes de matériel en attente/);
+  assert.match(html, /Electroportatif/);
 });
 
 // ── requireDigestTokenWith / timingSafeEqualStr ──────────────────────────────────────────────
