@@ -14,7 +14,8 @@ const workerSrc = fs.readFileSync(path.join(__dirname, '..', 'worker.js'), 'utf8
 const dashboardSrc = fs.readFileSync(path.join(__dirname, '..', 'dashboard.html'), 'utf8');
 
 function extractJournalAuditBlock(src) {
-  const m = /if \(p\.get\('journal_audit'\) === '1'\) \{\n([^\n]*)\n/.exec(src);
+  // \r?\n : tolère un checkout Windows en CRLF (core.autocrlf=true), voir security.gated-actions.test.js.
+  const m = /if \(p\.get\('journal_audit'\) === '1'\) \{\r?\n([^\r\n]*)\r?\n/.exec(src);
   return m ? m[1] : null;
 }
 

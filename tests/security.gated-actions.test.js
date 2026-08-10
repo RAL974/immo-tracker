@@ -27,7 +27,9 @@ function extractWorkerProtectedActions(src) {
   const protectedActions = new Set();
   const unprotectedDashboardActions = new Set();
   // Repère chaque bloc "if (action === 'xxx') {" et regarde si la ligne suivante appelle le garde.
-  const re = /if \(action === '([a-z_]+)'\) \{\n([^\n]*)\n/g;
+  // \r?\n (pas \n seul) : tolère un checkout Windows en CRLF (core.autocrlf=true) — le blob Git
+  // reste en LF, seul le fichier sur disque local peut avoir \r\n, sinon 0 bloc n'est détecté.
+  const re = /if \(action === '([a-z_]+)'\) \{\r?\n([^\r\n]*)\r?\n/g;
   let m;
   while ((m = re.exec(src))) {
     const action = m[1];
