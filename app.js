@@ -448,10 +448,16 @@ function showScreen(id, skipInit) {
 // ── Init au chargement ────────────────────────────────────
 window.addEventListener('load', async () => {
   const saved = localStorage.getItem('employe');
-  if (saved) {
-    S.employe = JSON.parse(saved);
+  // Valeur défensive : une entrée localStorage corrompue/invalide (ex. littéralement "null", JSON
+  // malformé, ou un objet sans code) ne doit jamais planter le chargement — juste repartir comme
+  // une première visite. Vu en production (Sentry) : "Cannot read properties of null (reading 'nom')".
+  let parsed = null;
+  if (saved) { try { parsed = JSON.parse(saved); } catch (e) { parsed = null; } }
+  if (parsed && parsed.code) {
+    S.employe = parsed;
     afficherEmploye();
   } else {
+    if (saved) localStorage.removeItem('employe');
     // Première visite → aller directement au scan
     showScreen('screen-activation');
     return;
