@@ -23,7 +23,8 @@ Les interfaces web ne parlent jamais directement à SharePoint : tout passe par 
 | Catalogue immos (complet, migration) | `immos_full.json` — **objet** `{...}` de 1167 immos | GitHub Pages (racine) | .../immos_full.json |
 | Base de données | Listes SharePoint | Microsoft 365 Electricité Services Réunion | espacesoleil97.sharepoint.com/sites/Logistique-Immos |
 | Authentification API | App Azure AD "Immo Tracker" | Azure / Entra ID | — |
-| Notifications | Flux "Notification_Mouvement_Immo" | Power Automate | — |
+| Notifications (par mouvement) | Flux "Notification_Mouvement_Immo" | Power Automate | — |
+| Digest hebdomadaire (ajouté août 2026) | Nouveau flux Power Automate planifié (lundi matin) → `?digest=1` (Worker) → e-mail. Voir § dédiée plus bas. | Power Automate + Worker | — |
 | Observabilité (erreurs JS, ajouté août 2026) | SDK chargé via CDN dans `index.html`/`dashboard.html`, `environment` distinct `pwa`/`dashboard` | Sentry (compte gratuit de William) | sentry.io — DSN dans le code (pas un secret) |
 | Génération PDF locale (ajouté août 2026) | `html2canvas` + `jsPDF` chargés via CDN dans `dashboard.html` (même logique CDN que Chart.js/SheetJS/Sentry) — rasterisent le gabarit HTML des fiches EPI hors-écran pour produire un vrai fichier PDF, écrit directement sur le disque via la File System Access API du navigateur (`showDirectoryPicker`, Chrome/Edge uniquement) | Aucun (librairies statiques CDN) | — |
 | Lecture de scans PDF / OCR (ajouté août 2026) | `pdf.js` (rendu de la 1ère page d'un PDF scanné en image, utilisé par tous les flux d'émargement EPI/Outillage) + `Tesseract.js` (OCR client-side, uniquement pour l'import de scans en lot EPI) chargés via CDN, même logique zéro-backend | Aucun (librairies statiques CDN) | — |
@@ -40,6 +41,8 @@ Les interfaces web ne parlent jamais directement à SharePoint : tout passe par 
 Le **secret client** (sensible) est stocké chiffré dans les variables Cloudflare du Worker (`CLIENT_SECRET_ENV`), jamais dans le code. Procédure de renouvellement (tous les ~24 mois) détaillée dans `Immo_Tracker_Documentation.docx` §6.2.
 
 ⚠️ **`SESSION_SECRET_ENV`** (ajoutée août 2026, variable Cloudflare distincte de `CLIENT_SECRET_ENV`) : signe les jetons de session du dashboard, vérifiés côté Worker avant toute action sensible (voir `03_REGLES_METIER_ET_ROLES.md` § Autorisation côté serveur). **À ajouter par William dans Cloudflare (Settings → Variables and Secrets, même écran que `CLIENT_SECRET_ENV`)** — n'importe quelle valeur aléatoire suffisamment longue (ex. 32+ caractères) convient, aucune contrainte de format. Tant qu'elle est absente, le dashboard reste utilisable en lecture mais les actions protégées échouent explicitement (`session_secret_manquant`) plutôt que de rester ouvertes sans contrôle.
+
+⚠️ **`DIGEST_TOKEN_ENV`** (ajoutée août 2026, variable Cloudflare distincte des deux précédentes) : protège l'endpoint `?digest=1` (voir § Digest hebdomadaire plus bas). Contrairement à `SESSION_SECRET_ENV`, ce n'est **pas** un secret HMAC qui signe des jetons temporaires — juste une chaîne comparée directement à un paramètre `&token=` dans l'URL, parce que ce endpoint est appelé par un flux Power Automate planifié sans utilisateur connecté (donc sans jeton de session dashboard possible). **À ajouter par William dans Cloudflare (Settings → Variables and Secrets, même écran)** — n'importe quelle valeur aléatoire longue convient, à recopier telle quelle dans l'URL appelée par le flux Power Automate (voir plus bas). Tant qu'elle est absente, `?digest=1` échoue explicitement (`digest_token_manquant`, HTTP 500) plutôt que de rester ouvert sans contrôle — le reste du Worker n'est pas affecté.
 
 ## Procédures de déploiement
 
@@ -113,6 +116,48 @@ conséquence :
 2. **Fait** : le champ `nom` a été retiré de la réponse `?employes=1` (worker.js) et `employes.json` réduit à `Code`+`Poste`. C'est cette étape qui ferme réellement l'exposition publique — l'étape 1 seule n'y changeait rien. Garde-fou anti-régression ajouté (`tests/security.employes-sans-nom.test.js`) : vérifie que `?employes=1` ne renvoie plus jamais de clé `nom`, que le nom réel n'apparaît nulle part dans le payload JSON brut, et que les autres champs (poste, rôle, site, actif, mot de passe défini) restent bien présents.
 
 **Hors périmètre de ce chantier, signalé séparément** (voir `SECURITE_ETAT.md` § Reste à faire) : `getNomResolver()` (worker.js) attache un nom résolu à de nombreux autres endpoints publics non authentifiés (`?dashboard=1` en tête — jusqu'à 5000 mouvements, chacun avec `nom_employe`), plus deux fichiers de migration one-shot déjà exécutée mais toujours publics avec des noms complets (`epi_personnel.json`, `materiel_it_mouvements.json`). Ampleur nettement plus grande que ce chantier — décision explicite de rester borné à `employes.json`/`?employes=1` pour cette session.
+
+## Digest hebdomadaire (récapitulatif d'actions, ajouté août 2026)
+
+*Roadmap item F (`05_ROADMAP_EVOLUTIONS_FUTURES.md`), raisonnement complet dans `04_HISTORIQUE_DECISIONS.md`. Objectif : le flux "Notification_Mouvement_Immo" envoie un e-mail par mouvement — utile en temps réel, mais un point en attente peut se perdre dans le flot continu. Le digest complète ce flux (ne le remplace pas) par un récapitulatif hebdomadaire des points nécessitant une action.*
+
+**Architecture retenue (option A, cadrée avec William avant développement)** : un nouveau flux Power Automate planifié (Récurrence, lundi matin) appelle l'endpoint `?digest=1` du Worker en GET, qui calcule et renvoie le digest (JSON avec un champ `html` prêt à l'emploi) ; le flux envoie ensuite lui-même l'e-mail (action "Envoyer un e-mail (V2)"), exactement comme le flux existant. Le Worker reste un pur fournisseur de données — jamais expéditeur d'e-mail lui-même. Alternative écartée : un Cron Trigger Cloudflare + `sendMail` Graph direct depuis le Worker, qui aurait nécessité d'ajouter la permission applicative `Mail.Send` sur l'app Azure AD (élargit ce que `CLIENT_SECRET_ENV` peut faire en cas de fuite — un déploiement plus risqué pour un gain marginal ici).
+
+### Endpoint `?digest=1&token=<DIGEST_TOKEN_ENV>` (worker.js)
+
+Protégé par le secret dédié `DIGEST_TOKEN_ENV` (comparaison à temps constant, pas le mécanisme `requireAdmin`/`requireGarant` habituel — pas d'utilisateur connecté derrière un flux planifié). Les données agrégées (Immos, Mouvements, Transferts_En_Attente, Campagnes_Inventaire_Immos/Scans, catalogues EPI/Outillage) sont déjà toutes individuellement publiques via d'autres endpoints (`?dashboard=1`, `?catalogue_epi=1`...) — cette protection est une précaution supplémentaire (éviter qu'un calcul lourd soit déclenchable par n'importe qui), pas une fuite de données comblée.
+
+Réponse : `{ success, digest: {...}, html: "<table>...", objet: "Immo Tracker — Digest hebdomadaire : N point(s) à traiter", nb_points }`. Le champ `objet` est prêt à être branché sur le sujet de l'e-mail dans Power Automate.
+
+### Contenu du digest — 5 règles, seuils dans `DIGEST_SEUILS` (worker.js)
+
+| Section | Règle | Seuil |
+|---|---|---|
+| 🔄 Transferts/retours en attente | `Transferts_En_Attente`, Statut = En attente | > 7 jours |
+| 🛡️ Garanties à surveiller | même calcul que l'onglet Maintenance (mise en service + 2 ans) | expire sous 30 jours |
+| 🔧 Pannes non résolues | dernier mouvement d'une immo = `Panne` | > 7 jours |
+| 📦 Stock bas EPI/Outillage | réutilise `Stock_Mini` (défauts 5/3 déjà en place) | déjà sous le seuil configuré |
+| 📋 Campagne d'inventaire immos ouverte, faible couverture | `Campagnes_Inventaire_Immos`, Statut = En cours | couverture < 50% ET ouverte depuis > 14 jours |
+
+**Logique métier réutilisée, jamais réécrite en divergent** : les règles garanties/pannes/comptes administratifs reproduisent exactement les calculs déjà en place côté `dashboard.html` (onglet Maintenance : `GARANTIE_ANS`, `COMPTES_ADMIN_DASH`, `ETIQUETEUSES_DASH`) et le calcul de couverture de campagne (`calculerEcartsInventaireImmos`). Comme le Worker (edge, zéro build) et `dashboard.html` (fichier HTML autonome exécuté dans le navigateur) ne peuvent pas littéralement partager du code JS sans introduire un build, ces constantes sont **dupliquées** côté Worker (`DIGEST_SEUILS`, `COMPTES_ADMIN_DIGEST`, `ETIQUETEUSES_DIGEST`) — la dérive entre les deux copies est empêchée par un test dédié (`tests/worker.digest.test.js`, section anti-dérive) qui extrait les constantes littérales de `dashboard.html` par regex et les compare à celles du Worker, même principe que `security.gated-actions.test.js` pour `GATED_ACTIONS`.
+
+**Écart connu, signalé mais non corrigé** : le filtre "transferts en attente" du digest (`statut === 'En attente'`, allow-list explicite) diffère légèrement de celui de `?dashboard=1` (`statut !== 'Validé' && !== 'Valide' && !== 'Refused'`, deny-list qui n'exclut pas `'Annulé'`) — un transfert annulé continuerait donc, en théorie, d'apparaître dans l'onglet Transferts du dashboard alors qu'il n'apparaît jamais dans le digest. Comportement pré-existant de `?dashboard=1`, non modifié ici pour ne pas changer l'onglet Transferts déjà en production ; à corriger dans une session dédiée si confirmé gênant.
+
+**Pas de liens profonds vers un onglet précis** : `dashboard.html` ne fait aucun routage par URL (`#hash`) — chaque ligne du digest précise en texte l'onglet à ouvrir (ex. "onglet Transferts"), et un bouton unique "Ouvrir le dashboard" pointe vers la racine du dashboard.
+
+**Digest vide** : si les 5 sections sont vides, `digest.vide = true` et le HTML renvoyé est un simple message "rien à signaler" — c'est au flux Power Automate de décider, via une action Condition sur ce champ, de ne pas envoyer d'e-mail dans ce cas (évite l'usure d'alerte d'un e-mail hebdomadaire creux). Voir configuration du flux ci-dessous.
+
+### Configuration du flux Power Automate (étapes manuelles, côté William)
+
+1. Nouveau flux planifié : déclencheur **Récurrence**, ex. chaque lundi à 8h (heure Réunion, UTC+4 → 4h UTC).
+2. Action **HTTP** : GET vers `https://immo-proxy.ral-85d.workers.dev/?digest=1&token=<valeur de DIGEST_TOKEN_ENV>`.
+3. Action **Analyser JSON** sur le corps de la réponse (schéma déduit automatiquement depuis un exemple de réponse).
+4. Action **Condition** : `vide` est égal à `false` → si vrai, brancher l'action d'envoi ci-dessous ; si faux (digest vide), ne rien faire.
+5. Action **Envoyer un e-mail (V2)** : Destinataires `logistique@espacesoleil97.onmicrosoft.com; lm@espacesoleil97.onmicrosoft.com` (lm = référent Mayotte), Objet = champ `objet` du JSON, Corps = champ `html` du JSON (format HTML).
+
+### Diagnostics
+
+Nouveau paramètre à ajouter à la liste des adresses de debug déjà documentées plus bas : `?digest=1&token=<DIGEST_TOKEN_ENV>` (non listé dans "Outils de diagnostic" ci-dessous car il exige un token, contrairement aux `?debug_*` publics — à tester manuellement depuis un navigateur avec le token en paramètre, ou depuis l'historique d'exécution du flux Power Automate).
 
 ## Pièges connus (vécus, à éviter)
 

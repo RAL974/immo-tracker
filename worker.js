@@ -231,6 +231,210 @@ function origineReconnue(request, allowedOrigins) {
   return list.some(function (o) { return referer.indexOf(o) === 0; });
 }
 
+// ── Digest hebdomadaire (récapitulatif d'actions, ajouté août 2026, endpoint ?digest=1 plus bas) ──
+// Fonctions pures hoistées ici pour être testables indépendamment d'une vraie requête HTTP/Graph
+// (voir tests/worker.digest.test.js), même principe que signSessionWith/requireAdminWith plus haut.
+// Ce mécanisme calcule un digest à la demande — pas de cron Worker : un flux Power Automate planifié
+// (lundi matin) appelle ?digest=1 puis envoie l'e-mail lui-même, cohérent avec le flux
+// "Notification_Mouvement_Immo" déjà en place (voir 01_ARCHITECTURE_TECHNIQUE.md). Le Worker reste un
+// pur fournisseur de données, jamais expéditeur d'e-mail.
+//
+// Comparaison à temps constant (évite qu'un attaquant déduise le secret DIGEST_TOKEN_ENV octet par
+// octet à partir du temps de réponse) — même volume de travail que les chaînes comparées le justifie
+// ici (secret court comparé à chaque appel), contrairement au hash de mot de passe qui a sa propre
+// dérivation PBKDF2 (déjà à temps non déterministe par nature).
+function timingSafeEqualStr(a, b) {
+  a = String(a == null ? '' : a); b = String(b == null ? '' : b);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+// Pas requireAdmin/requireGarant ici : ce flux tourne sans utilisateur connecté (Power Automate
+// planifié), donc pas de jeton de session dashboard (12h, lié à un employé) possible. Secret dédié
+// statique à la place — même famille que CLIENT_SECRET_ENV/SESSION_SECRET_ENV (variable Cloudflare,
+// Settings > Variables and Secrets), comparaison directe plutôt que vérification HMAC de session.
+function requireDigestTokenWith(reqToken, secret) {
+  if (!secret) return { ok: false, error: 'digest_token_manquant' };
+  if (!timingSafeEqualStr(reqToken, secret)) return { ok: false, error: 'token_invalide' };
+  return { ok: true };
+}
+
+// Seuils du digest — constantes ajustables ici (pas de réglage dashboard pour cette V1, cohérent
+// avec une demande volontairement minimale ; à revisiter si l'usage réel le justifie).
+const DIGEST_SEUILS = {
+  transfertJours: 7,          // Transferts_En_Attente en attente depuis plus de N jours
+  garantieAns: 2,              // durée de garantie type — DOIT rester égal à GARANTIE_ANS (dashboard.html,
+                                // onglet Maintenance) : synchronisation vérifiée par tests/worker.digest.test.js
+  garantieJours: 30,           // remonté dans le digest seulement si expiration < N jours (plus resserré
+                                // que les 180 jours affichés dans l'onglet Maintenance — le digest ne
+                                // remonte que l'urgent)
+  panneJours: 7,                // dernier mouvement d'une immo = Panne, non résolue depuis plus de N jours
+  campagneCouverturePct: 50,   // % de couverture en-dessous duquel une campagne ouverte est signalée
+  campagneMinJours: 14,         // ...et seulement si elle est ouverte depuis au moins N jours (ne pas
+                                // alerter une campagne qui vient de démarrer)
+};
+// Comptes administratifs / étiqueteuses exceptées : dupliqués depuis COMPTES_ADMIN_DASH/ETIQUETEUSES_DASH
+// (dashboard.html, onglet Maintenance) — impossible de vraiment partager le code entre le Worker (edge,
+// zéro build) et le dashboard (navigateur, fichier HTML autonome), donc dupliqué avec la même logique ;
+// dérive empêchée par un test dédié (tests/worker.digest.test.js) qui compare les deux listes littérales.
+const COMPTES_ADMIN_DIGEST = ['205', '2154', '2181', '2182', '2183', '2184', '2718', '2752'];
+const ETIQUETEUSES_DIGEST = ['IM000272', 'IM000495', 'IM000496', 'IM000605', 'IM000606', 'IM000607', 'IM000643', 'IM000685', 'IM000686', 'IM000771', 'IM000889', 'IM000897', 'IM000898', 'IM000899', 'IM000900', 'IM000901', 'IM000902', 'IM000903', 'IM000904'];
+function estImmoActiviteDigest(compteImmobilisation, codeIM) {
+  const compte = (compteImmobilisation || '').toString().trim();
+  if (COMPTES_ADMIN_DIGEST.indexOf(compte) === -1) return true; // compte non administratif
+  return ETIQUETEUSES_DIGEST.indexOf(codeIM) !== -1;             // étiqueteuse (exception)
+}
+
+// ── Règle 1 : transferts/retours en attente depuis plus de N jours ──
+// `pending` : forme normalisée { code_im, donneur_code, donneur_nom, receveur_code, receveur_nom,
+// statut, horodatage }. Filtre explicite sur statut === 'En attente' (allow-list) plutôt que la
+// deny-list utilisée par ?dashboard=1 (qui, elle, ne exclut pas 'Annulé' — écart pré-existant, signalé
+// dans 04_HISTORIQUE_DECISIONS.md, non corrigé ici pour ne pas changer le comportement de l'onglet
+// Transferts déjà en production).
+function digestTransfertsEnAttente(pending, nowMs, seuilJours) {
+  return (pending || [])
+    .filter(t => (t.statut || 'En attente') === 'En attente')
+    .map(t => Object.assign({}, t, { jours: Math.floor((nowMs - new Date(t.horodatage).getTime()) / 86400000) }))
+    .filter(t => Number.isFinite(t.jours) && t.jours >= seuilJours)
+    .sort((a, b) => b.jours - a.jours);
+}
+
+// ── Règle 2 : garanties expirant sous N jours ──
+// Reprend exactement le calcul de l'onglet Maintenance (dashboard.html, "Garanties à surveiller") :
+// date de référence = mise en service, ou achat à défaut ; + garantieAns. `immos` normalisé
+// { code_im, libelle, date_mise_service, date_achat, valeur_achat, compte_immobilisation, actif }.
+function digestGarantiesProches(immos, nowMs, seuils) {
+  const out = [];
+  (immos || []).forEach(i => {
+    if (i.actif === false) return;
+    if (!estImmoActiviteDigest(i.compte_immobilisation, i.code_im)) return;
+    const dref = i.date_mise_service || i.date_achat;
+    if (!dref) return;
+    const fin = new Date(dref);
+    if (isNaN(fin.getTime())) return;
+    fin.setFullYear(fin.getFullYear() + seuils.garantieAns);
+    const jours = Math.round((fin.getTime() - nowMs) / 86400000);
+    if (jours > 0 && jours <= seuils.garantieJours) out.push(Object.assign({}, i, { jours_restants: jours, fin_garantie: fin.toISOString() }));
+  });
+  return out.sort((a, b) => a.jours_restants - b.jours_restants);
+}
+
+// ── Règle 3 : pannes non résolues depuis plus de N jours ──
+// Une immo est "en panne" si son dernier mouvement (tous types confondus) est de type Panne — même
+// définition que estEnPanneDash côté dashboard.html (dernier élément de l'historique trié). `mouvements`
+// normalisé { code_im, type_mouvement, horodatage, code_employe }.
+function digestPannesNonResolues(mouvements, nowMs, seuilJours) {
+  const dernier = {};
+  (mouvements || []).forEach(m => {
+    if (!m.code_im) return;
+    const prev = dernier[m.code_im];
+    if (!prev || new Date(m.horodatage).getTime() > new Date(prev.horodatage).getTime()) dernier[m.code_im] = m;
+  });
+  return Object.keys(dernier).map(c => dernier[c])
+    .filter(m => m.type_mouvement === 'Panne')
+    .map(m => Object.assign({}, m, { jours: Math.floor((nowMs - new Date(m.horodatage).getTime()) / 86400000) }))
+    .filter(m => Number.isFinite(m.jours) && m.jours >= seuilJours)
+    .sort((a, b) => b.jours - a.jours);
+}
+
+// ── Règle 4 : stock bas EPI/Outillage ──
+// Réutilise le seuil personnalisé Stock_Mini s'il est renseigné, sinon le défaut historique (5 EPI /
+// 3 Outillage) — mêmes valeurs que côté dashboard.html (STOCK_MINI_DEFAUT_EPI/OUTILLAGE).
+const STOCK_MINI_DEFAUT_EPI = 5;
+const STOCK_MINI_DEFAUT_OUTILLAGE = 3;
+function digestStockBas(catalogueEpi, catalogueOutillage) {
+  const sousLeSeuil = (articles, defaut) => (articles || [])
+    .map(a => Object.assign({}, a, { seuil_effectif: (a.stock_mini && a.stock_mini > 0) ? a.stock_mini : defaut }))
+    .filter(a => (a.stock_actuel || 0) < a.seuil_effectif)
+    .sort((a, b) => (a.stock_actuel || 0) - (b.stock_actuel || 0));
+  return { epi: sousLeSeuil(catalogueEpi, STOCK_MINI_DEFAUT_EPI), outillage: sousLeSeuil(catalogueOutillage, STOCK_MINI_DEFAUT_OUTILLAGE) };
+}
+
+// ── Règle 5 : campagne d'inventaire immos ouverte avec faible couverture ──
+// Couverture = immos ACTIVES distinctement scannées / total immos actives — même définition que
+// calculerEcartsInventaireImmos (dashboard.html) : une immo inactive scannée n'est jamais comptée
+// comme "vue" (dénominateur cohérent). `campagnes` normalisé { nom, statut, date_debut }, `scans`
+// normalisé { code_im, campagne }, `immosActives` = immos avec actif !== false.
+function digestCampagnesFaibleCouverture(campagnes, scans, immosActives, nowMs, seuils) {
+  const codesActifs = new Set((immosActives || []).map(i => i.code_im));
+  const totalActives = codesActifs.size;
+  const vusParCampagne = {};
+  (scans || []).forEach(s => {
+    if (!codesActifs.has(s.code_im)) return; // une immo inactive/inconnue scannée n'est jamais comptée comme "vue"
+    (vusParCampagne[s.campagne] = vusParCampagne[s.campagne] || new Set()).add(s.code_im);
+  });
+  return (campagnes || [])
+    .filter(c => (c.statut || 'En cours') === 'En cours')
+    .map(c => {
+      const jours = Math.floor((nowMs - new Date(c.date_debut).getTime()) / 86400000);
+      const vues = vusParCampagne[c.nom] ? vusParCampagne[c.nom].size : 0;
+      const pct = totalActives ? Math.round(vues / totalActives * 100) : 0;
+      return Object.assign({}, c, { jours_ouverte: jours, couverture_pct: pct, vues: vues, total_actives: totalActives });
+    })
+    .filter(c => Number.isFinite(c.jours_ouverte) && c.jours_ouverte >= seuils.campagneMinJours && c.couverture_pct < seuils.campagneCouverturePct);
+}
+
+// ── Assemblage ──
+function buildDigest(data, nowMs, seuils) {
+  const s = seuils || DIGEST_SEUILS;
+  const immosActives = (data.immos || []).filter(i => i.actif !== false);
+  const transferts = digestTransfertsEnAttente(data.pending, nowMs, s.transfertJours);
+  const garanties = digestGarantiesProches(data.immos, nowMs, s);
+  const pannes = digestPannesNonResolues(data.mouvements, nowMs, s.panneJours);
+  const stock = digestStockBas(data.catalogueEpi, data.catalogueOutillage);
+  const campagnes = digestCampagnesFaibleCouverture(data.campagnes, data.scans, immosActives, nowMs, s);
+  const vide = !transferts.length && !garanties.length && !pannes.length && !stock.epi.length && !stock.outillage.length && !campagnes.length;
+  return { genere_le: new Date(nowMs).toISOString(), vide, transferts, garanties, pannes, stock, campagnes, seuils: s };
+}
+
+function escapeHtmlDigest(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Rendu HTML — sobre, tables uniquement (pas de flex/grid, compatibilité client mail), pensé pour
+// être lu sur mobile Outlook. Un seul lien "Ouvrir le dashboard" par section : dashboard.html ne fait
+// pas de routage par onglet via l'URL (pas de #hash), donc pas de lien profond possible vers un onglet
+// précis — le texte de chaque ligne précise l'onglet à ouvrir.
+function renderDigestHtml(digest, dashboardUrl) {
+  const url = dashboardUrl || 'https://ral974.github.io/immo-tracker/dashboard.html';
+  const section = (titre, emoji, count, bodyHtml, videTexte) => {
+    if (!count) return '';
+    return '<tr><td style="padding:18px 0 6px">' +
+      '<div style="font-size:15px;font-weight:700;color:#1A2B3C;margin-bottom:8px">' + emoji + ' ' + escapeHtmlDigest(titre) + ' (' + count + ')</div>' +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px">' + bodyHtml + '</table>' +
+      '</td></tr>';
+  };
+  const ligne = (texte, sousTexte) => '<tr><td style="padding:6px 0;border-bottom:1px solid #EEE;color:#333">' + escapeHtmlDigest(texte) +
+    (sousTexte ? '<br><span style="color:#888;font-size:12px">' + escapeHtmlDigest(sousTexte) + '</span>' : '') + '</td></tr>';
+
+  let body = '';
+  body += section('Transferts/retours en attente', '🔄', digest.transferts.length,
+    digest.transferts.map(t => ligne(t.code_im + ' — ' + (t.donneur_nom || t.donneur_code || '?') + ' → ' + (t.receveur_nom || t.receveur_code || 'DEPOT'), t.jours + ' jour(s) en attente — onglet Transferts')).join(''));
+  body += section('Garanties à surveiller', '🛡️', digest.garanties.length,
+    digest.garanties.map(g => ligne(g.code_im + ' — ' + (g.libelle || ''), 'expire dans ' + g.jours_restants + ' jour(s) — onglet Maintenance')).join(''));
+  body += section('Pannes non résolues', '🔧', digest.pannes.length,
+    digest.pannes.map(p => ligne(p.code_im, 'en panne depuis ' + p.jours + ' jour(s) — onglet Circulation/Dépôt')).join(''));
+  const stockLignes = digest.stock.epi.map(a => ligne('[EPI] ' + (a.designation || a.type_article) + ' — ' + (a.taille_affichage || a.taille_salarie || ''), 'stock ' + a.stock_actuel + ' / seuil ' + a.seuil_effectif + ' — onglet EPI › Stock'))
+    .concat(digest.stock.outillage.map(a => ligne('[Outillage] ' + (a.title || a.designation || ''), 'stock ' + a.stock_actuel + ' / seuil ' + a.seuil_effectif + ' — onglet Prime d\'outillage › Stock')));
+  body += section('Stock bas EPI/Outillage', '📦', digest.stock.epi.length + digest.stock.outillage.length, stockLignes.join(''));
+  body += section('Campagnes d\'inventaire ouvertes, faible couverture', '📋', digest.campagnes.length,
+    digest.campagnes.map(c => ligne(c.nom, c.vues + ' / ' + c.total_actives + ' immos vues (' + c.couverture_pct + '%), ouverte depuis ' + c.jours_ouverte + ' jour(s) — onglet Inventaire immos')).join(''));
+
+  if (digest.vide) {
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-family:Arial,Helvetica,sans-serif;padding:20px;color:#333">' +
+      '<h2 style="color:#1A2B3C">📋 Digest hebdomadaire Immo Tracker</h2>' +
+      '<p>Rien à signaler cette semaine — aucun transfert en attente depuis plus de ' + digest.seuils.transfertJours + ' jours, aucune garantie proche, aucune panne non résolue, aucun stock bas, aucune campagne à faible couverture.</p>' +
+      '</td></tr></table>';
+  }
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;font-family:Arial,Helvetica,sans-serif">' +
+    '<tr><td style="padding:0 0 10px"><h2 style="color:#1A2B3C;margin:0 0 4px">📋 Digest hebdomadaire Immo Tracker</h2>' +
+    '<span style="color:#888;font-size:12px">Généré le ' + new Date(digest.genere_le).toLocaleDateString('fr-FR') + '</span></td></tr>' +
+    body +
+    '<tr><td style="padding:20px 0 0"><a href="' + url + '" style="display:inline-block;background:#A67A1E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:700;font-size:13px">Ouvrir le dashboard</a></td></tr>' +
+    '</table>';
+}
+
 // ── Journal d'audit des actions sensibles (liste SharePoint Journal_Audit, ajoutée août 2026) ──
 // Périmètre : exactement les 62 actions POST protégées requireAdmin/requireGarant (mêmes noms que
 // GATED_ACTIONS côté dashboard.html) + les échecs de connexion (verify_password, voir plus bas).
@@ -350,7 +554,10 @@ if (typeof module !== 'undefined' && module.exports) {
     NOM_LOOKUP_ATTEMPTS, NOM_LOOKUP_WINDOW_MS, NOM_LOOKUP_MAX_PER_WINDOW, clientIpFrom, nomLookupRateLimited, origineReconnue,
     GATED_ACTIONS_AUDIT, AUDIT_AUTH_ERRORS, AUDIT_DETAIL_EXCLUDED_KEYS, auditDetailFrom, auditCibleFrom, reportAuditFailureToSentry,
     MAX_PHOTO_BYTES, PHOTO_MAX_COUNT, isValidPhotoFilename, isValidJpegBytes, sanitizePhotoList, joinPhotos, parsePhotosField,
-    buildPhotosMarker, extractPhotosMarker, stripPhotosMarker };
+    buildPhotosMarker, extractPhotosMarker, stripPhotosMarker,
+    timingSafeEqualStr, requireDigestTokenWith, DIGEST_SEUILS, COMPTES_ADMIN_DIGEST, ETIQUETEUSES_DIGEST, estImmoActiviteDigest,
+    digestTransfertsEnAttente, digestGarantiesProches, digestPannesNonResolues, digestStockBas, digestCampagnesFaibleCouverture,
+    STOCK_MINI_DEFAUT_EPI, STOCK_MINI_DEFAUT_OUTILLAGE, buildDigest, escapeHtmlDigest, renderDigestHtml };
 }
 
 async function handleRequest(request) {
@@ -405,6 +612,12 @@ async function handleRequest(request) {
   const signSession = (code, role) => signSessionWith(code, role, SESSION_SECRET);
   const requireAdmin = (reqBody) => requireAdminWith(reqBody, SESSION_SECRET, GESTIONNAIRES);
   const requireGarant = (reqBody) => requireGarantWith(reqBody, SESSION_SECRET, GESTIONNAIRES);
+
+  // Secret dédié au digest hebdomadaire (?digest=1 plus bas) — distinct de CLIENT_SECRET_ENV/
+  // SESSION_SECRET_ENV, variable Cloudflare (Settings > Variables and Secrets) à ajouter par William.
+  // Une simple comparaison (pas un jeton de session HMAC) : ce endpoint est appelé par un flux Power
+  // Automate planifié, sans utilisateur connecté derrière — voir requireDigestTokenWith plus haut.
+  const DIGEST_TOKEN = (typeof DIGEST_TOKEN_ENV !== 'undefined' && DIGEST_TOKEN_ENV) || (typeof globalThis !== 'undefined' && globalThis.DIGEST_TOKEN_ENV) || '';
 
   // ── Hachage sécurisé des mots de passe (PBKDF2 / SHA-256, jamais stocké en clair) ──
   const bytesToHex = (buf) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -608,6 +821,48 @@ async function handleRequest(request) {
       try { detail = f.Detail ? JSON.parse(f.Detail) : {}; } catch (e) { detail = { __raw: f.Detail || '' }; }
       return { id: i.id, horodatage: f.Horodatage || '', code_employe: f.Code_Employe || '', action: f.Action || f.Title || '', cible: f.Cible || '', detail: detail, resultat: f.Resultat || '' };
     }));
+  }
+
+  // ── Digest hebdomadaire (récapitulatif d'actions, ajouté août 2026) ─────────────────────────────
+  // Consommé par un flux Power Automate planifié (voir 01_ARCHITECTURE_TECHNIQUE.md) — protégé par
+  // DIGEST_TOKEN_ENV (comparaison à temps constant, pas requireAdmin : pas d'utilisateur connecté
+  // derrière un flux planifié). Les données agrégées ici (Immos, Mouvements, Transferts_En_Attente,
+  // Campagnes_Inventaire_Immos/Scans, catalogues EPI/Outillage) sont déjà toutes individuellement
+  // publiques (?dashboard=1, ?catalogue_epi=1, ?campagnes_inventaire_immos=1...) — ce garde-fou est
+  // une précaution supplémentaire (éviter un calcul lourd déclenchable par n'importe qui), pas une
+  // fuite de données nouvelle qu'il faudrait combler.
+  if (p.get('digest') === '1') {
+    const _auth = requireDigestTokenWith(p.get('token'), DIGEST_TOKEN);
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'digest_token_manquant' ? 500 : 401);
+
+    const [immoItems, movR, pendItems, campItems, scanItems, epiItems, outilItems] = await Promise.all([
+      paginate(GL + '/Immos/items?$expand=fields&$top=200', 6),
+      fetch(GL + '/Mouvements/items?$expand=fields&$top=5000', { headers: H }),
+      paginate(GL + '/Transferts_En_Attente/items?$expand=fields&$top=200', 5),
+      paginate(GL + '/Campagnes_Inventaire_Immos/items?$expand=fields&$top=200', 5),
+      paginate(GL + '/Scans_Inventaire_Immos/items?$expand=fields($select=Title,Campagne)&$top=5000', 15),
+      paginate(GL + '/Catalogue_Articles_EPI/items?$expand=fields&$top=200', 5),
+      paginate(GL + '/Catalogue_Outillage/items?$expand=fields&$top=200', 5),
+    ]);
+    const movData = await movR.json();
+
+    const immos = immoItems.map(i => {
+      const f = i.fields || {};
+      return { code_im: f.Title || '', libelle: f.Libelle || '', date_mise_service: f.Date_Mise_Service || '', date_achat: f.Date_Achat || '', valeur_achat: parseFloat(f.Valeur_Achat) || 0, compte_immobilisation: (f.Compte_Immobilisation || '').toString().trim(), actif: (f.Actif || 'Oui') !== 'Non' };
+    });
+    const mouvements = (movData.value || []).map(i => { const f = i.fields || {}; return { code_im: f.Title || '', type_mouvement: f.Type_Mouvement || '', horodatage: f.Horodatage || f.Created || '', code_employe: f.Code_Employe || '' }; });
+    const pending = pendItems
+      .filter(i => { const s = (i.fields || {}).Statut || ''; return s !== 'Validé' && s !== 'Valide' && s !== 'Refused'; })
+      .map(i => { const f = i.fields || {}; return { code_im: f.Title || '', donneur_code: f.Code_Employe_Donneur || '', donneur_nom: f.Nom_Donneur || '', receveur_code: f.Code_Employe_Receveur || '', receveur_nom: f.Nom_Receveur || '', statut: f.Statut || 'En attente', horodatage: f.Created || '' }; });
+    const campagnes = campItems.map(i => { const f = i.fields || {}; return { nom: f.Title || '', statut: f.Statut || 'En cours', date_debut: f.Date_Debut || '' }; });
+    const scans = scanItems.map(i => { const f = i.fields || {}; return { code_im: f.Title || '', campagne: f.Campagne || '' }; });
+    const catalogueEpi = epiItems.map(i => { const f = i.fields || {}; return { type_article: f.Type_Article || f.Title || '', designation: f.Designation || '', taille_affichage: f.Taille_Affichage || '', taille_salarie: f.Taille_Salarie || '', stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, stock_mini: f.Stock_Mini != null ? f.Stock_Mini : 0 }; });
+    const catalogueOutillage = outilItems.map(i => { const f = i.fields || {}; return { title: f.Title || '', stock_actuel: f.Stock_Actuel != null ? f.Stock_Actuel : 0, stock_mini: f.Stock_Mini != null ? f.Stock_Mini : 0 }; });
+
+    const digest = buildDigest({ immos, mouvements, pending, campagnes, scans, catalogueEpi, catalogueOutillage }, Date.now(), DIGEST_SEUILS);
+    const nbPoints = digest.transferts.length + digest.garanties.length + digest.pannes.length + digest.stock.epi.length + digest.stock.outillage.length + digest.campagnes.length;
+    const objet = digest.vide ? 'Immo Tracker — Digest hebdomadaire : rien à signaler' : 'Immo Tracker — Digest hebdomadaire : ' + nbPoints + ' point(s) à traiter';
+    return json({ success: true, digest: digest, html: renderDigestHtml(digest), objet: objet, nb_points: nbPoints });
   }
 
   // ── Métadonnées achat (valeur + date) ──────────────────────────────────────

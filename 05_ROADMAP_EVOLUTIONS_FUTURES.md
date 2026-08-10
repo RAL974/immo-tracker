@@ -33,8 +33,8 @@ Un CT peut demander du matériel pour une date future (ex. "2 perceuses + 1 éch
 ### E. Interface simplifiée pour Mayotte
 Constat : le référent matériel à Mayotte (Logistique_Mayotte) est peu à l'aise avec l'informatique (imprime des documents, envoie des photos par email plutôt que d'utiliser l'app). Évolution : une vue ultra-simplifiée à 3 actions principales ("Je reçois", "Je rends", "Signaler panne"), sans les fonctions avancées, pour ce profil spécifiquement. Petit effort de développement, gain d'adoption potentiellement important sur le terrain à Mayotte.
 
-### F. Digest de notifications hebdomadaire
-Aujourd'hui : un email par mouvement (flux Power Automate existant). Évolution : ajout d'un digest hebdomadaire automatique récapitulant les points nécessitant une action (transferts en attente depuis plus de 7 jours, retours à valider, garanties expirant dans le mois). Évite que des actions en attente restent "oubliées" dans le flux continu d'emails individuels.
+### F. Digest de notifications hebdomadaire — ✅ FAIT (août 2026)
+Développé et déployé : nouvel endpoint `?digest=1` (Worker, protégé par `DIGEST_TOKEN_ENV`) calculé et envoyé chaque lundi par un nouveau flux Power Automate planifié, en complément du flux "Notification_Mouvement_Immo" existant (qui reste inchangé — un email par mouvement continue d'être envoyé). Récapitule 5 points d'action : transferts/retours en attente > 7 jours, garanties expirant sous 30 jours, pannes non résolues > 7 jours, stock bas EPI/Outillage (seuils déjà en place), campagnes d'inventaire immos ouvertes à faible couverture (< 50%, ouvertes depuis > 14 jours) — les 3 derniers points ajoutés par l'assistant en complément de la demande initiale de William, à sa validation lors du cadrage. Digest vide = pas d'email (décision prise côté flux Power Automate, via une Condition sur le champ `vide`). Détail complet dans `01_ARCHITECTURE_TECHNIQUE.md` § Digest hebdomadaire et `04_HISTORIQUE_DECISIONS.md`.
 
 ## Priorisation suggérée (à valider avec William)
 
@@ -42,7 +42,8 @@ Aujourd'hui : un email par mouvement (flux Power Automate existant). Évolution 
 2. **Module temps chantier** (cadré comme suivi opérationnel, pas RH) : valeur métier forte pour le pilotage des coûts de chantier.
 3. ~~**B — Photos / constat d'état**~~ : **fait (août 2026)**.
 4. ~~**C — Coûts de réparation + seuil de réforme**~~ : **fait (août 2026)**.
-5. **D, E, F** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
+5. ~~**F — Digest hebdomadaire**~~ : **fait (août 2026)**.
+6. **D, E** : à considérer selon les retours d'usage une fois les priorités ci-dessus en place.
 
 ## Note pour toute reprise de ce document
 
