@@ -3457,7 +3457,11 @@ async function handleRequest(request) {
           Montant_Total: parseFloat(body.montant_total) || 0, Devise: body.devise || (origine === 'International' ? 'USD' : 'EUR'),
           Acompte_Pourcentage: (body.acompte_pourcentage != null && body.acompte_pourcentage !== '') ? parseFloat(body.acompte_pourcentage) : null,
           Incoterm: body.incoterm || '', Delai_Estime_Jours: (body.delai_estime_jours != null && body.delai_estime_jours !== '') ? parseFloat(body.delai_estime_jours) : null,
-          Date_Arrivee_Estimee: body.date_arrivee_estimee || '', Statut: 'En attente', Cree_Par: auteurCode, Notes: body.notes || ''
+          // Colonne SharePoint de type Date : un champ vide doit être omis/null, jamais une chaîne
+          // vide '' (Graph refuse '' sur une colonne Date avec "One of the provided arguments is
+          // not acceptable", constaté en test réel) — même convention que Date_Sortie_Service
+          // (Materiel_IT) ailleurs dans ce fichier.
+          Date_Arrivee_Estimee: body.date_arrivee_estimee || null, Statut: 'En attente', Cree_Par: auteurCode, Notes: body.notes || ''
         } }) });
         const cmdData = await rCmd.json();
         if (!rCmd.ok) return json({ success: false, error: 'sharepoint', message: (cmdData.error && cmdData.error.message) || 'Erreur écriture' });
@@ -3485,8 +3489,10 @@ async function handleRequest(request) {
       if (body.acompte_pourcentage !== undefined) fields.Acompte_Pourcentage = body.acompte_pourcentage === '' ? null : parseFloat(body.acompte_pourcentage);
       if (body.incoterm !== undefined) fields.Incoterm = body.incoterm;
       if (body.delai_estime_jours !== undefined) fields.Delai_Estime_Jours = body.delai_estime_jours === '' ? null : parseFloat(body.delai_estime_jours);
-      if (body.date_arrivee_estimee !== undefined) fields.Date_Arrivee_Estimee = body.date_arrivee_estimee;
-      if (body.date_commande !== undefined) fields.Date_Commande = body.date_commande;
+      // Colonnes Date SharePoint : '' est refusé par Graph ("One of the provided arguments is not
+      // acceptable"), toujours envoyer null pour un champ Date vidé — voir creer_commande_brasseur.
+      if (body.date_arrivee_estimee !== undefined) fields.Date_Arrivee_Estimee = body.date_arrivee_estimee || null;
+      if (body.date_commande !== undefined) fields.Date_Commande = body.date_commande || null;
       if (body.notes !== undefined) fields.Notes = body.notes;
       if (body.statut !== undefined) {
         if (STATUTS_COMMANDE.indexOf(body.statut) === -1) return json({ success: false, error: 'statut_invalide', valeurs_valides: STATUTS_COMMANDE });

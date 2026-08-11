@@ -328,6 +328,73 @@ test('transfert_brasseur : stock insuffisant au dépôt source → refusé', asy
   assert.equal(data.error, 'stock_insuffisant');
 });
 
+// ── Création et édition de commande ─────────────────────────────────────────────────────────
+
+test('creer_commande_brasseur : champs Date optionnels laissés vides -> null, jamais une chaîne vide (Graph refuse "" sur une colonne Date)', async (t) => {
+  // Bug réel trouvé en test recette (11 août 2026) : Date_Arrivee_Estimee: '' faisait échouer
+  // l'écriture SharePoint avec "One of the provided arguments is not acceptable" dès que le champ
+  // optionnel "Arrivée estimée" était laissé vide dans le formulaire.
+  let ecrit = null;
+  mockBrasseurs(t, { catalogue: [CAT_BA], onWrite: (evt) => { if (!evt.batch && evt.method === 'POST' && /Brasseurs_Commandes/.test(evt.url)) ecrit = evt.body.fields; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_commande_brasseur', {
+    token, origine: 'International', fournisseur: '1stShine', date_commande: '2026-08-11',
+    // acompte_pourcentage / date_arrivee_estimee volontairement vides, comme un formulaire non rempli
+    acompte_pourcentage: '', date_arrivee_estimee: '',
+    lignes: [{ reference: 'DCF-FS52920B', quantite_commandee: 5, prix_unitaire: 3.5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Date_Arrivee_Estimee, null);
+  assert.notEqual(ecrit.Date_Arrivee_Estimee, '', "jamais une chaîne vide sur une colonne Date SharePoint");
+  assert.equal(ecrit.Acompte_Pourcentage, null);
+});
+
+test('creer_commande_brasseur : origine invalide -> refusé', async (t) => {
+  mockBrasseurs(t, { catalogue: [CAT_BA] });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_commande_brasseur', {
+    token, origine: 'Mars', lignes: [{ reference: 'DCF-FS52920B', quantite_commandee: 5, prix_unitaire: 3.5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'donnees_invalides');
+});
+
+test('creer_commande_brasseur : numéro auto (CMD.AA.MM.NNN) si aucun n° de PI fourni', async (t) => {
+  let titre = null;
+  mockBrasseurs(t, { catalogue: [CAT_BA], onWrite: (evt) => { if (!evt.batch && evt.method === 'POST' && /Brasseurs_Commandes/.test(evt.url)) titre = evt.body.fields.Title; } });
+  const now = new Date();
+  const aa = String(now.getFullYear()).slice(-2), mm = String(now.getMonth() + 1).padStart(2, '0');
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_commande_brasseur', {
+    token, origine: 'Local', fournisseur: 'Alclima', lignes: [{ reference: 'DCF-FS52920B', quantite_commandee: 2, prix_unitaire: 40 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(titre, 'CMD.' + aa + '.' + mm + '.001');
+  assert.equal(data.reference, titre);
+});
+
+test('editer_commande_brasseur : date vidée explicitement -> null, jamais une chaîne vide', async (t) => {
+  let patched = null;
+  mockBrasseurs(t, { onWrite: (evt) => { if (!evt.batch && evt.method === 'PATCH') patched = evt.body; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('editer_commande_brasseur', { token, id: 'cmd1', date_arrivee_estimee: '' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(patched.Date_Arrivee_Estimee, null);
+});
+
+test('editer_commande_brasseur : statut hors liste fermée -> refusé', async (t) => {
+  mockBrasseurs(t, {});
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('editer_commande_brasseur', { token, id: 'cmd1', statut: 'Livree' }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'statut_invalide');
+});
+
 // ── Réception de commande avec écart ────────────────────────────────────────────────────────
 
 test('reception_commande_brasseur : réception partielle → statut Recue_Partielle, écart lisible (commandée − reçue)', async (t) => {
