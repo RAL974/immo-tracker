@@ -386,6 +386,37 @@ test('editer_commande_brasseur : date vidée explicitement -> null, jamais une c
   assert.equal(patched.Date_Arrivee_Estimee, null);
 });
 
+test('editer_commande_brasseur : date_arrivee_reelle transmise telle quelle, vidée -> null (même convention que date_arrivee_estimee)', async (t) => {
+  let patched = null;
+  mockBrasseurs(t, { onWrite: (evt) => { if (!evt.batch && evt.method === 'PATCH') patched = evt.body; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('editer_commande_brasseur', { token, id: 'cmd1', date_arrivee_reelle: '2026-10-15' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(patched.Date_Arrivee_Reelle, '2026-10-15');
+
+  const res2 = await W.handleRequest(postRequest('editer_commande_brasseur', { token, id: 'cmd1', date_arrivee_reelle: '' }));
+  assert.equal((await res2.json()).success, true);
+  assert.equal(patched.Date_Arrivee_Reelle, null);
+});
+
+test('editer_commande_brasseur : échec Graph (ex. colonne inconnue) renvoie un message exploitable, pas juste success:false', async (t) => {
+  t.mock.method(global, 'fetch', async (url, opts) => {
+    const u = String(url);
+    if (u.includes('login.microsoftonline.com')) return new Response(JSON.stringify({ access_token: 'fake-graph-token' }), { status: 200 });
+    if (/\/Brasseurs_Commandes\/items\/[^/?]+\/fields/.test(u) && opts.method === 'PATCH') {
+      return new Response(JSON.stringify({ error: { message: "Field 'Date_Arrivee_Reelle' is not recognized." } }), { status: 400 });
+    }
+    return new Response(JSON.stringify({}), { status: 200 });
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('editer_commande_brasseur', { token, id: 'cmd1', date_arrivee_reelle: '2026-10-15' }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'sharepoint');
+  assert.match(data.message, /Date_Arrivee_Reelle/);
+});
+
 test('editer_commande_brasseur : statut hors liste fermée -> refusé', async (t) => {
   mockBrasseurs(t, {});
   const token = await garantToken();

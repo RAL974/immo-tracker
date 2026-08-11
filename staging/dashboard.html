@@ -7145,6 +7145,17 @@ async function chargerBrasseursCommandes(){
   }catch(e){brasseursCommandes=[];brasseursLignesCommande=[];}
   renderBrasseursCommandesResults();
 }
+// Délai (jours) entre Date_Commande et l'arrivée — réelle si connue, sinon estimée (marquée comme
+// telle). Calcul entièrement dynamique, jamais stocké — même principe que la VNC des immos ou la
+// prime annuelle Outillage.
+function brasseursDelaiJours(c){
+  if(!c.date_commande)return null;
+  var cible=c.date_arrivee_reelle||c.date_arrivee_estimee;
+  if(!cible)return null;
+  var j=Math.round((new Date(cible)-new Date(c.date_commande))/86400000);
+  if(isNaN(j))return null;
+  return {jours:j,reel:!!c.date_arrivee_reelle};
+}
 function renderBrasseursCommandesResults(){
   var el=document.getElementById('brasseurs-cmd-results');
   if(!el)return;
@@ -7152,14 +7163,53 @@ function renderBrasseursCommandesResults(){
   if(cntEl)cntEl.textContent=brasseursCommandes.length+' commande(s)';
   if(!brasseursCommandes.length){el.innerHTML='<p class="es" style="padding:16px">Aucune commande.</p>';return;}
   var STATUT_BADGE={'En attente':'bu','Recue_Partielle':'bn','Recue':'bb','Annulee':'ba'};
-  var html='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Origine</th><th>Fournisseur</th><th>Date</th><th>Montant</th><th>Statut</th><th>Arrivée estimée</th><th>Action</th></tr></thead><tbody>';
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Origine</th><th>Fournisseur</th><th>Date</th><th>Montant</th><th>Statut</th><th>Arrivée estimée</th><th>Arrivée réelle</th><th>Délai</th><th>Action</th></tr></thead><tbody>';
   brasseursCommandes.slice().sort(function(a,b){return (b.date_commande||'').localeCompare(a.date_commande||'');}).forEach(function(c){
+    var delai=brasseursDelaiJours(c);
     html+='<tr><td>'+c.reference+'</td><td>'+c.origine+'</td><td>'+(c.fournisseur||'—')+'</td><td>'+(c.date_commande?fmtD(c.date_commande):'—')+'</td>'+
       '<td>'+nbFr(c.montant_total)+' '+(c.devise||'')+'</td><td><span class="badge '+(STATUT_BADGE[c.statut]||'bn')+'">'+c.statut+'</span></td><td>'+(c.date_arrivee_estimee?fmtD(c.date_arrivee_estimee):'—')+'</td>'+
-      '<td>'+(c.statut!=='Recue'&&c.statut!=='Annulee'?'<button onclick="ouvrirReceptionBrasseur(\''+c.id+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">📥 Réception</button>':'—')+'</td></tr>';
+      '<td>'+(c.date_arrivee_reelle?fmtD(c.date_arrivee_reelle):'—')+'</td>'+
+      '<td>'+(delai?(delai.jours+' j'+(delai.reel?'':' (estimé)')):'—')+'</td>'+
+      '<td style="white-space:nowrap">'+(c.statut!=='Recue'&&c.statut!=='Annulee'?'<button onclick="ouvrirReceptionBrasseur(\''+c.id+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">📥 Réception</button>':'')+
+      '<button onclick="ouvrirEditionArriveeBrasseur(\''+c.id+'\')" style="padding:4px 10px;background:var(--ds-neutral-200,#e5e5e5);color:var(--ds-ink-900,#222);border:none;border-radius:6px;font-size:11px;cursor:pointer">✏️ Arrivée</button></td></tr>';
   });
   html+='</tbody></table></div>';
   el.innerHTML=html;
+}
+
+// ── Édition des dates d'arrivée (estimée/réelle) d'une commande existante ──
+// Champ "Arrivée réelle" nécessite la colonne SharePoint Date_Arrivee_Reelle sur Brasseurs_Commandes
+// (ajoutée août 2026) — si elle n'existe pas encore côté SharePoint, seule la modification de
+// l'arrivée estimée fonctionnera (l'autre échouera explicitement, jamais silencieusement).
+function ouvrirEditionArriveeBrasseur(commandeId){
+  var cmd=brasseursCommandes.find(function(c){return c.id===commandeId;});
+  if(!cmd){alert('Commande introuvable.');return;}
+  document.getElementById('add-titre').textContent='✏️ Dates d\'arrivée — '+cmd.reference;
+  document.getElementById('add-msg').textContent='';
+  var html='<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Arrivée estimée</label><input type="date" id="ba-f-estimee" value="'+(cmd.date_arrivee_estimee||'')+'" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Arrivée réelle</label><input type="date" id="ba-f-reelle" value="'+(cmd.date_arrivee_reelle||'')+'" style="'+addFieldStyle+'"></div></div>'+
+    '<p style="font-size:12px;color:var(--grey)">Commande du '+(cmd.date_commande?fmtD(cmd.date_commande):'—')+'. Laisser un champ vide pour l\'effacer.</p>';
+  document.getElementById('add-form').innerHTML=html;
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=function(){soumettreEditionArriveeBrasseur(commandeId);};
+}
+async function soumettreEditionArriveeBrasseur(commandeId){
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  var payload={id:commandeId,date_arrivee_estimee:(document.getElementById('ba-f-estimee')||{}).value||'',date_arrivee_reelle:(document.getElementById('ba-f-reelle')||{}).value||''};
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=editer_commande_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Dates mises à jour !';
+      await chargerBrasseursCommandes();
+      setTimeout(function(){fermerAjout();},800);
+    }else{
+      msg.textContent='Échec : '+(res.message||res.error||'inconnu')+(res.error==='sharepoint'?' — la colonne Date_Arrivee_Reelle existe-t-elle bien sur Brasseurs_Commandes ?':'');
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  }catch(e){msg.textContent='Erreur réseau : '+e.message;btn.disabled=false;btn.textContent='Confirmer';}
 }
 
 // ── Formulaire création commande ──

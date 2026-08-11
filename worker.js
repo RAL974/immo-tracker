@@ -1365,7 +1365,9 @@ async function handleRequest(request) {
     const items = await paginate(GL + '/Brasseurs_Commandes/items?$expand=fields&$orderby=fields/Created%20desc&$top=500', 8);
     return json(items.map(i => {
       const f = i.fields || {};
-      return { id: i.id, reference: f.Title || '', origine: f.Origine || '', fournisseur: f.Fournisseur || '', date_commande: f.Date_Commande || '', montant_total: f.Montant_Total != null ? f.Montant_Total : 0, devise: f.Devise || '', acompte_pourcentage: f.Acompte_Pourcentage != null ? f.Acompte_Pourcentage : null, incoterm: f.Incoterm || '', delai_estime_jours: f.Delai_Estime_Jours != null ? f.Delai_Estime_Jours : null, date_arrivee_estimee: f.Date_Arrivee_Estimee || '', statut: f.Statut || 'En attente', cree_par: f.Cree_Par || '', notes: f.Notes || '' };
+      // date_arrivee_reelle : lu de façon tolérante (f.Date_Arrivee_Reelle est simplement undefined
+      // tant que William n'a pas créé la colonne SharePoint — aucune erreur, juste une chaîne vide).
+      return { id: i.id, reference: f.Title || '', origine: f.Origine || '', fournisseur: f.Fournisseur || '', date_commande: f.Date_Commande || '', montant_total: f.Montant_Total != null ? f.Montant_Total : 0, devise: f.Devise || '', acompte_pourcentage: f.Acompte_Pourcentage != null ? f.Acompte_Pourcentage : null, incoterm: f.Incoterm || '', delai_estime_jours: f.Delai_Estime_Jours != null ? f.Delai_Estime_Jours : null, date_arrivee_estimee: f.Date_Arrivee_Estimee || '', date_arrivee_reelle: f.Date_Arrivee_Reelle || '', statut: f.Statut || 'En attente', cree_par: f.Cree_Par || '', notes: f.Notes || '' };
     }));
   }
 
@@ -3493,6 +3495,12 @@ async function handleRequest(request) {
       // Colonnes Date SharePoint : '' est refusé par Graph ("One of the provided arguments is not
       // acceptable"), toujours envoyer null pour un champ Date vidé — voir creer_commande_brasseur.
       if (body.date_arrivee_estimee !== undefined) fields.Date_Arrivee_Estimee = body.date_arrivee_estimee || null;
+      // Date_Arrivee_Reelle (ajoutée août 2026, demande de William) : date de réception physique
+      // effective, distincte de l'estimation — libre, jamais déduite automatiquement de la réception
+      // SharePoint (le statut peut passer à "Recue" un autre jour que l'arrivée physique réelle).
+      // Le délai réel (Date_Commande → Date_Arrivee_Reelle) se calcule à la volée côté dashboard,
+      // jamais stocké — même principe que la prime annuelle Outillage ou la VNC des immos.
+      if (body.date_arrivee_reelle !== undefined) fields.Date_Arrivee_Reelle = body.date_arrivee_reelle || null;
       if (body.date_commande !== undefined) fields.Date_Commande = body.date_commande || null;
       if (body.notes !== undefined) fields.Notes = body.notes;
       if (body.statut !== undefined) {
@@ -3502,7 +3510,8 @@ async function handleRequest(request) {
       if (!Object.keys(fields).length) return json({ success: false, error: 'donnees_invalides' });
       try {
         const r = await fetch(GL + '/Brasseurs_Commandes/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
-        return json({ success: r.ok });
+        if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
+        return json({ success: true });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 

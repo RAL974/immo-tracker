@@ -486,10 +486,11 @@ ex. fournisseur Alclima, qui a aussi été client par le passé).*
 | `Acompte_Pourcentage` | Nombre | Optionnel |
 | `Incoterm` | Texte | Optionnel — ex. `FOB Shenzhen`, vide pour un achat local |
 | `Delai_Estime_Jours` | Nombre | Optionnel, non critique |
-| `Date_Arrivee_Estimee` | Date | Optionnel, non critique |
+| `Date_Arrivee_Estimee` | Date | Optionnel, non critique — modifiable à tout moment depuis le dashboard (bouton "✏️ Arrivée") |
+| `Date_Arrivee_Reelle` | Date | Ajoutée août 2026 — date d'arrivée physique effective, saisie manuellement (jamais déduite automatiquement d'une réception SharePoint, qui peut être enregistrée un autre jour que l'arrivée réelle). Le délai (`Date_Commande` → arrivée réelle si connue, sinon estimée) est calculé à la volée côté dashboard, jamais stocké. |
 | `Statut` | Texte | `En attente` / `Recue_Partielle` / `Recue` / `Annulee` — recalculé automatiquement à chaque réception depuis l'ensemble des lignes |
 | `Cree_Par` | Texte | Code employé résolu du jeton de session |
-| `Notes` | Texte | Libre |
+| `Notes` | Texte | Libre — ⚠️ colonne texte sur une seule ligne (limite ≈255 caractères côté SharePoint), pas "plusieurs lignes" : un texte plus long fait échouer l'écriture avec un message Graph générique ("Invalid request", sans nommer le champ). Vérifié en pratique (août 2026, saisie de la PI FS202603051). |
 
 ### `Brasseurs_Lignes_Commande`
 
