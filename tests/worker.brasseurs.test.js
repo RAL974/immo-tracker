@@ -90,6 +90,11 @@ function mockBrasseurs(t, config) {
     if (/\/Employes\/items/.test(u) && method === 'GET') {
       return new Response(JSON.stringify({ value: (config.employes || []).map((f, i) => ({ id: 'emp' + i, fields: f })) }), { status: 200 });
     }
+    if (/\/drive\/root:\/Fiches_Brasseurs\//.test(u) && method === 'PUT') {
+      counter++;
+      if (config.onWrite) config.onWrite({ method: 'PUT', url: u, drive: true });
+      return new Response(JSON.stringify({ id: 'drive-item-' + counter }), { status: 200 });
+    }
     throw new Error('URL non mockée dans ce test : ' + method + ' ' + u);
   });
 }
@@ -107,6 +112,9 @@ const DEPOT_OMT = { Title: 'OMT', Nom_Complet: 'OM Transit', Prefixe_Document: '
 const DEPOT_TC2 = { Title: 'TC2', Nom_Complet: 'TC N°2', Prefixe_Document: 'TC2', Site: 'Reunion', Actif: 'Oui' };
 const CAT_BA = { Title: 'DCF-FS52920B', Designation: 'Brasseur blanc', Categorie: 'Brasseur', Stock_Mini: 0, Actif: 'Oui' };
 const PROP_ESR = 'ELECTRICITE SERVICES REUNION';
+// Un JPEG valide minimal : juste la signature FF D8 FF suffit pour isValidJpegBytes (même fixture que tests/worker.photos.test.js).
+const FAKE_JPEG_B64 = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]).toString('base64');
+const FAKE_PNG_B64 = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]).toString('base64');
 
 async function garantToken() { return W.signSessionWith('XXXX', 'Logistique', SESSION_SECRET); }
 
@@ -737,4 +745,231 @@ test('sortie_stock_brasseur_pwa : Cree_Par vide (marqueur origine PWA), Code_Emp
   assert.equal(ecrit.Code_Employe, 'CTXX');
   assert.equal(ecrit.Type_Mouvement, 'Sortie');
   assert.match(ecrit.Document, /^TC2\.\d{2}\.\d{2}\.\d{3}$/);
+});
+
+// ── sortie_stock_brasseur_pwa — mode avancé Négoce + client (garant uniquement, ajouté août 2026) ──
+
+test('sortie_stock_brasseur_pwa : Négoce refusé pour un rôle non-garant (CT), même avec un client fourni', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT], mouvements: [MVT_STOCK_TC2_200] });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot: 'TC2', destination: 'Négoce', tiers: 'Client SARL', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'destination_reservee_dashboard');
+});
+
+test('sortie_stock_brasseur_pwa : Négoce accepté pour Logistique, avec un client — Tiers écrit, Destination normalisée', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_LOGI], mouvements: [MVT_STOCK_TC2_200],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'LOGX', depot: 'TC2', destination: 'negoce', tiers: 'Client SARL', lignes: [{ reference: 'DCF-FS52920B', quantite: 3 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Destination, 'Négoce', 'normalisée à la forme accentuée quelle que soit la casse saisie');
+  assert.equal(ecrit.Tiers, 'Client SARL');
+  assert.equal(ecrit.Quantit_x00e9_, -3);
+});
+
+test('sortie_stock_brasseur_pwa : Négoce pour un garant sans client fourni → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_LOGI], mouvements: [MVT_STOCK_TC2_200] });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'LOGX', depot: 'TC2', destination: 'Négoce', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'client_requis');
+});
+
+test('sortie_stock_brasseur_pwa : destination Maintenance pour un garant — inchangé, pas de Tiers exigé', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_ADMIN], mouvements: [MVT_STOCK_TC2_200],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'ADMX', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Destination, 'Maintenance');
+  assert.equal(ecrit.Tiers, '');
+});
+
+// ── transfert_stock_brasseur_pwa (PWA, sans jeton, réservé aux garants — ajouté août 2026) ──────
+
+test('transfert_stock_brasseur_pwa : rôle non-garant (CT) → droits_insuffisants, rien écrit', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT, DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 10 }],
+    onWrite: () => { wrote = true; },
+  });
+  const res = await W.handleRequest(postRequest('transfert_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot_source: 'OMT', depot_destination: 'TC2', lignes: [{ reference: 'DCF-FS52920B', quantite: 2 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'droits_insuffisants');
+  assert.equal(wrote, false);
+});
+
+for (const emp of [EMP_LOGI, { Title: 'LGMA', field_1: 'Logistique Mayotte Test', field_2: 'Oui', Code_CT: 'Logistique_Mayotte' }, EMP_ADMIN]) {
+  test('transfert_stock_brasseur_pwa : ' + emp.Code_CT + ' — génère deux mouvements liés cohérents (Transfert_Sortie ↔ Transfert_Entree)', async (t) => {
+    const ecritures = [];
+    mockBrasseurs(t, {
+      depots: [DEPOT_OMT, DEPOT_TC2], catalogue: [CAT_BA], employes: [emp],
+      mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 10 }],
+      onWrite: (evt) => { ecritures.push(evt); },
+    });
+    const res = await W.handleRequest(postRequest('transfert_stock_brasseur_pwa', {
+      code_employe: emp.Title, depot_source: 'OMT', depot_destination: 'TC2', lignes: [{ reference: 'DCF-FS52920B', quantite: 3 }],
+    }));
+    const data = await res.json();
+    assert.equal(data.success, true, JSON.stringify(data));
+    const postes = ecritures.filter((e) => e.method === 'POST');
+    assert.equal(postes.length, 2);
+    const sortie = postes[0].body.fields, entree = postes[1].body.fields;
+    assert.equal(sortie.Type_Mouvement, 'Transfert_Sortie');
+    assert.equal(sortie.Quantit_x00e9_, -3);
+    assert.equal(sortie.Code_Employe, emp.Title);
+    assert.equal(sortie.Cree_Par, '', 'marqueur origine PWA : Cree_Par vide, contrairement à transfert_brasseur (dashboard)');
+    assert.equal(entree.Type_Mouvement, 'Transfert_Entree');
+    assert.equal(entree.Quantit_x00e9_, 3);
+    assert.equal(entree.Transfert_Lien, 'mv-new-1', "l'entrée référence l'id généré par la sortie");
+    const patches = ecritures.filter((e) => e.method === 'PATCH');
+    assert.equal(patches.length, 1);
+    assert.equal(patches[0].body.Transfert_Lien, 'mv-new-2', 'la sortie est mise à jour après coup pour référencer l\'entrée');
+  });
+}
+
+test('transfert_stock_brasseur_pwa : même dépôt source/destination → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], employes: [EMP_LOGI] });
+  const res = await W.handleRequest(postRequest('transfert_stock_brasseur_pwa', {
+    code_employe: 'LOGX', depot_source: 'OMT', depot_destination: 'OMT', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'donnees_invalides');
+});
+
+test('transfert_stock_brasseur_pwa : stock insuffisant au dépôt source → refusé', async (t) => {
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT, DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_LOGI],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 2 }],
+  });
+  const res = await W.handleRequest(postRequest('transfert_stock_brasseur_pwa', {
+    code_employe: 'LOGX', depot_source: 'OMT', depot_destination: 'TC2', lignes: [{ reference: 'DCF-FS52920B', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'stock_insuffisant');
+});
+
+test('transfert_stock_brasseur_pwa : dépôt inconnu → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], employes: [EMP_LOGI] });
+  const res = await W.handleRequest(postRequest('transfert_stock_brasseur_pwa', {
+    code_employe: 'LOGX', depot_source: 'OMT', depot_destination: 'XXX', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'depot_invalide');
+});
+
+test('transfert_stock_brasseur_pwa : employé inactif (mais garant) → refusé employe_inactif, pas droits_insuffisants', async (t) => {
+  // Le rôle est vérifié avant l'activité : un Logistique inactif doit être bloqué par estEmployeActifServeur,
+  // pas confondu avec un simple manque de droits (EMP_INACTIF, rôle Ouvrier, aurait été bloqué avant même
+  // d'atteindre ce contrôle — d'où un fixture dédié, garant mais inactif, pour isoler ce chemin précis).
+  const EMP_LOGI_INACTIF = { Title: 'LGIN', field_1: 'Logistique Inactif Test', field_2: 'Non', Code_CT: 'Logistique' };
+  mockBrasseurs(t, { depots: [DEPOT_OMT, DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_LOGI_INACTIF] });
+  const res = await W.handleRequest(postRequest('transfert_stock_brasseur_pwa', {
+    code_employe: 'LGIN', depot_source: 'OMT', depot_destination: 'TC2', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'employe_inactif');
+});
+
+test('transfert_stock_brasseur_pwa : plus de 10 lignes → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT, DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_LOGI] });
+  const lignes = Array.from({ length: 11 }, () => ({ reference: 'DCF-FS52920B', quantite: 1 }));
+  const res = await W.handleRequest(postRequest('transfert_stock_brasseur_pwa', {
+    code_employe: 'LOGX', depot_source: 'OMT', depot_destination: 'TC2', lignes,
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'trop_de_lignes');
+});
+
+// ── upload_fiche_brasseur (PWA, sans jeton — archivage de la preuve signée, ajouté août 2026) ───
+
+test('upload_fiche_brasseur : accepte un JPEG valide, l\'écrit sur le drive et marque Photo_Fiche sur les lignes du document', async (t) => {
+  let drivePut = null, patches = [];
+  mockBrasseurs(t, {
+    mouvements: [
+      { Title: 'DCF-FS52920B', Document: 'TC2.26.08.005', Depot: 'TC2', Proprietaire: PROP_ESR, Quantit_x00e9_: -2 },
+      { Title: 'PALES', Document: 'TC2.26.08.005', Depot: 'TC2', Proprietaire: PROP_ESR, Quantit_x00e9_: -2 },
+    ],
+    onWrite: (evt) => { if (evt.drive) drivePut = evt; if (evt.batch && evt.method === 'PATCH') patches.push(evt.body); },
+  });
+  const res = await W.handleRequest(postRequest('upload_fiche_brasseur', {
+    document: 'TC2.26.08.005', filename: 'bl_tc2_005.jpg', data: FAKE_JPEG_B64,
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.lignes_marquees, 2);
+  assert.ok(drivePut, 'doit écrire le fichier sur le drive');
+  assert.ok(drivePut.url.includes('Fiches_Brasseurs'));
+  assert.ok(drivePut.url.includes('TC2.26.08.005'));
+  assert.equal(patches.length, 2);
+  assert.equal(patches[0].Photo_Fiche, 'bl_tc2_005.jpg');
+});
+
+test('upload_fiche_brasseur : refuse des octets qui ne sont pas un vrai JPEG même avec un nom .jpg', async (t) => {
+  mockBrasseurs(t, {});
+  const res = await W.handleRequest(postRequest('upload_fiche_brasseur', {
+    document: 'TC2.26.08.005', filename: 'faux.jpg', data: FAKE_PNG_B64,
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'type_fichier_invalide');
+});
+
+test('upload_fiche_brasseur : refuse un nom de fichier invalide (traversée de chemin)', async (t) => {
+  mockBrasseurs(t, {});
+  const res = await W.handleRequest(postRequest('upload_fiche_brasseur', {
+    document: 'TC2.26.08.005', filename: '../../secret.jpg', data: FAKE_JPEG_B64,
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'nom_fichier_invalide');
+});
+
+test('upload_fiche_brasseur : refuse un fichier trop volumineux, rien écrit sur le drive', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, { onWrite: () => { wrote = true; } });
+  const bigBytes = new Uint8Array(W.MAX_PHOTO_BYTES + 1000);
+  bigBytes[0] = 0xFF; bigBytes[1] = 0xD8; bigBytes[2] = 0xFF;
+  const bigB64 = Buffer.from(bigBytes).toString('base64');
+  const res = await W.handleRequest(postRequest('upload_fiche_brasseur', {
+    document: 'TC2.26.08.005', filename: 'gros.jpg', data: bigB64,
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'fichier_trop_volumineux');
+  assert.equal(wrote, false);
+});
+
+test('upload_fiche_brasseur : document sans ligne correspondante → succès, 0 ligne marquée (pas d\'erreur)', async (t) => {
+  mockBrasseurs(t, { mouvements: [] });
+  const res = await W.handleRequest(postRequest('upload_fiche_brasseur', {
+    document: 'TC2.26.08.999', filename: 'orphelin.jpg', data: FAKE_JPEG_B64,
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.lignes_marquees, 0);
 });

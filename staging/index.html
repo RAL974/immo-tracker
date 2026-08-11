@@ -597,15 +597,31 @@
 <!-- ══════════════ SORTIE DE STOCK — BRASSEURS D'AIR ══════════════ -->
 <!-- Ajouté août 2026 (retour terrain) : le technicien déclare lui-même la sortie du dépôt, au lieu que
      le gestionnaire la ressaisisse après coup depuis l'Excel de suivi. Action Worker sortie_stock_brasseur_pwa
-     (sans jeton, même modèle de confiance que Transférer/Retour dépôt) — voir 03_REGLES_METIER_ET_ROLES.md. -->
+     (sans jeton, même modèle de confiance que Transférer/Retour dépôt). Étendu ensuite (retour terrain,
+     même session) pour la population garant (Admin/Logistique/Logistique_Mayotte, ceux qui font
+     physiquement les remises client/inter-dépôts) : mode Transfert + destination Client (Négoce) +
+     génération/archivage d'un bon signé — voir 03_REGLES_METIER_ET_ROLES.md. -->
 <div id="screen-sortie-brasseurs" class="screen">
   <h2>📦 Sortie de stock — Brasseurs d'air</h2>
   <div id="sb-hors-ligne" class="hidden" style="text-align:center;color:var(--red);padding:20px 10px">📡 Hors connexion — la sortie de stock nécessite le réseau (le stock disponible doit être vérifié en direct sur le serveur). Réessaie une fois reconnecté.</div>
   <div id="sb-en-ligne">
-    <label class="field-label">Dépôt</label>
+    <!-- Bascule Sortie / Transfert — visible seulement pour Admin/Logistique/Logistique_Mayotte -->
+    <div id="sb-mode-toggle" class="btn-group hidden" style="margin-bottom:10px">
+      <button type="button" class="btn btn-outline" id="sb-mode-sortie-btn" onclick="changerModeSortieBrasseurs('sortie')" style="font-size:13px">➖ Sortie</button>
+      <button type="button" class="btn btn-outline" id="sb-mode-transfert-btn" onclick="changerModeSortieBrasseurs('transfert')" style="font-size:13px">🔄 Transfert</button>
+    </div>
+
+    <label class="field-label" id="sb-depot-label">Dépôt</label>
     <select id="sb-depot" class="select-input" onchange="changerDepotSortieBrasseurs()">
       <option value="">-- Choisis un dépôt --</option>
     </select>
+
+    <div id="sb-depot-dest-bloc" class="hidden">
+      <label class="field-label">Dépôt destination</label>
+      <select id="sb-depot-destination" class="select-input" onchange="changerDepotDestinationSortieBrasseurs()">
+        <option value="">-- Choisis le dépôt receveur --</option>
+      </select>
+    </div>
 
     <div id="sb-corps" class="hidden">
       <label class="field-label">Référence</label>
@@ -621,16 +637,35 @@
 
       <div id="sb-panier"></div>
 
-      <label class="field-label">Destination</label>
-      <div class="btn-group">
-        <button type="button" class="btn btn-outline" id="sb-dest-chantier-btn" onclick="choisirDestinationSortieBrasseurs('chantier')" style="font-size:13px">🏗️ Chantier</button>
-        <button type="button" class="btn btn-outline" id="sb-dest-maintenance-btn" onclick="choisirDestinationSortieBrasseurs('maintenance')" style="font-size:13px">🔧 Maintenance</button>
+      <div id="sb-destination-bloc">
+        <label class="field-label">Destination</label>
+        <div class="btn-group">
+          <button type="button" class="btn btn-outline" id="sb-dest-chantier-btn" onclick="choisirDestinationSortieBrasseurs('chantier')" style="font-size:13px">🏗️ Chantier</button>
+          <button type="button" class="btn btn-outline" id="sb-dest-maintenance-btn" onclick="choisirDestinationSortieBrasseurs('maintenance')" style="font-size:13px">🔧 Maintenance</button>
+          <button type="button" class="btn btn-outline hidden" id="sb-dest-client-btn" onclick="choisirDestinationSortieBrasseurs('client')" style="font-size:13px">👤 Client</button>
+        </div>
+        <input type="text" id="sb-destination-chantier" class="select-input hidden" placeholder="Nom du chantier" oninput="majBoutonValiderSortieBrasseurs()">
+        <input type="text" id="sb-destination-client" class="select-input hidden" placeholder="Nom du client" oninput="majBoutonValiderSortieBrasseurs()">
       </div>
-      <input type="text" id="sb-destination-chantier" class="select-input hidden" placeholder="Nom du chantier" oninput="majBoutonValiderSortieBrasseurs()">
 
       <div class="sticky-actions">
         <button class="btn btn-secondary" id="sb-btn-valider" disabled onclick="validerSortieBrasseurs(this)">✅ Valider la sortie</button>
       </div>
+    </div>
+
+    <!-- Panneau de confirmation post-validation : générer le bon imprimable + archiver la preuve signée -->
+    <div id="sb-confirmation" class="hidden">
+      <div class="es" style="padding:16px;text-align:center">
+        <p style="font-size:16px;font-weight:700;color:var(--ds-success,#2E7D32)">✅ Opération enregistrée</p>
+        <p>Document : <strong id="sb-confirm-doc"></strong></p>
+      </div>
+      <button class="btn btn-secondary" onclick="genererBonBrasseurs()">🖨️ Générer le bon à imprimer</button>
+      <label class="btn btn-tertiary" style="display:block;text-align:center;cursor:pointer;margin-top:10px">
+        📎 Joindre la preuve signée
+        <input type="file" accept="image/*" id="sb-input-preuve" style="display:none" onchange="joindrePreuveBrasseur(this)">
+      </label>
+      <button class="btn btn-outline" style="margin-top:10px" onclick="ouvrirEcranSortieBrasseurs()">➕ Nouvelle opération</button>
+      <button class="btn btn-link" onclick="showScreen('screen-accueil')">Retour à l'accueil</button>
     </div>
   </div>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>

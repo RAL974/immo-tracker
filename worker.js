@@ -823,6 +823,20 @@ async function handleRequest(request) {
     return BRASSEUR_QUANTITE_PLAFOND_TECHNIQUE;
   }
 
+  // Population "garant" du module Brasseurs (Admin/Logistique/Logistique_Mayotte — même population
+  // que peutGererBrasseurs côté dashboard), relue depuis Employes.Code_CT puisqu'aucun jeton de
+  // session n'existe sur les actions PWA. Pilote l'accès au mode avancé (transfert inter-dépôts,
+  // destination Négoce + client) ajouté août 2026 suite au retour terrain de William : "achats ou
+  // logistique (gestionnaire de dépôt ou atelier)" = exactement cette population, qui fait déjà ces
+  // gestes au dashboard — RA/CT_Specialise/Encadrement (illimités en quantité, voir plus haut) n'ont
+  // pas ce mode avancé, cohérent avec le fait qu'ils n'ont aujourd'hui aucun droit d'écriture
+  // Brasseurs au dashboard non plus.
+  async function estGarantBrasseurServeur(code) {
+    if (GESTIONNAIRES.includes(code)) return true;
+    const role = roleNorm(await roleEmployeServeur(code));
+    return role === 'admin' || role === 'logistique' || role === 'logistique_mayotte';
+  }
+
   // ── Journal d'audit (écriture) — best-effort ────────────────────────────────
   // Un échec ici ne doit JAMAIS remonter à l'appelant ni empêcher l'action métier déjà exécutée
   // (elle a déjà eu lieu quand cette fonction est appelée, voir le point d'insertion unique après
@@ -1058,6 +1072,13 @@ async function handleRequest(request) {
   // ── Fiche Prime d'outillage émargée (photo/scan) proxy ────────────────────────
   if (p.get('fiche_outillage')) {
     const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Fiches_Outillage/' + p.get('fiche_outillage') + ':/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
+    if (!r.ok) return new Response('Fiche non trouvee', { status: 404, headers: cors });
+    return new Response(await r.arrayBuffer(), { status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=3600' } });
+  }
+
+  // ── BL/bon de transfert Brasseurs — preuve signée (photo/scan) proxy ─────────
+  if (p.get('fiche_brasseur')) {
+    const r = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Fiches_Brasseurs/' + p.get('fiche_brasseur') + ':/content', { headers: { 'Authorization': 'Bearer ' + td.access_token } });
     if (!r.ok) return new Response('Fiche non trouvee', { status: 404, headers: cors });
     return new Response(await r.arrayBuffer(), { status: 200, headers: { ...cors, 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=3600' } });
   }
@@ -1372,7 +1393,7 @@ async function handleRequest(request) {
     const items = await paginate(GL + '/Brasseurs_Mouvements/items?$expand=fields&$orderby=fields/Horodatage%20desc&$top=5000', 15);
     return json(items.map(i => {
       const f = i.fields || {};
-      return { id: i.id, reference: f.Title || '', document: f.Document || '', depot: f.Depot || '', date: f.Date || '', type_mouvement: f.Type_Mouvement || '', tiers: f.Tiers || '', proprietaire: f.Proprietaire || '', destination: f.Destination || '', quantite: f[BRASSEUR_QTE_FIELD] != null ? f[BRASSEUR_QTE_FIELD] : 0, code_employe: f.Code_Employe || '', commentaire: f.Commentaire || '', transfert_lien: f.Transfert_Lien || '', horodatage: f.Horodatage || f.Created || '', cree_par: f.Cree_Par || '' };
+      return { id: i.id, reference: f.Title || '', document: f.Document || '', depot: f.Depot || '', date: f.Date || '', type_mouvement: f.Type_Mouvement || '', tiers: f.Tiers || '', proprietaire: f.Proprietaire || '', destination: f.Destination || '', quantite: f[BRASSEUR_QTE_FIELD] != null ? f[BRASSEUR_QTE_FIELD] : 0, code_employe: f.Code_Employe || '', commentaire: f.Commentaire || '', transfert_lien: f.Transfert_Lien || '', horodatage: f.Horodatage || f.Created || '', cree_par: f.Cree_Par || '', photo_fiche: f.Photo_Fiche || '' };
     }));
   }
 
@@ -3414,7 +3435,10 @@ async function handleRequest(request) {
     //  - Type_Mouvement toujours 'Sortie' (jamais Entrée/Inventaire/Transfert depuis ce flux)
     //  - Proprietaire toujours ELECTRICITE SERVICES REUNION, jamais transmis par le client (cadrage §1.7 :
     //    le cas rare de stock 1ST SHINE à TC2 se corrige après coup par un gestionnaire au dashboard)
-    //  - Destination jamais 'Négoce' (une vente reste une décision de gestionnaire, pas un geste terrain)
+    //  - Destination "Négoce" réservée à la population garant (Admin/Logistique/Logistique_Mayotte —
+    //    voir estGarantBrasseurServeur), avec un nom de client obligatoire (Tiers) dans ce cas.
+    //    Retour terrain de William : ce sont eux qui font physiquement ces remises, pas un geste
+    //    terrain quelconque — pour tout autre rôle, "Négoce" reste refusé (doit passer par le dashboard).
     //  - Quantité plafonnée selon le rôle réel de l'auteur, relu depuis Employes.Code_CT côté serveur —
     //    jamais transmis/déduit du client (voir brasseurPlafondPourCode, décision William du 11/08/2026)
     // Cree_Par est laissé vide (aucune session à résoudre) : ce vide, par contraste avec une sortie créée
@@ -3427,11 +3451,18 @@ async function handleRequest(request) {
       const depot = (body.depot || '').trim().toUpperCase();
       const lignes = Array.isArray(body.lignes) ? body.lignes : [];
       const destination = (body.destination || '').trim();
+      const tiersSaisi = (body.tiers || '').trim();
       if (!codeEmploye) return json({ success: false, error: 'employe_requis' });
       if (!depot || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
       if (lignes.length > 5) return json({ success: false, error: 'trop_de_lignes', max: 5 });
       if (!destination) return json({ success: false, error: 'destination_requise' });
-      if (/^n[ée]goce$/i.test(destination)) return json({ success: false, error: 'destination_reservee_dashboard', message: 'Une sortie vers le Négoce doit être enregistrée par un gestionnaire au dashboard.' });
+      const estNegoce = /^n[ée]goce$/i.test(destination);
+      let estGarant = false;
+      if (estNegoce) {
+        estGarant = await estGarantBrasseurServeur(codeEmploye);
+        if (!estGarant) return json({ success: false, error: 'destination_reservee_dashboard', message: 'Une sortie vers le Négoce doit être enregistrée par un gestionnaire au dashboard.' });
+        if (!tiersSaisi) return json({ success: false, error: 'client_requis', message: 'Le nom du client est obligatoire pour une sortie Négoce.' });
+      }
       if (!(await estEmployeActifServeur(codeEmploye))) return json({ success: false, error: 'employe_inactif' });
       const plafond = await brasseurPlafondPourCode(codeEmploye);
       const [depotsRaw, catalogueRaw] = await Promise.all([
@@ -3459,12 +3490,15 @@ async function handleRequest(request) {
       }
       const document = await nextBrasseurDocument(depotInfo.Prefixe_Document || depot, 'Brasseurs_Mouvements', 'Document');
       const horodatage = new Date().toISOString();
+      // Destination normalisée à la forme canonique accentuée "Négoce" (le garant peut taper "negoce"
+      // sans accent) — cohérence de recherche/filtre avec les sorties Négoce créées au dashboard.
+      const destinationEcrite = estNegoce ? 'Négoce' : destination;
       const requests = lignesValidees.map((l, idx) => ({
         id: String(idx), method: 'POST', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Mouvements/items',
         headers: { 'Content-Type': 'application/json' },
         body: { fields: {
           Title: l.reference, Document: document, Depot: depot, Date: horodatage.slice(0, 10), Type_Mouvement: 'Sortie',
-          Tiers: '', Proprietaire: proprietaire, Destination: destination,
+          Tiers: estNegoce ? tiersSaisi : '', Proprietaire: proprietaire, Destination: destinationEcrite,
           [BRASSEUR_QTE_FIELD]: l.quantite, Code_Employe: codeEmploye, Commentaire: '',
           Horodatage: horodatage, Cree_Par: ''
         } }
@@ -3473,6 +3507,104 @@ async function handleRequest(request) {
         const res = await graphBatch(requests);
         return json({ success: res.success, document: document, lignes_ecrites: lignesValidees.length, ok: res.ok, ko: res.ko, erreurs: res.erreurs });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Transfert inter-dépôts terrain (PWA, sans jeton de session) — ajoutée août 2026 ───────────
+    // Réservé à la population "garant" du module (Admin/Logistique/Logistique_Mayotte, vérifiée
+    // côté serveur via estGarantBrasseurServeur — aucun jeton de session sur ce flux, donc aucun
+    // autre moyen de connaître le rôle). Mirroir de transfert_brasseur (dashboard, requireGarant) :
+    // deux mouvements liés par ligne (Transfert_Sortie/Transfert_Entree), écrits séquentiellement
+    // (pas en $batch, Transfert_Lien a besoin de l'id généré par l'écriture précédente). Propriétaire
+    // toujours ELECTRICITE SERVICES REUNION comme sur sortie_stock_brasseur_pwa (non exposé ici non
+    // plus — pas demandé, cohérent avec l'écran simple).
+    if (action === 'transfert_stock_brasseur_pwa') {
+      const codeEmploye = (body.code_employe || '').trim().toUpperCase();
+      if (!codeEmploye) return json({ success: false, error: 'employe_requis' });
+      if (!(await estGarantBrasseurServeur(codeEmploye))) return json({ success: false, error: 'droits_insuffisants' }, 403);
+      if (!(await estEmployeActifServeur(codeEmploye))) return json({ success: false, error: 'employe_inactif' });
+      const depotSource = (body.depot_source || '').trim().toUpperCase();
+      const depotDest = (body.depot_destination || '').trim().toUpperCase();
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!depotSource || !depotDest || depotSource === depotDest || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (lignes.length > 10) return json({ success: false, error: 'trop_de_lignes', max: 10 });
+      const proprietaire = BRASSEUR_PROPRIETAIRES[0];
+      const [depotsRaw, catalogueRaw] = await Promise.all([
+        paginate(GL + '/Brasseurs_Depots/items?$expand=fields&$top=100', 3),
+        paginate(GL + '/Brasseurs_Catalogue/items?$expand=fields&$top=200', 5)
+      ]);
+      const depotsMap = {}; depotsRaw.forEach(i => { const f = i.fields || {}; if (f.Title) depotsMap[f.Title.toUpperCase()] = f; });
+      if (!depotsMap[depotSource] || (depotsMap[depotSource].Actif || 'Oui') === 'Non') return json({ success: false, error: 'depot_invalide', depot: depotSource });
+      if (!depotsMap[depotDest] || (depotsMap[depotDest].Actif || 'Oui') === 'Non') return json({ success: false, error: 'depot_invalide', depot: depotDest });
+      const catByRef = {}; catalogueRaw.forEach(i => { const f = i.fields || {}; if (f.Title) catByRef[f.Title.toUpperCase()] = f; });
+      const lignesValidees = [];
+      for (const l of lignes) {
+        const reference = (l.reference || '').trim().toUpperCase();
+        const cat = catByRef[reference];
+        if (!reference || !cat) return json({ success: false, error: 'reference_inconnue', reference: l.reference });
+        if ((cat.Actif || 'Oui') === 'Non') return json({ success: false, error: 'reference_inactive', reference: l.reference });
+        const qte = Math.abs(parseFloat(l.quantite));
+        if (!qte) return json({ success: false, error: 'quantite_invalide', reference: l.reference });
+        if (qte > BRASSEUR_QUANTITE_PLAFOND_TECHNIQUE) return json({ success: false, error: 'quantite_plafonnee', reference: l.reference, plafond: BRASSEUR_QUANTITE_PLAFOND_TECHNIQUE });
+        const stockSource = await brasseurStockActuel(depotSource, reference, proprietaire);
+        if (stockSource - qte < 0) return json({ success: false, error: 'stock_insuffisant', reference: l.reference, stock_actuel: stockSource, demande: qte, depot: depotSource });
+        lignesValidees.push({ reference, quantite: qte });
+      }
+      const document = await nextBrasseurDocument('TRF', 'Brasseurs_Mouvements', 'Document');
+      const horodatage = new Date().toISOString();
+      const paires = [];
+      try {
+        for (const l of lignesValidees) {
+          const rSortie = await fetch(GL + '/Brasseurs_Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+            Title: l.reference, Document: document, Depot: depotSource, Date: horodatage.slice(0, 10), Type_Mouvement: 'Transfert_Sortie',
+            Tiers: '', Proprietaire: proprietaire, Destination: depotDest, [BRASSEUR_QTE_FIELD]: -l.quantite,
+            Code_Employe: codeEmploye, Commentaire: '', Horodatage: horodatage, Cree_Par: ''
+          } }) });
+          const rSortieData = await rSortie.json();
+          if (!rSortie.ok) return json({ success: false, error: 'sharepoint', message: (rSortieData.error && rSortieData.error.message) || 'Erreur écriture', reference: l.reference, document: document });
+          const rEntree = await fetch(GL + '/Brasseurs_Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+            Title: l.reference, Document: document, Depot: depotDest, Date: horodatage.slice(0, 10), Type_Mouvement: 'Transfert_Entree',
+            Tiers: '', Proprietaire: proprietaire, Destination: depotSource, [BRASSEUR_QTE_FIELD]: l.quantite,
+            Code_Employe: codeEmploye, Commentaire: '', Horodatage: horodatage, Cree_Par: '',
+            Transfert_Lien: rSortieData.id
+          } }) });
+          const rEntreeData = await rEntree.json();
+          if (!rEntree.ok) return json({ success: false, error: 'sharepoint', message: (rEntreeData.error && rEntreeData.error.message) || 'Erreur écriture', reference: l.reference, document: document });
+          await fetch(GL + '/Brasseurs_Mouvements/items/' + rSortieData.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Transfert_Lien: rEntreeData.id }) });
+          paires.push({ reference: l.reference, id_sortie: rSortieData.id, id_entree: rEntreeData.id });
+        }
+        return json({ success: true, document: document, paires: paires });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message, document: document }); }
+    }
+
+    // ── Archivage de la preuve signée (photo/scan) d'un BL/bon de transfert Brasseurs — PWA, sans
+    // jeton (même modèle que upload_photo : validation de la signature JPEG réelle des octets et du
+    // nom de fichier, pas d'authentification par ailleurs). Marque Photo_Fiche sur TOUTES les lignes
+    // de Brasseurs_Mouvements partageant ce Document (un Document peut regrouper plusieurs lignes de
+    // référence, voir cadrage §2) — pas de notion de "fiche" séparée comme pour les EPI, on annote
+    // directement les lignes déjà écrites.
+    if (action === 'upload_fiche_brasseur') {
+      try {
+        const document = (body.document || '').trim();
+        const filename = (body.filename || (Date.now() + '.jpg')).toString().trim();
+        if (!document || !isValidPhotoFilename(filename)) return json({ success: false, error: 'nom_fichier_invalide' });
+        const b64 = (body.data || '').includes(',') ? body.data.split(',')[1] : body.data;
+        if (!b64) return json({ success: false, error: 'donnees_invalides' });
+        let bytes;
+        try { bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); } catch (e) { return json({ success: false, error: 'donnees_invalides' }); }
+        if (bytes.length > MAX_PHOTO_BYTES) return json({ success: false, error: 'fichier_trop_volumineux', max_bytes: MAX_PHOTO_BYTES });
+        if (!isValidJpegBytes(bytes)) return json({ success: false, error: 'type_fichier_invalide' });
+        const putRes = await fetch('https://graph.microsoft.com/v1.0/sites/' + SITE_ID + '/drive/root:/Fiches_Brasseurs/' + encodeURIComponent(document) + '/' + encodeURIComponent(filename) + ':/content', { method: 'PUT', headers: { 'Authorization': 'Bearer ' + td.access_token, 'Content-Type': 'image/jpeg' }, body: bytes.buffer });
+        if (!putRes.ok) return json({ success: false, error: 'upload_echec' });
+        const lignesDoc = await paginate(GL + "/Brasseurs_Mouvements/items?$expand=fields($select=Document)&$filter=fields/Document eq '" + document.replace(/'/g, "''") + "'&$top=200", 5);
+        if (lignesDoc.length) {
+          const requests = lignesDoc.map((it, idx) => ({
+            id: String(idx), method: 'PATCH', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Mouvements/items/' + it.id + '/fields',
+            headers: { 'Content-Type': 'application/json' }, body: { Photo_Fiche: filename }
+          }));
+          await graphBatch(requests);
+        }
+        return json({ success: true, filename: filename, lignes_marquees: lignesDoc.length });
+      } catch (e) { return json({ success: false, error: e.message }); }
     }
 
     // Transfert inter-dépôts : génère DEUX mouvements liés par ligne de référence (Transfert_Sortie

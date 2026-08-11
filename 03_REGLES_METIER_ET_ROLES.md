@@ -434,9 +434,10 @@ lui-même.
 - **Toujours `Type_Mouvement='Sortie'`** — aucune Entrée/Inventaire/Transfert possible depuis cet écran.
 - **Propriétaire toujours `ELECTRICITE SERVICES REUNION`**, jamais transmis par le client — le cas rare
   de stock 1ST SHINE à TC2 (§1.7 du cadrage) se corrige après coup par un gestionnaire au dashboard.
-- **Destination jamais `Négoce`** (refusé côté serveur, insensible à la casse/accents) : une vente
-  reste une décision de gestionnaire prise au dashboard, pas un geste terrain. Seules « Maintenance »
-  (valeur fixe) ou un texte libre de chantier sont acceptés.
+- **Destination `Négoce` réservée à la population garant** (Admin/Logistique/Logistique_Mayotte,
+  vérifiée côté serveur — voir § suivant) : pour tout autre rôle, refusée explicitement, insensible à
+  la casse/accents (une vente reste une décision de gestionnaire pour un rôle terrain). Seules
+  « Maintenance » (valeur fixe) ou un texte libre de chantier restent acceptés hors population garant.
 - **Dépôt** : n'importe quel dépôt actif de `Brasseurs_Depots` (pas verrouillé à TC2, pour ne pas avoir
   à revenir sur le code si un autre dépôt en a besoin).
 - **Quantité plafonnée selon le rôle réel de l'auteur** — relu côté serveur depuis `Employes.Code_CT`
@@ -467,3 +468,54 @@ dans le journal des mouvements — sans nouvelle colonne SharePoint.
 **Pas de liaison automatique pales↔brasseur sur cet écran** (contrairement au dashboard, voir
 paragraphe précédent) — le technicien ajoute une ligne PALES lui-même s'il en prend. Évolution
 possible si le besoin se confirme à l'usage.
+
+### Mode avancé PWA (garant) : transfert inter-dépôts, client, bon signé archivé (ajouté août 2026)
+
+Deuxième retour terrain de William, même session : « un non-ouvrier ou non-CT doit pouvoir faire des
+transferts inter-sites... voir tous les dépôts existants mais aussi la possibilité de mettre un client,
+puisque ce sont soit les achats soit la logistique qui font physiquement ces remises. » Traduit en un
+mode avancé de l'écran « 📦 Sortie de stock », visible uniquement pour la population **garant** du
+module (**Admin, Logistique, Logistique_Mayotte** — exactement `peutGererBrasseurs` au dashboard ;
+RA/CT_Specialise/Encadrement, illimités en quantité mais sans droit d'écriture Brasseurs au dashboard,
+n'ont pas ce mode). Détection client-side (`estGarant(code)`, déjà utilisée pour la validation des
+retours dépôt) — **purement une décision d'affichage**, le Worker revérifie indépendamment le rôle
+côté serveur sur chacune des deux actions ci-dessous (aucun jeton de session n'existe sur ce flux PWA).
+
+**Bascule Sortie/Transfert** en haut de l'écran (masquée pour les autres rôles, qui gardent l'écran
+simple inchangé) :
+- **Mode Sortie, destination étendue** : en plus de Chantier/Maintenance, un bouton « 👤 Client »
+  devient disponible — sélectionne `Destination='Négoce'` et exige un nom de client (`Tiers`),
+  refusé côté serveur si absent (`client_requis`). Toujours via `sortie_stock_brasseur_pwa` (même
+  action que l'écran simple), qui vérifie le rôle avant d'accepter `Négoce`.
+- **Mode Transfert, nouvelle action `transfert_stock_brasseur_pwa`** : dépôt source (le sélecteur
+  « Dépôt » déjà présent) + dépôt destination (nouveau sélecteur, tous les dépôts actifs sauf la
+  source) + jusqu'à 10 lignes de référence. Miroir exact de `transfert_brasseur` (dashboard,
+  `requireGarant`) : deux mouvements liés par ligne (`Transfert_Sortie`/`Transfert_Entree`), écrits
+  séquentiellement (pas en `$batch`, `Transfert_Lien` a besoin de l'id généré par l'écriture
+  précédente), garde-fou stock négatif au dépôt source. Propriétaire toujours
+  `ELECTRICITE SERVICES REUNION` (non exposé, cohérent avec l'écran Sortie). Si l'appelant n'est pas
+  garant : `droits_insuffisants` (403), rien écrit.
+
+**Génération et archivage d'un bon signé**, juste après validation (les deux modes) — panneau de
+confirmation avec deux actions, visible à tous (pas seulement aux garants, un simple Ouvrier peut lui
+aussi vouloir imprimer/archiver sa sortie) :
+- **« 🖨️ Générer le bon à imprimer »** : ouvre un nouvel onglet avec un gabarit HTML imprimable
+  (`window.print()`, aucune librairie PDF, même principe que les fiches EPI/Outillage du dashboard —
+  logo, tableau référence/quantité, bloc signature). **Deux gabarits distincts** (décision explicite
+  de William plutôt qu'un seul gabarit à variantes) : « Bon de livraison » (mode Sortie — dépôt,
+  destinataire client/chantier/Maintenance) et « Bon de transfert » (mode Transfert — dépôt source,
+  dépôt destination).
+- **« 📎 Joindre la preuve signée »** : après signature physique, une photo est prise/choisie,
+  compressée côté client (`compressPhotoDataUrl`, même helper que les photos de mouvement d'immo) et
+  envoyée à la nouvelle action **`upload_fiche_brasseur`** (PWA, sans jeton — mêmes garde-fous que
+  `upload_photo` : signature JPEG réelle des octets vérifiée, pas seulement le nom de fichier annoncé,
+  taille max). Stockée sur le drive dans `/Fiches_Brasseurs/{document}/{fichier}`, puis
+  **`Photo_Fiche`** (nouvelle colonne `Brasseurs_Mouvements`, texte — créée par William avant ce lot)
+  est renseignée sur **toutes** les lignes partageant ce `Document` (un document peut regrouper
+  plusieurs lignes de référence). Pas d'état intermédiaire « en attente de signature » comme les
+  fiches EPI : le stock Brasseurs est déjà décrémenté au moment du mouvement (modèle « stock calculé »
+  déjà en place), l'archivage est une preuve a posteriori, pas une condition de décrémentation.
+- Lecture publique de la preuve via `?fiche_brasseur=` (même niveau de confiance que
+  `?fiche_epi=`/`?fiche_outillage=`, aucun jeton). Dashboard : icône « 📎 » à côté du numéro de
+  document dans le journal des mouvements Brasseurs dès que `photo_fiche` est renseigné, lien direct
+  vers la preuve.
