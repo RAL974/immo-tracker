@@ -6909,7 +6909,7 @@ async function enregistrerDepotBrasseur(){
     })});
     var res=await r.json();
     if(res.success){
-      toast('✅ Dépôt '+code+' créé.','success');
+      showToast('✅ Dépôt '+code+' créé.','success');
       document.getElementById('add-overlay').style.display='none';
       dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='stock';renderBrasseurs();
     }else{msg.textContent='Échec : '+(res.message||res.error||'inconnu');btn.disabled=false;btn.textContent='Confirmer';}
@@ -6939,7 +6939,7 @@ async function enregistrerReferenceBrasseur(){
     })});
     var res=await r.json();
     if(res.success){
-      toast('✅ Référence '+reference+' ajoutée au catalogue.','success');
+      showToast('✅ Référence '+reference+' ajoutée au catalogue.','success');
       document.getElementById('add-overlay').style.display='none';
       dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='stock';renderBrasseurs();
     }else{msg.textContent='Échec : '+(res.message||res.error||'inconnu');btn.disabled=false;btn.textContent='Confirmer';}
@@ -7000,7 +7000,7 @@ async function annulerMouvementBrasseur(id){
   try{
     var r=await fetch(W+'?action=annuler_mouvement_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,motif:motif})});
     var res=await r.json();
-    if(res.success){toast('✅ Mouvement annulé.','success');dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='mouvements';renderBrasseurs();}
+    if(res.success){showToast('✅ Mouvement annulé.','success');dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='mouvements';renderBrasseurs();}
     else alert('Échec : '+(res.error||'inconnu'));
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
@@ -7071,7 +7071,7 @@ async function soumettreMouvementBrasseur(){
     var r=await fetch(W+'?action=creer_mouvement_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
-      toast('✅ Mouvement '+res.document+' enregistré ('+res.lignes_ecrites+' ligne(s)).','success');
+      showToast('✅ Mouvement '+res.document+' enregistré ('+res.lignes_ecrites+' ligne(s)).','success');
       document.getElementById('add-overlay').style.display='none';
       dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='mouvements';renderBrasseurs();
     }else{
@@ -7119,7 +7119,7 @@ async function soumettreTransfertBrasseur(){
     var r=await fetch(W+'?action=transfert_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
-      toast('✅ Transfert '+res.document+' enregistré ('+res.paires.length+' ligne(s)).','success');
+      showToast('✅ Transfert '+res.document+' enregistré ('+res.paires.length+' ligne(s)).','success');
       document.getElementById('add-overlay').style.display='none';
       dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='mouvements';renderBrasseurs();
     }else{
@@ -7141,7 +7141,7 @@ async function chargerBrasseursCommandes(){
   try{
     var r=await fetch(W+'?brasseurs_commandes=1'+tok),r2=await fetch(W+'?brasseurs_lignes_commande=1'+tok);
     brasseursCommandes=await r.json();brasseursLignesCommande=await r2.json();
-    if(brasseursCommandes&&brasseursCommandes.error){toast('🔒 Accès commandes réservé aux gestionnaires dépôt.','error');brasseursCommandes=[];brasseursLignesCommande=[];}
+    if(brasseursCommandes&&brasseursCommandes.error){showToast('🔒 Accès commandes réservé aux gestionnaires dépôt.','danger');brasseursCommandes=[];brasseursLignesCommande=[];}
   }catch(e){brasseursCommandes=[];brasseursLignesCommande=[];}
   renderBrasseursCommandesResults();
 }
@@ -7223,7 +7223,7 @@ async function soumettreCommandeBrasseur(){
     var r=await fetch(W+'?action=creer_commande_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
-      toast('✅ Commande '+res.reference+' créée ('+res.lignes_ecrites+' ligne(s)).','success');
+      showToast('✅ Commande '+res.reference+' créée ('+res.lignes_ecrites+' ligne(s)).','success');
       document.getElementById('add-overlay').style.display='none';
       await chargerBrasseursCommandes();
     }else{
@@ -7277,7 +7277,7 @@ async function soumettreReceptionBrasseur(){
     var r=await fetch(W+'?action=reception_commande_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
-      toast('✅ Réception '+res.document+' enregistrée (statut commande : '+res.statut+').','success');
+      showToast('✅ Réception '+res.document+' enregistrée (statut commande : '+res.statut+').','success');
       document.getElementById('add-overlay').style.display='none';
       dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='commandes';renderBrasseurs();
       await chargerBrasseursCommandes();
