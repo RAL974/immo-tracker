@@ -78,12 +78,26 @@ Content-type de la liste : `Item`.
 
 ⚠️ **Aucun mouvement n'est jamais créé à partir de `Reservations`, quel que soit le statut** (y compris `Confirmee`/`Rendue`) — la remise physique réelle passe exclusivement par `transfert`/`valider`, ailleurs. Voir `04_HISTORIQUE_DECISIONS.md`.
 
+## Liste `Absences`
+
+*Registre à sens unique des absences signalées par l'encadrement de terrain (CT/RA/Logistique) pour un ouvrier — pas un module RH complet (pas de validation, pas de type d'absence, pas de plage de dates). Voir `03_REGLES_METIER_ET_ROLES.md` § Module Absences pour les règles métier.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code de l'employé **absent** |
+| `Code_Declarant` | Texte | Code de la personne qui signale l'absence |
+| `Date_Absence` | Date | Obligatoire |
+| `Motif` | Texte | Libre, optionnel — pas de liste de valeurs contrôlée |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Horodatage` | Date/heure | ISO, moment de la déclaration |
+
+⚠️ Pas de colonne nom (`Nom_Declarant`/`Nom_Absent`) : les noms sont résolus côté client à l'affichage. L'action `signaler_absence` reçoit un champ `nom_declarant` côté client mais il n'est jamais recopié dans SharePoint (ignoré côté Worker).
+
 ## Autres listes
 
 | Liste | Rôle |
 |---|---|
 | `Transferts_En_Attente` | Transferts et retours dépôt en attente de validation |
-| `Chantiers` | Référentiel des chantiers |
 
 ## Catégories dérivées du compte d'immobilisation
 

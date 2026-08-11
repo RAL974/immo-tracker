@@ -4,27 +4,37 @@
 
 Les droits sont définis dans **une seule table** (`ROLE_CAPS`, dans `app.js`), reprise avec la même logique côté `dashboard.html`. Chaque rôle déclare ses capacités — pour changer un droit, une seule ligne à modifier.
 
-Cinq capacités possibles :
+Onze capacités possibles (liste tenue à jour ici — c'est l'introduction générale du modèle, ne pas la laisser dériver de `ROLE_CAPS` réel) :
 - **`reserver`** : peut réserver / recevoir du matériel
 - **`bisite`** : voit et agit sur les deux îles (sinon limité à son site)
 - **`garant`** : peut valider un retour dépôt (atteste de l'état du matériel)
 - **`voitTout`** : voit toutes les catégories, y compris les comptes administratifs
 - **`admin`** : gère la solution (rôles, ajouts, mots de passe, migration…)
 - **`comptesExtra`** : liste de comptes normalement masqués mais visibles en exception pour ce rôle
+- **`absences`** : peut signaler l'absence d'un ouvrier depuis la PWA terrain (voir § Module Absences)
+- **`voitAbsences`** : peut consulter le registre complet des absences dans le dashboard — donnée RH, distincte de `absences` (voir § Module Absences)
+- **`gererInventaire`** : peut lancer/clôturer une campagne d'inventaire de stock (voir § Campagne d'inventaire de stock)
+- **`compterInventaire`** : peut saisir des lignes de comptage lors d'une campagne d'inventaire
+- **`modeSimplifie`** : accueil PWA réduit à 3 actions pour un profil peu à l'aise avec l'informatique (voir § Mode simplifié PWA)
 
-## Matrice des 9 rôles
+## Matrice des 10 rôles
 
-| Rôle | reserver | bisite | garant | voitTout | admin | Particularité |
-|---|:---:|:---:|:---:|:---:|:---:|---|
-| **Admin** | ✅ | ✅ | ✅ | ✅ | ✅ | Tous droits |
-| **Logistique** (Gestionnaire Dépôt RUN) | ✅ | ✅ | ✅ | ✅ | — | — |
-| **Logistique_Mayotte** | ✅ | ❌ (Mayotte only) | ✅ | ❌ | — | `comptesExtra: ['2182']` — voit aussi les véhicules pour l'entretien sur place |
-| **RA** (Responsable d'affaires) | ✅ | ✅ | — | — | — | — |
-| **CT_Specialise** | ✅ | ✅ | — | — | — | — |
-| **CT** (Conducteur de travaux) | ✅ | ❌ (son site) | — | — | — | — |
-| **Ouvrier_Specialise** | ✅ | ✅ | — | — | — | — |
-| **Ouvrier** | — | — | — | — | — | Aucun droit particulier |
-| **Encadrement** | — | ✅ | — | ✅ | — | View-only : voit tout (2 îles, toutes catégories) pour export/consultation, mais ne réserve pas, n'est pas garant. Destiné à la RH et services support. |
+*✅ = capacité activée, — = absente/non applicable.*
+
+| Rôle | reserver | bisite | garant | voitTout | admin | absences | voitAbsences | gererInventaire | compterInventaire | modeSimplifie |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **Logistique** (Gestionnaire Dépôt RUN) | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — |
+| **Logistique_Mayotte** | ✅ | — | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ |
+| **RA** (Responsable d'affaires) | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — |
+| **CT_Specialise** | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — |
+| **CT** (Conducteur de travaux) | ✅ | — | — | — | — | ✅ | — | — | ✅ | — |
+| **Ouvrier_Specialise** | ✅ | ✅ | — | — | — | — | — | — | — | — |
+| **Ouvrier** | — | — | — | — | — | — | — | — | — | — |
+| **Encadrement** | — | ✅ | — | ✅ | — | — | ✅ | — | — | — |
+| **Compteur_Inventaire** | — | — | — | — | — | — | — | — | ✅ | — |
+
+**Particularités** : `Logistique_Mayotte` a `comptesExtra: ['2182']` (voit aussi les véhicules pour l'entretien sur place) et est mono-site Mayotte ; `CT` est mono-site (son île) ; `Ouvrier` n'a aucun droit particulier ; `Encadrement` est view-only (voit tout — 2 îles, toutes catégories — pour export/consultation, mais ne réserve pas et n'est pas garant, destiné à la RH et aux services support) ; `Compteur_Inventaire` est un rôle allégé pour le personnel temporaire lors d'une campagne d'inventaire de stock, sans autre capacité.
 
 ## Super-administrateur permanent
 
@@ -306,3 +316,15 @@ Extension du digest hebdomadaire (`?digest=1`) avec une 6e règle : `digestDeman
 **Zéro changement pour les autres profils, vérifié** : sur `screen-etat` et `screen-accepter` (partagés entre tous les rôles), les champs normaux (menu déroulant, note, bouton "Confirmer") restent affichés tels quels dès que `modeSimplifieActif()` est faux — seule une grille de boutons supplémentaire, cachée par défaut, apparaît en plus pour les profils avec `modeSimplifie:true`. Basculé par `syncEcransModeSimplifie()`, appelée à chaque changement d'écran (`showScreen()`), sans effet en dehors de ces deux écrans.
 
 **Hors-ligne / dégradé** : aucune logique nouvelle — mêmes appels réseau, même gestion d'erreur, même service worker (`sw.js`) qu'en mode normal.
+
+## Module Absences
+
+*Existait déjà dans le code sans être documenté — repéré lors de l'audit d'écarts documentation/code du 9 août 2026 (`ARCHITECTURE_GLOBALE.md` § 7). Registre à sens unique des absences signalées par l'encadrement de terrain — ce n'est pas un module RH complet : pas de workflow de validation, pas de type d'absence structuré, pas de plage de dates. Colonnes de la liste `Absences` : voir `02_MODELE_DONNEES.md`.*
+
+**Qui peut déclarer une absence (`absences`)** : CT, CT_Specialise, RA, Logistique, Logistique_Mayotte, Admin. Depuis la PWA terrain, bouton "🧑‍💼 Gestion personnel" sur l'accueil (visible si `peutSignalerAbsence()`) → sélection d'un **ouvrier ou ouvrier spécialisé actif du même site** que le déclarant (pas d'auto-déclaration, pas de déclaration pour un autre profil), date (pré-remplie au jour même, modifiable), motif libre optionnel. Action `signaler_absence` : partagée avec le reste de la PWA terrain (pas de jeton de session, identité résolue depuis le badge scanné) — aucune notification Power Automate n'est déclenchée, contrairement aux mouvements classiques.
+
+**Qui peut consulter le registre (`voitAbsences`)** : Admin, Encadrement uniquement — capacité **distincte** de `absences` : Logistique/CT/RA peuvent signaler une absence mais pas consulter l'historique complet, cohérent avec le fait que c'est une donnée RH, pas une donnée de gestion de parc. Onglet "Absences" du dashboard : toujours visible au menu, mais le contenu est masqué ("🔒 Réservé à l'encadrement et aux administrateurs") si le rôle connecté n'a pas `voitAbsences`.
+
+**Lecture non authentifiée côté Worker** : l'endpoint `?absences=1` n'applique aucune restriction lui-même — la règle "Admin/Encadrement seulement" n'est appliquée que côté dashboard, cohérent avec le principe déjà en place pour les endpoints GET de fonctionnement courant (friction minimale, pas de secret au sens strict — voir `SECURITE_ETAT.md`).
+
+**Registre définitif** : aucune action d'édition ou de suppression d'une déclaration — une fois enregistrée, elle reste telle quelle.

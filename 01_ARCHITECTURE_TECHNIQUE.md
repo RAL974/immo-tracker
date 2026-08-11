@@ -178,10 +178,18 @@ Nouveau paramètre à ajouter à la liste des adresses de debug déjà document�
 Adresses à ouvrir directement dans un navigateur (Worker) :
 ```
 ?debug_immos=1
+?debug_resa=1
+?debug_transferts=1
 ?debug_employes=1
 ?debug_mouvements=1
+?debug_inventaire_columns=1
+?debug_columns=<nom_liste>
 ?next_code_im=1
+?next_code_materiel_it=<préfixe>
+?next_code_ligne_tel=1
 ```
+
+Deux endpoints de diagnostic supplémentaires nécessitent un jeton en paramètre (`&token=`), donc pas de simple copier-coller d'URL — voir leurs sections dédiées : `?export_liste=<nom_liste>&token=<jeton_admin>` (sauvegarde d'une liste, `requireAdmin`, § `03_REGLES_METIER_ET_ROLES.md` et `PROCEDURE_ROLLBACK.md`) et `?journal_audit=1&token=<jeton_admin>` (lecture du journal d'audit, `requireAdmin`, § `03_REGLES_METIER_ET_ROLES.md`). `?digest=1&token=<DIGEST_TOKEN_ENV>` n'est volontairement pas listé ici (voir § Digest hebdomadaire ci-dessus, § Diagnostics) — token distinct, appelé par Power Automate plutôt qu'en diagnostic manuel courant.
 
 ## Anomalies bénignes (sans conséquence)
 - `favicon.ico 404` — icône d'onglet absente, sans impact (atténué depuis août 2026 par l'ajout d'un `<link rel="icon">` explicite dans `index.html`/`dashboard.html`, qui évite la sonde automatique du navigateur dans la plupart des cas).

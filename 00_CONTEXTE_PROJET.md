@@ -1,6 +1,6 @@
 # Immo Tracker — Contexte du projet
 
-*Document de référence à charger en connaissance de projet. Dernière mise à jour : juillet 2026.*
+*Document de référence à charger en connaissance de projet. Dernière mise à jour : août 2026.*
 
 ## Qui, quoi, pourquoi
 
@@ -22,7 +22,7 @@
 - **Coût d'hébergement : ≈ 0 €** (GitHub Pages + Cloudflare Workers gratuits + Microsoft 365 déjà en place chez Electricité Services Réunion)
 - Bi-site : **1013 immos Réunion / ~154 Mayotte** (après correction via la migration EBP)
 
-## Statut d'avancement (juillet 2026)
+## Statut d'avancement (août 2026)
 
 ✅ **Fait et en production :**
 - Cœur applicatif (réservation, transfert, retour, historique)
@@ -42,7 +42,7 @@
 - Worker Cloudflare (`worker.js`) désormais commité et déployé automatiquement via Git (août 2026, voir `01_ARCHITECTURE_TECHNIQUE.md`)
 - Campagne d'inventaire de stock d'articles/consommables (août 2026, distinct de l'inventaire des immobilisations — voir `04_HISTORIQUE_DECISIONS.md`)
 - Autorisation côté serveur des actions sensibles du Worker + tests automatisés + garde-fous avant push (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
-- Module Matériel IT — téléphones, puis ordinateurs — hors circuit immobilisations (août 2026, code livré, **en attente de la création des 2 listes SharePoint par William** avant mise en service, voir `04_HISTORIQUE_DECISIONS.md`)
+- Module Matériel IT — téléphones (puis Lignes téléphoniques, indépendantes des appareils) — hors circuit immobilisations, en service (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Seuils d'alerte stock EPI + Outillage, avec suggestion de commande (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Campagne d'inventaire physique des immobilisations par scan QR — roadmap item A1 (août 2026, listes SharePoint créées et fonctionnalité en service, voir `04_HISTORIQUE_DECISIONS.md`)
 - Recherche globale dashboard, raccourci clavier `/` (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
@@ -50,13 +50,17 @@
 - Mode sombre du dashboard, nettoyage de code mort, cohérence visuelle des vues EPI/Outillage (août 2026, voir `04_HISTORIQUE_DECISIONS.md`)
 - Sauvegarde complète des listes SharePoint (bouton dashboard, un fichier JSON de toutes les listes, orchestrée liste par liste pour rester sous les limites du plan gratuit Cloudflare) + procédure de restauration documentée (PROCEDURE_RESTAURATION.md) — août 2026
 - Environnement de recette (staging) séparé de la production — Worker Cloudflare (`immo-proxy-staging`) et site SharePoint dédiés (`Logistique-Immos-Recette`), données 100% fictives, bandeau permanent, coût 0 €, **en service** (août 2026, voir `PROCEDURE_RECETTE.md` et `01_ARCHITECTURE_TECHNIQUE.md`).
+- Pseudonymisation d'`employes.json` — plus de noms dans le catalogue statique public ni dans `?employes=1` ; résolution de noms via l'endpoint dédié `?noms_employes=1` (août 2026, voir `01_ARCHITECTURE_TECHNIQUE.md` et `SECURITE_ETAT.md`).
+- Politique de mot de passe renforcée (8 caractères minimum) + verrou anti brute-force persistant via Cloudflare KV (août 2026, voir `SECURITE_ETAT.md`).
+- Journal d'audit des actions sensibles du dashboard (liste `Journal_Audit`, onglet dédié, réservé Admin) (août 2026, voir `03_REGLES_METIER_ET_ROLES.md`).
+- Module Absences (signalement par l'encadrement de terrain, registre consultable Admin/Encadrement) (voir `03_REGLES_METIER_ET_ROLES.md` et `02_MODELE_DONNEES.md`).
+- **Roadmap item B** — Photos et constat d'état lors d'un mouvement (retour/transfert/panne/résolution) (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
+- **Roadmap item D** — Demande de matériel planifiée par catégorie (sans immo précise) + planning dashboard par semaine/chantier, Lot 1 et Lot 2 (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
+- **Roadmap item E** — Accueil PWA simplifié pour le référent Mayotte (`ROLE_CAPS.modeSimplifie`) (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
+- **Roadmap item F** — Digest hebdomadaire de notifications (`?digest=1` + flux Power Automate) (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
-- Module de report d'heures / temps chantier
-- Photos et constat d'état en image
-- Demandes de matériel planifiées à l'avance
-- Interface simplifiée pour Mayotte
-- Digest de notifications hebdomadaire
+- Module de report d'heures / temps chantier (seule évolution de la roadmap non encore développée)
 
 ## Comment utiliser cette base de connaissance
 

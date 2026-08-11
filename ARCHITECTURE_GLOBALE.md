@@ -1,6 +1,6 @@
 # Immo Tracker — Architecture globale
 
-*Cartographie générée en lisant le code réel du dépôt (`worker.js`, `app.js`, `dashboard.html`, `index.html`, tests, config) le 9 août 2026 — pas seulement les documents `00_*` à `05_*`. Sert de vérification croisée de ces documents ; les écarts constatés sont listés en fin de fichier plutôt que silencieusement corrigés dans la doc existante.*
+*Cartographie générée en lisant le code réel du dépôt (`worker.js`, `app.js`, `dashboard.html`, `index.html`, tests, config) le 9 août 2026 — pas seulement les documents `00_*` à `05_*`. Sert de vérification croisée de ces documents ; les écarts constatés sont listés en fin de fichier plutôt que silencieusement corrigés dans la doc existante. Comptes et tableaux repassés au réel le 11 août 2026 (passe de documentation, voir `04_HISTORIQUE_DECISIONS.md`).*
 
 ## 1. Schéma de la chaîne
 
@@ -55,6 +55,8 @@ Aucun appel direct navigateur → SharePoint : le Worker détient seul le secret
 
 Pas d'écran PWA pour EPI, Outillage, Matériel IT, Lignes téléphoniques — ces modules sont **100% dashboard** (confirmé par grep : aucune de leurs actions n'apparaît dans `app.js`).
 
+**Accueil simplifié (roadmap item E, ajouté août 2026)** : pour les profils avec `ROLE_CAPS.modeSimplifie` (`Logistique_Mayotte` seul à ce jour), `#screen-accueil` bascule vers un contenu réduit à 3 actions (`#accueil-simple`) plutôt que l'accueil habituel (`#accueil-normal`) — même écran, contenu reconstruit selon le rôle par `afficherEmploye()`. Nouvel écran dédié `screen-simple-recevoir`. Couche de présentation uniquement, mêmes actions Worker que le mode normal — voir `03_REGLES_METIER_ET_ROLES.md` § Mode simplifié PWA.
+
 ### Dashboard (`dashboard.html`, un seul fichier, tabs `data-tab`)
 
 | Onglet | Fonctions de rendu principales |
@@ -63,7 +65,7 @@ Pas d'écran PWA pour EPI, Outillage, Matériel IT, Lignes téléphoniques — c
 | Circulation | `renderCirc` |
 | Dépôt | `renderDepot` |
 | Transferts | `renderTransferts` |
-| Réservations | `renderResa` |
+| Réservations | `renderResa` (sous-vue "Liste") + `renderResaPlanning` (sous-vue "Planning" — demandes actionnables groupées par semaine/chantier, ajoutée août 2026, roadmap item D Lot 2) |
 | Absences | `renderAbsences` *(non documenté dans 00-05)* |
 | Alertes | `renderAlertes` |
 | Historique | (rendu dans le même bloc que Circulation/mouvements) |
@@ -78,9 +80,9 @@ Pas d'écran PWA pour EPI, Outillage, Matériel IT, Lignes téléphoniques — c
 
 ## 3. Actions du Worker (`worker.js`) et niveau de protection
 
-*Recompté par script (grep sur chaque bloc `if (action === '...')`) lors de l'audit de sécurité du 9 août 2026 (voir § 8) — nombres à jour à cette date, 5 actions de plus qu'au premier inventaire (9 août, avant l'ajout des seuils d'alerte stock et de la campagne d'inventaire immos par scan).*
+*Recompté au 11 août 2026 (passe de documentation) par grep indépendant sur chaque bloc `if (action === '...')` — 82 actions, 4 de plus qu'au dernier recomptage du 9 août (`creer_retour_direct_garant`, `modifier_ligne_inventaire` notamment). Les niveaux `requireAdmin`/`requireGarant` (27/35) restent inchangés depuis le 9 août.*
 
-78 actions POST (`?action=<nom>`) exécutables, dispatchées après `const body = await request.json()`, plus une action retirée mais dont le nom reste réservé (`maj_duree_amort`, voir plus bas). Trois niveaux.
+82 actions POST (`?action=<nom>`) exécutables, dispatchées après `const body = await request.json()`, plus une action retirée mais dont le nom reste réservé (`maj_duree_amort`, voir plus bas). Trois niveaux.
 
 ### `requireAdmin` (27 actions — admin strict)
 
@@ -92,9 +94,9 @@ Pas d'écran PWA pour EPI, Outillage, Matériel IT, Lignes téléphoniques — c
 
 `upload_fds`, `maj_site_immo`, `marquer_statut_immo`, `maj_panne`, `enregistrer_reparation`, `creer_campagne_inventaire`, `cloturer_campagne_inventaire`, `maj_taille_employe`, `maj_grille_dotation_epi`, `supprimer_grille_dotation_epi`, `ajouter_article_epi`, `bulk_maj_stock_epi`, `maj_stock_mini_epi`, `reception_commande_epi`, `generer_dotation_epi`, `generer_remise_ponctuelle_epi`, `emarger_dotation_epi`, `upload_fiche_epi`, `annuler_dotation_epi`, `maj_service_outillage`, `maj_grille_outillage`, `supprimer_grille_outillage`, `reception_commande_outillage`, `editer_stock_outillage`, `maj_stock_mini_outillage`, `distribuer_outillage`, `upload_fiche_outillage`, `annuler_ligne_outillage`, `maj_materiel_it`, `affecter_materiel_it`, `maj_ligne_telephonique`, `affecter_ligne_telephonique`, `annuler_transfert`, `maj_transfert`, `creer_mouvement_direct`
 
-### Publiques — partagées avec la PWA terrain (badge sans mot de passe — 16 actions)
+### Publiques — partagées avec la PWA terrain (badge sans mot de passe — 17 actions)
 
-`verify_password`, `set_password` *(actions d'entrée qui produisent le jeton — ne peuvent pas déjà en exiger un ; désormais protégées par un verrou anti brute-force, voir § 8)*, `upload_photo`, `delete_photo`, `reserver`, `statut_resa`, `modifier_resa`, `transfert`, `declarer_panne`, `resoudre_panne`, `signaler_absence`, `ajouter_ligne_inventaire`, `supprimer_ligne_inventaire`, `enregistrer_scan_inventaire_immo`, `declarer_vol`, `valider`
+`verify_password`, `set_password` *(actions d'entrée qui produisent le jeton — ne peuvent pas déjà en exiger un ; désormais protégées par un verrou anti brute-force, voir § 8)*, `upload_photo`, `delete_photo`, `reserver`, `statut_resa`, `modifier_resa`, `transfert`, `declarer_panne`, `resoudre_panne`, `signaler_absence`, `ajouter_ligne_inventaire`, `supprimer_ligne_inventaire`, `enregistrer_scan_inventaire_immo`, `declarer_vol`, `valider`, `creer_retour_direct_garant` *(ajoutée après le 9 août — écrit un mouvement Retour/DEPOT direct pour un garant, même modèle de confiance que les autres actions de cette liste malgré son nom)*
 
 ✅ **`maj_duree_amort` — orpheline, retirée (corrigé lors de l'audit du 9 août 2026)** : ce bloc écrivait encore la colonne `Duree_Amortissement` sans aucune authentification, alors qu'aucun appel n'existe plus dans `dashboard.html`/`app.js` depuis le passage à la durée 100% automatique (voir `02_MODELE_DONNEES.md`). Neutralisé sur le même modèle que `bulk_maj_immos` juste au-dessus dans le code (`{ success: false, error: 'deprecated' }`) plutôt que supprimé, pour ne rien casser si un appel resterait en cache quelque part. Voir § 8 et `SECURITE_ETAT.md`.
 
@@ -107,7 +109,9 @@ Pas d'écran PWA pour EPI, Outillage, Matériel IT, Lignes téléphoniques — c
 | `?next_code_im=1`, `?next_code_ligne_tel=1`, `?next_code_materiel_it=<préfixe>` | Aucune | Prochain code disponible |
 | `?immo_metadata=1`, `?fds_map=1`, `?photos_map=1`, `?employes=1`, `?reservations=1`, `?transferts=1`, `?campagnes_inventaire=1`, `?lignes_inventaire=<id>`, `?campagnes_inventaire_immos=1`, `?scans_inventaire_immos=<nom>`, `?catalogue_epi=1`, `?grille_dotation_epi=1`, `?dotations_epi=1`, `?lignes_dotation_epi=<id>`, `?lignes_dotation_epi_toutes=1`, `?catalogue_outillage=1`, `?grille_outillage=1`, `?lignes_outillage=1`, `?materiel_it=1`, `?mouvements_materiel_it=1`, `?lignes_telephoniques=1`, `?mouvements_lignes_telephoniques=1`, `?absences=1`, `?maintenance=1`, `?mes_reservations=<code>`, `?dashboard=1` | Aucune | Données consolidées pour l'affichage dashboard/PWA — lecture seule mais sans authentification (cohérent avec le choix de conception documenté : friction minimale, PWA sans mot de passe) |
 | `?photo=<id>`, `?photos=<code>`, `?fds=<code>`, `?fiche_epi=<id>`, `?fiche_outillage=<id>` | Aucune | Récupération de fichiers/photos déposés sur le drive SharePoint |
-| **`?export_liste=<nom_liste>&token=<jeton>`** | **`requireAdmin`** | Export JSON complet d'une liste blanche de listes SharePoint (sauvegarde manuelle avant migration — voir `PROCEDURE_ROLLBACK.md`). Seul endpoint GET protégé du Worker ; le jeton HMAC est transmis en query string (`&token=`) car requireAdmin attend normalement un corps JSON POST — adapté ici pour un GET |
+| **`?export_liste=<nom_liste>&token=<jeton>`** | **`requireAdmin`** | Export JSON complet d'une liste blanche de listes SharePoint (sauvegarde manuelle avant migration — voir `PROCEDURE_ROLLBACK.md`). Le jeton HMAC est transmis en query string (`&token=`) car requireAdmin attend normalement un corps JSON POST — adapté ici pour un GET |
+| **`?journal_audit=1&token=<jeton>`** | **`requireAdmin`** | Lecture du journal d'audit des actions sensibles (`Journal_Audit`), même mécanisme de jeton en paramètre que `?export_liste=` |
+| **`?digest=1&token=<DIGEST_TOKEN_ENV>`** | Secret dédié (comparaison à temps constant, pas `requireAdmin`/`requireGarant` — appelé par Power Automate sans utilisateur connecté) | Calcule et renvoie le digest hebdomadaire (6 règles), voir `01_ARCHITECTURE_TECHNIQUE.md` § Digest hebdomadaire |
 
 ### Audit d'exhaustivité (méthode et résultat, 9 août 2026)
 
@@ -132,8 +136,10 @@ Site `espacesoleil97.sharepoint.com/sites/Logistique-Immos`. Aucune colonne `Loo
 | `Lignes_Outillage` | État de distribution outillage (liste plate, pas de fiche séparée) | `Title` = code employé |
 | `Materiel_IT` → `Mouvements_Materiel_IT` | Téléphones/ordinateurs + historique de détenteurs | `Mouvements_Materiel_IT.Title` = code appareil |
 | `Lignes_Telephoniques` → `Mouvements_Lignes_Telephoniques` | Lignes téléphoniques (indépendantes des appareils) + historique | `Mouvements_Lignes_Telephoniques.Title` = code ligne |
+| `Campagnes_Inventaire_Immos` → `Scans_Inventaire_Immos` | Campagnes d'inventaire physique des immobilisations par scan QR (distinctes de `Campagnes_Inventaire`/`Lignes_Inventaire`, stock d'articles) | `Scans_Inventaire_Immos.Title` = code immo scannée |
+| `Journal_Audit` | Trace des actions sensibles (`requireAdmin`/`requireGarant`) et des échecs de connexion | — |
 
-*(Chantiers : voir écart § 7 — aucune liste SharePoint de ce nom n'est utilisée en pratique.)*
+22 listes SharePoint au total (`EXPORTABLE_LISTS`, `worker.js`). *(Chantiers : voir écart § 7 — aucune liste SharePoint de ce nom n'est utilisée en pratique, `chantiers.json` est un fichier orphelin.)*
 
 ## 5. Fichiers du dépôt
 
@@ -176,14 +182,14 @@ Aucune de ces dépendances n'est installée via npm — chargement direct par ba
 
 ## 7. Écarts constatés entre le code réel et les documents 00-05
 
-1. **Module "Absences" totalement absent des docs 00-05.** Existe pourtant pleinement dans le code : liste SharePoint `Absences`, action `signaler_absence` (PWA, publique), onglet dashboard "Absences" (`renderAbsences`), capacités `ROLE_CAPS.absences`/`voitAbsences` dans `app.js` (non mentionnées dans `03_REGLES_METIER_ET_ROLES.md`, qui ne liste que reserver/bisite/garant/voitTout/admin/comptesExtra). À documenter dans `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md` si confirmé comme fonctionnalité durable.
-2. **`Chantiers` n'est pas une liste SharePoint utilisée en pratique**, malgré son entrée dans `02_MODELE_DONNEES.md` ("Autres listes → Référentiel des chantiers"). Le code ne fait aucun appel Graph sur une liste de ce nom ; `Code_Chantier`/`Nom_Chantier` sont de simples champs texte libre sur `Reservations`/`Mouvements`. Le fichier `chantiers.json` à la racine (85 Ko) n'est référencé nulle part non plus. À corriger dans la doc, ou à réellement implémenter si le besoin existe.
-3. **Deux fichiers JSON orphelins supplémentaires** : `outillage_durees.json` et `outillage_grille_ajouts.json` (0 référence dans le code). Probablement les données sources du correctif documenté dans `04_HISTORIQUE_DECISIONS.md` (« Retour terrain Prime d'outillage : durée d'amortissement & prime annuelle ») — la migration a dû être appliquée une fois puis le code de chargement retiré, sans que les fichiers sources aient été nettoyés du dépôt.
+1. ~~**Module "Absences" totalement absent des docs 00-05.**~~ — **corrigé lors de la passe de documentation du 11 août 2026** : documenté dans `02_MODELE_DONNEES.md` (liste `Absences`) et `03_REGLES_METIER_ET_ROLES.md` (§ Module Absences, capacités `absences`/`voitAbsences` intégrées à la matrice des rôles).
+2. ~~**`Chantiers` n'est pas une liste SharePoint utilisée en pratique**~~ — **corrigé le 11 août 2026** : ligne retirée de `02_MODELE_DONNEES.md` (« Autres listes »). `chantiers.json` (85 Ko) reste un fichier orphelin dans le dépôt — non supprimé (hors périmètre d'une passe de documentation, c'est un fichier de données pas du code), à nettoyer dans une session dédiée si confirmé inutile.
+3. **Deux fichiers JSON orphelins supplémentaires** : `outillage_durees.json` et `outillage_grille_ajouts.json` (0 référence dans le code). Probablement les données sources du correctif documenté dans `04_HISTORIQUE_DECISIONS.md` (« Retour terrain Prime d'outillage : durée d'amortissement & prime annuelle ») — la migration a dû être appliquée une fois puis le code de chargement retiré, sans que les fichiers sources aient été nettoyés du dépôt. Toujours pas nettoyé (même raisonnement que le point 2).
 4. ~~**Action Worker `maj_duree_amort` non protégée et orpheline**~~ — **corrigé lors de l'audit de sécurité du 9 août 2026** (voir § 3 et § 8, et `SECURITE_ETAT.md`) : neutralisée sur le modèle `bulk_maj_immos` (`{success:false, error:'deprecated'}`), plus aucune écriture possible sans authentification.
-5. **`ROLE_CAPS` a plus de capacités que les « cinq capacités possibles » présentées dans `03_REGLES_METIER_ET_ROLES.md`.** En plus de `reserver`/`bisite`/`garant`/`voitTout`/`admin`/`comptesExtra`, le code définit `absences`, `voitAbsences`, `gererInventaire`, `compterInventaire` — ces deux dernières sont bien documentées plus loin dans le même fichier (section campagne d'inventaire), mais pas rattachées à l'introduction générale du modèle de droits, qui reste présentée comme n'ayant que cinq capacités.
+5. ~~**`ROLE_CAPS` a plus de capacités que les « cinq capacités possibles » présentées dans `03_REGLES_METIER_ET_ROLES.md`.**~~ — **corrigé le 11 août 2026** : l'introduction et la matrice de `03_REGLES_METIER_ET_ROLES.md` couvrent désormais les 11 capacités réelles (ajout de `absences`, `voitAbsences`, `gererInventaire`, `compterInventaire`, `modeSimplifie`) et les 10 rôles (ajout de `Compteur_Inventaire`, qui manquait de la matrice).
 6. **Divergence de dates résolue en amont de cette session** : au démarrage, ce dépôt (`C:\Users\ral\immo-tracker`) avait un code à jour (dernier commit "Lot 3", 9 août) mais une documentation figée au 6 août (n'incluant pas Lot 3), tandis qu'un second dossier de travail (`Desktop\Immos`, non git) avait l'inverse — documentation à jour au 9 août mais code du 3 août. Les fichiers `00_*` à `05_*` et `CLAUDE.md` de ce dépôt ont été resynchronisés depuis `Desktop\Immos` (version confirmée la plus récente : elle mentionne déjà "Lot 3") avant de démarrer le travail de cette session. Si un autre poste/dossier existe encore avec une version divergente, il faudra le rapprocher séparément.
 
-*Aucun de ces écarts n'a été corrigé silencieusement dans le comportement du code — seuls `worker.js`/`dashboard.html` liés directement au Volet A (export de sauvegarde) ont été modifiés cette session. Les corrections de documentation (points 1, 2, 5) restent à appliquer à `02_MODELE_DONNEES.md`/`03_REGLES_METIER_ET_ROLES.md` dans une passe dédiée.*
+*Aucun de ces écarts n'a jamais été corrigé silencieusement dans le comportement du code. Les points 1, 2 et 5 ont été corrigés dans `02_MODELE_DONNEES.md`/`03_REGLES_METIER_ET_ROLES.md` lors de la passe de documentation dédiée du 11 août 2026 (voir `04_HISTORIQUE_DECISIONS.md`) ; les points 3 et 6 (fichiers JSON orphelins) restent en l'état, décision volontaire de ne pas toucher aux fichiers de données dans une session de documentation.*
 
 ## 8. Audit et durcissement de sécurité (9-10 août 2026)
 
@@ -199,4 +205,4 @@ Aucune de ces dépendances n'est installée via npm — chargement direct par ba
    - `?materiel_it=1` et `?lignes_telephoniques=1` renvoyaient des codes PIN/PUK/RIO/déverrouillage SIM réels sans aucune authentification. Protégés `requireGarant` (jeton en paramètre `&token=`, même mécanisme que `?export_liste=`) — sans impact PWA, ces deux modules sont 100% dashboard.
    - `materiel_it_catalogue.json` (fichier source de migration, toujours suivi par git) contenait les PIN/PUK/RIO/déverrouillage réels de 40 téléphones. Champs redactés dans l'arbre de travail actuel, **et historique git réécrit** (`git filter-repo`, décision confirmée par William) : le commit d'origine (`b48a4f7`) n'est plus atteignable depuis aucune branche/tag du dépôt distant après force-push. ⚠️ Constaté après coup : GitHub sert encore la page de ce commit par son SHA direct (orphelin, non rattaché à une branche) — purge côté GitHub à demander explicitement par William, et rotation des codes eux-mêmes toujours recommandée. Détail complet dans `SECURITE_ETAT.md`.
    - `dashboard.html` contient un code d'accès partagé en clair (`var PIN='ES974'`) avant l'écran de sélection d'identité. **Décision de William : conservé tel quel**, assumé explicitement comme un filtre cosmétique (l'authentification réelle reste le mot de passe par employé, vérifié serveur) — documenté dans `SECURITE_ETAT.md`.
-7. **29 nouveaux tests** répartis sur 4 nouveaux fichiers (`worker.rate-limit.test.js` : 11, `worker.security-headers.test.js` : 7, `security.materiel-it-gets.test.js` : 10, `security.debug-employes-redaction.test.js` : 1) — suite complète passée de 33 à 62 tests, tous verts avant chaque commit de cette session (`npm run verify`, hook `pre-push`).
+7. **29 nouveaux tests** répartis sur 4 nouveaux fichiers (`worker.rate-limit.test.js` : 11, `worker.security-headers.test.js` : 7, `security.materiel-it-gets.test.js` : 10, `security.debug-employes-redaction.test.js` : 1) — suite complète passée de 33 à 62 tests à cette date, tous verts avant chaque commit de cette session (`npm run verify`, hook `pre-push`). *(Chiffre historique de cette session précise — la suite complète compte 171 tests au 11 août 2026, voir `04_HISTORIQUE_DECISIONS.md` pour les ajouts postérieurs : journal d'audit, demandes de matériel planifiées, digest, etc.)*
