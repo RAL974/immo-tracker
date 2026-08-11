@@ -78,6 +78,8 @@ Pas d'écran PWA pour EPI, Outillage, Matériel IT, Lignes téléphoniques — c
 | Analyses | `renderAnalyse` (VNC, export comptable, coûts réparation, top mouvementées...) |
 | Utilisateurs (+ admin) | `renderUsers` — contient aussi les outils d'administration (ajout immo/employé, seed rôles/sites, dédoublonnage, export de sauvegarde — voir § 6) |
 
+**Contrat d'export universel (ajouté 11 août 2026)** : tous les exports Excel/CSV de l'application passent désormais par une fonction unique, `exporterExcel(nomFichier, ongletsSpec)` (SheetJS), remplaçant les anciens exports CSV isolés. Les exports d'immobilisations partagent un socle de colonnes garanti (`SOCLE_IMMO_ENTETES`, incluant systématiquement le Territoire) via `socleImmoLigne(codeIM)`. Détail complet (contrat, périmètre couvert, gap connu sur les grilles de configuration EPI/Outillage) dans `04_HISTORIQUE_DECISIONS.md`.
+
 ## 3. Actions du Worker (`worker.js`) et niveau de protection
 
 *Recompté au 11 août 2026 (passe de documentation) par grep indépendant sur chaque bloc `if (action === '...')` — 82 actions, 4 de plus qu'au dernier recomptage du 9 août (`creer_retour_direct_garant`, `modifier_ligne_inventaire` notamment). Les niveaux `requireAdmin`/`requireGarant` (27/35) restent inchangés depuis le 9 août.*
@@ -106,6 +108,7 @@ Pas d'écran PWA pour EPI, Outillage, Matériel IT, Lignes téléphoniques — c
 |---|---|---|
 | `?debug_immos=1`, `?debug_resa=1`, `?debug_transferts=1`, `?debug_employes=1`, `?debug_mouvements=1` | Aucune | Échantillon brut Graph (2-5 lignes) d'une liste, à but diagnostic |
 | `?debug_inventaire_columns=1`, `?debug_columns=<liste>` | Aucune | Noms internes réels des colonnes d'une liste SharePoint |
+| `?audit_site_immos=1` (ajouté 11 août 2026) | Aucune | Qualité de la donnée `Immos.Site` sur les immos actives (comptes Réunion/Mayotte/vide-invalide) — contrairement à `?immo_metadata=1`, ne masque jamais un Site vide en `'Reunion'` ; outil de contrôle qualité, voir `04_HISTORIQUE_DECISIONS.md` § Contrat d'export universel |
 | `?next_code_im=1`, `?next_code_ligne_tel=1`, `?next_code_materiel_it=<préfixe>` | Aucune | Prochain code disponible |
 | `?immo_metadata=1`, `?fds_map=1`, `?photos_map=1`, `?employes=1`, `?reservations=1`, `?transferts=1`, `?campagnes_inventaire=1`, `?lignes_inventaire=<id>`, `?campagnes_inventaire_immos=1`, `?scans_inventaire_immos=<nom>`, `?catalogue_epi=1`, `?grille_dotation_epi=1`, `?dotations_epi=1`, `?lignes_dotation_epi=<id>`, `?lignes_dotation_epi_toutes=1`, `?catalogue_outillage=1`, `?grille_outillage=1`, `?lignes_outillage=1`, `?materiel_it=1`, `?mouvements_materiel_it=1`, `?lignes_telephoniques=1`, `?mouvements_lignes_telephoniques=1`, `?absences=1`, `?maintenance=1`, `?mes_reservations=<code>`, `?dashboard=1` | Aucune | Données consolidées pour l'affichage dashboard/PWA — lecture seule mais sans authentification (cohérent avec le choix de conception documenté : friction minimale, PWA sans mot de passe) |
 | `?photo=<id>`, `?photos=<code>`, `?fds=<code>`, `?fiche_epi=<id>`, `?fiche_outillage=<id>` | Aucune | Récupération de fichiers/photos déposés sur le drive SharePoint |
