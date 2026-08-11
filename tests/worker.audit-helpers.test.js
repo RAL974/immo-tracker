@@ -58,7 +58,7 @@ test('auditCibleFrom choisit le meilleur identifiant disponible, par ordre de pr
 
 test('GATED_ACTIONS_AUDIT et AUDIT_AUTH_ERRORS sont exportés et non vides', () => {
   assert.ok(W.GATED_ACTIONS_AUDIT instanceof Set);
-  assert.equal(W.GATED_ACTIONS_AUDIT.size, 62, 'périmètre attendu : les 62 actions gated (voir GATED_ACTIONS côté dashboard.html)');
+  assert.equal(W.GATED_ACTIONS_AUDIT.size, 68, 'périmètre attendu : les 68 actions gated (voir GATED_ACTIONS côté dashboard.html) — 62 + 6 actions Brasseurs d\'air ajoutées août 2026');
   assert.ok(W.AUDIT_AUTH_ERRORS.has('session_invalide'));
   assert.ok(W.AUDIT_AUTH_ERRORS.has('droits_insuffisants'));
   assert.ok(W.AUDIT_AUTH_ERRORS.has('session_secret_manquant'));

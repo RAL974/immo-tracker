@@ -328,3 +328,89 @@ Extension du digest hebdomadaire (`?digest=1`) avec une 6e règle : `digestDeman
 **Lecture non authentifiée côté Worker** : l'endpoint `?absences=1` n'applique aucune restriction lui-même — la règle "Admin/Encadrement seulement" n'est appliquée que côté dashboard, cohérent avec le principe déjà en place pour les endpoints GET de fonctionnement courant (friction minimale, pas de secret au sens strict — voir `SECURITE_ETAT.md`).
 
 **Registre définitif** : aucune action d'édition ou de suppression d'une déclaration — une fois enregistrée, elle reste telle quelle.
+
+## Module « Brasseurs d'air » — négoce + pose (ajouté août 2026)
+
+*Cadrage complet : `Fichiers divers/Brasseurs d'air/CADRAGE_MODULE_BRASSEURS.md`. Suivi du stock de
+brasseurs d'air (négoce et pose), **hors circuit des immobilisations**, 100% piloté depuis le
+dashboard (aucun écran PWA à ce stade — évoqué au cadrage comme une session dédiée future). Modèle
+de données détaillé dans `02_MODELE_DONNEES.md`.*
+
+**Une seule capacité, `peutGererBrasseurs`** (Admin, Logistique, Logistique_Mayotte) — **pas de
+« voir » séparé pour Encadrement** contrairement à EPI/Outillage. Raison : les prix de commande
+(`Brasseurs_Lignes_Commande.Prix_Unitaire`, `Brasseurs_Commandes.Montant_Total`) sont protégés
+`requireGarant` côté Worker (cadrage §3.e, décision explicite de William de traiter les prix comme
+une donnée sensible ici), et `estGarantSessionPure` n'inclut pas Encadrement — un accès « view-only »
+plus large côté dashboard échouerait de toute façon sur l'onglet Commandes. Une seule capacité,
+alignée exactement sur ce que le Worker autorise réellement, plutôt qu'une fausse promesse d'accès
+partiel.
+
+**Stock calculé, jamais stocké** : même principe qu'EPI/Outillage — la vue Stock du dashboard est un
+pivot Référence × Dépôt (l'équivalent des tableaux croisés dynamiques du classeur Excel d'origine),
+recalculé à la volée depuis la somme des `Brasseurs_Mouvements.Quantit_x00e9_` filtrée par dépôt,
+référence et propriétaire.
+
+**Propriétaire du stock — liste fermée à 2 valeurs, sans exception** : `ELECTRICITE SERVICES REUNION`
+/ `1ST SHINE`, contrôlée côté serveur (rejet si valeur hors liste). Le champ reste actif et
+sélectionnable sur **tous** les dépôts, y compris ceux qui portent presque toujours le stock de
+l'entreprise — William a confirmé un cas réel vécu de stock 1ST SHINE porté ponctuellement à TC2, pas
+seulement une hypothèse théorique.
+
+**Numérotation automatique des documents** : format `{PREFIXE}.{AA}.{MM}.{NNN}` (ex. `OMT.26.08.003`,
+`TRF.26.08.001`, `CMD.26.08.001`), repris à 1 chaque mois pour chaque préfixe. Calculée et attribuée
+**côté serveur au moment même de l'écriture** (jamais un `GET` séparé suivi d'un `POST` côté client,
+contrairement à `?next_code_im=1`) — élimine tout scénario de numéro déjà pris entre la lecture et
+l'écriture d'un second utilisateur simultané.
+
+**Un mouvement peut regrouper plusieurs lignes de référence** sous un même numéro de document
+(reproduit le regroupement déjà observé dans le classeur d'origine, ex. une sortie chantier
+regroupant brasseur + pales + accessoires) — validation « tout ou rien » côté serveur : si une seule
+ligne échoue (référence inconnue/inactive, stock insuffisant...), rien n'est écrit.
+
+**Recalage d'inventaire = un type de mouvement, pas une action séparée** : `Type_Mouvement='Inventaire'`
+dans `creer_mouvement_brasseur`. La quantité transmise pour ce type est le **niveau de stock cible**
+(pas un delta) — le Worker calcule l'écart signé nécessaire pour l'atteindre et l'écrit comme
+`Quantit_x00e9_` ; une référence déjà au bon niveau ne génère aucune ligne.
+
+**Transfert inter-dépôts = deux mouvements liés, écrits séquentiellement** : `Transfert_Sortie` au
+dépôt source (quantité négative) et `Transfert_Entree` au dépôt destination (quantité positive),
+partageant un même `Document` (préfixe fixe `TRF`, indépendant du dépôt) et se référençant
+mutuellement via `Transfert_Lien`. Écrit en deux appels Graph successifs (pas en `$batch`) : il faut
+connaître l'id SharePoint de la sortie pour renseigner `Transfert_Lien` sur l'entrée, et
+réciproquement — un lot `$batch` ne peut pas exposer l'id généré d'une requête à une autre requête du
+même lot.
+
+**Garde-fou stock négatif** : toute `Sortie`/`Transfert_Sortie`/écart d'`Inventaire` négatif est
+bloquée côté serveur si elle ferait passer le stock (Dépôt×Référence×Propriétaire) sous 0 — message
+explicite (`stock_insuffisant`, stock actuel + quantité demandée renvoyés) plutôt qu'un rejet muet.
+Aucune exception prévue par le cadrage.
+
+**Réception de commande — écarts lisibles directement** : `reception_commande_brasseur` génère une
+entrée de stock par ligne reçue et incrémente `Quantite_Recue` sur `Brasseurs_Lignes_Commande` —
+l'écart commandé/reçu se lit directement (`Quantite_Commandee − Quantite_Recue`), aucun champ dédié.
+Le statut de la commande (`Brasseurs_Commandes.Statut`) est **recalculé depuis l'ensemble des lignes**
+à chaque réception (pas seulement celles reçues dans l'appel en cours, pour rester correct sur une
+2ᵉ réception partielle) : `Recue` si toutes les lignes sont soldées, `Recue_Partielle` sinon.
+
+**Annulation = quantité ramenée à 0, jamais de suppression** — convention reprise du classeur Excel
+d'origine (§1.4 du cadrage : le registre montrait déjà des « mouvements annulés » à quantité 0,
+attribués aux dérives de saisie de l'ancien responsable logistique, pas à un pattern métier à
+reproduire). Le motif est tracé dans `Commentaire` (`[ANNULÉ par CODE le ISO — motif]`), jamais en
+écrasant le commentaire existant.
+
+**Liaison automatique pales↔brasseur — comportement d'écran uniquement, aucune donnée structurelle** :
+à la saisie d'une ligne de sortie `DCF-FS52920B`/`DCF-FS52920N`, le dashboard pré-remplit
+automatiquement une ligne `PALES` à la même quantité sur le même document — modifiable ou
+supprimable avant validation (ex. technicien qui réutilise les pales déjà en place chez le client,
+donc met la ligne à 0 ou la supprime). Les autres accessoires
+(`CACHES`/`KITFIX`/`VISSERIE`/`CARTONS`/`ECL`/`CMD-T`) restent en report manuel pur, sans
+pré-proposition.
+
+**Identité toujours résolue depuis le jeton de session** : `Code_Employe` et `Cree_Par` sur
+`Brasseurs_Mouvements`, `Cree_Par` sur `Brasseurs_Commandes` — jamais depuis le corps de la requête,
+même règle que le reste du projet depuis le chantier « Autorisation côté serveur » (voir
+`04_HISTORIQUE_DECISIONS.md`).
+
+**Recherche globale** : les références du catalogue Brasseurs sont incluses dans la recherche globale
+du dashboard, même limitation de fraîcheur que EPI/Outillage — non trouvables tant que l'onglet
+Brasseurs n'a pas été ouvert au moins une fois dans la session (chargement paresseux).

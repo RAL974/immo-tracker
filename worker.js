@@ -457,6 +457,22 @@ function renderDigestHtml(digest, dashboardUrl) {
     '</table>';
 }
 
+// ── Module « Brasseurs d'air » (négoce + pose, ajouté août 2026) ── Cadrage complet dans
+// `Fichiers divers/Brasseurs d'air/CADRAGE_MODULE_BRASSEURS.md`. Stock CALCULÉ (jamais un solde
+// stocké) : somme des mouvements par Dépôt×Référence×Propriétaire, même principe que EPI/Outillage.
+// Isolation stricte vis-à-vis de la liste Mouvements des immobilisations : aucune des deux ne
+// référence l'autre, aucun code partagé.
+// Liste fermée, tranchée définitivement avec William (cadrage §3.d) — rejet serveur si valeur hors liste.
+const BRASSEUR_PROPRIETAIRES = ['ELECTRICITE SERVICES REUNION', '1ST SHINE'];
+// Colonne quantité de Brasseurs_Mouvements : nommée en interne "Quantit_x00e9_" par SharePoint, PAS
+// "Quantite" comme documenté dans le cadrage initial — "Quantité" tapé avec l'accent a été échappé
+// automatiquement à la création de la colonne (l'accent "é" devient l'échappement Unicode "_x00e9_")
+// au lieu d'être normalisé comme les autres colonnes du projet. Constaté via
+// ?debug_columns=Brasseurs_Mouvements (sur les DEUX sites, prod et recette, avant d'écrire ce
+// module) — même classe d'incident que Fabricant/Fabriquant et Code_deverouillage, voir
+// 04_HISTORIQUE_DECISIONS.md. Toujours utiliser cette constante, jamais le nom littéral.
+const BRASSEUR_QTE_FIELD = 'Quantit_x00e9_';
+
 // ── Journal d'audit des actions sensibles (liste SharePoint Journal_Audit, ajoutée août 2026) ──
 // Périmètre : exactement les 62 actions POST protégées requireAdmin/requireGarant (mêmes noms que
 // GATED_ACTIONS côté dashboard.html) + les échecs de connexion (verify_password, voir plus bas).
@@ -481,7 +497,9 @@ const GATED_ACTIONS_AUDIT = new Set([
   'cloturer_campagne_inventaire_immos', 'creer_campagne_inventaire_immos', 'upload_fds', 'maj_taille_employe',
   'ajouter_materiel_it', 'maj_materiel_it', 'affecter_materiel_it', 'bulk_import_materiel_it',
   'bulk_import_mouvements_materiel_it', 'ajouter_ligne_telephonique', 'maj_ligne_telephonique',
-  'affecter_ligne_telephonique', 'bulk_import_lignes_telephoniques', 'bulk_import_mouvements_lignes_telephoniques'
+  'affecter_ligne_telephonique', 'bulk_import_lignes_telephoniques', 'bulk_import_mouvements_lignes_telephoniques',
+  'creer_mouvement_brasseur', 'transfert_brasseur', 'creer_commande_brasseur', 'editer_commande_brasseur',
+  'reception_commande_brasseur', 'annuler_mouvement_brasseur'
 ]);
 // Réponses renvoyées par requireAdmin/requireGarant AVANT toute exécution métier : ne jamais
 // journaliser ces cas. Deux raisons : (1) aucune écriture n'a eu lieu, rien à auditer côté métier ;
@@ -703,6 +721,35 @@ async function handleRequest(request) {
     return { success: ko === 0, ok: ok, ko: ko, erreurs: errs };
   }
 
+  // ── Numérotation automatique des documents Brasseurs (Mouvements/Commandes, cadrage §3.a/§4) ──
+  // Format {PREFIXE}.{AA}.{MM}.{NNN} (ex. OMT.26.08.003, TC2.26.08.001, TRF.26.08.001, CMD.26.08.001)
+  // — numérotation reprise à 1 chaque mois pour chaque préfixe. Calculée et attribuée côté serveur au
+  // moment même de l'écriture (jamais un GET séparé suivi d'un POST côté client, contrairement à
+  // ?next_code_im=1) : élimine tout scénario de numéro déjà pris entre la lecture et l'écriture.
+  async function nextBrasseurDocument(prefixe, listName, fieldName) {
+    const now = new Date();
+    const aa = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const re = new RegExp('^' + prefixe.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.' + aa + '\\.' + mm + '\\.(\\d{3})$');
+    let maxSeq = 0;
+    const items = await paginate(GL + '/' + listName + '/items?$expand=fields($select=' + fieldName + ')&$top=500', 10);
+    items.forEach(it => {
+      const t = (it.fields && it.fields[fieldName]) || '';
+      const m = re.exec(t);
+      if (m) { const n = parseInt(m[1], 10); if (n > maxSeq) maxSeq = n; }
+    });
+    return prefixe + '.' + aa + '.' + mm + '.' + String(maxSeq + 1).padStart(3, '0');
+  }
+
+  // Stock actuel (calculé, jamais stocké) d'une référence à un dépôt pour un propriétaire donné —
+  // somme signée des mouvements Brasseurs_Mouvements déjà enregistrés. Utilisé pour le garde-fou
+  // "pas de stock négatif" avant toute Sortie/Transfert_Sortie.
+  async function brasseurStockActuel(depot, reference, proprietaire) {
+    const filtre = "fields/Depot eq '" + depot.replace(/'/g, "''") + "' and fields/Title eq '" + reference.replace(/'/g, "''") + "' and fields/Proprietaire eq '" + proprietaire.replace(/'/g, "''") + "'";
+    const items = await paginate(GL + "/Brasseurs_Mouvements/items?$expand=fields($select=" + BRASSEUR_QTE_FIELD + ")&$filter=" + filtre + "&$top=2000", 10);
+    return items.reduce((s, it) => s + (parseFloat((it.fields || {})[BRASSEUR_QTE_FIELD]) || 0), 0);
+  }
+
   // Résolution du vrai nom d'un employé depuis son code (évite les doublons "CONI" vs "COUTAREL Nicolas")
   let _nomParCode = null;
   async function getNomResolver() {
@@ -821,7 +868,8 @@ async function handleRequest(request) {
       'Campagnes_Inventaire', 'Lignes_Inventaire', 'Catalogue_Articles_EPI', 'Grille_Dotation_EPI', 'Dotations_EPI',
       'Lignes_Dotation_EPI', 'Catalogue_Outillage', 'Grille_Outillage', 'Lignes_Outillage', 'Materiel_IT',
       'Mouvements_Materiel_IT', 'Lignes_Telephoniques', 'Mouvements_Lignes_Telephoniques',
-      'Campagnes_Inventaire_Immos', 'Scans_Inventaire_Immos', 'Journal_Audit'];
+      'Campagnes_Inventaire_Immos', 'Scans_Inventaire_Immos', 'Journal_Audit',
+      'Brasseurs_Depots', 'Brasseurs_Catalogue', 'Brasseurs_Mouvements', 'Brasseurs_Commandes', 'Brasseurs_Lignes_Commande'];
     const nomListe = p.get('export_liste');
     if (EXPORTABLE_LISTS.indexOf(nomListe) === -1) return json({ success: false, error: 'liste_inconnue', listes_valides: EXPORTABLE_LISTS }, 400);
     const res = await paginateStatus(GL + '/' + encodeURIComponent(nomListe) + '/items?$expand=fields&$top=200', 45);
@@ -1269,6 +1317,69 @@ async function handleRequest(request) {
       if (m) { const n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
     });
     return json({ next_code: 'LIG' + String(maxNum + 1).padStart(6, '0'), max_num: maxNum });
+  }
+
+  // ── Module « Brasseurs d'air » (négoce + pose) — lecture ────────────────────────────────────
+  if (p.get('brasseurs_depots') === '1') {
+    const items = await paginate(GL + '/Brasseurs_Depots/items?$expand=fields&$top=100', 3);
+    return json(items.map(i => { const f = i.fields || {}; return { id: i.id, code: f.Title || '', nom_complet: f.Nom_Complet || '', prefixe_document: f.Prefixe_Document || '', site: f.Site || '', actif: (f.Actif || 'Oui') !== 'Non' }; }));
+  }
+
+  if (p.get('brasseurs_catalogue') === '1') {
+    const items = await paginate(GL + '/Brasseurs_Catalogue/items?$expand=fields&$top=200', 5);
+    return json(items.map(i => { const f = i.fields || {}; return { id: i.id, reference: f.Title || '', designation: f.Designation || '', categorie: f.Categorie || '', stock_mini: f.Stock_Mini != null ? f.Stock_Mini : 0, actif: (f.Actif || 'Oui') !== 'Non' }; }));
+  }
+
+  if (p.get('brasseurs_mouvements') === '1') {
+    const items = await paginate(GL + '/Brasseurs_Mouvements/items?$expand=fields&$orderby=fields/Horodatage%20desc&$top=5000', 15);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, reference: f.Title || '', document: f.Document || '', depot: f.Depot || '', date: f.Date || '', type_mouvement: f.Type_Mouvement || '', tiers: f.Tiers || '', proprietaire: f.Proprietaire || '', destination: f.Destination || '', quantite: f[BRASSEUR_QTE_FIELD] != null ? f[BRASSEUR_QTE_FIELD] : 0, code_employe: f.Code_Employe || '', commentaire: f.Commentaire || '', transfert_lien: f.Transfert_Lien || '', horodatage: f.Horodatage || f.Created || '', cree_par: f.Cree_Par || '' };
+    }));
+  }
+
+  // Stock consolidé Dépôt × Référence × Propriétaire — CALCULÉ (jamais stocké), équivalent des TCD
+  // du classeur Excel d'origine (cadrage §2). Pas de protection requireGarant : uniquement des
+  // quantités, aucun prix (même niveau de confiance que ?brasseurs_mouvements=1/?catalogue_epi=1).
+  if (p.get('brasseurs_stock') === '1') {
+    const items = await paginate(GL + '/Brasseurs_Mouvements/items?$expand=fields($select=Title,Depot,Proprietaire,' + BRASSEUR_QTE_FIELD + ')&$top=5000', 15);
+    const parCle = {};
+    items.forEach(i => {
+      const f = i.fields || {};
+      const depot = f.Depot || '', reference = f.Title || '', proprietaire = f.Proprietaire || '';
+      if (!depot || !reference || !proprietaire) return;
+      const cle = depot + '||' + reference + '||' + proprietaire;
+      if (!parCle[cle]) parCle[cle] = { depot, reference, proprietaire, quantite: 0 };
+      parCle[cle].quantite += parseFloat(f[BRASSEUR_QTE_FIELD]) || 0;
+    });
+    return json(Object.values(parCle));
+  }
+
+  // Commandes fournisseur : contient Montant_Total (donnée financière) — protégé requireGarant
+  // comme les autres endpoints exposant des prix (?materiel_it=1, ?lignes_telephoniques=1), jeton en
+  // paramètre &token= (GET, pas de corps JSON). Cadrage §3.e : protection des prix, Option A partout.
+  if (p.get('brasseurs_commandes') === '1') {
+    const _auth = await requireGarant({ token: p.get('token') });
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+    const items = await paginate(GL + '/Brasseurs_Commandes/items?$expand=fields&$orderby=fields/Created%20desc&$top=500', 8);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, reference: f.Title || '', origine: f.Origine || '', fournisseur: f.Fournisseur || '', date_commande: f.Date_Commande || '', montant_total: f.Montant_Total != null ? f.Montant_Total : 0, devise: f.Devise || '', acompte_pourcentage: f.Acompte_Pourcentage != null ? f.Acompte_Pourcentage : null, incoterm: f.Incoterm || '', delai_estime_jours: f.Delai_Estime_Jours != null ? f.Delai_Estime_Jours : null, date_arrivee_estimee: f.Date_Arrivee_Estimee || '', statut: f.Statut || 'En attente', cree_par: f.Cree_Par || '', notes: f.Notes || '' };
+    }));
+  }
+
+  // Lignes de commande : Prix_Unitaire — même protection que ci-dessus (cadrage §3.e, "Option A
+  // partout, y compris achats locaux"). Toutes les lignes de toutes les commandes en un seul appel
+  // (comme ?lignes_dotation_epi_toutes=1), filtrées côté dashboard par commande_id (Title) — évite
+  // un appel par commande pour l'écran de réception.
+  if (p.get('brasseurs_lignes_commande') === '1') {
+    const _auth = await requireGarant({ token: p.get('token') });
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+    const items = await paginate(GL + '/Brasseurs_Lignes_Commande/items?$expand=fields&$top=2000', 10);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, commande_id: f.Title || '', reference: f.Reference || '', quantite_commandee: f.Quantite_Commandee != null ? f.Quantite_Commandee : 0, prix_unitaire: f.Prix_Unitaire != null ? f.Prix_Unitaire : 0, quantite_recue: f.Quantite_Recue != null ? f.Quantite_Recue : 0 };
+    }));
   }
 
   // ── Réservations par employé ──────────────────────────────────────────────────
@@ -3141,6 +3252,297 @@ async function handleRequest(request) {
         Horodatage: body.horodatage || new Date().toISOString(), Photos: joinPhotos(body.photos)
       } }) });
       return json({ success: r.ok, status: r.status });
+    }
+
+    // ── Module « Brasseurs d'air » (négoce + pose) — écriture ────────────────────────────────────
+    // Toutes ces actions gèrent du stock à valeur commerciale : gated requireGarant (même population
+    // que EPI/Outillage : Admin, Logistique, Logistique_Mayotte), journalisées via GATED_ACTIONS_AUDIT.
+
+    // Crée un mouvement (Entrée/Sortie/Inventaire), une ou plusieurs lignes de référence partageant
+    // un même numéro de document généré côté serveur — reproduit le regroupement déjà observé dans
+    // le classeur d'origine (ex. OM.25.05.001 regroupant 6 lignes de référence). Le recalage
+    // d'inventaire (type 'Inventaire') n'est pas une action séparée : la quantité transmise pour ce
+    // type est le niveau de stock CIBLE, le Worker calcule et écrit l'écart signé nécessaire pour
+    // l'atteindre (une ligne à écart nul est simplement omise, rien à recaler).
+    if (action === 'creer_mouvement_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const depot = (body.depot || '').trim().toUpperCase();
+      const type = body.type_mouvement;
+      const proprietaire = (body.proprietaire || '').trim().toUpperCase();
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!depot || ['Entree', 'Sortie', 'Inventaire'].indexOf(type) === -1 || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (BRASSEUR_PROPRIETAIRES.indexOf(proprietaire) === -1) return json({ success: false, error: 'proprietaire_invalide', valeurs_valides: BRASSEUR_PROPRIETAIRES });
+      if (lignes.length > 20) return json({ success: false, error: 'trop_de_lignes', max: 20 });
+      const [depotsRaw, catalogueRaw] = await Promise.all([
+        paginate(GL + '/Brasseurs_Depots/items?$expand=fields&$top=100', 3),
+        paginate(GL + '/Brasseurs_Catalogue/items?$expand=fields&$top=200', 5)
+      ]);
+      const depotInfo = depotsRaw.map(i => i.fields || {}).find(f => (f.Title || '').toUpperCase() === depot);
+      if (!depotInfo || (depotInfo.Actif || 'Oui') === 'Non') return json({ success: false, error: 'depot_invalide' });
+      const catByRef = {};
+      catalogueRaw.forEach(i => { const f = i.fields || {}; if (f.Title) catByRef[f.Title.toUpperCase()] = f; });
+      // Valide (et calcule les quantités signées de) TOUTES les lignes AVANT toute écriture (tout ou rien)
+      const lignesValidees = [];
+      for (const l of lignes) {
+        const reference = (l.reference || '').trim().toUpperCase();
+        const cat = catByRef[reference];
+        if (!reference || !cat) return json({ success: false, error: 'reference_inconnue', reference: l.reference });
+        if ((cat.Actif || 'Oui') === 'Non') return json({ success: false, error: 'reference_inactive', reference: l.reference });
+        const saisie = parseFloat(l.quantite);
+        if (isNaN(saisie)) return json({ success: false, error: 'quantite_invalide', reference: l.reference });
+        let quantiteSignee;
+        if (type === 'Inventaire') {
+          const stockActuel = await brasseurStockActuel(depot, reference, proprietaire);
+          quantiteSignee = saisie - stockActuel;
+          if (quantiteSignee === 0) continue; // rien à recaler pour cette référence
+        } else {
+          if (saisie <= 0) return json({ success: false, error: 'quantite_invalide', reference: l.reference, message: 'La quantité doit être strictement positive (le signe est déterminé par le type de mouvement).' });
+          quantiteSignee = type === 'Sortie' ? -Math.abs(saisie) : Math.abs(saisie);
+        }
+        if (quantiteSignee < 0) {
+          const stockActuel = await brasseurStockActuel(depot, reference, proprietaire);
+          if (stockActuel + quantiteSignee < 0) return json({ success: false, error: 'stock_insuffisant', reference: l.reference, stock_actuel: stockActuel, demande: Math.abs(quantiteSignee) });
+        }
+        lignesValidees.push({ reference, quantite: quantiteSignee });
+      }
+      if (!lignesValidees.length) return json({ success: false, error: 'aucune_ligne_a_ecrire' });
+      const document = await nextBrasseurDocument(depotInfo.Prefixe_Document || depot, 'Brasseurs_Mouvements', 'Document');
+      const auteurCode = _auth.session.code;
+      const horodatage = new Date().toISOString();
+      const dateMvt = body.date || horodatage.slice(0, 10);
+      const requests = lignesValidees.map((l, idx) => ({
+        id: String(idx), method: 'POST', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Mouvements/items',
+        headers: { 'Content-Type': 'application/json' },
+        body: { fields: {
+          Title: l.reference, Document: document, Depot: depot, Date: dateMvt, Type_Mouvement: type,
+          Tiers: body.tiers || '', Proprietaire: proprietaire, Destination: body.destination || '',
+          [BRASSEUR_QTE_FIELD]: l.quantite, Code_Employe: auteurCode, Commentaire: body.commentaire || '',
+          Horodatage: horodatage, Cree_Par: auteurCode
+        } }
+      }));
+      try {
+        const res = await graphBatch(requests);
+        return json({ success: res.success, document: document, lignes_ecrites: lignesValidees.length, ok: res.ok, ko: res.ko, erreurs: res.erreurs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Transfert inter-dépôts : génère DEUX mouvements liés par ligne de référence (Transfert_Sortie
+    // au dépôt source, Transfert_Entree au dépôt destination), partageant un même numéro de document
+    // (préfixe fixe TRF, indépendant du dépôt — cadrage §4) et se référençant mutuellement via
+    // Transfert_Lien. Écrit séquentiellement (pas en $batch) : il faut connaître l'id SharePoint de
+    // la sortie pour renseigner Transfert_Lien sur l'entrée, et réciproquement — une écriture $batch
+    // ne peut pas exposer l'id généré d'une requête à une autre requête du même lot.
+    if (action === 'transfert_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const depotSource = (body.depot_source || '').trim().toUpperCase();
+      const depotDest = (body.depot_destination || '').trim().toUpperCase();
+      const proprietaire = (body.proprietaire || '').trim().toUpperCase();
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!depotSource || !depotDest || depotSource === depotDest || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (BRASSEUR_PROPRIETAIRES.indexOf(proprietaire) === -1) return json({ success: false, error: 'proprietaire_invalide', valeurs_valides: BRASSEUR_PROPRIETAIRES });
+      if (lignes.length > 10) return json({ success: false, error: 'trop_de_lignes', max: 10 });
+      const [depotsRaw, catalogueRaw] = await Promise.all([
+        paginate(GL + '/Brasseurs_Depots/items?$expand=fields&$top=100', 3),
+        paginate(GL + '/Brasseurs_Catalogue/items?$expand=fields&$top=200', 5)
+      ]);
+      const depotsMap = {}; depotsRaw.forEach(i => { const f = i.fields || {}; if (f.Title) depotsMap[f.Title.toUpperCase()] = f; });
+      if (!depotsMap[depotSource] || (depotsMap[depotSource].Actif || 'Oui') === 'Non') return json({ success: false, error: 'depot_invalide', depot: depotSource });
+      if (!depotsMap[depotDest] || (depotsMap[depotDest].Actif || 'Oui') === 'Non') return json({ success: false, error: 'depot_invalide', depot: depotDest });
+      const catByRef = {}; catalogueRaw.forEach(i => { const f = i.fields || {}; if (f.Title) catByRef[f.Title.toUpperCase()] = f; });
+      const lignesValidees = [];
+      for (const l of lignes) {
+        const reference = (l.reference || '').trim().toUpperCase();
+        const cat = catByRef[reference];
+        if (!reference || !cat) return json({ success: false, error: 'reference_inconnue', reference: l.reference });
+        if ((cat.Actif || 'Oui') === 'Non') return json({ success: false, error: 'reference_inactive', reference: l.reference });
+        const qte = Math.abs(parseFloat(l.quantite));
+        if (!qte) return json({ success: false, error: 'quantite_invalide', reference: l.reference });
+        const stockSource = await brasseurStockActuel(depotSource, reference, proprietaire);
+        if (stockSource - qte < 0) return json({ success: false, error: 'stock_insuffisant', reference: l.reference, stock_actuel: stockSource, demande: qte, depot: depotSource });
+        lignesValidees.push({ reference, quantite: qte });
+      }
+      const document = await nextBrasseurDocument('TRF', 'Brasseurs_Mouvements', 'Document');
+      const auteurCode = _auth.session.code;
+      const horodatage = new Date().toISOString();
+      const dateMvt = body.date || horodatage.slice(0, 10);
+      const paires = [];
+      try {
+        for (const l of lignesValidees) {
+          const rSortie = await fetch(GL + '/Brasseurs_Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+            Title: l.reference, Document: document, Depot: depotSource, Date: dateMvt, Type_Mouvement: 'Transfert_Sortie',
+            Tiers: '', Proprietaire: proprietaire, Destination: depotDest, [BRASSEUR_QTE_FIELD]: -l.quantite,
+            Code_Employe: auteurCode, Commentaire: body.commentaire || '', Horodatage: horodatage, Cree_Par: auteurCode
+          } }) });
+          const rSortieData = await rSortie.json();
+          if (!rSortie.ok) return json({ success: false, error: 'sharepoint', message: (rSortieData.error && rSortieData.error.message) || 'Erreur écriture', reference: l.reference, document: document });
+          const rEntree = await fetch(GL + '/Brasseurs_Mouvements/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+            Title: l.reference, Document: document, Depot: depotDest, Date: dateMvt, Type_Mouvement: 'Transfert_Entree',
+            Tiers: '', Proprietaire: proprietaire, Destination: depotSource, [BRASSEUR_QTE_FIELD]: l.quantite,
+            Code_Employe: auteurCode, Commentaire: body.commentaire || '', Horodatage: horodatage, Cree_Par: auteurCode,
+            Transfert_Lien: rSortieData.id
+          } }) });
+          const rEntreeData = await rEntree.json();
+          if (!rEntree.ok) return json({ success: false, error: 'sharepoint', message: (rEntreeData.error && rEntreeData.error.message) || 'Erreur écriture', reference: l.reference, document: document });
+          await fetch(GL + '/Brasseurs_Mouvements/items/' + rSortieData.id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Transfert_Lien: rEntreeData.id }) });
+          paires.push({ reference: l.reference, id_sortie: rSortieData.id, id_entree: rEntreeData.id });
+        }
+        return json({ success: true, document: document, paires: paires });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message, document: document }); }
+    }
+
+    // Crée l'en-tête de commande fournisseur (internationale ou achat local, cadrage §1.5/§4) + ses
+    // lignes. Numéro auto (CMD.AA.MM.NNN) si aucun n° de PI fournisseur n'est transmis ; sinon le n°
+    // de PI fait foi (Title) — même logique de numérotation que Brasseurs_Mouvements.Document.
+    if (action === 'creer_commande_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const origine = body.origine === 'Local' ? 'Local' : (body.origine === 'International' ? 'International' : null);
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!origine || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (lignes.length > 20) return json({ success: false, error: 'trop_de_lignes', max: 20 });
+      const catalogueRaw = await paginate(GL + '/Brasseurs_Catalogue/items?$expand=fields&$top=200', 5);
+      const catRefs = new Set(catalogueRaw.map(i => ((i.fields || {}).Title || '').toUpperCase()));
+      const lignesValidees = [];
+      for (const l of lignes) {
+        const reference = (l.reference || '').trim().toUpperCase();
+        const qte = parseFloat(l.quantite_commandee);
+        if (!reference || !catRefs.has(reference)) return json({ success: false, error: 'reference_inconnue', reference: l.reference });
+        if (isNaN(qte) || qte <= 0) return json({ success: false, error: 'quantite_invalide', reference: l.reference });
+        lignesValidees.push({ reference: reference, quantite_commandee: qte, prix_unitaire: parseFloat(l.prix_unitaire) || 0 });
+      }
+      const numeroPI = (body.numero_pi || '').trim();
+      const titre = numeroPI || await nextBrasseurDocument('CMD', 'Brasseurs_Commandes', 'Title');
+      const auteurCode = _auth.session.code;
+      try {
+        const rCmd = await fetch(GL + '/Brasseurs_Commandes/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: titre, Origine: origine, Fournisseur: body.fournisseur || '', Date_Commande: body.date_commande || new Date().toISOString().slice(0, 10),
+          Montant_Total: parseFloat(body.montant_total) || 0, Devise: body.devise || (origine === 'International' ? 'USD' : 'EUR'),
+          Acompte_Pourcentage: (body.acompte_pourcentage != null && body.acompte_pourcentage !== '') ? parseFloat(body.acompte_pourcentage) : null,
+          Incoterm: body.incoterm || '', Delai_Estime_Jours: (body.delai_estime_jours != null && body.delai_estime_jours !== '') ? parseFloat(body.delai_estime_jours) : null,
+          Date_Arrivee_Estimee: body.date_arrivee_estimee || '', Statut: 'En attente', Cree_Par: auteurCode, Notes: body.notes || ''
+        } }) });
+        const cmdData = await rCmd.json();
+        if (!rCmd.ok) return json({ success: false, error: 'sharepoint', message: (cmdData.error && cmdData.error.message) || 'Erreur écriture' });
+        const requests = lignesValidees.map((l, idx) => ({
+          id: String(idx), method: 'POST', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Lignes_Commande/items',
+          headers: { 'Content-Type': 'application/json' },
+          body: { fields: { Title: String(cmdData.id), Reference: l.reference, Quantite_Commandee: l.quantite_commandee, Prix_Unitaire: l.prix_unitaire, Quantite_Recue: 0 } }
+        }));
+        const res = await graphBatch(requests);
+        return json({ success: res.success, id: cmdData.id, reference: titre, lignes_ecrites: lignesValidees.length, ok: res.ok, ko: res.ko, erreurs: res.erreurs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Édite l'en-tête d'une commande existante (fournisseur, montant, dates, statut, notes...) — les
+    // lignes ne se modifient qu'à la réception (reception_commande_brasseur ci-dessous), pas ici.
+    if (action === 'editer_commande_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const STATUTS_COMMANDE = ['En attente', 'Recue_Partielle', 'Recue', 'Annulee'];
+      const fields = {};
+      if (body.fournisseur !== undefined) fields.Fournisseur = body.fournisseur;
+      if (body.montant_total !== undefined) fields.Montant_Total = parseFloat(body.montant_total) || 0;
+      if (body.devise !== undefined) fields.Devise = body.devise;
+      if (body.acompte_pourcentage !== undefined) fields.Acompte_Pourcentage = body.acompte_pourcentage === '' ? null : parseFloat(body.acompte_pourcentage);
+      if (body.incoterm !== undefined) fields.Incoterm = body.incoterm;
+      if (body.delai_estime_jours !== undefined) fields.Delai_Estime_Jours = body.delai_estime_jours === '' ? null : parseFloat(body.delai_estime_jours);
+      if (body.date_arrivee_estimee !== undefined) fields.Date_Arrivee_Estimee = body.date_arrivee_estimee;
+      if (body.date_commande !== undefined) fields.Date_Commande = body.date_commande;
+      if (body.notes !== undefined) fields.Notes = body.notes;
+      if (body.statut !== undefined) {
+        if (STATUTS_COMMANDE.indexOf(body.statut) === -1) return json({ success: false, error: 'statut_invalide', valeurs_valides: STATUTS_COMMANDE });
+        fields.Statut = body.statut;
+      }
+      if (!Object.keys(fields).length) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/Brasseurs_Commandes/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Réception d'une commande : génère une entrée de stock par ligne reçue (Brasseurs_Mouvements,
+    // Type_Mouvement='Entree') et incrémente Quantite_Recue sur chaque Brasseurs_Lignes_Commande —
+    // les écarts commandé/reçu se lisent directement (Quantite_Commandee − Quantite_Recue), aucun
+    // champ dédié. Le statut de la commande passe à Recue (toutes lignes soldées) ou
+    // Recue_Partielle sinon, recalculé depuis TOUTES les lignes de la commande (pas seulement
+    // celles reçues dans cet appel, pour rester correct sur une 2e réception partielle).
+    if (action === 'reception_commande_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const commandeId = body.commande_id;
+      const depot = (body.depot || '').trim().toUpperCase();
+      const proprietaire = (body.proprietaire || '').trim().toUpperCase();
+      const receptions = Array.isArray(body.lignes) ? body.lignes : []; // [{ligne_id, quantite_recue}]
+      if (!commandeId || !depot || !receptions.length) return json({ success: false, error: 'donnees_invalides' });
+      if (BRASSEUR_PROPRIETAIRES.indexOf(proprietaire) === -1) return json({ success: false, error: 'proprietaire_invalide', valeurs_valides: BRASSEUR_PROPRIETAIRES });
+      const [cmdRes, depotsRaw] = await Promise.all([
+        fetch(GL + '/Brasseurs_Commandes/items/' + commandeId + '?$expand=fields', { headers: H }),
+        paginate(GL + '/Brasseurs_Depots/items?$expand=fields&$top=100', 3)
+      ]);
+      const cmdData = await cmdRes.json();
+      if (!cmdRes.ok || !cmdData.fields) return json({ success: false, error: 'commande_introuvable' });
+      const depotInfo = depotsRaw.map(i => i.fields || {}).find(f => (f.Title || '').toUpperCase() === depot);
+      if (!depotInfo || (depotInfo.Actif || 'Oui') === 'Non') return json({ success: false, error: 'depot_invalide' });
+      const toutesLignes = await paginate(GL + "/Brasseurs_Lignes_Commande/items?$expand=fields&$filter=fields/Title eq '" + String(commandeId).replace(/'/g, "''") + "'&$top=200", 5);
+      const ligneParId = {}; toutesLignes.forEach(i => { ligneParId[i.id] = i.fields || {}; });
+      const receptionsValidees = [];
+      for (const r of receptions) {
+        const ligne = ligneParId[r.ligne_id];
+        if (!ligne) return json({ success: false, error: 'ligne_inconnue', ligne_id: r.ligne_id });
+        const qte = parseFloat(r.quantite_recue);
+        if (isNaN(qte) || qte <= 0) return json({ success: false, error: 'quantite_invalide', ligne_id: r.ligne_id });
+        receptionsValidees.push({ ligne_id: r.ligne_id, reference: ligne.Reference, quantite_recue: qte, deja_recu: parseFloat(ligne.Quantite_Recue) || 0, commandee: parseFloat(ligne.Quantite_Commandee) || 0 });
+      }
+      if (!receptionsValidees.length) return json({ success: false, error: 'donnees_invalides' });
+      if ((receptionsValidees.length * 2) > 20) return json({ success: false, error: 'trop_de_lignes', max: 10 });
+      const document = await nextBrasseurDocument(depotInfo.Prefixe_Document || depot, 'Brasseurs_Mouvements', 'Document');
+      const auteurCode = _auth.session.code;
+      const horodatage = new Date().toISOString();
+      try {
+        const mvtRequests = receptionsValidees.map((r, idx) => ({
+          id: 'm' + idx, method: 'POST', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Mouvements/items',
+          headers: { 'Content-Type': 'application/json' },
+          body: { fields: { Title: r.reference, Document: document, Depot: depot, Date: horodatage.slice(0, 10), Type_Mouvement: 'Entree',
+            Tiers: cmdData.fields.Fournisseur || '', Proprietaire: proprietaire, Destination: 'Réception commande ' + (cmdData.fields.Title || commandeId),
+            [BRASSEUR_QTE_FIELD]: r.quantite_recue, Code_Employe: auteurCode, Commentaire: body.commentaire || '', Horodatage: horodatage, Cree_Par: auteurCode } }
+        }));
+        const ligneRequests = receptionsValidees.map((r, idx) => ({
+          id: 'l' + idx, method: 'PATCH', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Lignes_Commande/items/' + r.ligne_id + '/fields',
+          headers: { 'Content-Type': 'application/json' }, body: { Quantite_Recue: r.deja_recu + r.quantite_recue }
+        }));
+        const res = await graphBatch([...mvtRequests, ...ligneRequests]);
+        // Statut global recalculé depuis TOUTES les lignes de la commande (pas seulement celles reçues ici)
+        const toutesApres = toutesLignes.map(i => {
+          const f = i.fields || {};
+          const recu = receptionsValidees.find(r => r.ligne_id === i.id);
+          return { commandee: parseFloat(f.Quantite_Commandee) || 0, recue: recu ? (recu.deja_recu + recu.quantite_recue) : (parseFloat(f.Quantite_Recue) || 0) };
+        });
+        const totalementRecue = toutesApres.every(l => l.recue >= l.commandee);
+        const partiellementRecue = toutesApres.some(l => l.recue > 0);
+        const nouveauStatut = totalementRecue ? 'Recue' : (partiellementRecue ? 'Recue_Partielle' : (cmdData.fields.Statut || 'En attente'));
+        await fetch(GL + '/Brasseurs_Commandes/items/' + commandeId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Statut: nouveauStatut }) });
+        return json({ success: res.success, document: document, statut: nouveauStatut, ok: res.ok, ko: res.ko, erreurs: res.erreurs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Annulation d'un mouvement : convention reprise du classeur d'origine (cadrage §1.4) — un
+    // mouvement annulé est ramené à quantité 0 et tracé en commentaire, jamais supprimé (conserve
+    // l'historique des numéros de document et la traçabilité complète).
+    if (action === 'annuler_mouvement_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      try {
+        const cur = await fetch(GL + '/Brasseurs_Mouvements/items/' + id + '?$expand=fields', { headers: H });
+        const curData = await cur.json();
+        if (!cur.ok || !curData.fields) return json({ success: false, error: 'mouvement_introuvable' });
+        if (parseFloat(curData.fields[BRASSEUR_QTE_FIELD]) === 0) return json({ success: false, error: 'deja_annule' });
+        const auteurCode = _auth.session.code;
+        const note = '[ANNULÉ par ' + auteurCode + ' le ' + new Date().toISOString() + (body.motif ? ' — ' + body.motif : '') + ']';
+        const r = await fetch(GL + '/Brasseurs_Mouvements/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({
+          [BRASSEUR_QTE_FIELD]: 0, Commentaire: ((curData.fields.Commentaire || '') + ' ' + note).trim()
+        }) });
+        return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
       return null;

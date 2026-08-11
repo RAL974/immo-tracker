@@ -392,6 +392,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div class="nav-item" data-tab="documents"><span class="nav-icon">📄</span><span class="nav-label">Documents FDS</span><span class="nav-badge orange" id="nb-docs">—</span></div>
   <div class="nav-item" data-tab="maintenance"><span class="nav-icon">🔧</span><span class="nav-label">Maintenance</span><span class="nav-badge" id="nb-maint">—</span></div>
   <div class="nav-item" data-tab="materiel-it"><span class="nav-icon">📱</span><span class="nav-label">Matériel IT</span></div>
+  <div class="nav-item" data-tab="brasseurs"><span class="nav-icon">🌀</span><span class="nav-label">Brasseurs d'air</span></div>
 
   <div class="nav-group">PERSONNEL</div>
   <div class="nav-item" data-tab="absences"><span class="nav-icon">🧑‍💼</span><span class="nav-label">Absences</span><span class="nav-badge" id="nb-absences">—</span></div>
@@ -659,6 +660,11 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
       <div id="materiel-it-content"></div>
     </div>
 
+    <!-- Brasseurs d'air (négoce + pose) -->
+    <div id="pane-brasseurs" class="tab-pane">
+      <div id="brasseurs-content"></div>
+    </div>
+
     <!-- Alertes -->
     <div id="pane-alertes" class="tab-pane"><div id="alertes-content"></div></div>
 
@@ -740,8 +746,8 @@ if(IS_RECETTE){
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
 // Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
-var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit'];
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques'];
+var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit','Brasseurs_Depots','Brasseurs_Catalogue','Brasseurs_Mouvements','Brasseurs_Commandes','Brasseurs_Lignes_Commande'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur'];
 (function(){
   var origFetch=window.fetch.bind(window);
   window.fetch=function(input,init){
@@ -1089,6 +1095,17 @@ function peutVoirOutillage(code){
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='encadrement';
 }
+// Peut gérer le module Brasseurs d'air (mouvements, transferts, commandes) : Admin, Logistique,
+// Logistique_Mayotte — même population que requireGarant côté Worker. Pas de "voir" séparé pour
+// Encadrement comme EPI/Outillage : les prix de commande (Brasseurs_Lignes_Commande.Prix_Unitaire,
+// Brasseurs_Commandes.Montant_Total) sont protégés requireGarant côté Worker (cadrage §3.e), donc un
+// accès "view-only" plus large côté client échouerait de toute façon sur l'onglet Commandes — une
+// seule capacité, alignée exactement sur ce que le Worker autorise réellement.
+function peutGererBrasseurs(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='logistique'||role==='logistique_mayotte';
+}
 var CT_CODES=['ROJO','LAHU','AUAR','BOMA','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
 var USERS_CACHE=null;
 var d=null, im={}, fdsMap={}, photosMap={}, reservations=[], maintenance=null;
@@ -1374,6 +1391,7 @@ function renderTab(name){
     case 'epi':             if(!dataLoaded.epi)loadEPI(); else renderEPI(); break;
     case 'outillage':       if(!dataLoaded.outillage)loadOutillage(); else renderOutillage(); break;
     case 'materiel-it':     if(!dataLoaded.materielIt)loadMaterielIT(); else renderMaterielIT(); break;
+    case 'brasseurs':       if(!dataLoaded.brasseurs)loadBrasseurs(); else renderBrasseurs(); break;
     case 'alertes':        renderAlertes(); break;
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
@@ -6751,6 +6769,460 @@ document.addEventListener('click',function(e){
   }
 });
 
+// ── Module « Brasseurs d'air » (négoce + pose, ajouté août 2026) ────────────────────────────────
+// Cadrage complet : Fichiers divers/Brasseurs d'air/CADRAGE_MODULE_BRASSEURS.md. Stock CALCULÉ
+// (jamais un solde stocké), même principe que EPI/Outillage — voir renderBrasseursStockPivot.
+var brasseursDepots=[], brasseursCatalogue=[], brasseursMouvements=[], brasseursStock=[];
+var brasseursCommandes=[], brasseursLignesCommande=[];
+var brasseursVue='stock'; // 'stock' | 'mouvements' | 'commandes'
+// Références brasseur déclenchant la pré-proposition automatique d'une ligne PALES à la sortie
+// (cadrage §1.6/§3.h) — comportement d'écran uniquement, aucune liaison structurelle en base.
+var BRASSEURS_BA_REFS=['DCF-FS52920B','DCF-FS52920N'];
+var brasseursLignesForm=[]; // lignes en cours de saisie pour le formulaire mouvement/transfert/commande en cours
+
+async function loadBrasseurs(){
+  dataLoaded.brasseurs=true;
+  if(!peutGererBrasseurs(ADMIN_SESSION.code)){renderBrasseurs();return;}
+  try{
+    var rd=await fetch(W+'?brasseurs_depots=1'),rc=await fetch(W+'?brasseurs_catalogue=1'),rm=await fetch(W+'?brasseurs_mouvements=1'),rs=await fetch(W+'?brasseurs_stock=1');
+    brasseursDepots=await rd.json();brasseursCatalogue=await rc.json();brasseursMouvements=await rm.json();brasseursStock=await rs.json();
+  }catch(e){brasseursDepots=[];brasseursCatalogue=[];brasseursMouvements=[];brasseursStock=[];}
+  renderBrasseurs();
+}
+
+function renderBrasseurs(){
+  var div=document.getElementById('brasseurs-content');
+  if(!div)return;
+  if(!peutGererBrasseurs(ADMIN_SESSION.code)){
+    div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé aux gestionnaires dépôt.</p>';
+    return;
+  }
+  var vues=[['stock','📦 Stock'],['mouvements','📋 Mouvements'],['commandes','🛒 Commandes']];
+  var html='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
+    vues.map(function(v){return '<button onclick="changerVueBrasseurs(\''+v[0]+'\')" style="padding:8px 16px;border-radius:20px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:'+(brasseursVue===v[0]?'var(--blue-chrome)':'var(--ds-neutral-100,#eee)')+';color:'+(brasseursVue===v[0]?'#fff':'var(--ds-text,#444)')+'">'+v[1]+'</button>';}).join('')+
+    '</div><div id="brasseurs-vue-content"></div>';
+  div.innerHTML=html;
+  renderBrasseursVue();
+}
+function changerVueBrasseurs(v){brasseursVue=v;renderBrasseurs();}
+function renderBrasseursVue(){
+  var c=document.getElementById('brasseurs-vue-content');
+  if(!c)return;
+  if(brasseursVue==='stock')renderBrasseursStock(c);
+  else if(brasseursVue==='mouvements')renderBrasseursMouvements(c);
+  else if(brasseursVue==='commandes')renderBrasseursCommandes(c);
+}
+
+// ── Vue Stock : pivot Référence × Dépôt (équivalent des TCD du classeur Excel d'origine) ──
+function seuilBrasseurs(c){return c.stock_mini>0?c.stock_mini:5;}
+function brasseursStockTotalRef(reference,proprietaireFiltre){
+  return brasseursStock.filter(function(s){return s.reference===reference&&(!proprietaireFiltre||s.proprietaire===proprietaireFiltre);}).reduce(function(a,s){return a+s.quantite;},0);
+}
+function renderBrasseursStock(container){
+  container.innerHTML='<div id="brasseurs-resume-sous-seuil"></div>'+
+    '<div class="card"><div class="card-head"><h3>📦 Stock Brasseurs d\'air <span class="card-cnt" id="brasseurs-stock-cnt"></span></h3>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<select id="brasseurs-stock-prop" onchange="renderBrasseursStockPivot()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--ds-border,#ddd);background:var(--card);color:var(--ds-text,#222)">'+
+    '<option value="">Tous propriétaires</option><option value="ELECTRICITE SERVICES REUNION">Electricité Services Réunion</option><option value="1ST SHINE">1st Shine</option></select>'+
+    '<button onclick="exporterStockBrasseurs()" style="padding:6px 14px;background:#00695C;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇️ Export CSV</button>'+
+    '</div></div>'+
+    '<div class="filters" style="padding:10px 14px 0;margin-bottom:0"><input type="text" id="brasseurs-stock-q" oninput="renderBrasseursStockPivot()" placeholder="🔍 Filtrer par référence, désignation..." style="max-width:400px"></div>'+
+    '<div id="brasseurs-stock-pivot"></div></div>';
+  renderBrasseursStockPivot();
+  majResumeSousSeuilBrasseurs();
+}
+function renderBrasseursStockPivot(){
+  var el=document.getElementById('brasseurs-stock-pivot');
+  if(!el)return;
+  var prop=(document.getElementById('brasseurs-stock-prop')||{}).value||'';
+  var q=((document.getElementById('brasseurs-stock-q')||{}).value||'').trim().toUpperCase();
+  var depotsActifs=brasseursDepots.filter(function(d){return d.actif;}).sort(function(a,b){return (a.code||'').localeCompare(b.code||'');});
+  var refsActives=brasseursCatalogue.filter(function(c){return c.actif&&(!q||(c.reference||'').toUpperCase().includes(q)||(c.designation||'').toUpperCase().includes(q));}).sort(function(a,b){return (a.reference||'').localeCompare(b.reference||'');});
+  var cntEl=document.getElementById('brasseurs-stock-cnt');
+  if(cntEl)cntEl.textContent=refsActives.length+' référence(s)';
+  function cellule(depotCode,reference){
+    return brasseursStock.filter(function(s){return s.depot===depotCode&&s.reference===reference&&(!prop||s.proprietaire===prop);}).reduce(function(a,s){return a+s.quantite;},0);
+  }
+  if(!refsActives.length){el.innerHTML='<p class="es" style="padding:16px">Aucune référence'+(q?' pour ce filtre':'')+'.</p>';return;}
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Désignation</th>'+depotsActifs.map(function(d){return '<th>'+d.code+'</th>';}).join('')+'<th>Total</th></tr></thead><tbody>';
+  refsActives.forEach(function(c){
+    var total=0;
+    var cells=depotsActifs.map(function(d){var qte=cellule(d.code,c.reference);total+=qte;return '<td style="text-align:center">'+qte+'</td>';}).join('');
+    var seuil=seuilBrasseurs(c);
+    var stockClass=total<=0?'ba':(total<seuil?'bu':'bn');
+    html+='<tr'+(total<seuil?' class="warn-row"':'')+'><td>'+c.reference+'</td><td style="font-size:12px">'+(c.designation||'—')+'</td>'+cells+'<td style="text-align:center"><span class="badge '+stockClass+'">'+total+'</span></td></tr>';
+  });
+  html+='<tr style="font-weight:700;background:var(--ds-neutral-50,#fafafa)"><td colspan="2">Total dépôt</td>'+
+    depotsActifs.map(function(d){var t=0;refsActives.forEach(function(c){t+=cellule(d.code,c.reference);});return '<td style="text-align:center">'+t+'</td>';}).join('')+
+    '<td style="text-align:center">'+refsActives.reduce(function(a,c){return a+brasseursStockTotalRef(c.reference,prop);},0)+'</td></tr>';
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+function majResumeSousSeuilBrasseurs(){
+  var el=document.getElementById('brasseurs-resume-sous-seuil');
+  if(!el)return;
+  var sousSeuil=brasseursCatalogue.filter(function(c){return c.actif&&brasseursStockTotalRef(c.reference)<seuilBrasseurs(c);});
+  if(!sousSeuil.length){el.innerHTML='';return;}
+  el.innerHTML='<div class="card" style="border-top:3px solid var(--red);margin-bottom:14px"><div class="card-head"><h3>⚠️ '+sousSeuil.length+' référence(s) sous le seuil d\'alerte</h3></div>'+
+    '<div style="padding:10px 14px;display:flex;gap:6px;flex-wrap:wrap">'+
+    sousSeuil.map(function(c){return '<span class="badge ba" style="cursor:pointer" onclick="document.getElementById(\'brasseurs-stock-q\').value=\''+c.reference.replace(/'/g,"\\'")+'\';renderBrasseursStockPivot();">'+c.reference+' ('+brasseursStockTotalRef(c.reference)+')</span>';}).join('')+
+    '</div></div>';
+}
+function exporterStockBrasseurs(){
+  var entetes=['Reference','Designation','Depot','Proprietaire','Quantite'];
+  var lignesCsv=[entetes.map(csvCell).join(';')];
+  brasseursStock.forEach(function(s){
+    var cat=brasseursCatalogue.find(function(c){return c.reference===s.reference;});
+    lignesCsv.push([s.reference,(cat&&cat.designation)||'',s.depot,s.proprietaire,nbFr(s.quantite)].map(csvCell).join(';'));
+  });
+  var csv='\uFEFF'+lignesCsv.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a2=document.createElement('a');a2.href=url;a2.download='Stock_Brasseurs.csv';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
+}
+
+// ── Vue Mouvements : journal filtrable + saisie ──
+function renderBrasseursMouvements(container){
+  var depotOpts='<option value="">Tous dépôts</option>'+brasseursDepots.map(function(d){return '<option value="'+d.code+'">'+d.code+' — '+d.nom_complet+'</option>';}).join('');
+  container.innerHTML='<div class="card"><div class="card-head"><h3>📋 Journal des mouvements <span class="card-cnt" id="brasseurs-mvt-cnt"></span></h3>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button onclick="ouvrirMouvementBrasseur(\'Entree\')" style="padding:6px 14px;background:#2E7D32;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Entrée</button>'+
+    '<button onclick="ouvrirMouvementBrasseur(\'Sortie\')" style="padding:6px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➖ Sortie</button>'+
+    '<button onclick="ouvrirTransfertBrasseur()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Transfert</button>'+
+    '<button onclick="ouvrirMouvementBrasseur(\'Inventaire\')" style="padding:6px 14px;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🎯 Recalage inventaire</button>'+
+    '</div></div>'+
+    '<div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px 0;margin-bottom:0">'+
+    '<input type="text" id="bm-q" oninput="refreshBrasseursMouvementsResults()" placeholder="🔍 Référence, tiers..." style="max-width:220px">'+
+    '<select id="bm-depot" onchange="refreshBrasseursMouvementsResults()">'+depotOpts+'</select>'+
+    '<select id="bm-type" onchange="refreshBrasseursMouvementsResults()"><option value="">Tous types</option><option value="Entree">Entrée</option><option value="Sortie">Sortie</option><option value="Inventaire">Inventaire</option><option value="Transfert_Sortie">Transfert (sortie)</option><option value="Transfert_Entree">Transfert (entrée)</option></select>'+
+    '<input type="date" id="bm-du" onchange="refreshBrasseursMouvementsResults()"><input type="date" id="bm-au" onchange="refreshBrasseursMouvementsResults()">'+
+    '</div><div id="brasseurs-mvt-results"></div></div>';
+  refreshBrasseursMouvementsResults();
+}
+function refreshBrasseursMouvementsResults(){
+  var res=document.getElementById('brasseurs-mvt-results');
+  if(!res)return;
+  var q=((document.getElementById('bm-q')||{}).value||'').trim().toUpperCase();
+  var depotF=(document.getElementById('bm-depot')||{}).value||'';
+  var typeF=(document.getElementById('bm-type')||{}).value||'';
+  var du=(document.getElementById('bm-du')||{}).value||'';
+  var au=(document.getElementById('bm-au')||{}).value||'';
+  var rows=brasseursMouvements.filter(function(m){
+    if(depotF&&m.depot!==depotF)return false;
+    if(typeF&&m.type_mouvement!==typeF)return false;
+    if(du&&(m.date||'')<du)return false;
+    if(au&&(m.date||'')>au)return false;
+    if(q&&!((m.reference||'').toUpperCase().includes(q)||(m.tiers||'').toUpperCase().includes(q)||(m.document||'').toUpperCase().includes(q)||(m.code_employe||'').toUpperCase().includes(q)))return false;
+    return true;
+  });
+  var cntEl=document.getElementById('brasseurs-mvt-cnt');
+  if(cntEl)cntEl.textContent=rows.length+(brasseursMouvements.length>rows.length?' / '+brasseursMouvements.length+' (filtrés)':'')+' mouvement(s)';
+  if(!rows.length){res.innerHTML='<p class="es" style="padding:16px">Aucun mouvement'+(q||depotF||typeF||du||au?' pour ce filtre':'')+'.</p>';return;}
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Document</th><th>Date</th><th>Dépôt</th><th>Référence</th><th>Type</th><th>Qté</th><th>Propriétaire</th><th>Tiers</th><th>Destination</th><th>Employé</th><th>Action</th></tr></thead><tbody>';
+  rows.slice(0,300).forEach(function(m){
+    var annule=m.quantite===0;
+    html+='<tr'+(annule?' style="opacity:.5"':'')+'><td>'+m.document+'</td><td>'+fmtD(m.date)+'</td><td>'+m.depot+'</td><td>'+m.reference+'</td><td><span class="badge '+(m.type_mouvement==='Sortie'||m.type_mouvement==='Transfert_Sortie'?'ba':(m.type_mouvement==='Entree'||m.type_mouvement==='Transfert_Entree'?'bb':'bn'))+'">'+m.type_mouvement+'</span></td>'+
+      '<td style="text-align:right;font-weight:700">'+(m.quantite>0?'+':'')+m.quantite+'</td><td style="font-size:11px">'+m.proprietaire+'</td><td>'+(m.tiers||'—')+'</td><td>'+(m.destination||'—')+'</td><td>'+m.code_employe+'</td>'+
+      '<td>'+(!annule?'<button onclick="annulerMouvementBrasseur(\''+m.id+'\')" style="padding:4px 10px;background:var(--grey);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🚫 Annuler</button>':'<span style="font-size:11px;color:var(--grey)">Annulé</span>')+'</td></tr>';
+  });
+  html+='</tbody></table></div>'+(rows.length>300?'<p class="es" style="padding:8px 14px">Affichage limité aux 300 premiers résultats — affinez le filtre pour voir le reste.</p>':'');
+  res.innerHTML=html;
+}
+async function annulerMouvementBrasseur(id){
+  var motif=prompt('Motif de l\'annulation (optionnel) :','');
+  if(motif===null)return;
+  if(!(await confirmModal('Annuler ce mouvement ? Il sera ramené à quantité 0 (jamais supprimé, traçabilité conservée).')))return;
+  try{
+    var r=await fetch(W+'?action=annuler_mouvement_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,motif:motif})});
+    var res=await r.json();
+    if(res.success){toast('✅ Mouvement annulé.','success');dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='mouvements';renderBrasseurs();}
+    else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+
+// ── Formulaire mouvement (Entrée/Sortie/Inventaire) — lignes multiples partageant un même document ──
+var brasseursMvtType=null;
+function ouvrirMouvementBrasseur(type){
+  brasseursMvtType=type;
+  brasseursLignesForm=[];
+  var titres={Entree:'➕ Nouvelle entrée',Sortie:'➖ Nouvelle sortie',Inventaire:'🎯 Recalage inventaire'};
+  document.getElementById('add-titre').textContent=titres[type]||'Mouvement';
+  document.getElementById('add-msg').textContent='';
+  var depotOpts='<option value="">-- Sélectionner --</option>'+brasseursDepots.filter(function(d){return d.actif;}).map(function(d){return '<option value="'+d.code+'">'+d.code+' — '+d.nom_complet+'</option>';}).join('');
+  var html='<div class="frow"><label style="'+addLabelStyle+'">Dépôt *</label><select id="bm-f-depot" style="'+addFieldStyle+'">'+depotOpts+'</select></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date</label><input type="date" id="bm-f-date" value="'+new Date().toISOString().slice(0,10)+'" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Propriétaire *</label><select id="bm-f-prop" style="'+addFieldStyle+'"><option value="ELECTRICITE SERVICES REUNION">Electricité Services Réunion</option><option value="1ST SHINE">1st Shine</option></select></div></div>'+
+    (type!=='Inventaire'?'<div class="frow"><label style="'+addLabelStyle+'">Tiers (fournisseur/client)</label><input id="bm-f-tiers" style="'+addFieldStyle+'"></div>':'')+
+    '<div class="frow"><label style="'+addLabelStyle+'">Destination</label><input id="bm-f-dest" style="'+addFieldStyle+'" placeholder="Négoce, Maintenance, nom de chantier..."></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Commentaire</label><input id="bm-f-comment" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">'+(type==='Inventaire'?'Lignes (référence + niveau de stock cible)':'Lignes (référence + quantité)')+' *</label>'+
+    '<div style="display:flex;gap:8px;margin-top:4px"><select id="bm-f-ref" style="'+addFieldStyle+';flex:2">'+brasseursCatalogue.filter(function(c){return c.actif;}).map(function(c){return '<option value="'+c.reference+'">'+c.reference+' — '+(c.designation||'')+'</option>';}).join('')+'</select>'+
+    '<input type="number" id="bm-f-qte" min="0" step="1" placeholder="Qté" style="'+addFieldStyle+';flex:1"><button type="button" onclick="ajouterLigneBrasseurForm()" style="padding:0 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Ajouter</button></div>'+
+    '<div id="bm-f-lignes" style="margin-top:8px"></div></div>';
+  document.getElementById('add-form').innerHTML=html;
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=soumettreMouvementBrasseur;
+  renderBrasseursLignesForm();
+}
+function ajouterLigneBrasseurForm(){
+  var ref=(document.getElementById('bm-f-ref')||{}).value;
+  var qte=parseFloat((document.getElementById('bm-f-qte')||{}).value);
+  if(!ref||isNaN(qte)||qte<0){alert('Sélectionne une référence et une quantité valide.');return;}
+  var existante=brasseursLignesForm.find(function(l){return l.reference===ref;});
+  if(existante)existante.quantite=qte;
+  else brasseursLignesForm.push({reference:ref,quantite:qte});
+  // Liaison automatique BA→PALES à la sortie (cadrage §1.6/§3.h) : pré-remplit une ligne PALES à la
+  // même quantité si elle n'existe pas déjà — l'utilisateur reste libre de la modifier/supprimer
+  // ensuite (ex. technicien qui réutilise les pales déjà en place chez le client).
+  if(brasseursMvtType==='Sortie'&&BRASSEURS_BA_REFS.indexOf(ref)!==-1&&!brasseursLignesForm.find(function(l){return l.reference==='PALES';})){
+    brasseursLignesForm.push({reference:'PALES',quantite:qte,auto:true});
+  }
+  document.getElementById('bm-f-qte').value='';
+  renderBrasseursLignesForm();
+}
+function retirerLigneBrasseurForm(idx){brasseursLignesForm.splice(idx,1);renderBrasseursLignesForm();}
+function renderBrasseursLignesForm(){
+  var el=document.getElementById('bm-f-lignes');
+  if(!el)return;
+  if(!brasseursLignesForm.length){el.innerHTML='<p style="font-size:12px;color:var(--grey)">Aucune ligne ajoutée.</p>';return;}
+  el.innerHTML='<table style="width:100%;font-size:12px"><tbody>'+brasseursLignesForm.map(function(l,idx){
+    return '<tr><td>'+l.reference+(l.auto?' <span style="color:var(--grey)">(pales — auto)</span>':'')+'</td><td style="text-align:right">'+l.quantite+'</td>'+
+      '<td style="text-align:right"><button type="button" onclick="retirerLigneBrasseurForm('+idx+')" style="padding:2px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;cursor:pointer">✕</button></td></tr>';
+  }).join('')+'</tbody></table>';
+}
+async function soumettreMouvementBrasseur(){
+  var depot=(document.getElementById('bm-f-depot')||{}).value;
+  var proprietaire=(document.getElementById('bm-f-prop')||{}).value;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!depot){msg.textContent='Le dépôt est obligatoire.';return;}
+  if(!brasseursLignesForm.length){msg.textContent='Ajoute au moins une ligne.';return;}
+  var payload={depot:depot,type_mouvement:brasseursMvtType,proprietaire:proprietaire,
+    date:(document.getElementById('bm-f-date')||{}).value,tiers:(document.getElementById('bm-f-tiers')||{}).value||'',
+    destination:(document.getElementById('bm-f-dest')||{}).value||'',commentaire:(document.getElementById('bm-f-comment')||{}).value||'',
+    lignes:brasseursLignesForm.map(function(l){return {reference:l.reference,quantite:l.quantite};})};
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=creer_mouvement_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      toast('✅ Mouvement '+res.document+' enregistré ('+res.lignes_ecrites+' ligne(s)).','success');
+      document.getElementById('add-overlay').style.display='none';
+      dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='mouvements';renderBrasseurs();
+    }else{
+      msg.textContent='Échec : '+(res.message||res.error||'inconnu')+(res.reference?' ('+res.reference+')':'');
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  }catch(e){msg.textContent='Erreur réseau : '+e.message;btn.disabled=false;btn.textContent='Confirmer';}
+}
+
+// ── Formulaire transfert inter-dépôts ──
+function ouvrirTransfertBrasseur(){
+  brasseursLignesForm=[];
+  brasseursMvtType='Transfert';
+  document.getElementById('add-titre').textContent='🔄 Transfert inter-dépôts';
+  document.getElementById('add-msg').textContent='';
+  var depotOpts='<option value="">-- Sélectionner --</option>'+brasseursDepots.filter(function(d){return d.actif;}).map(function(d){return '<option value="'+d.code+'">'+d.code+' — '+d.nom_complet+'</option>';}).join('');
+  var html='<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Dépôt source *</label><select id="bt-f-source" style="'+addFieldStyle+'">'+depotOpts+'</select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Dépôt destination *</label><select id="bt-f-dest" style="'+addFieldStyle+'">'+depotOpts+'</select></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date</label><input type="date" id="bt-f-date" value="'+new Date().toISOString().slice(0,10)+'" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Propriétaire *</label><select id="bt-f-prop" style="'+addFieldStyle+'"><option value="ELECTRICITE SERVICES REUNION">Electricité Services Réunion</option><option value="1ST SHINE">1st Shine</option></select></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Commentaire</label><input id="bt-f-comment" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Lignes (référence + quantité) *</label>'+
+    '<div style="display:flex;gap:8px;margin-top:4px"><select id="bm-f-ref" style="'+addFieldStyle+';flex:2">'+brasseursCatalogue.filter(function(c){return c.actif;}).map(function(c){return '<option value="'+c.reference+'">'+c.reference+' — '+(c.designation||'')+'</option>';}).join('')+'</select>'+
+    '<input type="number" id="bm-f-qte" min="0" step="1" placeholder="Qté" style="'+addFieldStyle+';flex:1"><button type="button" onclick="ajouterLigneBrasseurForm()" style="padding:0 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Ajouter</button></div>'+
+    '<div id="bm-f-lignes" style="margin-top:8px"></div></div>';
+  document.getElementById('add-form').innerHTML=html;
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=soumettreTransfertBrasseur;
+  renderBrasseursLignesForm();
+}
+async function soumettreTransfertBrasseur(){
+  var depotSource=(document.getElementById('bt-f-source')||{}).value;
+  var depotDest=(document.getElementById('bt-f-dest')||{}).value;
+  var proprietaire=(document.getElementById('bt-f-prop')||{}).value;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!depotSource||!depotDest){msg.textContent='Les deux dépôts sont obligatoires.';return;}
+  if(depotSource===depotDest){msg.textContent='Le dépôt source et destination doivent être différents.';return;}
+  if(!brasseursLignesForm.length){msg.textContent='Ajoute au moins une ligne.';return;}
+  var payload={depot_source:depotSource,depot_destination:depotDest,proprietaire:proprietaire,
+    date:(document.getElementById('bt-f-date')||{}).value,commentaire:(document.getElementById('bt-f-comment')||{}).value||'',
+    lignes:brasseursLignesForm.map(function(l){return {reference:l.reference,quantite:l.quantite};})};
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=transfert_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      toast('✅ Transfert '+res.document+' enregistré ('+res.paires.length+' ligne(s)).','success');
+      document.getElementById('add-overlay').style.display='none';
+      dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='mouvements';renderBrasseurs();
+    }else{
+      msg.textContent='Échec : '+(res.message||res.error||'inconnu')+(res.reference?' ('+res.reference+')':'');
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  }catch(e){msg.textContent='Erreur réseau : '+e.message;btn.disabled=false;btn.textContent='Confirmer';}
+}
+
+// ── Vue Commandes fournisseur (prix protégés requireGarant côté Worker, jeton en &token=) ──
+function renderBrasseursCommandes(container){
+  container.innerHTML='<div class="card"><div class="card-head"><h3>🛒 Commandes fournisseur <span class="card-cnt" id="brasseurs-cmd-cnt"></span></h3>'+
+    '<button onclick="ouvrirCommandeBrasseur()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Nouvelle commande</button></div>'+
+    '<div id="brasseurs-cmd-results">Chargement…</div></div>';
+  chargerBrasseursCommandes();
+}
+async function chargerBrasseursCommandes(){
+  var tok='&token='+encodeURIComponent(ADMIN_SESSION.token||'');
+  try{
+    var r=await fetch(W+'?brasseurs_commandes=1'+tok),r2=await fetch(W+'?brasseurs_lignes_commande=1'+tok);
+    brasseursCommandes=await r.json();brasseursLignesCommande=await r2.json();
+    if(brasseursCommandes&&brasseursCommandes.error){toast('🔒 Accès commandes réservé aux gestionnaires dépôt.','error');brasseursCommandes=[];brasseursLignesCommande=[];}
+  }catch(e){brasseursCommandes=[];brasseursLignesCommande=[];}
+  renderBrasseursCommandesResults();
+}
+function renderBrasseursCommandesResults(){
+  var el=document.getElementById('brasseurs-cmd-results');
+  if(!el)return;
+  var cntEl=document.getElementById('brasseurs-cmd-cnt');
+  if(cntEl)cntEl.textContent=brasseursCommandes.length+' commande(s)';
+  if(!brasseursCommandes.length){el.innerHTML='<p class="es" style="padding:16px">Aucune commande.</p>';return;}
+  var STATUT_BADGE={'En attente':'bu','Recue_Partielle':'bn','Recue':'bb','Annulee':'ba'};
+  var html='<div class="tbl-wrap"><table><thead><tr><th>Référence</th><th>Origine</th><th>Fournisseur</th><th>Date</th><th>Montant</th><th>Statut</th><th>Arrivée estimée</th><th>Action</th></tr></thead><tbody>';
+  brasseursCommandes.slice().sort(function(a,b){return (b.date_commande||'').localeCompare(a.date_commande||'');}).forEach(function(c){
+    html+='<tr><td>'+c.reference+'</td><td>'+c.origine+'</td><td>'+(c.fournisseur||'—')+'</td><td>'+(c.date_commande?fmtD(c.date_commande):'—')+'</td>'+
+      '<td>'+nbFr(c.montant_total)+' '+(c.devise||'')+'</td><td><span class="badge '+(STATUT_BADGE[c.statut]||'bn')+'">'+c.statut+'</span></td><td>'+(c.date_arrivee_estimee?fmtD(c.date_arrivee_estimee):'—')+'</td>'+
+      '<td>'+(c.statut!=='Recue'&&c.statut!=='Annulee'?'<button onclick="ouvrirReceptionBrasseur(\''+c.id+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">📥 Réception</button>':'—')+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+// ── Formulaire création commande ──
+function ouvrirCommandeBrasseur(){
+  brasseursLignesForm=[];
+  document.getElementById('add-titre').textContent='➕ Nouvelle commande fournisseur';
+  document.getElementById('add-msg').textContent='';
+  var html='<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Origine *</label><select id="bc-f-origine" style="'+addFieldStyle+'"><option value="International">International (Chine)</option><option value="Local">Achat local</option></select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">N° PI fournisseur (optionnel)</label><input id="bc-f-pi" style="'+addFieldStyle+'" placeholder="Ex: FS202603051 — sinon numéro auto"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Fournisseur</label><input id="bc-f-fourn" style="'+addFieldStyle+'" placeholder="Ex: 1stShine Industrial, Alclima..."></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date commande</label><input type="date" id="bc-f-date" value="'+new Date().toISOString().slice(0,10)+'" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Devise</label><input id="bc-f-devise" style="'+addFieldStyle+'" placeholder="USD / EUR"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Montant total</label><input type="number" step="0.01" id="bc-f-montant" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Acompte (%)</label><input type="number" step="0.1" id="bc-f-acompte" style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Incoterm</label><input id="bc-f-incoterm" style="'+addFieldStyle+'" placeholder="Ex: FOB Shenzhen"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Arrivée estimée</label><input type="date" id="bc-f-arrivee" style="'+addFieldStyle+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="bc-f-notes" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Lignes (référence + quantité + prix unitaire) *</label>'+
+    '<div style="display:flex;gap:8px;margin-top:4px"><select id="bc-f-ref" style="'+addFieldStyle+';flex:2">'+brasseursCatalogue.filter(function(c){return c.actif;}).map(function(c){return '<option value="'+c.reference+'">'+c.reference+' — '+(c.designation||'')+'</option>';}).join('')+'</select>'+
+    '<input type="number" id="bc-f-qte" min="0" step="1" placeholder="Qté" style="'+addFieldStyle+';flex:1"><input type="number" id="bc-f-prix" min="0" step="0.01" placeholder="Prix unit." style="'+addFieldStyle+';flex:1">'+
+    '<button type="button" onclick="ajouterLigneCommandeBrasseurForm()" style="padding:0 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Ajouter</button></div>'+
+    '<div id="bc-f-lignes" style="margin-top:8px"></div></div>';
+  document.getElementById('add-form').innerHTML=html;
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=soumettreCommandeBrasseur;
+  renderLignesCommandeBrasseurForm();
+}
+function ajouterLigneCommandeBrasseurForm(){
+  var ref=(document.getElementById('bc-f-ref')||{}).value;
+  var qte=parseFloat((document.getElementById('bc-f-qte')||{}).value);
+  var prix=parseFloat((document.getElementById('bc-f-prix')||{}).value)||0;
+  if(!ref||isNaN(qte)||qte<=0){alert('Sélectionne une référence et une quantité valide.');return;}
+  var existante=brasseursLignesForm.find(function(l){return l.reference===ref;});
+  if(existante){existante.quantite_commandee=qte;existante.prix_unitaire=prix;}
+  else brasseursLignesForm.push({reference:ref,quantite_commandee:qte,prix_unitaire:prix});
+  document.getElementById('bc-f-qte').value='';document.getElementById('bc-f-prix').value='';
+  renderLignesCommandeBrasseurForm();
+}
+function retirerLigneCommandeBrasseurForm(idx){brasseursLignesForm.splice(idx,1);renderLignesCommandeBrasseurForm();}
+function renderLignesCommandeBrasseurForm(){
+  var el=document.getElementById('bc-f-lignes');
+  if(!el)return;
+  if(!brasseursLignesForm.length){el.innerHTML='<p style="font-size:12px;color:var(--grey)">Aucune ligne ajoutée.</p>';return;}
+  el.innerHTML='<table style="width:100%;font-size:12px"><tbody>'+brasseursLignesForm.map(function(l,idx){
+    return '<tr><td>'+l.reference+'</td><td style="text-align:right">'+l.quantite_commandee+'</td><td style="text-align:right">'+nbFr(l.prix_unitaire)+'</td>'+
+      '<td style="text-align:right"><button type="button" onclick="retirerLigneCommandeBrasseurForm('+idx+')" style="padding:2px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;cursor:pointer">✕</button></td></tr>';
+  }).join('')+'</tbody></table>';
+}
+async function soumettreCommandeBrasseur(){
+  var origine=(document.getElementById('bc-f-origine')||{}).value;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!brasseursLignesForm.length){msg.textContent='Ajoute au moins une ligne.';return;}
+  var payload={origine:origine,numero_pi:(document.getElementById('bc-f-pi')||{}).value||'',fournisseur:(document.getElementById('bc-f-fourn')||{}).value||'',
+    date_commande:(document.getElementById('bc-f-date')||{}).value,devise:(document.getElementById('bc-f-devise')||{}).value||'',
+    montant_total:(document.getElementById('bc-f-montant')||{}).value,acompte_pourcentage:(document.getElementById('bc-f-acompte')||{}).value,
+    incoterm:(document.getElementById('bc-f-incoterm')||{}).value||'',date_arrivee_estimee:(document.getElementById('bc-f-arrivee')||{}).value||'',
+    notes:(document.getElementById('bc-f-notes')||{}).value||'',lignes:brasseursLignesForm};
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=creer_commande_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      toast('✅ Commande '+res.reference+' créée ('+res.lignes_ecrites+' ligne(s)).','success');
+      document.getElementById('add-overlay').style.display='none';
+      await chargerBrasseursCommandes();
+    }else{
+      msg.textContent='Échec : '+(res.message||res.error||'inconnu')+(res.reference?' ('+res.reference+')':'');
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  }catch(e){msg.textContent='Erreur réseau : '+e.message;btn.disabled=false;btn.textContent='Confirmer';}
+}
+
+// ── Écran de réception : pré-rempli avec les quantités commandées restantes, modifiables ──
+var brasseursReceptionCommandeId=null;
+function ouvrirReceptionBrasseur(commandeId){
+  brasseursReceptionCommandeId=commandeId;
+  var cmd=brasseursCommandes.find(function(c){return c.id===commandeId;});
+  if(!cmd){alert('Commande introuvable.');return;}
+  var lignes=brasseursLignesCommande.filter(function(l){return l.commande_id===commandeId;});
+  var restantes=lignes.filter(function(l){return l.quantite_recue<l.quantite_commandee;});
+  if(!restantes.length){alert('Toutes les lignes de cette commande sont déjà entièrement reçues.');return;}
+  document.getElementById('add-titre').textContent='📥 Réception — '+cmd.reference;
+  document.getElementById('add-msg').textContent='';
+  var depotOpts='<option value="">-- Sélectionner --</option>'+brasseursDepots.filter(function(d){return d.actif;}).map(function(d){return '<option value="'+d.code+'">'+d.code+' — '+d.nom_complet+'</option>';}).join('');
+  var html='<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Dépôt de réception *</label><select id="br-f-depot" style="'+addFieldStyle+'">'+depotOpts+'</select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Propriétaire *</label><select id="br-f-prop" style="'+addFieldStyle+'"><option value="ELECTRICITE SERVICES REUNION">Electricité Services Réunion</option><option value="1ST SHINE">1st Shine</option></select></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Commentaire</label><input id="br-f-comment" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Lignes à réceptionner (écart commandé/reçu affiché, quantité modifiable)</label>'+
+    '<table style="width:100%;font-size:12px"><thead><tr><th>Référence</th><th>Commandé</th><th>Déjà reçu</th><th>Restant</th><th>Reçu maintenant</th></tr></thead><tbody>'+
+    restantes.map(function(l){
+      var restant=l.quantite_commandee-l.quantite_recue;
+      return '<tr data-ligne-id="'+l.id+'"><td>'+l.reference+'</td><td style="text-align:right">'+l.quantite_commandee+'</td><td style="text-align:right">'+l.quantite_recue+'</td><td style="text-align:right">'+restant+'</td>'+
+        '<td><input type="number" class="br-f-qte" min="0" step="1" value="'+restant+'" data-ligne-id="'+l.id+'" style="width:80px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222)"></td></tr>';
+    }).join('')+'</tbody></table></div>';
+  document.getElementById('add-form').innerHTML=html;
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=soumettreReceptionBrasseur;
+}
+async function soumettreReceptionBrasseur(){
+  var depot=(document.getElementById('br-f-depot')||{}).value;
+  var proprietaire=(document.getElementById('br-f-prop')||{}).value;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!depot){msg.textContent='Le dépôt est obligatoire.';return;}
+  var lignes=[];
+  document.querySelectorAll('.br-f-qte').forEach(function(inp){
+    var qte=parseFloat(inp.value);
+    if(!isNaN(qte)&&qte>0)lignes.push({ligne_id:inp.dataset.ligneId,quantite_recue:qte});
+  });
+  if(!lignes.length){msg.textContent='Saisis au moins une quantité reçue.';return;}
+  var payload={commande_id:brasseursReceptionCommandeId,depot:depot,proprietaire:proprietaire,commentaire:(document.getElementById('br-f-comment')||{}).value||'',lignes:lignes};
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var r=await fetch(W+'?action=reception_commande_brasseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      toast('✅ Réception '+res.document+' enregistrée (statut commande : '+res.statut+').','success');
+      document.getElementById('add-overlay').style.display='none';
+      dataLoaded.brasseurs=false;await loadBrasseurs();brasseursVue='commandes';renderBrasseurs();
+      await chargerBrasseursCommandes();
+    }else{
+      msg.textContent='Échec : '+(res.message||res.error||'inconnu');
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  }catch(e){msg.textContent='Erreur réseau : '+e.message;btn.disabled=false;btn.textContent='Confirmer';}
+}
+
 // ── Recherche globale (header, raccourci "/") ────────────
 // Purement client-side sur les données déjà chargées en mémoire (im, employesList, epiCatalogue,
 // outilCatalogue) — aucun nouvel appel Worker (voir 03_REGLES_METIER_ET_ROLES.md). Résultats
@@ -6782,7 +7254,11 @@ function renderGlobalSearch(qRaw){
     return (a.type_article||'').toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.marque||'').toUpperCase().includes(q);
   }).slice(0,GSEARCH_MAX);
 
-  if(!immos.length&&!employes.length&&!epiRes.length&&!outilRes.length){
+  var brasseursRes=(brasseursCatalogue||[]).filter(function(a){
+    return (a.reference||'').toUpperCase().includes(q)||(a.designation||'').toUpperCase().includes(q)||(a.categorie||'').toUpperCase().includes(q);
+  }).slice(0,GSEARCH_MAX);
+
+  if(!immos.length&&!employes.length&&!epiRes.length&&!outilRes.length&&!brasseursRes.length){
     box.innerHTML='<div class="gs-empty">Aucun résultat pour "'+qRaw.replace(/</g,'&lt;')+'".</div>';
     box.classList.add('open');
     return;
@@ -6818,6 +7294,13 @@ function renderGlobalSearch(qRaw){
       return '<div class="gs-item" onclick="fermerGSearch();irVersArticleOutillage(\''+ref+'\')"><span>'+a.type_article+'</span><small>'+(a.reference||'')+'</small></div>';
     }).join('');
   }
+  if(brasseursRes.length){
+    html+='<div class="gs-group-label">🌀 Brasseurs d\'air</div>';
+    html+=brasseursRes.map(function(a){
+      var ref=(a.reference||'').replace(/'/g,"\\'");
+      return '<div class="gs-item" onclick="fermerGSearch();irVersReferenceBrasseur(\''+ref+'\')"><span>'+a.reference+'</span><small>'+(a.designation||'')+'</small></div>';
+    }).join('');
+  }
   box.innerHTML=html;
   box.classList.add('open');
 }
@@ -6849,6 +7332,15 @@ async function irVersArticleOutillage(reference){
   goTab('outillage');
   var qEl=document.getElementById('outil-stock-q');
   if(qEl){qEl.value=reference;refreshOutilStockResults();}
+}
+
+async function irVersReferenceBrasseur(reference){
+  if(!peutGererBrasseurs(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires dépôt.');return;}
+  if(!dataLoaded.brasseurs)await loadBrasseurs();
+  brasseursVue='stock';
+  goTab('brasseurs');
+  var qEl=document.getElementById('brasseurs-stock-q');
+  if(qEl){qEl.value=reference;renderBrasseursStockPivot();}
 }
 
 // Raccourci clavier "/" : focus la recherche globale, sauf si l'utilisateur est déjà en train de

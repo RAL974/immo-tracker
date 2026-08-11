@@ -408,9 +408,124 @@ Mêmes colonnes et même principe que `Mouvements_Materiel_IT` (`Title` = code d
 
 ⚠️ Aucune écriture n'a lieu si l'authentification échoue (`session_invalide`/`droits_insuffisants`/`session_secret_manquant`) — voir `03_REGLES_METIER_ET_ROLES.md` pour le raisonnement. `Journal_Audit` fait partie des listes couvertes par `?export_liste=` (sauvegarde admin, voir `PROCEDURE_ROLLBACK.md`).
 
+## Module « Brasseurs d'air » — négoce + pose (ajouté août 2026)
+
+*Cadrage complet : `Fichiers divers/Brasseurs d'air/CADRAGE_MODULE_BRASSEURS.md`. Suivi du stock de
+brasseurs d'air et accessoires liés (négoce et pose), **hors circuit des immobilisations** — module
+isolé au même titre qu'EPI/Outillage/Matériel IT, aucune interaction avec la liste `Mouvements` des
+immobilisations. Stock **calculé** (jamais un solde stocké) : somme des mouvements par
+Dépôt×Référence×Propriétaire, même principe que EPI/Outillage. 5 nouvelles listes SharePoint,
+créées par William sur les deux sites (production et recette) avant le développement du code.*
+
+⚠️ **Piège de nommage constaté à la création des listes** (même classe d'incident que
+`Fabricant`/`Fabriquant` et `Code_deverouillage`, voir `04_HISTORIQUE_DECISIONS.md`) : la colonne
+quantité de `Brasseurs_Mouvements` a été tapée "Quantité" (avec l'accent) — SharePoint l'a stockée
+en interne sous le nom échappé **`Quantit_x00e9_`**, pas `Quantite` comme documenté dans le cadrage
+initial. Constaté via `?debug_columns=Brasseurs_Mouvements` sur les deux sites avant d'écrire le
+code (identique sur production et recette). Le code (`worker.js`, constante `BRASSEUR_QTE_FIELD`)
+utilise systématiquement ce nom interne réel — ne jamais écrire `Quantite` en dur pour cette liste.
+
+### `Brasseurs_Depots`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Code court du dépôt, ex. `OMT`, `TC2` |
+| `Nom_Complet` | Texte | Ex. `OM Transit`, `TC N°2` |
+| `Prefixe_Document` | Texte | Préfixe utilisé par la numérotation auto des documents, ex. `OM`, `TC2` |
+| `Site` | Texte | `Reunion` / `Mayotte` |
+| `Actif` | Texte | `Oui` / `Non` |
+
+### `Brasseurs_Catalogue`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Référence, ex. `DCF-FS52920B` (blanc), `DCF-FS52920N` (noir), `PALES`, `CMD-M`... |
+| `Designation` | Texte | Ex. `Brasseur d'air blanc` |
+| `Categorie` | Texte | Optionnel — ex. `Brasseur`, `Pièce détachée`, `Consommable` |
+| `Stock_Mini` | Nombre | Seuil d'alerte global (0/vide = seuil par défaut, même logique qu'EPI/Outillage) |
+| `Actif` | Texte | `Oui` / `Non` |
+
+### `Brasseurs_Mouvements`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Référence (correspond à `Brasseurs_Catalogue.Title`) |
+| `Document` | Texte | Numéro généré côté serveur, format `{PREFIXE}.{AA}.{MM}.{NNN}` (ex. `OMT.26.08.003`, `TRF.26.08.001`) — repris à 1 chaque mois pour chaque préfixe |
+| `Depot` | Texte | Correspond à `Brasseurs_Depots.Title` |
+| `Date` | Date | Date du mouvement |
+| `Type_Mouvement` | Texte | `Entree` / `Sortie` / `Inventaire` / `Transfert_Sortie` / `Transfert_Entree` — nommée `Type_Mouvement` et non `Type` (nom réservé SharePoint, même raison que `Type_Dotation`/`Type_Article`/`Type_Materiel` ailleurs dans le projet) |
+| `Tiers` | Texte | Fournisseur ou client, texte libre — un même tiers peut être tour à tour client et fournisseur |
+| `Proprietaire` | Texte | `ELECTRICITE SERVICES REUNION` / `1ST SHINE` — liste fermée à 2 valeurs, contrôlée côté Worker |
+| `Destination` | Texte | Libre — `Négoce`, `Maintenance`, nom de chantier, `EDF AGIR+`, etc. |
+| **`Quantit_x00e9_`** | Nombre | ⚠️ Nom interne réel (voir piège ci-dessus). Signée : positif = entrée de stock, négatif = sortie |
+| `Code_Employe` | Texte | Auteur, toujours résolu depuis `_auth.session.code` (jeton vérifié), jamais depuis le corps de la requête |
+| `Commentaire` | Texte | Libre. Porte aussi la trace d'annulation (`[ANNULÉ par CODE le ISO — motif]`, voir plus bas) |
+| `Transfert_Lien` | Texte | ID SharePoint de la ligne miroir, uniquement pour `Transfert_Sortie`/`Transfert_Entree` |
+| `Horodatage` | Date/heure | ISO |
+| `Cree_Par` | Texte | Code employé résolu du jeton de session (identique à `Code_Employe` dans ce module) |
+
+⚠️ **Annulation = quantité ramenée à 0, jamais de suppression** (convention reprise du classeur Excel
+d'origine, qui montrait déjà des « mouvements annulés » à quantité 0) : l'historique des numéros de
+document et la traçabilité restent intacts. Un mouvement à `Quantit_x00e9_ = 0` est donc à
+interpréter comme annulé, pas comme une anomalie.
+
+### `Brasseurs_Commandes`
+
+*Couvre aussi bien une commande internationale (PI fournisseur, ex. Chine) qu'un achat local — un
+même modèle, `Origine` pilote quels champs sont pertinents (les achats locaux existent réellement,
+ex. fournisseur Alclima, qui a aussi été client par le passé).*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Référence de commande — n° de PI fournisseur s'il existe (ex. `FS202603051`), sinon identifiant généré `CMD.AA.MM.NNN` (même numérotation que `Brasseurs_Mouvements.Document`) |
+| `Origine` | Texte | `International` / `Local` |
+| `Fournisseur` | Texte | |
+| `Date_Commande` | Date | |
+| `Montant_Total` | Nombre | ⚠️ Donnée financière — lecture protégée `requireGarant` (voir plus bas) |
+| `Devise` | Texte | `USD` (international) / `EUR` (local) — texte libre, pas de conversion automatique |
+| `Acompte_Pourcentage` | Nombre | Optionnel |
+| `Incoterm` | Texte | Optionnel — ex. `FOB Shenzhen`, vide pour un achat local |
+| `Delai_Estime_Jours` | Nombre | Optionnel, non critique |
+| `Date_Arrivee_Estimee` | Date | Optionnel, non critique |
+| `Statut` | Texte | `En attente` / `Recue_Partielle` / `Recue` / `Annulee` — recalculé automatiquement à chaque réception depuis l'ensemble des lignes |
+| `Cree_Par` | Texte | Code employé résolu du jeton de session |
+| `Notes` | Texte | Libre |
+
+### `Brasseurs_Lignes_Commande`
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | ID SharePoint de la commande parente (texte, pas de Lookup — cohérent avec `Lignes_Inventaire`/`Lignes_Dotation_EPI`) |
+| `Reference` | Texte | Correspond à `Brasseurs_Catalogue.Title` |
+| `Quantite_Commandee` | Nombre | |
+| `Prix_Unitaire` | Nombre | ⚠️ Donnée financière — lecture protégée `requireGarant`, dans la devise de la commande parente. Cadrage : « Option A partout, y compris achats locaux » — un seul mécanisme de protection, uniforme quel que soit le fournisseur |
+| `Quantite_Recue` | Nombre | 0 par défaut, incrémentée à chaque réception — l'écart se lit directement (`Quantite_Commandee − Quantite_Recue`), aucun champ dédié |
+
+### Protection des prix (endpoints GET)
+
+`?brasseurs_commandes=1` et `?brasseurs_lignes_commande=1` sont protégés `requireGarant` (jeton en
+`&token=`, GET sans corps JSON — même mécanisme que `?materiel_it=1`/`?export_liste=`), car ils
+exposent respectivement `Montant_Total` et `Prix_Unitaire`. `?brasseurs_depots=1`,
+`?brasseurs_catalogue=1`, `?brasseurs_mouvements=1` et `?brasseurs_stock=1` restent publics (aucun
+prix, seulement des quantités — même niveau de confiance que `?catalogue_epi=1`).
+
+### Liaison automatique pales↔brasseur
+
+Aucune colonne dédiée : purement un comportement d'écran (dashboard) — à la saisie d'une ligne de
+sortie `DCF-FS52920B`/`DCF-FS52920N`, une ligne `PALES` est pré-remplie à la même quantité sur le
+même `Document`, modifiable/supprimable avant validation (ex. technicien qui réutilise les pales déjà
+en place chez le client). Les autres accessoires (`CACHES`/`KITFIX`/`VISSERIE`/`CARTONS`/`ECL`/`CMD-T`)
+n'ont aucune pré-proposition automatique.
+
+### `EXPORTABLE_LISTS`
+
+Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et `dashboard.html`,
+synchronisation vérifiée par `tests/backup.export-structure.test.js`) — sauvegarde possible via
+`?export_liste=<nom>` comme le reste du modèle de données, voir `PROCEDURE_ROLLBACK.md`.
+
 ## Recherche globale dashboard (ajoutée août 2026)
 
-Aucun nouveau modèle de données : la recherche du header (voir `03_REGLES_METIER_ET_ROLES.md`) lit exclusivement les structures déjà chargées en mémoire côté dashboard (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`) — aucune colonne SharePoint ni action Worker ajoutée.
+Aucun nouveau modèle de données : la recherche du header (voir `03_REGLES_METIER_ET_ROLES.md`) lit exclusivement les structures déjà chargées en mémoire côté dashboard (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`, et depuis août 2026 `brasseursCatalogue`) — aucune colonne SharePoint ni action Worker ajoutée.
 
 ## Fichiers JSON associés
 

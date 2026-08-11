@@ -1,0 +1,401 @@
+// Tests du module « Brasseurs d'air » (négoce + pose, ajouté août 2026). Microsoft Graph est
+// entièrement mocké — aucun appel réseau réel, aucune donnée SharePoint touchée. Couvre : les
+// validations serveur (référence inconnue, dépôt invalide, propriétaire hors liste, signe/stock
+// négatif), le transfert inter-dépôts (deux mouvements liés cohérents), la réception avec écart
+// (statut Recue_Partielle vs Recue), la numérotation automatique des documents, et la protection
+// requireGarant des endpoints exposant des prix (mêmes vérifications que security.export-liste.test.js).
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { loadWorker } = require('./helpers/loadWorker');
+
+const CLIENT_SECRET = 'fake-client-secret';
+const SESSION_SECRET = 'fake-session-secret';
+global.CLIENT_SECRET_ENV = CLIENT_SECRET;
+global.SESSION_SECRET_ENV = SESSION_SECRET;
+
+const W = loadWorker();
+
+// ── Mock Graph générique pour le module Brasseurs ──────────────────────────────────────────────
+// config: { depots:[fields], catalogue:[fields], mouvements:[fields], commande:fields,
+//           lignesCommande:[{id,fields}], onWrite(evt) }
+function mockBrasseurs(t, config) {
+  let counter = 0;
+  t.mock.method(global, 'fetch', async (url, opts) => {
+    const u = String(url);
+    const method = (opts && opts.method) || 'GET';
+    if (u.includes('login.microsoftonline.com')) return new Response(JSON.stringify({ access_token: 'fake-graph-token' }), { status: 200 });
+
+    if (u.includes('/$batch')) {
+      const body = JSON.parse(opts.body);
+      const responses = body.requests.map((r) => {
+        counter++;
+        if (config.onWrite) config.onWrite({ batch: true, method: r.method, url: r.url, body: r.body });
+        return { id: r.id, status: r.method === 'POST' ? 201 : 200, body: r.method === 'POST' ? { id: 'batch-item-' + counter } : {} };
+      });
+      return new Response(JSON.stringify({ responses }), { status: 200 });
+    }
+
+    if (/\/Brasseurs_Commandes\/items\/[^/?]+\?/.test(u) && method === 'GET') {
+      return new Response(JSON.stringify(config.commande ? { fields: config.commande } : {}), { status: config.commande ? 200 : 404 });
+    }
+    if (/\/Brasseurs_Commandes\/items\/[^/?]+\/fields/.test(u) && method === 'PATCH') {
+      if (config.onWrite) config.onWrite({ method, url: u, body: JSON.parse(opts.body) });
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    if (/\/Brasseurs_Commandes\/items\?/.test(u) && method === 'GET') {
+      return new Response(JSON.stringify({ value: [] }), { status: 200 });
+    }
+    if (/\/Brasseurs_Commandes\/items$/.test(u) && method === 'POST') {
+      counter++;
+      if (config.onWrite) config.onWrite({ method, url: u, body: JSON.parse(opts.body) });
+      return new Response(JSON.stringify({ id: 'cmd-new-' + counter }), { status: 200 });
+    }
+
+    if (/\/Brasseurs_Mouvements\/items\/[^/?]+\?/.test(u) && method === 'GET') {
+      return new Response(JSON.stringify(config.mouvementUnique ? { fields: config.mouvementUnique } : {}), { status: config.mouvementUnique ? 200 : 404 });
+    }
+    if (/\/Brasseurs_Mouvements\/items\/[^/?]+\/fields/.test(u) && method === 'PATCH') {
+      if (config.onWrite) config.onWrite({ method, url: u, body: JSON.parse(opts.body) });
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    if (/\/Brasseurs_Mouvements\/items\?/.test(u) && method === 'GET') {
+      return new Response(JSON.stringify({ value: (config.mouvements || []).map((f, i) => ({ id: 'mv' + i, fields: f })) }), { status: 200 });
+    }
+    if (/\/Brasseurs_Mouvements\/items$/.test(u) && method === 'POST') {
+      counter++;
+      if (config.onWrite) config.onWrite({ method, url: u, body: JSON.parse(opts.body) });
+      return new Response(JSON.stringify({ id: 'mv-new-' + counter }), { status: 200 });
+    }
+
+    if (/\/Brasseurs_Depots\/items/.test(u)) {
+      return new Response(JSON.stringify({ value: (config.depots || []).map((f, i) => ({ id: 'dep' + i, fields: f })) }), { status: 200 });
+    }
+    if (/\/Brasseurs_Catalogue\/items/.test(u)) {
+      return new Response(JSON.stringify({ value: (config.catalogue || []).map((f, i) => ({ id: 'cat' + i, fields: f })) }), { status: 200 });
+    }
+    if (/\/Brasseurs_Lignes_Commande\/items\?/.test(u) && method === 'GET') {
+      return new Response(JSON.stringify({ value: config.lignesCommande || [] }), { status: 200 });
+    }
+    throw new Error('URL non mockée dans ce test : ' + method + ' ' + u);
+  });
+}
+
+function postRequest(action, body) {
+  return new Request('https://immo-proxy.test/?action=' + action, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}),
+  });
+}
+function getRequest(qs) {
+  return new Request('https://immo-proxy.test/?' + qs);
+}
+
+const DEPOT_OMT = { Title: 'OMT', Nom_Complet: 'OM Transit', Prefixe_Document: 'OMT', Site: 'Reunion', Actif: 'Oui' };
+const DEPOT_TC2 = { Title: 'TC2', Nom_Complet: 'TC N°2', Prefixe_Document: 'TC2', Site: 'Reunion', Actif: 'Oui' };
+const CAT_BA = { Title: 'DCF-FS52920B', Designation: 'Brasseur blanc', Categorie: 'Brasseur', Stock_Mini: 0, Actif: 'Oui' };
+const PROP_ESR = 'ELECTRICITE SERVICES REUNION';
+
+async function garantToken() { return W.signSessionWith('XXXX', 'Logistique', SESSION_SECRET); }
+
+// ── Validations serveur ─────────────────────────────────────────────────────────────────────
+
+test('creer_mouvement_brasseur : référence inconnue → refusé, rien écrit', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], mouvements: [], onWrite: () => { wrote = true; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Sortie', proprietaire: PROP_ESR, lignes: [{ reference: 'INCONNU', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'reference_inconnue');
+  assert.equal(wrote, false);
+});
+
+test('creer_mouvement_brasseur : dépôt invalide → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], mouvements: [] });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'XXX', type_mouvement: 'Entree', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'depot_invalide');
+});
+
+test('creer_mouvement_brasseur : propriétaire hors liste fermée → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], mouvements: [] });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Entree', proprietaire: 'ALCLIMA', lignes: [{ reference: 'DCF-FS52920B', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'proprietaire_invalide');
+});
+
+test('creer_mouvement_brasseur : Sortie qui rendrait le stock négatif → bloqué avec message explicite', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], mouvements: [], onWrite: () => { wrote = true; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Sortie', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'stock_insuffisant');
+  assert.equal(data.stock_actuel, 0);
+  assert.equal(data.demande, 5);
+  assert.equal(wrote, false, 'aucune écriture ne doit avoir lieu si une ligne échoue (tout ou rien)');
+});
+
+test('creer_mouvement_brasseur : Sortie couverte par le stock existant → acceptée, quantité écrite négative', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT], catalogue: [CAT_BA],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 10 }],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Sortie', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 4 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Quantit_x00e9_, -4, 'le signe est déterminé par le type de mouvement, pas par le client');
+  assert.equal(ecrit.Code_Employe, 'XXXX', "l'auteur est résolu depuis le jeton de session, jamais depuis le corps de la requête");
+  assert.equal(ecrit.Cree_Par, 'XXXX');
+});
+
+test('creer_mouvement_brasseur : quantité positive obligatoire pour Entree/Sortie (le signe se déduit du type)', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], mouvements: [] });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Entree', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: -3 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'quantite_invalide');
+});
+
+test('creer_mouvement_brasseur : recalage Inventaire calcule et écrit un écart signé (stock cible − stock actuel)', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT], catalogue: [CAT_BA],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 6 }],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Inventaire', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 9 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Quantit_x00e9_, 3, 'stock cible 9 - stock actuel 6 = écart +3');
+  assert.equal(ecrit.Type_Mouvement, 'Inventaire');
+});
+
+test('creer_mouvement_brasseur : recalage Inventaire sans écart → aucune ligne écrite', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT], catalogue: [CAT_BA],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 6 }],
+    onWrite: () => { wrote = true; },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Inventaire', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 6 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'aucune_ligne_a_ecrire');
+  assert.equal(wrote, false);
+});
+
+// ── Transfert inter-dépôts ───────────────────────────────────────────────────────────────────
+
+test('transfert_brasseur : génère deux mouvements liés cohérents (Transfert_Sortie ↔ Transfert_Entree)', async (t) => {
+  const ecritures = [];
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT, DEPOT_TC2], catalogue: [CAT_BA],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 10 }],
+    onWrite: (evt) => { ecritures.push(evt); },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('transfert_brasseur', {
+    token, depot_source: 'OMT', depot_destination: 'TC2', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 3 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.paires.length, 1);
+  assert.equal(data.paires[0].id_sortie, 'mv-new-1');
+  assert.equal(data.paires[0].id_entree, 'mv-new-2');
+
+  const postes = ecritures.filter((e) => e.method === 'POST');
+  assert.equal(postes.length, 2);
+  const sortie = postes[0].body.fields, entree = postes[1].body.fields;
+  assert.equal(sortie.Type_Mouvement, 'Transfert_Sortie');
+  assert.equal(sortie.Depot, 'OMT');
+  assert.equal(sortie.Quantit_x00e9_, -3);
+  assert.equal(entree.Type_Mouvement, 'Transfert_Entree');
+  assert.equal(entree.Depot, 'TC2');
+  assert.equal(entree.Quantit_x00e9_, 3);
+  assert.equal(entree.Transfert_Lien, 'mv-new-1', "l'entrée référence la sortie dès sa création");
+  assert.equal(sortie.Document, entree.Document, 'les deux mouvements partagent le même numéro de document');
+
+  const patches = ecritures.filter((e) => e.method === 'PATCH');
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0].body.Transfert_Lien, 'mv-new-2', 'la sortie est mise à jour après coup pour référencer l\'entrée');
+});
+
+test('transfert_brasseur : même dépôt source/destination → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT], catalogue: [CAT_BA], mouvements: [] });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('transfert_brasseur', {
+    token, depot_source: 'OMT', depot_destination: 'OMT', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'donnees_invalides');
+});
+
+test('transfert_brasseur : stock insuffisant au dépôt source → refusé', async (t) => {
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT, DEPOT_TC2], catalogue: [CAT_BA],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 2 }],
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('transfert_brasseur', {
+    token, depot_source: 'OMT', depot_destination: 'TC2', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'stock_insuffisant');
+});
+
+// ── Réception de commande avec écart ────────────────────────────────────────────────────────
+
+test('reception_commande_brasseur : réception partielle → statut Recue_Partielle, écart lisible (commandée − reçue)', async (t) => {
+  const ecritures = [];
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT],
+    commande: { Title: 'CMD.26.08.001', Fournisseur: '1stShine', Statut: 'En attente' },
+    lignesCommande: [
+      { id: 'l1', fields: { Title: 'cmd1', Reference: 'DCF-FS52920B', Quantite_Commandee: 10, Quantite_Recue: 0, Prix_Unitaire: 50 } },
+      { id: 'l2', fields: { Title: 'cmd1', Reference: 'CMD-M', Quantite_Commandee: 5, Quantite_Recue: 0, Prix_Unitaire: 10 } },
+    ],
+    onWrite: (evt) => { ecritures.push(evt); },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('reception_commande_brasseur', {
+    token, commande_id: 'cmd1', depot: 'OMT', proprietaire: PROP_ESR, lignes: [{ ligne_id: 'l1', quantite_recue: 4 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.statut, 'Recue_Partielle', '4/10 reçu sur une ligne, 0/5 sur l\'autre : réception partielle');
+
+  const mvtPost = ecritures.find((e) => e.batch && e.method === 'POST');
+  assert.equal(mvtPost.body.fields.Quantit_x00e9_, 4);
+  assert.equal(mvtPost.body.fields.Type_Mouvement, 'Entree');
+  assert.equal(mvtPost.body.fields.Tiers, '1stShine');
+
+  const lignePatch = ecritures.find((e) => e.batch && e.method === 'PATCH');
+  assert.equal(lignePatch.body.Quantite_Recue, 4, 'écart restant = 10 − 4 = 6, lisible directement (Quantite_Commandee − Quantite_Recue)');
+
+  const statutPatch = ecritures.find((e) => !e.batch && e.method === 'PATCH');
+  assert.equal(statutPatch.body.Statut, 'Recue_Partielle');
+});
+
+test('reception_commande_brasseur : toutes les lignes soldées → statut Recue', async (t) => {
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT],
+    commande: { Title: 'CMD.26.08.001', Fournisseur: '1stShine', Statut: 'Recue_Partielle' },
+    lignesCommande: [
+      { id: 'l1', fields: { Title: 'cmd1', Reference: 'DCF-FS52920B', Quantite_Commandee: 10, Quantite_Recue: 10 } },
+      { id: 'l2', fields: { Title: 'cmd1', Reference: 'CMD-M', Quantite_Commandee: 5, Quantite_Recue: 0 } },
+    ],
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('reception_commande_brasseur', {
+    token, commande_id: 'cmd1', depot: 'OMT', proprietaire: PROP_ESR, lignes: [{ ligne_id: 'l2', quantite_recue: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.statut, 'Recue', 'les deux lignes sont désormais soldées (10/10 et 5/5)');
+});
+
+// ── Annulation (convention "quantité 0", jamais de suppression) ────────────────────────────────
+
+test('annuler_mouvement_brasseur : ramène la quantité à 0 et trace le motif en commentaire, ne supprime rien', async (t) => {
+  let patched = null;
+  mockBrasseurs(t, {
+    mouvementUnique: { Title: 'DCF-FS52920B', Quantit_x00e9_: -4, Commentaire: 'note initiale' },
+    onWrite: (evt) => { if (!evt.batch && evt.method === 'PATCH') patched = evt.body; },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('annuler_mouvement_brasseur', { token, id: 'mv1', motif: 'erreur de saisie' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(patched.Quantit_x00e9_, 0);
+  assert.match(patched.Commentaire, /ANNULÉ/);
+  assert.match(patched.Commentaire, /erreur de saisie/);
+  assert.match(patched.Commentaire, /note initiale/, 'le commentaire existant est conservé, pas écrasé');
+});
+
+// ── Numérotation automatique ─────────────────────────────────────────────────────────────────
+
+test('creer_mouvement_brasseur : numéro de document au format {PREFIXE}.{AA}.{MM}.{NNN}, repris à partir du max existant', async (t) => {
+  const now = new Date();
+  const aa = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  mockBrasseurs(t, {
+    depots: [DEPOT_OMT], catalogue: [CAT_BA],
+    mouvements: [
+      { Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 20, Document: 'OMT.' + aa + '.' + mm + '.005' },
+      { Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 1, Document: 'TC2.' + aa + '.' + mm + '.099' }, // préfixe différent : ignoré
+    ],
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('creer_mouvement_brasseur', {
+    token, depot: 'OMT', type_mouvement: 'Entree', proprietaire: PROP_ESR, lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.document, 'OMT.' + aa + '.' + mm + '.006');
+});
+
+// ── Protection des endpoints exposant des prix (cadrage §3.e) ──────────────────────────────────
+
+test('?brasseurs_commandes=1 sans jeton → 401/403, aucun prix exposé', async (t) => {
+  mockBrasseurs(t, { commande: null });
+  const res = await W.handleRequest(getRequest('brasseurs_commandes=1'));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.ok(res.status === 401 || res.status === 403);
+});
+
+test('?brasseurs_commandes=1 avec un jeton non-garant (CT) → droits_insuffisants', async (t) => {
+  mockBrasseurs(t, {});
+  const token = await W.signSessionWith('YYYY', 'CT', SESSION_SECRET);
+  const res = await W.handleRequest(getRequest('brasseurs_commandes=1&token=' + token));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'droits_insuffisants');
+});
+
+test('?brasseurs_lignes_commande=1 avec un jeton garant valide → accès autorisé, prix renvoyés', async (t) => {
+  mockBrasseurs(t, { lignesCommande: [{ id: 'l1', fields: { Title: 'cmd1', Reference: 'DCF-FS52920B', Quantite_Commandee: 10, Prix_Unitaire: 42.5, Quantite_Recue: 0 } }] });
+  const token = await garantToken();
+  const res = await W.handleRequest(getRequest('brasseurs_lignes_commande=1&token=' + token));
+  const data = await res.json();
+  assert.ok(Array.isArray(data));
+  assert.equal(data[0].prix_unitaire, 42.5);
+});
+
+test('?brasseurs_stock=1 et ?brasseurs_mouvements=1 restent publics (aucun prix, même confiance que ?catalogue_epi=1)', async (t) => {
+  mockBrasseurs(t, { mouvements: [{ Title: 'DCF-FS52920B', Depot: 'OMT', Proprietaire: PROP_ESR, Quantit_x00e9_: 5 }] });
+  const res1 = await W.handleRequest(getRequest('brasseurs_stock=1'));
+  const res2 = await W.handleRequest(getRequest('brasseurs_mouvements=1'));
+  assert.equal(res1.status, 200);
+  assert.equal(res2.status, 200);
+});
