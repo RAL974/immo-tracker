@@ -2262,7 +2262,7 @@ function refreshEPIStockResults(){
   rows.forEach(function(a){
     var seuil=seuilEPI(a);
     var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<seuil?'bu':'bn');
-    html+='<tr'+(a.stock_actuel<seuil?' class="warn-row"':'')+'><td>'+a.type_article+'</td><td>'+a.taille_affichage+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.designation||'—')+'</td>'+
+    html+='<tr><td>'+a.type_article+'</td><td>'+a.taille_affichage+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.designation||'—')+'</td>'+
       '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
       '<td style="font-size:12px;color:var(--grey)">'+(a.stock_mini>0?a.stock_mini:'— (défaut '+seuil+')')+'</td>'+
       (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeEPI(\''+a.id+'\',\''+(a.type_article+' '+a.taille_affichage).replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
@@ -3541,7 +3541,7 @@ function refreshOutilStockResults(){
   rows.forEach(function(a){
     var seuil=seuilOutil(a);
     var stockClass=a.stock_actuel<=0?'ba':(a.stock_actuel<seuil?'bu':'bn');
-    html+='<tr'+(a.stock_actuel<seuil?' class="warn-row"':'')+'><td>'+a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.marque||'—')+'</td><td>'+a.prix_unitaire.toFixed(2)+' €</td>'+
+    html+='<tr><td>'+a.type_article+'</td><td style="font-size:11px;color:var(--grey)">'+a.reference+'</td><td style="font-size:12px">'+(a.marque||'—')+'</td><td>'+a.prix_unitaire.toFixed(2)+' €</td>'+
       '<td><span class="badge '+stockClass+'">'+a.stock_actuel+'</span></td>'+
       '<td style="font-size:12px;color:var(--grey)">'+(a.stock_mini>0?a.stock_mini:'— (défaut '+seuil+')')+'</td>'+
       (canEdit?'<td style="white-space:nowrap"><button onclick="receptionCommandeOutillage(\''+a.id+'\',\''+a.type_article.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">+ Réception</button> '+
@@ -6892,7 +6892,7 @@ function renderBrasseursStockPivot(){
     var cells=depotsActifs.map(function(d){var qte=cellule(d.code,c.reference);total+=qte;return '<td style="text-align:center">'+qte+'</td>';}).join('');
     var seuil=seuilBrasseurs(c);
     var stockClass=total<=0?'ba':(total<seuil?'bu':'bn');
-    html+='<tr'+(total<seuil?' class="warn-row"':'')+'><td>'+c.reference+'</td><td style="font-size:12px">'+(c.designation||'—')+'</td>'+cells+'<td style="text-align:center"><span class="badge '+stockClass+'">'+total+'</span></td></tr>';
+    html+='<tr><td>'+c.reference+'</td><td style="font-size:12px">'+(c.designation||'—')+'</td>'+cells+'<td style="text-align:center"><span class="badge '+stockClass+'">'+total+'</span></td></tr>';
   });
   html+='<tr style="font-weight:700;background:var(--ds-neutral-50,#fafafa)"><td colspan="2">Total dépôt</td>'+
     depotsActifs.map(function(d){var t=0;refsActives.forEach(function(c){t+=cellule(d.code,c.reference);});return '<td style="text-align:center">'+t+'</td>';}).join('')+

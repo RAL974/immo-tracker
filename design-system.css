@@ -159,13 +159,18 @@
      nombreux petits <select>/<input> de filtre du dashboard qui n'ont pas de background/color
      explicites (ex. filtres site par onglet) et resteraient sinon blancs même en mode sombre. */
   color-scheme:dark;
-  --ds-bg:#15181E;
-  --ds-surface:#1E222A;
-  --ds-surface-alt:#242830;
-  --ds-border:#2E333D;
-  --ds-border-strong:#3A4049;
+  /* Palette éclaircie (11 août 2026, retour terrain de William : le premier jet était trop sombre,
+     "quasi noir" — un charbon plus clair reste un mode sombre sans perdre le confort de lecture,
+     et se rapproche mieux du mode clair en "miroir" (même hiérarchie surface/bordure/texte, juste
+     inversée, plutôt qu'un simple noir sur blanc inversé). Contraste texte (--ds-text sur --ds-bg)
+     resté largement au-dessus du seuil AA malgré l'éclaircissement. */
+  --ds-bg:#1D2128;
+  --ds-surface:#262B34;
+  --ds-surface-alt:#2E343E;
+  --ds-border:#3A4049;
+  --ds-border-strong:#4A515C;
   --ds-text:#EDEFF2;
-  --ds-text-muted:#9AA3B1;
+  --ds-text-muted:#ADB5C2;
   /* --ds-primary sert à la fois de couleur de texte/accent (titres, valeurs, bordures d'accent —
      la grande majorité de ses usages dans dashboard.html) sur les cartes/panneaux --ds-surface, et
      à quelques usages de fond de "chrome" fixe (header/sidebar/boutons, découplés via --blue-chrome
@@ -175,26 +180,26 @@
   --ds-primary-dark:#000000;
   --ds-accent:var(--ds-gold-400);
   --ds-accent-contrast:#1B2028;
-  --ds-success-bg:#12281C;
+  --ds-success-bg:#17331F;
   --ds-success-dark:#4ADE80;   /* texte badge sur fond sombre : le ton "-dark" du mode clair (#157A46) serait illisible sur --ds-success-bg sombre */
-  --ds-warning-bg:#2E2210;
+  --ds-warning-bg:#3A2A12;
   --ds-warning-dark:#FFB84D;
-  --ds-danger-bg:#2E1416;
+  --ds-danger-bg:#3A1A1D;
   --ds-danger-dark:#FF6B7A;
-  --ds-info-bg:#122536;
+  --ds-info-bg:#182C40;
   --ds-info-dark:#6FB3F0;
-  --ds-gold-50:#241F10;      /* survol de ligne de tableau (tr:hover), pâle en clair → tinté sombre ici */
+  --ds-gold-50:#2E2712;      /* survol de ligne de tableau (tr:hover), pâle en clair → tinté sombre ici */
 
   /* Échelle neutre INVERSÉE (pas un simple alias vers --ds-ink-* comme en clair) : les badges,
      survols, texte atténué et bordures sombres/claires reposent tous sur cette échelle. Sans cette
      inversion, un badge "neutre" (--ds-neutral-100, très clair en mode jour) resterait clair et
-     illisible sur fond sombre. */
-  --ds-neutral-50:#1B2028;
-  --ds-neutral-100:#242A36;
-  --ds-neutral-200:#2E333D;
-  --ds-neutral-300:#4B5261;
-  --ds-neutral-400:#6B7383;
-  --ds-neutral-500:#9AA3B1;
+     illisible sur fond sombre. Valeurs 50-200 alignées sur la palette éclaircie ci-dessus. */
+  --ds-neutral-50:#242932;
+  --ds-neutral-100:#2E343E;
+  --ds-neutral-200:#3A4049;
+  --ds-neutral-300:#57606D;
+  --ds-neutral-400:#7B8494;
+  --ds-neutral-500:#ADB5C2;
   --ds-neutral-600:#CBD0D8;
   --ds-neutral-700:#E7E9EC;
   --ds-neutral-800:#F4F5F7;
@@ -252,7 +257,11 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
   pointer-events:none;
 }
 .ds-toast{
-  pointer-events:auto;background:var(--ds-neutral-800);color:#fff;border-radius:var(--ds-radius-md);
+  /* Fond volontairement fixe (--ds-ink-800, jamais l'échelle --ds-neutral-* inversée en mode sombre) :
+     un toast reste une "puce" sombre avec texte blanc quel que soit le thème de la page — utiliser
+     l'échelle inversée ici rendrait le toast quasi blanc sur texte blanc en mode sombre (bug constaté
+     le 11 août 2026, voir 04_HISTORIQUE_DECISIONS.md). */
+  pointer-events:auto;background:var(--ds-ink-800);color:#fff;border-radius:var(--ds-radius-md);
   padding:12px 14px;box-shadow:var(--ds-shadow-lg);font-size:var(--ds-text-base);line-height:var(--ds-leading-normal);
   display:flex;align-items:flex-start;gap:10px;
   animation:ds-toast-in var(--ds-transition-base);
