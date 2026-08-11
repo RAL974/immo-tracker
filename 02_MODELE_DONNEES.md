@@ -517,6 +517,14 @@ même `Document`, modifiable/supprimable avant validation (ex. technicien qui r�
 en place chez le client). Les autres accessoires (`CACHES`/`KITFIX`/`VISSERIE`/`CARTONS`/`ECL`/`CMD-T`)
 n'ont aucune pré-proposition automatique.
 
+### Alimentation des listes de configuration (`Brasseurs_Depots`/`Brasseurs_Catalogue`)
+
+Contrairement au cadrage initial (qui ne prévoyait qu'une création manuelle ponctuelle par William),
+2 actions dédiées ont été ajoutées après un premier essai en recette qui a révélé qu'aucune action
+n'existait pour peupler ces deux listes ni depuis le dashboard ni depuis un script — `ajouter_depot_brasseur`
+et `ajouter_reference_brasseur` (`requireGarant`, doublon refusé côté serveur), avec un bouton dédié
+dans la vue Stock du dashboard (« ➕ Dépôt » / « ➕ Référence »), même pattern que `ajouter_article_epi`.
+
 ### `EXPORTABLE_LISTS`
 
 Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et `dashboard.html`,

@@ -68,8 +68,18 @@ function mockBrasseurs(t, config) {
       return new Response(JSON.stringify({ id: 'mv-new-' + counter }), { status: 200 });
     }
 
+    if (/\/Brasseurs_Depots\/items$/.test(u) && method === 'POST') {
+      counter++;
+      if (config.onWrite) config.onWrite({ method, url: u, body: JSON.parse(opts.body) });
+      return new Response(JSON.stringify({ id: 'dep-new-' + counter }), { status: 200 });
+    }
     if (/\/Brasseurs_Depots\/items/.test(u)) {
       return new Response(JSON.stringify({ value: (config.depots || []).map((f, i) => ({ id: 'dep' + i, fields: f })) }), { status: 200 });
+    }
+    if (/\/Brasseurs_Catalogue\/items$/.test(u) && method === 'POST') {
+      counter++;
+      if (config.onWrite) config.onWrite({ method, url: u, body: JSON.parse(opts.body) });
+      return new Response(JSON.stringify({ id: 'cat-new-' + counter }), { status: 200 });
     }
     if (/\/Brasseurs_Catalogue\/items/.test(u)) {
       return new Response(JSON.stringify({ value: (config.catalogue || []).map((f, i) => ({ id: 'cat' + i, fields: f })) }), { status: 200 });
@@ -96,6 +106,51 @@ const CAT_BA = { Title: 'DCF-FS52920B', Designation: 'Brasseur blanc', Categorie
 const PROP_ESR = 'ELECTRICITE SERVICES REUNION';
 
 async function garantToken() { return W.signSessionWith('XXXX', 'Logistique', SESSION_SECRET); }
+
+// ── Ajout de dépôt / référence catalogue ────────────────────────────────────────────────────
+
+test('ajouter_depot_brasseur : crée le dépôt, refuse un doublon', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, { depots: [], onWrite: (evt) => { if (!evt.batch && evt.method === 'POST' && /Brasseurs_Depots/.test(evt.url)) ecrit = evt.body.fields; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('ajouter_depot_brasseur', { token, code: 'OMT', nom_complet: 'OM Transit', site: 'Reunion' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Title, 'OMT');
+  assert.equal(ecrit.Nom_Complet, 'OM Transit');
+  assert.equal(ecrit.Prefixe_Document, 'OMT', 'préfixe par défaut = le code si non fourni');
+  assert.equal(ecrit.Actif, 'Oui');
+});
+
+test('ajouter_depot_brasseur : refuse un doublon (code déjà existant)', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_OMT] });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('ajouter_depot_brasseur', { token, code: 'OMT' }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'doublon');
+});
+
+test('ajouter_reference_brasseur : crée la référence, refuse un doublon', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, { catalogue: [], onWrite: (evt) => { if (!evt.batch && evt.method === 'POST' && /Brasseurs_Catalogue/.test(evt.url)) ecrit = evt.body.fields; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('ajouter_reference_brasseur', { token, reference: 'DCF-FS52920B', designation: 'Brasseur blanc', categorie: 'Brasseur' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Title, 'DCF-FS52920B');
+  assert.equal(ecrit.Designation, 'Brasseur blanc');
+  assert.equal(ecrit.Actif, 'Oui');
+});
+
+test('ajouter_reference_brasseur : refuse un doublon (référence déjà existante)', async (t) => {
+  mockBrasseurs(t, { catalogue: [CAT_BA] });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('ajouter_reference_brasseur', { token, reference: 'DCF-FS52920B' }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'doublon');
+});
 
 // ── Validations serveur ─────────────────────────────────────────────────────────────────────
 

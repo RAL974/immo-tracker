@@ -18,8 +18,12 @@
 //   node scripts/seed-staging-data.js --token=<jeton>
 //   node scripts/seed-staging-data.js --token=<jeton> --worker=https://immo-proxy-staging.ral-85d.workers.dev/
 //
-// Idempotent : relancer ce script ne duplique rien (ajouter_immo/ajouter_employe refusent les
-// doublons de code déjà côté Worker) — un simple avertissement s'affiche pour les lignes déjà créées.
+// Idempotent pour les employés/immos/dépôts/catalogue Brasseurs (le Worker refuse les doublons de
+// code) — un simple avertissement s'affiche pour les lignes déjà créées. ⚠️ PAS idempotent pour les
+// mouvements Brasseurs (creer_mouvement_brasseur n'a pas de notion de doublon, chaque appel ajoute
+// du stock) : relancer ce script après un premier passage réussi double le stock de départ. Sans
+// conséquence réelle (données 100% fictives, recette uniquement) mais à savoir avant de comparer un
+// chiffre de stock affiché à ce qui est décrit ici.
 'use strict';
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
@@ -50,7 +54,7 @@ async function call(action, body) {
   });
   let data = {};
   try { data = await res.json(); } catch (e) {}
-  const label = (body.code_im || body.code || '?');
+  const label = (body.code_im || body.code || body.reference || body.depot || '?');
   if (data.success) console.log('  ✅ ' + action + ' ' + label);
   else console.warn('  ⚠️  ' + action + ' ' + label + ' → ' + JSON.stringify(data));
   return data;
@@ -102,6 +106,29 @@ const AFFECTATIONS = [
   { code_im: 'IM900010', code_employe: 'FIC8', nom_employe: 'SIMON Claire (test)', etat: 'Bon état' },
 ];
 
+// ── Module Brasseurs d'air : dépôts + catalogue + quelques mouvements de départ ─────────────────
+// Codes de dépôt/référence réalistes (pas de suffixe "(test)" : ce ne sont pas des données
+// personnelles, juste une structure de catalogue générique — voir Fichiers divers/Brasseurs d'air/
+// CADRAGE_MODULE_BRASSEURS.md pour le catalogue de départ complet attendu en production).
+const BRASSEURS_DEPOTS = [
+  { code: 'OMT', nom_complet: 'OM Transit', site: 'Reunion' },
+  { code: 'TC2', nom_complet: 'TC N°2', site: 'Reunion' },
+];
+const BRASSEURS_CATALOGUE = [
+  { reference: 'DCF-FS52920B', designation: "Brasseur d'air blanc", categorie: 'Brasseur' },
+  { reference: 'DCF-FS52920N', designation: "Brasseur d'air noir", categorie: 'Brasseur' },
+  { reference: 'PALES', designation: 'Jeu de pales', categorie: 'Pièce détachée' },
+  { reference: 'CMD-M', designation: 'Commande murale', categorie: 'Pièce détachée' },
+  { reference: 'T90', designation: 'Télécommande T90', categorie: 'Accessoire' },
+];
+// Quelques mouvements Entrée pour donner du stock de départ à OMT (proprietaire par défaut : ESR).
+const BRASSEURS_MOUVEMENTS = [
+  { depot: 'OMT', type_mouvement: 'Entree', proprietaire: 'ELECTRICITE SERVICES REUNION', tiers: '1stShine Industrial (test)',
+    lignes: [{ reference: 'DCF-FS52920B', quantite: 20 }, { reference: 'DCF-FS52920N', quantite: 8 }, { reference: 'PALES', quantite: 25 }] },
+  { depot: 'OMT', type_mouvement: 'Entree', proprietaire: 'ELECTRICITE SERVICES REUNION', tiers: 'Stock initial (test)',
+    lignes: [{ reference: 'CMD-M', quantite: 15 }, { reference: 'T90', quantite: 10 }] },
+];
+
 async function main() {
   console.log('Worker de recette cible : ' + WORKER);
 
@@ -113,6 +140,15 @@ async function main() {
 
   console.log('\n→ Affectations initiales…');
   for (const a of AFFECTATIONS) await call('importer_affectation_immo', a);
+
+  console.log('\n→ Dépôts Brasseurs d\'air factices…');
+  for (const d of BRASSEURS_DEPOTS) await call('ajouter_depot_brasseur', d);
+
+  console.log('\n→ Catalogue Brasseurs d\'air factice…');
+  for (const c of BRASSEURS_CATALOGUE) await call('ajouter_reference_brasseur', c);
+
+  console.log('\n→ Stock de départ Brasseurs d\'air (mouvements Entrée)…');
+  for (const m of BRASSEURS_MOUVEMENTS) await call('creer_mouvement_brasseur', m);
 
   console.log('\nTerminé. Rechargez le dashboard de recette pour voir les données.');
 }

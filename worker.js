@@ -499,7 +499,7 @@ const GATED_ACTIONS_AUDIT = new Set([
   'bulk_import_mouvements_materiel_it', 'ajouter_ligne_telephonique', 'maj_ligne_telephonique',
   'affecter_ligne_telephonique', 'bulk_import_lignes_telephoniques', 'bulk_import_mouvements_lignes_telephoniques',
   'creer_mouvement_brasseur', 'transfert_brasseur', 'creer_commande_brasseur', 'editer_commande_brasseur',
-  'reception_commande_brasseur', 'annuler_mouvement_brasseur'
+  'reception_commande_brasseur', 'annuler_mouvement_brasseur', 'ajouter_depot_brasseur', 'ajouter_reference_brasseur'
 ]);
 // Réponses renvoyées par requireAdmin/requireGarant AVANT toute exécution métier : ne jamais
 // journaliser ces cas. Deux raisons : (1) aucune écriture n'a eu lieu, rien à auditer côté métier ;
@@ -3257,6 +3257,45 @@ async function handleRequest(request) {
     // ── Module « Brasseurs d'air » (négoce + pose) — écriture ────────────────────────────────────
     // Toutes ces actions gèrent du stock à valeur commerciale : gated requireGarant (même population
     // que EPI/Outillage : Admin, Logistique, Logistique_Mayotte), journalisées via GATED_ACTIONS_AUDIT.
+
+    // Ajoute un dépôt (rare — quelques dépôts seulement, ex. OMT/TC2) — même pattern que
+    // ajouter_article_epi. Sans cette action, Brasseurs_Depots ne serait modifiable qu'en éditant
+    // SharePoint directement, contrairement à tous les autres catalogues du projet.
+    if (action === 'ajouter_depot_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const code = (body.code || '').trim().toUpperCase();
+      if (!code) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const existe = await fetch(GL + "/Brasseurs_Depots/items?$expand=fields&$filter=fields/Title eq '" + code.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const existeData = await existe.json();
+        if (existeData.value && existeData.value.length) return json({ success: false, error: 'doublon', message: 'Ce dépôt existe déjà.' });
+        const r = await fetch(GL + '/Brasseurs_Depots/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: code, Nom_Complet: body.nom_complet || '', Prefixe_Document: (body.prefixe_document || code).trim().toUpperCase(), Site: body.site || 'Reunion', Actif: 'Oui'
+        } }) });
+        const rd = await r.json();
+        if (!r.ok) return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' });
+        return json({ success: true, id: rd.id });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Ajoute une référence au catalogue (brasseur, pièce détachée, consommable) — même pattern que
+    // ajouter_article_epi.
+    if (action === 'ajouter_reference_brasseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const reference = (body.reference || '').trim().toUpperCase();
+      if (!reference) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const existe = await fetch(GL + "/Brasseurs_Catalogue/items?$expand=fields&$filter=fields/Title eq '" + reference.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const existeData = await existe.json();
+        if (existeData.value && existeData.value.length) return json({ success: false, error: 'doublon', message: 'Cette référence existe déjà.' });
+        const r = await fetch(GL + '/Brasseurs_Catalogue/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: reference, Designation: body.designation || '', Categorie: body.categorie || '', Stock_Mini: parseFloat(body.stock_mini) || 0, Actif: 'Oui'
+        } }) });
+        const rd = await r.json();
+        if (!r.ok) return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' });
+        return json({ success: true, id: rd.id });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
 
     // Crée un mouvement (Entrée/Sortie/Inventaire), une ou plusieurs lignes de référence partageant
     // un même numéro de document généré côté serveur — reproduit le regroupement déjà observé dans
