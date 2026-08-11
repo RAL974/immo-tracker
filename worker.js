@@ -464,6 +464,17 @@ function renderDigestHtml(digest, dashboardUrl) {
 // référence l'autre, aucun code partagé.
 // Liste fermée, tranchée définitivement avec William (cadrage §3.d) — rejet serveur si valeur hors liste.
 const BRASSEUR_PROPRIETAIRES = ['ELECTRICITE SERVICES REUNION', '1ST SHINE'];
+// Plafond de quantité par référence pour une sortie déclarée depuis la PWA (sortie_stock_brasseur_pwa,
+// ajouté août 2026 — retour terrain de William 11/08/2026) : un simple Ouvrier est plafonné (10), un CT/
+// gestionnaire de dépôt/RA/Admin/Encadrement ne l'est pas. Deux rôles supplémentaires confirmés "ne
+// touchent pas aux BA" par William sont traités comme Ouvrier (prudence, pas d'usage réel attendu de
+// toute façon). Rôle vide/inconnu → plafonné par défaut prudent, comme un Ouvrier.
+const BRASSEUR_QUANTITE_PLAFOND_OUVRIER = 10;
+// Garde-fou technique anti-typo, s'applique même aux rôles "illimités" (ex. un 0 en trop tapé au clavier
+// mobile) — n'a jamais vocation à être atteint par un usage réel (une commande annuelle complète est de
+// l'ordre de quelques dizaines d'unités, voir CADRAGE_MODULE_BRASSEURS.md).
+const BRASSEUR_QUANTITE_PLAFOND_TECHNIQUE = 500;
+const BRASSEUR_ROLES_PLAFONNES_PWA = new Set(['ouvrier', 'ouvrier_specialise', 'ct_specialise']);
 // Colonne quantité de Brasseurs_Mouvements : nommée en interne "Quantit_x00e9_" par SharePoint, PAS
 // "Quantite" comme documenté dans le cadrage initial — "Quantité" tapé avec l'accent a été échappé
 // automatiquement à la création de la colonne (l'accent "é" devient l'échappement Unicode "_x00e9_")
@@ -784,6 +795,32 @@ async function handleRequest(request) {
       } catch (e) {}
     }
     return _actifParCode[code] !== false;
+  }
+
+  // Rôle réel (Employes.Code_CT) d'un code employé — nécessaire pour sortie_stock_brasseur_pwa, qui
+  // n'a aucun jeton de session (badge scanné, sans mot de passe) pour connaître le rôle autrement.
+  // Même pattern de cache (une seule lecture de la liste Employes par requête) que estEmployeActifServeur.
+  let _roleParCode = null;
+  async function roleEmployeServeur(code) {
+    if (!code) return '';
+    if (!_roleParCode) {
+      _roleParCode = {};
+      try {
+        const emp = await paginate(GL + '/Employes/items?$expand=fields&$top=200', 5);
+        emp.forEach(i => { const f = i.fields || {}; const c = f.Title || ''; if (c) _roleParCode[c] = f.Code_CT || ''; });
+      } catch (e) {}
+    }
+    return _roleParCode[code] || '';
+  }
+
+  // Plafond de quantité (par référence) applicable à une sortie PWA pour ce code employé — voir
+  // BRASSEUR_QUANTITE_PLAFOND_OUVRIER plus haut. Les super-admins permanents (GESTIONNAIRES) ne sont
+  // jamais plafonnés au niveau métier, quel que soit leur rôle SharePoint (même logique que estAdminSessionPure).
+  async function brasseurPlafondPourCode(code) {
+    if (GESTIONNAIRES.includes(code)) return BRASSEUR_QUANTITE_PLAFOND_TECHNIQUE;
+    const role = roleNorm(await roleEmployeServeur(code));
+    if (!role || BRASSEUR_ROLES_PLAFONNES_PWA.has(role)) return BRASSEUR_QUANTITE_PLAFOND_OUVRIER;
+    return BRASSEUR_QUANTITE_PLAFOND_TECHNIQUE;
   }
 
   // ── Journal d'audit (écriture) — best-effort ────────────────────────────────
@@ -3360,6 +3397,76 @@ async function handleRequest(request) {
           Tiers: body.tiers || '', Proprietaire: proprietaire, Destination: body.destination || '',
           [BRASSEUR_QTE_FIELD]: l.quantite, Code_Employe: auteurCode, Commentaire: body.commentaire || '',
           Horodatage: horodatage, Cree_Par: auteurCode
+        } }
+      }));
+      try {
+        const res = await graphBatch(requests);
+        return json({ success: res.success, document: document, lignes_ecrites: lignesValidees.length, ok: res.ok, ko: res.ko, erreurs: res.erreurs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Sortie de stock terrain (PWA, sans jeton de session) — ajoutée août 2026 ─────────────────
+    // Retour terrain de William : les sorties du dépôt étaient faites physiquement par les techniciens
+    // puis ressaisies après coup par le gestionnaire. Même modèle de confiance que reserver/transfert
+    // (badge scanné, sans mot de passe, voir PWA_SHARED_ACTIONS dans security.gated-actions.test.js) —
+    // volontairement PAS protégée par requireGarant, pour ne pas casser ce flux pour les 97 collaborateurs
+    // terrain. Portée délibérément plus étroite que creer_mouvement_brasseur (réservée au dashboard) :
+    //  - Type_Mouvement toujours 'Sortie' (jamais Entrée/Inventaire/Transfert depuis ce flux)
+    //  - Proprietaire toujours ELECTRICITE SERVICES REUNION, jamais transmis par le client (cadrage §1.7 :
+    //    le cas rare de stock 1ST SHINE à TC2 se corrige après coup par un gestionnaire au dashboard)
+    //  - Destination jamais 'Négoce' (une vente reste une décision de gestionnaire, pas un geste terrain)
+    //  - Quantité plafonnée selon le rôle réel de l'auteur, relu depuis Employes.Code_CT côté serveur —
+    //    jamais transmis/déduit du client (voir brasseurPlafondPourCode, décision William du 11/08/2026)
+    // Cree_Par est laissé vide (aucune session à résoudre) : ce vide, par contraste avec une sortie créée
+    // au dashboard (toujours Cree_Par renseigné par un jeton vérifié), permet au dashboard d'afficher un
+    // badge "📱 PWA" sur ces lignes sans nouvelle colonne SharePoint. Pas d'exception au journal d'audit
+    // (GATED_ACTIONS_AUDIT) : cohérent avec toutes les autres actions PWA partagées — le mouvement
+    // Brasseurs_Mouvements lui-même (Document, Horodatage, Code_Employe, quantité signée) sert de trace.
+    if (action === 'sortie_stock_brasseur_pwa') {
+      const codeEmploye = (body.code_employe || '').trim().toUpperCase();
+      const depot = (body.depot || '').trim().toUpperCase();
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      const destination = (body.destination || '').trim();
+      if (!codeEmploye) return json({ success: false, error: 'employe_requis' });
+      if (!depot || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (lignes.length > 5) return json({ success: false, error: 'trop_de_lignes', max: 5 });
+      if (!destination) return json({ success: false, error: 'destination_requise' });
+      if (/^n[ée]goce$/i.test(destination)) return json({ success: false, error: 'destination_reservee_dashboard', message: 'Une sortie vers le Négoce doit être enregistrée par un gestionnaire au dashboard.' });
+      if (!(await estEmployeActifServeur(codeEmploye))) return json({ success: false, error: 'employe_inactif' });
+      const plafond = await brasseurPlafondPourCode(codeEmploye);
+      const [depotsRaw, catalogueRaw] = await Promise.all([
+        paginate(GL + '/Brasseurs_Depots/items?$expand=fields&$top=100', 3),
+        paginate(GL + '/Brasseurs_Catalogue/items?$expand=fields&$top=200', 5)
+      ]);
+      const depotInfo = depotsRaw.map(i => i.fields || {}).find(f => (f.Title || '').toUpperCase() === depot);
+      if (!depotInfo || (depotInfo.Actif || 'Oui') === 'Non') return json({ success: false, error: 'depot_invalide' });
+      const catByRef = {};
+      catalogueRaw.forEach(i => { const f = i.fields || {}; if (f.Title) catByRef[f.Title.toUpperCase()] = f; });
+      const proprietaire = BRASSEUR_PROPRIETAIRES[0]; // ELECTRICITE SERVICES REUNION — jamais transmis par le client sur ce flux
+      // Valide TOUTES les lignes avant toute écriture (tout ou rien), même principe que creer_mouvement_brasseur
+      const lignesValidees = [];
+      for (const l of lignes) {
+        const reference = (l.reference || '').trim().toUpperCase();
+        const cat = catByRef[reference];
+        if (!reference || !cat) return json({ success: false, error: 'reference_inconnue', reference: l.reference });
+        if ((cat.Actif || 'Oui') === 'Non') return json({ success: false, error: 'reference_inactive', reference: l.reference });
+        const saisie = parseFloat(l.quantite);
+        if (isNaN(saisie) || saisie <= 0) return json({ success: false, error: 'quantite_invalide', reference: l.reference });
+        if (saisie > plafond) return json({ success: false, error: 'quantite_plafonnee', reference: l.reference, plafond: plafond });
+        const stockActuel = await brasseurStockActuel(depot, reference, proprietaire);
+        if (stockActuel - saisie < 0) return json({ success: false, error: 'stock_insuffisant', reference: l.reference, stock_actuel: stockActuel, demande: saisie });
+        lignesValidees.push({ reference, quantite: -Math.abs(saisie) });
+      }
+      const document = await nextBrasseurDocument(depotInfo.Prefixe_Document || depot, 'Brasseurs_Mouvements', 'Document');
+      const horodatage = new Date().toISOString();
+      const requests = lignesValidees.map((l, idx) => ({
+        id: String(idx), method: 'POST', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Mouvements/items',
+        headers: { 'Content-Type': 'application/json' },
+        body: { fields: {
+          Title: l.reference, Document: document, Depot: depot, Date: horodatage.slice(0, 10), Type_Mouvement: 'Sortie',
+          Tiers: '', Proprietaire: proprietaire, Destination: destination,
+          [BRASSEUR_QTE_FIELD]: l.quantite, Code_Employe: codeEmploye, Commentaire: '',
+          Horodatage: horodatage, Cree_Par: ''
         } }
       }));
       try {

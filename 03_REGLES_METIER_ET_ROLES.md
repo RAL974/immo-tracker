@@ -332,9 +332,10 @@ Extension du digest hebdomadaire (`?digest=1`) avec une 6e règle : `digestDeman
 ## Module « Brasseurs d'air » — négoce + pose (ajouté août 2026)
 
 *Cadrage complet : `Fichiers divers/Brasseurs d'air/CADRAGE_MODULE_BRASSEURS.md`. Suivi du stock de
-brasseurs d'air (négoce et pose), **hors circuit des immobilisations**, 100% piloté depuis le
-dashboard (aucun écran PWA à ce stade — évoqué au cadrage comme une session dédiée future). Modèle
-de données détaillé dans `02_MODELE_DONNEES.md`.*
+brasseurs d'air (négoce et pose), **hors circuit des immobilisations**. Gestion (entrées, transferts,
+recalages, réceptions, Négoce) 100% pilotée depuis le dashboard. Depuis août 2026 (retour terrain),
+un seul geste terrain existe côté PWA : la **sortie de stock**, déclarée directement par le
+technicien — voir § dédié plus bas. Modèle de données détaillé dans `02_MODELE_DONNEES.md`.*
 
 **Une seule capacité, `peutGererBrasseurs`** (Admin, Logistique, Logistique_Mayotte) — **pas de
 « voir » séparé pour Encadrement** contrairement à EPI/Outillage. Raison : les prix de commande
@@ -414,3 +415,55 @@ même règle que le reste du projet depuis le chantier « Autorisation côté se
 **Recherche globale** : les références du catalogue Brasseurs sont incluses dans la recherche globale
 du dashboard, même limitation de fraîcheur que EPI/Outillage — non trouvables tant que l'onglet
 Brasseurs n'a pas été ouvert au moins une fois dans la session (chargement paresseux).
+
+### Sortie de stock déclarée par le technicien (écran PWA, ajouté août 2026)
+
+Retour terrain de William : les sorties du dépôt TC N°2 étaient faites physiquement par les
+techniciens (historiquement « Pris par GOLU/VIMA/... » dans le classeur Excel), puis ressaisies après
+coup par le gestionnaire. Nouvel écran PWA « 📦 Sortie de stock (Brasseurs d'air) », visible à **tous**
+les collaborateurs connectés (même principe que Transférer/Retour dépôt) — le plafond de quantité
+selon le rôle (voir plus bas) suffit à limiter le risque, pas besoin de restreindre l'accès à l'écran
+lui-même.
+
+**Action Worker dédiée `sortie_stock_brasseur_pwa`, volontairement plus étroite que
+`creer_mouvement_brasseur`** (réservée au dashboard, `requireGarant`) :
+- **Sans jeton de session** — même modèle de confiance que `reserver`/`transfert` (badge scanné, sans
+  mot de passe, pour les 97 collaborateurs terrain). Listée dans `PWA_SHARED_ACTIONS`
+  (`tests/security.gated-actions.test.js`), volontairement **non protégée** par `requireGarant` : la
+  protéger casserait ce flux pour tout le monde.
+- **Toujours `Type_Mouvement='Sortie'`** — aucune Entrée/Inventaire/Transfert possible depuis cet écran.
+- **Propriétaire toujours `ELECTRICITE SERVICES REUNION`**, jamais transmis par le client — le cas rare
+  de stock 1ST SHINE à TC2 (§1.7 du cadrage) se corrige après coup par un gestionnaire au dashboard.
+- **Destination jamais `Négoce`** (refusé côté serveur, insensible à la casse/accents) : une vente
+  reste une décision de gestionnaire prise au dashboard, pas un geste terrain. Seules « Maintenance »
+  (valeur fixe) ou un texte libre de chantier sont acceptés.
+- **Dépôt** : n'importe quel dépôt actif de `Brasseurs_Depots` (pas verrouillé à TC2, pour ne pas avoir
+  à revenir sur le code si un autre dépôt en a besoin).
+- **Quantité plafonnée selon le rôle réel de l'auteur** — relu côté serveur depuis `Employes.Code_CT`
+  (aucun jeton de session ici pour porter le rôle), jamais transmis/déduit du client. Décision de
+  William (11/08/2026) : un simple **Ouvrier** est plafonné à **10 par référence** (« il arrive qu'on
+  donne 120 BA d'un coup pour un chantier » — trop bas pour un CT/gestionnaire, largement suffisant
+  pour un geste ponctuel d'ouvrier) ; **CT, RA, gestionnaire de dépôt (Logistique/Logistique_Mayotte),
+  Admin et Encadrement ne sont pas plafonnés** (au plafond technique près, 500, anti-typo uniquement).
+  `Ouvrier_Specialise` et `CT_Specialise` sont traités comme un Ouvrier — confirmés par William comme
+  ne touchant pas aux brasseurs d'air en pratique, plafonnés par prudence plutôt que bloqués
+  explicitement. Un rôle vide/inconnu (ou un employé absent de la liste Employés) est plafonné par
+  défaut prudent, comme un Ouvrier. Les codes super-admins permanents (`AIWI`/`CONI`/`NAXA`/`BAKA`) ne
+  sont jamais plafonnés au niveau métier, quel que soit leur rôle SharePoint.
+- **Garde-fou stock négatif** : identique à `creer_mouvement_brasseur` (refus explicite si la sortie
+  ferait passer le stock sous 0).
+- **Au plus 5 références par sortie** (contre 20 pour l'action dashboard) — cohérent avec un usage
+  terrain ponctuel (une intervention, pas une opération de masse).
+
+**Pas d'exception au journal d'audit (`GATED_ACTIONS_AUDIT`)** — décision explicite de William. Cohérent
+avec toutes les autres actions PWA partagées (`reserver`, `transfert`, `enregistrer_scan_inventaire_immo`...) :
+aucune n'y figure, parce que le mouvement lui-même sert de trace. Le mouvement `Brasseurs_Mouvements`
+créé par cette action porte déjà `Document`, `Horodatage`, `Code_Employe` (le badge scanné) et la
+quantité signée — rien n'est perdu. `Cree_Par` est en revanche laissé **vide** (aucune session à
+résoudre) : c'est ce vide, par contraste avec une sortie créée au dashboard (toujours `Cree_Par`
+renseigné par un jeton vérifié), qui permet au dashboard d'afficher un badge « 📱 PWA » sur ces lignes
+dans le journal des mouvements — sans nouvelle colonne SharePoint.
+
+**Pas de liaison automatique pales↔brasseur sur cet écran** (contrairement au dashboard, voir
+paragraphe précédent) — le technicien ajoute une ligne PALES lui-même s'il en prend. Évolution
+possible si le besoin se confirme à l'usage.

@@ -20,7 +20,7 @@ const dashboardSrc = fs.readFileSync(path.join(__dirname, '..', 'dashboard.html'
 // Actions volontairement non protégées par ce mécanisme : verify_password/set_password sont le
 // point d'ENTRÉE qui produit le jeton (il ne peut pas déjà en exiger un), et les actions
 // partagées avec la PWA terrain (badge sans mot de passe) suivent un autre modèle de confiance.
-const PWA_SHARED_ACTIONS = new Set(['declarer_panne', 'declarer_vol', 'delete_photo', 'modifier_resa', 'reserver', 'resoudre_panne', 'signaler_absence', 'statut_resa', 'supprimer_ligne_inventaire', 'transfert', 'upload_photo', 'valider', 'ajouter_ligne_inventaire', 'enregistrer_scan_inventaire_immo', 'creer_retour_direct_garant']);
+const PWA_SHARED_ACTIONS = new Set(['declarer_panne', 'declarer_vol', 'delete_photo', 'modifier_resa', 'reserver', 'resoudre_panne', 'signaler_absence', 'statut_resa', 'supprimer_ligne_inventaire', 'transfert', 'upload_photo', 'valider', 'ajouter_ligne_inventaire', 'enregistrer_scan_inventaire_immo', 'creer_retour_direct_garant', 'sortie_stock_brasseur_pwa']);
 const LOGIN_ACTIONS = new Set(['verify_password', 'set_password']);
 
 function extractWorkerProtectedActions(src) {

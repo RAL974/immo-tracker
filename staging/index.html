@@ -228,6 +228,13 @@
     📋 Campagne d'inventaire
   </button>
 
+  <!-- Sortie de stock Brasseurs d'air (négoce + pose) — visible à tous, comme Transférer/Retour dépôt
+       (n'importe quel technicien peut être amené à sortir du stock) ; le plafond de quantité selon le
+       rôle est vérifié côté serveur, pas ici (voir sortie_stock_brasseur_pwa dans worker.js). -->
+  <button id="btn-sortie-brasseurs" class="btn btn-link" onclick="ouvrirEcranSortieBrasseurs()" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+    📦 Sortie de stock (Brasseurs d'air)
+  </button>
+
   <!-- Section admin -->
   <div class="admin-section admin-only hidden">
     <div class="separator">Actions logistique</div>
@@ -583,6 +590,48 @@
     <p id="invim-nom-campagne" style="font-weight:700;color:var(--blue);font-size:15px"></p>
     <p style="color:var(--grey);font-size:13px">Chaque immo scannée pendant cette campagne est enregistrée comme "vue" avec ton code, le site et l'horodatage — sans effet sur son détenteur actuel (ce mode ne crée aucun mouvement).</p>
     <button class="btn btn-secondary" onclick="demarrerScanInventaireImmos()">📷 Démarrer le scan</button>
+  </div>
+  <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
+</div>
+
+<!-- ══════════════ SORTIE DE STOCK — BRASSEURS D'AIR ══════════════ -->
+<!-- Ajouté août 2026 (retour terrain) : le technicien déclare lui-même la sortie du dépôt, au lieu que
+     le gestionnaire la ressaisisse après coup depuis l'Excel de suivi. Action Worker sortie_stock_brasseur_pwa
+     (sans jeton, même modèle de confiance que Transférer/Retour dépôt) — voir 03_REGLES_METIER_ET_ROLES.md. -->
+<div id="screen-sortie-brasseurs" class="screen">
+  <h2>📦 Sortie de stock — Brasseurs d'air</h2>
+  <div id="sb-hors-ligne" class="hidden" style="text-align:center;color:var(--red);padding:20px 10px">📡 Hors connexion — la sortie de stock nécessite le réseau (le stock disponible doit être vérifié en direct sur le serveur). Réessaie une fois reconnecté.</div>
+  <div id="sb-en-ligne">
+    <label class="field-label">Dépôt</label>
+    <select id="sb-depot" class="select-input" onchange="changerDepotSortieBrasseurs()">
+      <option value="">-- Choisis un dépôt --</option>
+    </select>
+
+    <div id="sb-corps" class="hidden">
+      <label class="field-label">Référence</label>
+      <input type="text" id="sb-recherche" class="select-input" placeholder="🔍 Chercher une référence..." oninput="renderListeReferencesSortieBrasseurs()">
+      <div id="sb-liste-references" style="max-height:220px;overflow-y:auto;margin:6px 0 14px"></div>
+
+      <div id="sb-ligne-en-cours" class="hidden" style="background:var(--card);border:1px solid var(--ds-border,#ddd);border-radius:10px;padding:10px;margin-bottom:14px">
+        <p id="sb-ref-choisie" style="font-weight:700;margin:0 0 8px"></p>
+        <label class="field-label">Quantité</label>
+        <input type="number" id="sb-quantite" class="select-input" min="1" step="1" placeholder="0">
+        <button class="btn btn-secondary" style="margin-top:8px;width:100%" onclick="ajouterLigneSortieBrasseurs()">➕ Ajouter au bordereau</button>
+      </div>
+
+      <div id="sb-panier"></div>
+
+      <label class="field-label">Destination</label>
+      <div class="btn-group">
+        <button type="button" class="btn btn-outline" id="sb-dest-chantier-btn" onclick="choisirDestinationSortieBrasseurs('chantier')" style="font-size:13px">🏗️ Chantier</button>
+        <button type="button" class="btn btn-outline" id="sb-dest-maintenance-btn" onclick="choisirDestinationSortieBrasseurs('maintenance')" style="font-size:13px">🔧 Maintenance</button>
+      </div>
+      <input type="text" id="sb-destination-chantier" class="select-input hidden" placeholder="Nom du chantier" oninput="majBoutonValiderSortieBrasseurs()">
+
+      <div class="sticky-actions">
+        <button class="btn btn-secondary" id="sb-btn-valider" disabled onclick="validerSortieBrasseurs(this)">✅ Valider la sortie</button>
+      </div>
+    </div>
   </div>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
 </div>

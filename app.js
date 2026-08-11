@@ -2108,6 +2108,182 @@ function onScanReferenceInventaire(code) {
   showScreen('screen-inventaire-stock', true);
 }
 
+// ── Sortie de stock terrain — Brasseurs d'air (négoce + pose, ajouté août 2026) ────────────────
+// Retour terrain : les sorties du dépôt étaient faites physiquement par les techniciens puis
+// ressaisies après coup par le gestionnaire depuis l'Excel de suivi. Le technicien déclare
+// désormais lui-même la sortie, comme il le fait déjà pour Transférer/Retour dépôt. Action Worker
+// dédiée sortie_stock_brasseur_pwa (sans jeton de session, même modèle de confiance) — portée
+// volontairement étroite : toujours Type_Mouvement=Sortie, Proprietaire toujours ELECTRICITE
+// SERVICES REUNION (jamais transmis depuis cet écran), Destination jamais "Négoce" (réservé au
+// dashboard), quantité plafonnée selon le rôle réel de l'employé (vérifié côté serveur, pas ici —
+// voir 03_REGLES_METIER_ET_ROLES.md). Lecture du catalogue/stock via les mêmes endpoints publics
+// que le dashboard (?brasseurs_depots=1/?brasseurs_catalogue=1/?brasseurs_stock=1).
+const SB = { depots: [], catalogue: [], stock: {}, depotActuel: '', refChoisie: null, lignes: [], destinationMode: '' };
+
+async function ouvrirEcranSortieBrasseurs() {
+  showScreen('screen-sortie-brasseurs');
+  SB.depotActuel = ''; SB.refChoisie = null; SB.lignes = []; SB.destinationMode = '';
+  document.getElementById('sb-corps').classList.add('hidden');
+  document.getElementById('sb-ligne-en-cours').classList.add('hidden');
+  document.getElementById('sb-panier').innerHTML = '';
+  document.getElementById('sb-destination-chantier').value = '';
+  document.getElementById('sb-destination-chantier').classList.add('hidden');
+  ['sb-dest-chantier-btn', 'sb-dest-maintenance-btn'].forEach(id => marquerBoutonDestinationSelectionne(document.getElementById(id), false));
+  if (!navigator.onLine) {
+    document.getElementById('sb-hors-ligne').classList.remove('hidden');
+    document.getElementById('sb-en-ligne').classList.add('hidden');
+    return;
+  }
+  document.getElementById('sb-hors-ligne').classList.add('hidden');
+  document.getElementById('sb-en-ligne').classList.remove('hidden');
+  const depotSel = document.getElementById('sb-depot');
+  depotSel.innerHTML = '<option value="">Chargement...</option>';
+  try {
+    const [rd, rc, rs] = await Promise.all([
+      fetch(CONFIG.proxy + '?brasseurs_depots=1'),
+      fetch(CONFIG.proxy + '?brasseurs_catalogue=1'),
+      fetch(CONFIG.proxy + '?brasseurs_stock=1'),
+    ]);
+    SB.depots = (await rd.json()).filter(d => d.actif);
+    SB.catalogue = (await rc.json()).filter(c => c.actif);
+    SB.stock = {};
+    (await rs.json()).forEach(s => { SB.stock[s.depot + '||' + s.reference + '||' + s.proprietaire] = s.quantite; });
+    depotSel.innerHTML = '<option value="">-- Choisis un dépôt --</option>' +
+      SB.depots.map(d => '<option value="' + d.code + '">' + d.code + ' — ' + d.nom_complet + '</option>').join('');
+  } catch (e) {
+    depotSel.innerHTML = '<option value="">Erreur de chargement</option>';
+    toast('Erreur réseau : impossible de charger les dépôts/références.', 'error');
+  }
+}
+
+function stockBrasseurPour(depot, reference) {
+  return SB.stock[depot + '||' + reference + '||ELECTRICITE SERVICES REUNION'] || 0;
+}
+
+function changerDepotSortieBrasseurs() {
+  SB.depotActuel = document.getElementById('sb-depot').value;
+  SB.refChoisie = null;
+  document.getElementById('sb-ligne-en-cours').classList.add('hidden');
+  document.getElementById('sb-recherche').value = '';
+  document.getElementById('sb-corps').classList.toggle('hidden', !SB.depotActuel);
+  renderListeReferencesSortieBrasseurs();
+}
+
+function renderListeReferencesSortieBrasseurs() {
+  const cont = document.getElementById('sb-liste-references');
+  const q = (document.getElementById('sb-recherche').value || '').trim().toUpperCase();
+  if (!SB.depotActuel) { cont.innerHTML = ''; return; }
+  const items = SB.catalogue.filter(c => !q || c.reference.toUpperCase().includes(q) || (c.designation || '').toUpperCase().includes(q));
+  if (!items.length) { cont.innerHTML = '<p style="color:var(--grey);font-size:13px;padding:6px">Aucune référence.</p>'; return; }
+  cont.innerHTML = items.map(c => {
+    const stock = stockBrasseurPour(SB.depotActuel, c.reference);
+    return '<div class="suggestion-item" onclick="choisirReferenceSortieBrasseurs(\'' + c.reference.replace(/'/g, "\\'") + '\')">' +
+      '<strong>' + c.reference + '</strong> — ' + (c.designation || '') +
+      ' <span class="chantier-tag">' + stock + ' en stock</span></div>';
+  }).join('');
+}
+
+function choisirReferenceSortieBrasseurs(reference) {
+  SB.refChoisie = reference;
+  const stock = stockBrasseurPour(SB.depotActuel, reference);
+  document.getElementById('sb-ref-choisie').textContent = reference + ' (' + stock + ' en stock à ' + SB.depotActuel + ')';
+  document.getElementById('sb-ligne-en-cours').classList.remove('hidden');
+  const qte = document.getElementById('sb-quantite');
+  qte.value = ''; qte.focus();
+}
+
+function ajouterLigneSortieBrasseurs() {
+  if (!SB.refChoisie) return;
+  const quantite = parseFloat(document.getElementById('sb-quantite').value);
+  if (isNaN(quantite) || quantite <= 0) { toast('Indique une quantité supérieure à 0', 'error'); return; }
+  if (SB.lignes.length >= 5) { toast('Maximum 5 références par sortie — valide celle-ci puis recommence si besoin.', 'error'); return; }
+  const existante = SB.lignes.find(l => l.reference === SB.refChoisie);
+  if (existante) existante.quantite = quantite; else SB.lignes.push({ reference: SB.refChoisie, quantite: quantite });
+  SB.refChoisie = null;
+  document.getElementById('sb-ligne-en-cours').classList.add('hidden');
+  document.getElementById('sb-recherche').value = '';
+  renderListeReferencesSortieBrasseurs();
+  renderPanierSortieBrasseurs();
+  toast('✅ Ajouté au bordereau', 'success');
+  majBoutonValiderSortieBrasseurs();
+}
+
+function retirerLigneSortieBrasseurs(idx) {
+  SB.lignes.splice(idx, 1);
+  renderPanierSortieBrasseurs();
+  majBoutonValiderSortieBrasseurs();
+}
+
+function renderPanierSortieBrasseurs() {
+  const cont = document.getElementById('sb-panier');
+  if (!SB.lignes.length) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<p class="field-label">Bordereau (' + SB.lignes.length + ')</p>' +
+    SB.lignes.map((l, i) => '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:13px">' +
+      '<span>' + l.reference + ' <strong>x' + l.quantite + '</strong></span>' +
+      '<button onclick="retirerLigneSortieBrasseurs(' + i + ')" style="border:none;background:none;font-size:16px;cursor:pointer">🗑️</button></div>').join('');
+}
+
+function marquerBoutonDestinationSelectionne(btn, selectionne) {
+  // .btn-outline (transparent) est déclarée après .btn-primary dans style.css : les combiner en
+  // classes ne produirait aucun changement visuel (le fond transparent l'emporterait toujours).
+  // L'état "sélectionné" est donc marqué en style inline plutôt qu'en classe, pour rester fiable.
+  btn.style.background = selectionne ? 'var(--blue)' : '';
+  btn.style.color = selectionne ? '#fff' : '';
+}
+
+function choisirDestinationSortieBrasseurs(mode) {
+  SB.destinationMode = mode;
+  marquerBoutonDestinationSelectionne(document.getElementById('sb-dest-chantier-btn'), mode === 'chantier');
+  marquerBoutonDestinationSelectionne(document.getElementById('sb-dest-maintenance-btn'), mode === 'maintenance');
+  document.getElementById('sb-destination-chantier').classList.toggle('hidden', mode !== 'chantier');
+  if (mode === 'chantier') document.getElementById('sb-destination-chantier').focus();
+  majBoutonValiderSortieBrasseurs();
+}
+
+function destinationSortieBrasseursValide() {
+  if (SB.destinationMode === 'maintenance') return 'Maintenance';
+  if (SB.destinationMode === 'chantier') { const v = (document.getElementById('sb-destination-chantier').value || '').trim(); return v || null; }
+  return null;
+}
+
+function majBoutonValiderSortieBrasseurs() {
+  const btn = document.getElementById('sb-btn-valider');
+  if (!btn) return;
+  btn.disabled = !(SB.lignes.length && destinationSortieBrasseursValide());
+}
+
+async function validerSortieBrasseurs(btn) {
+  if (!navigator.onLine) { toast('📡 Hors connexion — la sortie de stock nécessite le réseau (contrôle du stock en direct sur le serveur).', 'error'); return; }
+  const destination = destinationSortieBrasseursValide();
+  if (!SB.lignes.length || !destination) return;
+  if (!setBusy(btn, 'Envoi...')) return;
+  try {
+    const r = await fetch(CONFIG.proxy + '?action=sortie_stock_brasseur_pwa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_employe: S.employe.code, depot: SB.depotActuel, destination: destination, lignes: SB.lignes }),
+    });
+    const d = await r.json();
+    clearBusy(btn);
+    if (d.success) {
+      vib(150);
+      toast('✅ Sortie enregistrée (' + d.document + ')', 'success');
+      SB.lignes = []; SB.refChoisie = null;
+      renderPanierSortieBrasseurs();
+      document.getElementById('sb-destination-chantier').value = '';
+      showScreen('screen-accueil');
+    } else {
+      const messages = {
+        quantite_plafonnee: 'Quantité au-delà du plafond autorisé pour ton rôle (max ' + (d.plafond || '?') + ' pour ' + (d.reference || 'cette référence') + '). Contacte un gestionnaire de dépôt si besoin.',
+        stock_insuffisant: 'Stock insuffisant pour ' + (d.reference || 'cette référence') + ' (' + (d.stock_actuel != null ? d.stock_actuel : '?') + ' disponible).',
+        destination_reservee_dashboard: 'Une sortie vers le Négoce doit être enregistrée par un gestionnaire au dashboard.',
+        employe_inactif: 'Ton compte est marqué inactif — contacte un gestionnaire.',
+        depot_invalide: 'Dépôt invalide ou inactif.',
+      };
+      toast('❌ ' + (messages[d.error] || ('Erreur : ' + (d.error || 'inconnue'))), 'error');
+    }
+  } catch (e) { clearBusy(btn); toast('Erreur réseau : la sortie n\'a pas été enregistrée. Réessaie une fois reconnecté.', 'error'); }
+}
+
 // ── Campagne d'inventaire PHYSIQUE des immobilisations (scan QR — distincte de la campagne de
 // stock ci-dessus, qui compte des articles/consommables sans code). Réservée aux profils admin
 // (roadmap item A1) : chaque scan enregistre juste "vu, ici, par untel, à telle date" dans

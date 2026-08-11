@@ -87,6 +87,9 @@ function mockBrasseurs(t, config) {
     if (/\/Brasseurs_Lignes_Commande\/items\?/.test(u) && method === 'GET') {
       return new Response(JSON.stringify({ value: config.lignesCommande || [] }), { status: 200 });
     }
+    if (/\/Employes\/items/.test(u) && method === 'GET') {
+      return new Response(JSON.stringify({ value: (config.employes || []).map((f, i) => ({ id: 'emp' + i, fields: f })) }), { status: 200 });
+    }
     throw new Error('URL non mockée dans ce test : ' + method + ' ' + u);
   });
 }
@@ -551,4 +554,187 @@ test('?brasseurs_stock=1 et ?brasseurs_mouvements=1 restent publics (aucun prix,
   const res2 = await W.handleRequest(getRequest('brasseurs_mouvements=1'));
   assert.equal(res1.status, 200);
   assert.equal(res2.status, 200);
+});
+
+// ── sortie_stock_brasseur_pwa (PWA, sans jeton — retour terrain, ajouté août 2026) ─────────────
+
+const EMP_OUVRIER = { Title: 'OUVR', field_1: 'Ouvrier Test', field_2: 'Oui', Code_CT: 'Ouvrier' };
+const EMP_OUVRIER_SPE = { Title: 'OUVS', field_1: 'Ouvrier Spécialisé Test', field_2: 'Oui', Code_CT: 'Ouvrier_Specialise' };
+const EMP_CT_SPE = { Title: 'CTSP', field_1: 'CT Spécialisé Test', field_2: 'Oui', Code_CT: 'CT_Specialise' };
+const EMP_CT = { Title: 'CTXX', field_1: 'CT Test', field_2: 'Oui', Code_CT: 'CT' };
+const EMP_RA = { Title: 'RAXX', field_1: 'RA Test', field_2: 'Oui', Code_CT: 'RA' };
+const EMP_LOGI = { Title: 'LOGX', field_1: 'Logistique Test', field_2: 'Oui', Code_CT: 'Logistique' };
+const EMP_ADMIN = { Title: 'ADMX', field_1: 'Admin Test', field_2: 'Oui', Code_CT: 'Admin' };
+const EMP_ENCADREMENT = { Title: 'ENCA', field_1: 'Encadrement Test', field_2: 'Oui', Code_CT: 'Encadrement' };
+const EMP_INACTIF = { Title: 'INAC', field_1: 'Ouvrier Inactif', field_2: 'Non', Code_CT: 'Ouvrier' };
+const EMP_SANS_ROLE = { Title: 'NORO', field_1: 'Sans rôle', field_2: 'Oui', Code_CT: '' };
+
+const MVT_STOCK_TC2_200 = { Title: 'DCF-FS52920B', Depot: 'TC2', Proprietaire: PROP_ESR, Quantit_x00e9_: 200 };
+
+test('sortie_stock_brasseur_pwa : Ouvrier plafonné à 10 par référence — refusé au-delà', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_OUVRIER], mouvements: [MVT_STOCK_TC2_200], onWrite: () => { wrote = true; } });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'OUVR', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 11 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'quantite_plafonnee');
+  assert.equal(data.plafond, 10);
+  assert.equal(wrote, false, 'tout ou rien : rien ne doit être écrit si une ligne dépasse le plafond');
+});
+
+test('sortie_stock_brasseur_pwa : Ouvrier — accepté jusqu\'à 10', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_OUVRIER], mouvements: [MVT_STOCK_TC2_200],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'OUVR', depot: 'TC2', destination: 'Chantier Bellepierre', lignes: [{ reference: 'DCF-FS52920B', quantite: 10 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Quantit_x00e9_, -10);
+});
+
+for (const emp of [EMP_CT, EMP_RA, EMP_LOGI, EMP_ADMIN, EMP_ENCADREMENT]) {
+  test('sortie_stock_brasseur_pwa : ' + emp.Code_CT + ' — illimité, une sortie de 120 unités est acceptée', async (t) => {
+    let ecrit = null;
+    mockBrasseurs(t, {
+      depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [emp], mouvements: [MVT_STOCK_TC2_200],
+      onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+    });
+    const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+      code_employe: emp.Title, depot: 'TC2', destination: 'Chantier gros chantier', lignes: [{ reference: 'DCF-FS52920B', quantite: 120 }],
+    }));
+    const data = await res.json();
+    assert.equal(data.success, true, JSON.stringify(data));
+    assert.equal(ecrit.Quantit_x00e9_, -120);
+  });
+}
+
+for (const emp of [EMP_OUVRIER_SPE, EMP_CT_SPE]) {
+  test('sortie_stock_brasseur_pwa : ' + emp.Code_CT + ' plafonné comme Ouvrier (ne touche pas aux BA)', async (t) => {
+    mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [emp], mouvements: [MVT_STOCK_TC2_200] });
+    const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+      code_employe: emp.Title, depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 15 }],
+    }));
+    const data = await res.json();
+    assert.equal(data.success, false);
+    assert.equal(data.error, 'quantite_plafonnee');
+    assert.equal(data.plafond, 10);
+  });
+}
+
+test('sortie_stock_brasseur_pwa : rôle vide/inconnu (ou employé absent de la liste) → plafonné par défaut prudent', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_SANS_ROLE], mouvements: [MVT_STOCK_TC2_200] });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'NORO', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 15 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'quantite_plafonnee');
+  assert.equal(data.plafond, 10);
+});
+
+test('sortie_stock_brasseur_pwa : stock insuffisant → refusé, rien écrit', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, {
+    depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'TC2', Proprietaire: PROP_ESR, Quantit_x00e9_: 2 }],
+    onWrite: () => { wrote = true; },
+  });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'stock_insuffisant');
+  assert.equal(data.stock_actuel, 2);
+  assert.equal(wrote, false);
+});
+
+for (const dest of ['Négoce', 'negoce', 'NÉGOCE', 'Negoce']) {
+  test('sortie_stock_brasseur_pwa : destination "' + dest + '" refusée, réservée au dashboard', async (t) => {
+    mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT], mouvements: [MVT_STOCK_TC2_200] });
+    const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+      code_employe: 'CTXX', depot: 'TC2', destination: dest, lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+    }));
+    const data = await res.json();
+    assert.equal(data.success, false);
+    assert.equal(data.error, 'destination_reservee_dashboard');
+  });
+}
+
+test('sortie_stock_brasseur_pwa : propriétaire toujours ELECTRICITE SERVICES REUNION, même si le client en transmet un autre', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT], mouvements: [MVT_STOCK_TC2_200],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot: 'TC2', proprietaire: '1ST SHINE', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Proprietaire, PROP_ESR);
+});
+
+test('sortie_stock_brasseur_pwa : dépôt inconnu → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT] });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot: 'XXX', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'depot_invalide');
+});
+
+test('sortie_stock_brasseur_pwa : dépôt inactif → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [{ ...DEPOT_TC2, Actif: 'Non' }], catalogue: [CAT_BA], employes: [EMP_CT] });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'depot_invalide');
+});
+
+test('sortie_stock_brasseur_pwa : employé inactif → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_INACTIF], mouvements: [MVT_STOCK_TC2_200] });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'INAC', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 1 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'employe_inactif');
+});
+
+test('sortie_stock_brasseur_pwa : plus de 5 lignes → refusé', async (t) => {
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT] });
+  const lignes = Array.from({ length: 6 }, () => ({ reference: 'DCF-FS52920B', quantite: 1 }));
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot: 'TC2', destination: 'Maintenance', lignes,
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'trop_de_lignes');
+});
+
+test('sortie_stock_brasseur_pwa : Cree_Par vide (marqueur origine PWA), Code_Employe = badge scanné, Type_Mouvement = Sortie, document numéroté sur le préfixe du dépôt', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT], mouvements: [MVT_STOCK_TC2_200],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'ctxx', depot: 'tc2', destination: 'Chantier Test', lignes: [{ reference: 'dcf-fs52920b', quantite: 2 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Cree_Par, '', 'aucune session : Cree_Par doit rester vide, c\'est le marqueur d\'origine PWA côté dashboard');
+  assert.equal(ecrit.Code_Employe, 'CTXX');
+  assert.equal(ecrit.Type_Mouvement, 'Sortie');
+  assert.match(ecrit.Document, /^TC2\.\d{2}\.\d{2}\.\d{3}$/);
 });
