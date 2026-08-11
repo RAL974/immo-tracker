@@ -83,12 +83,21 @@
 
   --ds-bg:#F6F5F2;               /* fond de page, neutre chaud (s'accorde avec l'or) */
   --ds-surface:#FFFFFF;          /* cartes, panneaux */
-  --ds-surface-alt:#FAFAF8;      /* lignes zébrées, en-têtes de tableau */
+  --ds-surface-alt:#FAFAF8;      /* en-têtes de tableau, survols — PAS le zébrage des lignes, voir --ds-zebra */
   --ds-border:#E7E4DD;
   --ds-border-strong:#D8D4CA;
   --ds-text:#22262E;
   --ds-text-muted:#6B7280;
   --ds-text-inverse:#FFFFFF;
+  /* Zébrage des lignes de tableau (ajouté 11 août 2026, retour de William : contraste insuffisant
+     avec --ds-surface-alt, trop proche du blanc) — token dédié plutôt que réutiliser
+     --ds-surface-alt, pour ne pas assombrir au passage les en-têtes/survols qui s'en servent aussi. */
+  --ds-zebra:#EDE7DC;
+  /* Barres de navigation (header/sidebar/bottom-nav) : couleur dédiée, distincte de --blue-chrome
+     (dashboard.html) qui reste utilisé par les boutons d'action — demande explicite de William
+     (11 août 2026) de faire tendre les barres de navigation vers le rose, avec une valeur propre à
+     chaque thème plutôt qu'une teinte fixe identique en clair et en sombre. */
+  --ds-nav-bg:#7A1F44;
 
   /* ── Typographie ── */
   --ds-font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
@@ -166,6 +175,11 @@
      resté largement au-dessus du seuil AA malgré l'éclaircissement. */
   --ds-bg:#1D2128;
   --ds-surface:#262B34;
+  /* Zébrage plus marqué qu'avant (même retour que le mode clair) et barres de navigation en rose
+     sombre — cohérent avec la version claire de --ds-nav-bg ci-dessus, mais assez sombre pour rester
+     un mode sombre (l'inverse du rose vif du mode clair, pas un simple alias). */
+  --ds-zebra:#333A45;
+  --ds-nav-bg:#3D0F26;
   --ds-surface-alt:#2E343E;
   --ds-border:#3A4049;
   --ds-border-strong:#4A515C;
