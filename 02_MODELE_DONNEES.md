@@ -458,11 +458,12 @@ utilise systématiquement ce nom interne réel — ne jamais écrire `Quantite` 
 | `Proprietaire` | Texte | `ELECTRICITE SERVICES REUNION` / `1ST SHINE` — liste fermée à 2 valeurs, contrôlée côté Worker |
 | `Destination` | Texte | Libre — `Négoce`, `Maintenance`, nom de chantier, `EDF AGIR+`, etc. |
 | **`Quantit_x00e9_`** | Nombre | ⚠️ Nom interne réel (voir piège ci-dessus). Signée : positif = entrée de stock, négatif = sortie |
-| `Code_Employe` | Texte | Auteur, toujours résolu depuis `_auth.session.code` (jeton vérifié), jamais depuis le corps de la requête |
+| `Code_Employe` | Texte | Auteur. Actions dashboard (`requireGarant`) : toujours résolu depuis `_auth.session.code` (jeton vérifié), jamais depuis le corps de la requête. Actions PWA (`sortie_stock_brasseur_pwa`/`transfert_stock_brasseur_pwa`, sans jeton) : résolu depuis `body.code_employe` (badge scanné), même modèle de confiance que `reserver`/`transfert` — voir `03_REGLES_METIER_ET_ROLES.md` |
 | `Commentaire` | Texte | Libre. Porte aussi la trace d'annulation (`[ANNULÉ par CODE le ISO — motif]`, voir plus bas) |
 | `Transfert_Lien` | Texte | ID SharePoint de la ligne miroir, uniquement pour `Transfert_Sortie`/`Transfert_Entree` |
 | `Horodatage` | Date/heure | ISO |
-| `Cree_Par` | Texte | Code employé résolu du jeton de session (identique à `Code_Employe` dans ce module) |
+| `Cree_Par` | Texte | Code employé résolu du jeton de session — identique à `Code_Employe` pour une écriture dashboard. **Toujours vide pour une écriture PWA** (aucune session) : ce vide est le marqueur d'origine PWA utilisé par le dashboard pour afficher un badge "📱 PWA" sur ces lignes (ajouté août 2026, voir `04_HISTORIQUE_DECISIONS.md`) |
+| `Photo_Fiche` | Texte | Ajoutée août 2026. Nom de fichier de la preuve signée (Bon de livraison/Bon de transfert) dans `/Fiches_Brasseurs/{Document}/{fichier}` — même mécanisme que `Dotations_EPI.Photo_Fiche`/`Lignes_Outillage.Photo_Fiche`. Écrite via l'action `upload_fiche_brasseur` sur **toutes** les lignes partageant le même `Document` (un document peut regrouper plusieurs lignes de référence) |
 
 ⚠️ **Annulation = quantité ramenée à 0, jamais de suppression** (convention reprise du classeur Excel
 d'origine, qui montrait déjà des « mouvements annulés » à quantité 0) : l'historique des numéros de
