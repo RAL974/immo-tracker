@@ -863,6 +863,27 @@ async function handleRequest(request) {
   // ── Debugs ──────────────────────────────────────────────────────────────────
   if (p.get('debug_immos')    === '1') { const r = await fetch(GL + '/Immos/items?$expand=fields&$top=2', { headers: H }); return new Response(await r.text(), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }); }
 
+  // Diagnostic (non authentifié, même convention que les autres ?debug_*) : qualité de la donnée
+  // Site sur les immos actives, en amont du contrat d'export universel (voir 04_HISTORIQUE_DECISIONS.md).
+  // Ne masque JAMAIS une valeur vide/invalide en 'Reunion' (contrairement à ?immo_metadata=1, qui le
+  // fait par défaut de transition) — c'est précisément ce que cet endpoint doit révéler.
+  if (p.get('audit_site_immos') === '1') {
+    const items = await paginate(GL + '/Immos/items?$expand=fields&$top=200', 6);
+    let totalActifs = 0, reunion = 0, mayotte = 0;
+    const invalides = [];
+    items.forEach(i => {
+      const f = i.fields || {};
+      if ((f.Actif || 'Oui') === 'Non') return;
+      totalActifs++;
+      const raw = (f.Site || '').toString().trim();
+      const s = raw.toLowerCase();
+      if (s.startsWith('may')) mayotte++;
+      else if (s.startsWith('reu')) reunion++;
+      else invalides.push({ code_im: f.Title || '', site_brut: raw });
+    });
+    return json({ total_actifs: totalActifs, reunion, mayotte, invalides_count: invalides.length, invalides });
+  }
+
   // Prochain code IM disponible (max + 1), en parcourant toutes les pages
   if (p.get('next_code_im') === '1') {
     let maxNum = 0;
