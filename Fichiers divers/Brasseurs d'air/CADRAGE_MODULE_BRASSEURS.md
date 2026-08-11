@@ -197,7 +197,7 @@ noire, généralisation de `Brasseurs_Commandes` aux achats locaux (nouveau cham
 | `Document` | Texte | Numéro généré, ex. `OMT.26.08.003` / `TC2.26.08.001` / `TRF.26.08.001` |
 | `Depot` | Texte | Correspond à `Brasseurs_Depots.Title` |
 | `Date` | Date | Date du mouvement |
-| `Type` | Texte | `Entree` / `Sortie` / `Inventaire` / `Transfert_Sortie` / `Transfert_Entree` |
+| `Type_Mouvement` | Texte | `Entree` / `Sortie` / `Inventaire` / `Transfert_Sortie` / `Transfert_Entree` — nommée `Type_Mouvement` et non `Type` : `Type` est un nom de colonne réservé par SharePoint (constaté à la création), cohérent avec `Type_Mouvement`/`Type_Dotation`/`Type_Article`/`Type_Materiel` déjà utilisés ailleurs dans le projet pour la même raison |
 | `Tiers` | Texte | Fournisseur ou client (libre — un même tiers peut être les deux selon la période, voir §1.5) |
 | `Proprietaire` | Texte | `ELECTRICITE SERVICES REUNION` / `1ST SHINE` (liste fermée à 2 valeurs, contrôlée côté Worker) |
 | `Destination` | Texte | Libre — `Négoce`, `Maintenance`, nom de chantier, `EDF AGIR+`, etc. |
