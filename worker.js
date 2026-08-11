@@ -499,7 +499,8 @@ const GATED_ACTIONS_AUDIT = new Set([
   'bulk_import_mouvements_materiel_it', 'ajouter_ligne_telephonique', 'maj_ligne_telephonique',
   'affecter_ligne_telephonique', 'bulk_import_lignes_telephoniques', 'bulk_import_mouvements_lignes_telephoniques',
   'creer_mouvement_brasseur', 'transfert_brasseur', 'creer_commande_brasseur', 'editer_commande_brasseur',
-  'reception_commande_brasseur', 'annuler_mouvement_brasseur', 'ajouter_depot_brasseur', 'ajouter_reference_brasseur'
+  'reception_commande_brasseur', 'annuler_mouvement_brasseur', 'ajouter_depot_brasseur', 'ajouter_reference_brasseur',
+  'migrer_mouvement_brasseur'
 ]);
 // Réponses renvoyées par requireAdmin/requireGarant AVANT toute exécution métier : ne jamais
 // journaliser ces cas. Deux raisons : (1) aucune écriture n'a eu lieu, rien à auditer côté métier ;
@@ -3587,6 +3588,87 @@ async function handleRequest(request) {
           [BRASSEUR_QTE_FIELD]: 0, Commentaire: ((curData.fields.Commentaire || '') + ' ' + note).trim()
         }) });
         return json({ success: r.ok });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Migration de l'historique du classeur Excel pré-appli (voir Fichiers divers/Brasseurs d'air/
+    // CADRAGE_MODULE_BRASSEURS.md et scripts/migrate-brasseurs.js) — SEULE action du module capable
+    // d'imposer un Document au lieu d'en générer un nouveau : creer_mouvement_brasseur refuse
+    // volontairement cette possibilité (garantit l'unicité de la numérotation en usage courant), mais
+    // la consigne de migration est explicite : conserver les numéros de document d'origine
+    // (OM.25.05.001...), la numérotation auto ne s'applique qu'aux mouvements créés après bascule.
+    // Réservée requireAdmin (plus strict que requireGarant, comme les autres migrations en masse du
+    // projet : bulk_import_lignes_inventaire, bulk_import_materiel_it...) car elle contourne des
+    // garde-fous normalement actifs en usage courant (quantité strictement positive, Document
+    // auto-généré, Type_Mouvement dérivé côté serveur). Idempotente : chaque ligne porte une clé de
+    // déduplication fournie par le script (une par ligne source du classeur, voir buildDedupeKey dans
+    // migrate-brasseurs.js) ; les Commentaire déjà écrits sont relus AVANT toute écriture et toute
+    // clé déjà présente est sautée sans erreur — un même appel (ou tout l'import) peut être rejoué
+    // sans jamais dupliquer de stock.
+    if (action === 'migrer_mouvement_brasseur') {
+      const _auth = await requireAdmin(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (lignes.length > 20) return json({ success: false, error: 'trop_de_lignes', max: 20 });
+
+      const [depotsRaw, catalogueRaw, mouvementsExistants] = await Promise.all([
+        paginate(GL + '/Brasseurs_Depots/items?$expand=fields&$top=100', 3),
+        paginate(GL + '/Brasseurs_Catalogue/items?$expand=fields&$top=200', 5),
+        paginate(GL + '/Brasseurs_Mouvements/items?$expand=fields($select=Commentaire)&$top=5000', 15),
+      ]);
+      const depotsMap = {}; depotsRaw.forEach(i => { const f = i.fields || {}; if (f.Title) depotsMap[f.Title.toUpperCase()] = f; });
+      const catByRef = {}; catalogueRaw.forEach(i => { const f = i.fields || {}; if (f.Title) catByRef[f.Title.toUpperCase()] = f; });
+      // Clé de dédup extraite du marqueur "[MIG:...]" en fin de Commentaire (voir plus bas où il est écrit).
+      const clesDejaMigrees = new Set();
+      mouvementsExistants.forEach(i => {
+        const m = /\[MIG:([^\]]+)\]/.exec((i.fields || {}).Commentaire || '');
+        if (m) clesDejaMigrees.add(m[1]);
+      });
+
+      const TYPES_VALIDES = ['Entree', 'Sortie', 'Inventaire'];
+      const auteurCode = _auth.session.code;
+      const horodatageMigration = new Date().toISOString();
+      const aEcrire = [];
+      let sautees = 0;
+      for (const l of lignes) {
+        const cle = String(l.cle_migration || '').trim();
+        if (!cle) return json({ success: false, error: 'cle_migration_manquante' });
+        if (clesDejaMigrees.has(cle)) { sautees++; continue; }
+        const depot = String(l.depot || '').trim().toUpperCase();
+        const reference = String(l.reference || '').trim().toUpperCase();
+        const proprietaire = String(l.proprietaire || '').trim().toUpperCase();
+        const type = l.type_mouvement;
+        const quantite = parseFloat(l.quantite);
+        if (!depotsMap[depot]) return json({ success: false, error: 'depot_invalide', depot: l.depot, cle_migration: cle });
+        if (!catByRef[reference]) return json({ success: false, error: 'reference_inconnue', reference: l.reference, cle_migration: cle });
+        if (BRASSEUR_PROPRIETAIRES.indexOf(proprietaire) === -1) return json({ success: false, error: 'proprietaire_invalide', valeurs_valides: BRASSEUR_PROPRIETAIRES, cle_migration: cle });
+        if (TYPES_VALIDES.indexOf(type) === -1) return json({ success: false, error: 'type_mouvement_invalide', valeurs_valides: TYPES_VALIDES, cle_migration: cle });
+        if (!l.document) return json({ success: false, error: 'document_manquant', cle_migration: cle });
+        // ⚠️ Contrairement à creer_mouvement_brasseur, 0 est explicitement accepté ici : les
+        // mouvements historiques annulés (quantité 0 + commentaire) doivent être repris tels quels
+        // pour garder l'historique fidèle (règle de migration explicite).
+        if (isNaN(quantite)) return json({ success: false, error: 'quantite_invalide', cle_migration: cle });
+        const dateMvt = l.date || horodatageMigration.slice(0, 10);
+        // Horodatage = date historique (pas l'instant de la migration elle-même), midi UTC à défaut
+        // d'heure réelle dans le classeur — pour que le tri chronologique reste cohérent une fois les
+        // mouvements migrés mélangés aux mouvements courants.
+        const horodatageHistorique = dateMvt + 'T12:00:00.000Z';
+        const commentaire = (String(l.commentaire || '').trim() + ' [MIG:' + cle + ']').trim();
+        aEcrire.push({
+          id: String(aEcrire.length), method: 'POST', url: '/sites/' + SITE_ID + '/lists/Brasseurs_Mouvements/items',
+          headers: { 'Content-Type': 'application/json' },
+          body: { fields: {
+            Title: reference, Document: String(l.document).trim(), Depot: depot, Date: dateMvt, Type_Mouvement: type,
+            Tiers: l.tiers || '', Proprietaire: proprietaire, Destination: l.destination || '',
+            [BRASSEUR_QTE_FIELD]: quantite, Code_Employe: l.code_employe || '', Commentaire: commentaire,
+            Horodatage: horodatageHistorique, Cree_Par: auteurCode,
+          } },
+        });
+      }
+      if (!aEcrire.length) return json({ success: true, ecrites: 0, sautees: sautees, message: 'Toutes les lignes de cet appel étaient déjà migrées.' });
+      try {
+        const res = await graphBatch(aEcrire);
+        return json({ success: res.success, ecrites: aEcrire.length - res.ko, sautees: sautees, ok: res.ok, ko: res.ko, erreurs: res.erreurs });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
