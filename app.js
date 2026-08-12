@@ -312,6 +312,21 @@ async function afficherSimpleRecevoir() {
 // ── Utilitaires ───────────────────────────────────────────
 function vib(ms) { if (navigator.vibrate) navigator.vibrate(ms || 150); }
 
+// ── Feedback de scan renforcé (vibration + flash plein écran) ──────────────
+// Surimpression colorée brève (~150ms) en plus de la vibration déjà en place — pas de son
+// (chantiers bruyants, inutile). Dégradation silencieuse si navigator.vibrate est absent (iOS
+// Safari notamment) : le flash visuel reste seul, jamais d'erreur.
+function scanFlash(ok) {
+  const el = document.getElementById('scan-flash-overlay');
+  if (!el) return;
+  el.className = ok ? 'flash-ok' : 'flash-fail';
+  void el.offsetWidth; // force le reflow pour permettre de rejouer l'animation sur un scan rapproché
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 150);
+}
+function scanFail() { if (navigator.vibrate) navigator.vibrate([70, 50, 70]); scanFlash(false); }
+
 // ── État "envoi en cours" sur un bouton d'action ────────────
 // Retour visuel immédiat + anti double-soumission (réseau terrain parfois lent/instable) : même
 // principe que le garde dataset.busy déjà utilisé pour l'inventaire, généralisé et étendu avec un
@@ -475,6 +490,7 @@ function startScanner(elId, cb, boxConfig, skipManualFallback) {
     if (dejaScanne) return;
     dejaScanne = true;
     vib(120);
+    scanFlash(true);
     toast('✅ Scanné !', 'success', 1200);
     cb(decodedText);
   };
@@ -803,6 +819,7 @@ function onScanActivation(code) {
   const parts = code.split('|');
   if (parts.length < 2 || code.startsWith('IM')) {
     // Pas une carte employé
+    scanFail();
     toast('Ce QR code n\'est pas une carte employé', 'error');
     return;
   }
@@ -885,7 +902,7 @@ function startMouvement(type) {
 }
 
 async function onScanImmo(code) {
-  if (!code.startsWith('IM')) { return; } // Ignorer les non-immos
+  if (!code.startsWith('IM')) { scanFail(); toast('Ce n\'est pas une immo', 'error'); return; }
   stopScanner(); vib(200);
   S.codeIM = code;
   const res = document.getElementById('immo-result');
@@ -937,6 +954,7 @@ function scannerCarteReceveur() {
   startScanner('scanner-receveur', code => {
     const parts = code.split('|');
     if (parts.length < 2 || code.startsWith('IM')) {
+      scanFail();
       toast('Ce n\'est pas une carte employé', 'error');
       return;
     }
@@ -1173,7 +1191,7 @@ async function afficherTransfertsEnAttente() {
 function demarrerValidation(tid, codeIM) {
   showScreen('screen-scan-validation');
   startScanner('scanner-validation', code => {
-    if (code !== codeIM) { toast('Mauvais QR code — attendu : ' + codeIM, 'error'); return; }
+    if (code !== codeIM) { scanFail(); toast('Mauvais QR code — attendu : ' + codeIM, 'error'); return; }
     stopScanner(); vib(200);
     S.codeIM = code;
     fetch(CONFIG.proxy + '?transferts=' + S.employe.code).then(r => r.json()).then(trs => {
@@ -1520,7 +1538,7 @@ function selForceImmo(code, libelle) {
 function scannerPourForce() {
   showScreen('screen-scan-force');
   startScanner('scanner-force', code => {
-    if (!code.startsWith('IM')) { toast('Ce n\'est pas une immo', 'error'); return; }
+    if (!code.startsWith('IM')) { scanFail(); toast('Ce n\'est pas une immo', 'error'); return; }
     stopScanner(); vib(150);
     selForceImmo(code, lib(code));
     showScreen('screen-force-attribution');
@@ -1626,7 +1644,7 @@ function selImmoResa(code, libelle) {
 function scannerPourResa() {
   showScreen('screen-scan-resa');
   startScanner('scanner-resa', code => {
-    if (!code.startsWith('IM')) { toast('Ce n\'est pas une immo', 'error'); return; }
+    if (!code.startsWith('IM')) { scanFail(); toast('Ce n\'est pas une immo', 'error'); return; }
     // Contrôle géographique : l'immo doit être sur un site autorisé
     if (S.employe && !immoVisiblePour(S.employe.code, code)) {
       stopScanner(); vib(300);
@@ -2190,8 +2208,8 @@ function changerModeSortieBrasseurs(mode) {
 
 function appliquerModeSortieBrasseursUI() {
   const enTransfert = SB.mode === 'transfert';
-  marquerBoutonDestinationSelectionne(document.getElementById('sb-mode-sortie-btn'), !enTransfert);
-  marquerBoutonDestinationSelectionne(document.getElementById('sb-mode-transfert-btn'), enTransfert);
+  marquerSegmentActif(document.getElementById('sb-mode-sortie-btn'), !enTransfert);
+  marquerSegmentActif(document.getElementById('sb-mode-transfert-btn'), enTransfert);
   document.getElementById('sb-depot-label').textContent = enTransfert ? 'Dépôt source' : 'Dépôt';
   document.getElementById('sb-depot-dest-bloc').classList.toggle('hidden', !enTransfert);
   document.getElementById('sb-destination-bloc').classList.toggle('hidden', enTransfert);
@@ -2200,6 +2218,13 @@ function appliquerModeSortieBrasseursUI() {
 
 function stockBrasseurPour(depot, reference) {
   return SB.stock[depot + '||' + reference + '||ELECTRICITE SERVICES REUNION'] || 0;
+}
+
+// Badge sémantique (style seulement, comportement de clic de la ligne inchangé) : succès si du
+// stock est disponible, neutre atténué si la référence est en rupture à ce dépôt.
+function badgeStockBrasseur(stock) {
+  const cls = stock > 0 ? 'stock-badge-ok' : 'stock-badge-zero';
+  return '<span class="stock-badge ' + cls + '">' + stock + ' en stock</span>';
 }
 
 function renderDepotsDestinationSortieBrasseurs() {
@@ -2236,7 +2261,7 @@ function renderListeReferencesSortieBrasseurs() {
     const stock = stockBrasseurPour(SB.depotActuel, c.reference);
     return '<div class="suggestion-item" onclick="choisirReferenceSortieBrasseurs(\'' + c.reference.replace(/'/g, "\\'") + '\')">' +
       '<strong>' + c.reference + '</strong> — ' + (c.designation || '') +
-      ' <span class="chantier-tag">' + stock + ' en stock</span></div>';
+      ' ' + badgeStockBrasseur(stock) + '</div>';
   }).join('');
 }
 
@@ -2279,6 +2304,14 @@ function renderPanierSortieBrasseurs() {
     SB.lignes.map((l, i) => '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:13px">' +
       '<span>' + l.reference + ' <strong>x' + l.quantite + '</strong></span>' +
       '<button onclick="retirerLigneSortieBrasseurs(' + i + ')" style="border:none;background:none;font-size:16px;cursor:pointer">🗑️</button></div>').join('');
+}
+
+// Contrôle segmenté (ex. bascule Sortie/Transfert) : simple ajout/retrait de la classe .active,
+// contrairement à marquerBoutonDestinationSelectionne ci-dessous (style inline, nécessaire pour
+// les boutons .btn-outline dont la spécificité empêcherait une classe de l'emporter).
+function marquerSegmentActif(btn, actif) {
+  if (!btn) return;
+  btn.classList.toggle('active', !!actif);
 }
 
 function marquerBoutonDestinationSelectionne(btn, selectionne) {
@@ -2639,7 +2672,7 @@ function scannerModifImmo() {
   showScreen('screen-scan-immo', true);
   document.getElementById('titre-mouvement').textContent = '📷 Scanner l\'immo proposée';
   startScanner('scanner-immo', function(code) {
-    if (!code.startsWith('IM')) return;
+    if (!code.startsWith('IM')) { scanFail(); toast('Ce n\'est pas une immo', 'error'); return; }
     stopScanner(); vib(200);
     const inp = document.getElementById('modif-immo-code');
     if (inp) inp.value = code;

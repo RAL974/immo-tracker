@@ -160,6 +160,54 @@
        chercher le bouton en bas d'un long formulaire. Sans effet sur les écrans courts (le
        sticky ne "colle" que si le contenu dépasse la hauteur visible). */
     .sticky-actions { position: sticky; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 8px; background: var(--bg); padding: 10px 0 4px; margin-top: 2px; z-index: 5; }
+
+    /* ── Cohérence couleur primaire (session UX/UI, voir 04_HISTORIQUE_DECISIONS.md) ─────
+       Une seule action or plein par écran (btn-secondary) ; le marine (btn-primary) est réservé
+       aux éléments de structure/sélection (user-badge, localisation-badge...), plus jamais utilisé
+       comme fond de bouton d'action sur cette passe (hors mode simplifié, laissé inchangé — design
+       à 3 couleurs délibéré et déjà validé). Les anciens boutons "secondaire" (mur de 3 styles
+       différents : marine plein / bleu teinté / outline) sont désormais tous en btn-tertiary. */
+
+    /* ── Champs cassant l'alignement de grille dans un formulaire flex-column ────────────
+       Un <div> englobant sans largeur explicite, dans .screen (flex-column, align-items:center),
+       se réduit à sa taille de contenu ("fit-content") au lieu d'occuper toute la largeur — piège
+       qui ne se voit que si ce div contient lui-même une rangée avec un élément de taille fixe
+       (ex. le bouton caméra d'une .search-row). Les autres champs (label/select, width:100%
+       explicite) ne sont pas concernés. Corrigé ponctuellement ici plutôt que par une règle
+       générale sur tous les <div> de .screen (trop large, risque de régression ailleurs). */
+    #resa-immo-bloc, #resa-cat-bloc { width: 100%; }
+
+    /* ── Contrôle segmenté (ex. Sortie/Transfert) ─────────────────────────────────────────
+       Remplace un groupe de boutons outline avec état "actif" en style inline (voir
+       marquerSegmentActif dans app.js) : un seul conteneur, moitié active en fond plein, moitié
+       inactive en fond neutre. L'état actif est marine (élément "sélectionné" = structure, voir
+       règle de couleur ci-dessus) — pas or, pour ne jamais entrer en concurrence avec le bouton
+       de validation or de l'écran (ex. "Valider la sortie"). */
+    .segmented { display: flex; width: 100%; border-radius: 12px; overflow: hidden; border: 2px solid #E8E0D8; }
+    .segmented .seg-btn { flex: 1; min-height: 48px; border: none; background: var(--card,#fff); color: var(--blue); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s, color .15s; }
+    .segmented .seg-btn + .seg-btn { border-left: 2px solid #E8E0D8; }
+    .segmented .seg-btn.active { background: var(--blue); color: #fff; }
+
+    /* ── Badges de stock sémantiques (référence avec/sans stock) ─────────────────────────
+       Style seulement — ne change rien au comportement de clic des lignes. */
+    .stock-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+    .stock-badge-ok   { background: var(--ds-success-bg,#E8F5E9); color: var(--ds-success-dark,#1B5E20); }
+    .stock-badge-zero { background: var(--ds-neutral-100,#ECEFF1); color: var(--ds-neutral-500,#78909C); }
+
+    /* ── En-tête "récap" des écrans de confirmation avant écriture (QUOI + QUI/OÙ) ───────
+       Un seul point de style pour tous les petits titres qui affichent "Désignation → Destination"
+       en haut des formulaires à un seul bouton de validation (screen-etat, screen-accepter,
+       screen-receveur, screen-reserver, screen-signaler-panne, screen-resoudre-panne,
+       screen-retrait-parc, screen-modifier-resa). */
+    .recap-title { font-weight: 800; color: var(--blue); font-size: 19px; text-align: center; line-height: 1.35; }
+
+    /* ── Flash plein écran au scan (succès/échec), voir startScanner()/scanFlash() dans app.js ──
+       Superposition brève (~150ms) en plus de la vibration déjà en place ; jamais de son (chantier
+       bruyant). pointer-events:none pour ne jamais intercepter un clic/tap pendant la superposition. */
+    #scan-flash-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 10050; opacity: 0; transition: opacity .12s ease-out; }
+    #scan-flash-overlay.flash-ok   { background: rgba(46,158,90,.35); }
+    #scan-flash-overlay.flash-fail { background: rgba(220,53,69,.35); }
+    #scan-flash-overlay.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -167,6 +215,7 @@
 <div id="recette-banner">🧪 RECETTE — environnement de test, aucune donnée réelle</div>
 <div id="offline-banner">📴 Hors ligne — données affichées en cache, certaines actions nécessitent le réseau</div>
 <div id="toast"></div>
+<div id="scan-flash-overlay"></div>
 
 <!-- ══════════════ ACCUEIL ══════════════ -->
 <div id="screen-accueil" class="screen active">
@@ -195,17 +244,20 @@
     ⚠️ Transfert(s) en attente de validation
   </div>
 
-  <!-- Actions principales -->
+  <!-- Actions principales — Transférer est l'action la plus fréquente : seul bouton or plein de
+       l'écran. Retour dépôt passe au même style neutre que les boutons secondaires ci-dessous
+       (voir 04_HISTORIQUE_DECISIONS.md, cohérence couleur primaire). -->
   <div class="btn-group">
     <button class="btn btn-secondary" onclick="startMouvement('Transfert')">
       🔄 Transférer <span id="badge-materiel" class="badge-count hidden"></span>
     </button>
-    <button class="btn btn-primary" onclick="startMouvement('Retour')">
+    <button class="btn btn-tertiary" onclick="startMouvement('Retour')">
       📥 Retour dépôt
     </button>
   </div>
 
-  <!-- Mon matériel (tous) / Stock dépôt (admin) -->
+  <!-- Actions secondaires — un seul style homogène (btn-tertiary) pour tous, au lieu des 3
+       traitements différents historiques (marine plein / bleu teinté / outline). -->
   <button id="btn-mon-materiel" class="btn btn-tertiary" onclick="showScreen('screen-mon-materiel')">
     📦 Mon matériel <span id="badge-mon-mat" class="badge-count hidden"></span>
   </button>
@@ -214,24 +266,24 @@
   </button>
 
   <!-- Réservations -->
-  <button id="btn-resa" class="btn btn-link" onclick="showScreen('screen-mes-reservations')" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+  <button id="btn-resa" class="btn btn-tertiary" onclick="showScreen('screen-mes-reservations')">
     📅 Réservations <span id="badge-resa" class="badge-count hidden"></span>
   </button>
 
   <!-- Gestion personnel (RA / CT / CT_Specialise / Logistique / Admin) -->
-  <button id="btn-gestion-personnel" class="btn btn-link hidden" onclick="showScreen('screen-gestion-personnel')" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+  <button id="btn-gestion-personnel" class="btn btn-tertiary hidden" onclick="showScreen('screen-gestion-personnel')">
     🧑‍💼 Gestion personnel
   </button>
 
   <!-- Campagne d'inventaire de stock (Admin / Logistique / CT / RA / Compteur_Inventaire) -->
-  <button id="btn-inventaire-stock" class="btn btn-link hidden" onclick="showScreen('screen-inventaire-stock')" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+  <button id="btn-inventaire-stock" class="btn btn-tertiary hidden" onclick="showScreen('screen-inventaire-stock')">
     📋 Campagne d'inventaire
   </button>
 
   <!-- Sortie de stock Brasseurs d'air (négoce + pose) — visible à tous, comme Transférer/Retour dépôt
        (n'importe quel technicien peut être amené à sortir du stock) ; le plafond de quantité selon le
        rôle est vérifié côté serveur, pas ici (voir sortie_stock_brasseur_pwa dans worker.js). -->
-  <button id="btn-sortie-brasseurs" class="btn btn-link" onclick="ouvrirEcranSortieBrasseurs()" style="font-size:15px;color:var(--blue);font-weight:700;border:2px solid #ddd;border-radius:12px;padding:12px">
+  <button id="btn-sortie-brasseurs" class="btn btn-tertiary" onclick="ouvrirEcranSortieBrasseurs()">
     📦 Sortie de stock (Brasseurs d'air)
   </button>
 
@@ -275,12 +327,12 @@
 <!-- ══════════════ SÉLECTION RECEVEUR ══════════════ -->
 <div id="screen-receveur" class="screen">
   <h2>À qui transférer ?</h2>
-  <p id="receveur-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <p id="receveur-immo-info" class="recap-title"></p>
 
   <!-- Option 1 : Scanner la carte BTP -->
   <div style="width:100%;background:#E8F5E9;border-radius:12px;padding:12px;text-align:center">
     <p style="font-size:13px;color:#1B5E20;font-weight:700;margin-bottom:8px">Option rapide — Carte BTP du receveur</p>
-    <button class="btn btn-primary" style="width:auto;padding:12px 24px" onclick="scannerCarteReceveur()">📷 Scanner la carte</button>
+    <button class="btn btn-tertiary" style="width:auto;padding:12px 24px" onclick="scannerCarteReceveur()">📷 Scanner la carte</button>
   </div>
 
   <div class="separator">ou sélectionner dans la liste</div>
@@ -306,7 +358,7 @@
 <!-- ══════════════ ÉTAT + PHOTO ══════════════ -->
 <div id="screen-etat" class="screen">
   <h2>État du matériel</h2>
-  <p id="etat-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <p id="etat-immo-info" class="recap-title"></p>
   <!-- Mode simplifié (roadmap item E) : mêmes champs, boutons au lieu d'un menu déroulant. Le
        clic soumet directement (confirmerAvecEtat) — masqué/vide pour les autres profils. -->
   <div id="etat-simple-boutons" class="etat-simple-grid hidden"></div>
@@ -342,7 +394,7 @@
   <h2>Enregistré !</h2>
   <div id="recap" class="recap-box"></div>
   <div id="alerte-degradation" class="alert-degradation hidden"></div>
-  <button class="btn btn-primary" onclick="showScreen('screen-accueil')">Retour accueil</button>
+  <button class="btn btn-secondary" onclick="showScreen('screen-accueil')">Retour accueil</button>
 </div>
 
 <!-- ══════════════ MON MATÉRIEL ══════════════ -->
@@ -392,7 +444,7 @@
 <!-- ══════════════ ACCEPTER TRANSFERT ══════════════ -->
 <div id="screen-accepter" class="screen">
   <h2>📥 Réception de matériel</h2>
-  <p id="accepter-texte" style="font-size:16px;font-weight:700;color:var(--blue);text-align:center"></p>
+  <p id="accepter-texte" class="recap-title"></p>
   <div id="accepter-etat-donneur" class="localisation-badge hidden"></div>
   <div id="accepter-note-donneur"></div>
   <!-- Mode simplifié (roadmap item E) : mêmes champs, boutons au lieu d'un menu déroulant. Le
@@ -432,7 +484,7 @@
   </select>
   <div class="search-row">
     <input type="text" id="rech-input" class="select-input" placeholder="Code, libellé, nom employé..." oninput="rechercheAuto()">
-    <button class="btn btn-primary" onclick="scannerPourRecherche()">📷</button>
+    <button class="btn btn-tertiary" onclick="scannerPourRecherche()">📷</button>
   </div>
   <div id="rech-resultats" class="liste-materiel">
     <p class="empty-msg">Sélectionne une catégorie ou tape ta recherche.</p>
@@ -474,7 +526,7 @@
   <label class="field-label">Immo</label>
   <div class="search-row">
     <input type="text" id="force-immo-search" class="select-input" placeholder="Code ou libellé..." oninput="rechercherImmoPourForce()">
-    <button class="btn btn-primary" onclick="scannerPourForce()">📷</button>
+    <button class="btn btn-tertiary" onclick="scannerPourForce()">📷</button>
   </div>
   <p id="force-immo-info" style="font-weight:700;color:var(--blue);font-size:14px;min-height:20px"></p>
   <div id="force-suggestions" class="liste-materiel"></div>
@@ -509,14 +561,14 @@
 <div id="screen-mes-reservations" class="screen">
   <h2>📅 Mes réservations</h2>
   <div id="mes-resa-liste" class="liste-materiel"></div>
-  <button class="btn btn-primary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
+  <button class="btn btn-secondary" onclick="showScreen('screen-reserver')">+ Nouvelle réservation</button>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
 </div>
 
 <!-- ══════════════ GESTION PERSONNEL ══════════════ -->
 <div id="screen-gestion-personnel" class="screen">
   <h2>🧑‍💼 Gestion personnel</h2>
-  <button class="btn btn-primary" onclick="ouvrirEcranSignalerAbsence()">🚫 Signaler une absence</button>
+  <button class="btn btn-secondary" onclick="ouvrirEcranSignalerAbsence()">🚫 Signaler une absence</button>
   <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Retour</button>
 </div>
 
@@ -555,7 +607,7 @@
     <label class="field-label">Référence</label>
     <div class="search-row">
       <input type="text" id="inv-reference" class="select-input" placeholder="Référence article (ou scanner le code-barres)">
-      <button class="btn btn-primary" onclick="scannerReferenceInventaire()">📷</button>
+      <button class="btn btn-tertiary" onclick="scannerReferenceInventaire()">📷</button>
     </div>
     <label class="field-label">Désignation</label>
     <input type="text" id="inv-designation" class="select-input" placeholder="Description de l'article">
@@ -605,10 +657,12 @@
   <h2>📦 Sortie de stock — Brasseurs d'air</h2>
   <div id="sb-hors-ligne" class="hidden" style="text-align:center;color:var(--red);padding:20px 10px">📡 Hors connexion — la sortie de stock nécessite le réseau (le stock disponible doit être vérifié en direct sur le serveur). Réessaie une fois reconnecté.</div>
   <div id="sb-en-ligne">
-    <!-- Bascule Sortie / Transfert — visible seulement pour Admin/Logistique/Logistique_Mayotte -->
-    <div id="sb-mode-toggle" class="btn-group hidden" style="margin-bottom:10px">
-      <button type="button" class="btn btn-outline" id="sb-mode-sortie-btn" onclick="changerModeSortieBrasseurs('sortie')" style="font-size:13px">➖ Sortie</button>
-      <button type="button" class="btn btn-outline" id="sb-mode-transfert-btn" onclick="changerModeSortieBrasseurs('transfert')" style="font-size:13px">🔄 Transfert</button>
+    <!-- Bascule Sortie / Transfert — visible seulement pour Admin/Logistique/Logistique_Mayotte.
+         Contrôle segmenté (voir marquerSegmentActif dans app.js) plutôt qu'un groupe de boutons
+         outline séparés. -->
+    <div id="sb-mode-toggle" class="segmented hidden" style="margin-bottom:10px">
+      <button type="button" class="seg-btn" id="sb-mode-sortie-btn" onclick="changerModeSortieBrasseurs('sortie')">➖ Sortie</button>
+      <button type="button" class="seg-btn" id="sb-mode-transfert-btn" onclick="changerModeSortieBrasseurs('transfert')">🔄 Transfert</button>
     </div>
 
     <label class="field-label" id="sb-depot-label">Dépôt</label>
@@ -632,7 +686,7 @@
         <p id="sb-ref-choisie" style="font-weight:700;margin:0 0 8px"></p>
         <label class="field-label">Quantité</label>
         <input type="number" id="sb-quantite" class="select-input" min="1" step="1" placeholder="0">
-        <button class="btn btn-secondary" style="margin-top:8px;width:100%" onclick="ajouterLigneSortieBrasseurs()">➕ Ajouter au bordereau</button>
+        <button class="btn btn-tertiary" style="margin-top:8px;width:100%" onclick="ajouterLigneSortieBrasseurs()">➕ Ajouter au bordereau</button>
       </div>
 
       <div id="sb-panier"></div>
@@ -687,9 +741,9 @@
 <!-- ══════════════ RÉSERVATION ══════════════ -->
 <div id="screen-reserver" class="screen">
   <h2>📅 Réserver une immo</h2>
-  <p id="resa-immo-info" style="font-weight:700;color:var(--blue);font-size:15px;min-height:20px"></p>
+  <p id="resa-immo-info" class="recap-title" style="min-height:20px"></p>
   <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-weight:600;min-height:48px">
-    <input type="checkbox" id="resa-mode-categorie" onchange="toggleModeResaCategorie()" style="width:20px;height:20px;flex:none">
+    <input type="checkbox" id="resa-mode-categorie" onchange="toggleModeResaCategorie()" style="width:22px;height:22px;flex:none">
     📋 Je ne sais pas encore quelle immo précise — demande par catégorie
   </label>
   <label class="field-label">Catégorie</label>
@@ -700,7 +754,7 @@
     <label class="field-label">Immo</label>
     <div class="search-row">
       <input type="text" id="resa-immo-search" class="select-input" placeholder="Code IM ou libellé..." oninput="rechercherImmoResa()">
-      <button class="btn btn-primary" onclick="scannerPourResa()">📷</button>
+      <button class="btn btn-tertiary" onclick="scannerPourResa()">📷</button>
     </div>
     <div id="resa-immo-suggestions" class="liste-materiel"></div>
   </div>
@@ -726,7 +780,7 @@
   <label class="field-label">Note (optionnel)</label>
   <textarea id="resa-note" class="note-textarea" placeholder="Précisions..."></textarea>
   <div class="sticky-actions">
-    <button class="btn btn-primary" onclick="soumettreReservation(this)">✅ Envoyer la demande</button>
+    <button class="btn btn-secondary" onclick="soumettreReservation(this)">✅ Envoyer la demande</button>
     <button class="btn btn-outline" onclick="showScreen('screen-accueil')">Annuler</button>
   </div>
 </div>
@@ -734,13 +788,13 @@
 <!-- ══════════════ MODIFIER RÉSERVATION ══════════════ -->
 <div id="screen-modifier-resa" class="screen">
   <h2>✏️ Modifier la réservation</h2>
-  <p id="modif-resa-info" style="font-weight:700;color:var(--blue);font-size:15px"></p>
+  <p id="modif-resa-info" class="recap-title"></p>
   <div id="modif-immo-bloc" class="hidden">
     <label class="field-label">Immo proposée <span style="color:var(--grey);font-weight:400;text-transform:none">— contre-proposition</span></label>
     <p id="modif-immo-actuelle" style="font-size:12px;color:var(--grey);margin:2px 0 6px"></p>
     <div style="display:flex;gap:6px;margin-bottom:8px">
       <input type="text" id="modif-immo-code" class="select-input" placeholder="Code IM (ex: IM000123)" style="flex:1;margin:0">
-      <button type="button" onclick="scannerModifImmo()" style="padding:0 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">📷</button>
+      <button type="button" onclick="scannerModifImmo()" style="padding:0 14px;background:var(--ds-info-bg,#E3F2FD);color:var(--blue);border:none;border-radius:8px;font-weight:700;cursor:pointer">📷</button>
     </div>
     <p id="modif-immo-label" style="font-size:12px;color:var(--green);font-weight:600;margin:-4px 0 8px"></p>
   </div>
@@ -753,7 +807,7 @@
   <label class="field-label">Note</label>
   <textarea id="modif-note" class="note-textarea"></textarea>
   <div class="sticky-actions">
-    <button class="btn btn-primary" onclick="validerModifResa(this)">✅ Enregistrer</button>
+    <button class="btn btn-secondary" onclick="validerModifResa(this)">✅ Enregistrer</button>
     <button class="btn btn-outline" onclick="showScreen('screen-mes-reservations')">Annuler</button>
   </div>
 </div>
@@ -768,7 +822,7 @@
 <!-- ══════════ ÉCRAN SIGNALER PANNE ══════════ -->
 <div id="screen-signaler-panne" class="screen">
   <h2>📢 Signaler une panne</h2>
-  <p id="panne-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <p id="panne-immo-titre" class="recap-title"></p>
   <label class="field-label">Description du problème <span style="color:var(--red)">*</span></label>
   <textarea id="panne-motif" class="note-textarea" placeholder="Décrivez précisément la panne, le dysfonctionnement... (5 car. min.)" style="min-height:120px"></textarea>
   <div class="photo-zone">
@@ -788,7 +842,7 @@
 <!-- ══════════ ÉCRAN RÉSOUDRE PANNE ══════════ -->
 <div id="screen-resoudre-panne" class="screen">
   <h2>✅ Résoudre la panne</h2>
-  <p id="resolution-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <p id="resolution-immo-titre" class="recap-title"></p>
   <label class="field-label">État après réparation</label>
   <select id="resolution-etat" class="select-input">
     <option value="Bon état">✅ Bon état</option>
@@ -819,7 +873,7 @@
 <!-- ══════════ ÉCRAN RETRAIT PARC ══════════ -->
 <div id="screen-retrait-parc" class="screen">
   <h2 id="retrait-titre">🚨 Retrait du parc</h2>
-  <p id="retrait-immo-titre" style="font-weight:700;color:var(--blue);font-size:15px;text-align:center"></p>
+  <p id="retrait-immo-titre" class="recap-title"></p>
   <div id="retrait-warning" style="background:#FFEBEE;border:2px solid var(--red);border-radius:12px;padding:12px;font-size:13px;color:var(--red);font-weight:700;text-align:center">
     ⚠️ Action irréversible — l'immo sera retirée définitivement du parc
   </div>
@@ -848,6 +902,9 @@
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
 }
+// Confirmation brève au retour réseau (en plus de la disparition du bandeau) : suit uniquement une
+// vraie transition hors-ligne → en ligne, jamais affichée si la page a toujours été en ligne.
+var _etaitHorsLigne=!navigator.onLine;
 function majBanniereHorsLigne(){
   var banner=document.getElementById('offline-banner');
   var horsLigne=!navigator.onLine;
@@ -862,6 +919,8 @@ function majBanniereHorsLigne(){
     banner.classList.toggle('show',horsLigne);
   }
   document.body.classList.toggle('offline-active',horsLigne);
+  if(!horsLigne&&_etaitHorsLigne&&typeof toast==='function')toast('✅ Connexion rétablie','success',2500);
+  _etaitHorsLigne=horsLigne;
 }
 window.addEventListener('online',majBanniereHorsLigne);
 window.addEventListener('offline',majBanniereHorsLigne);
