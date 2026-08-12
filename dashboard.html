@@ -426,7 +426,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div class="nav-group">ANALYTICS</div>
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
   <div class="nav-item" data-tab="analyses"><span class="nav-icon">📈</span><span class="nav-label">Analyses</span></div>
-  <div class="nav-item" data-tab="codir"><span class="nav-icon">🏛️</span><span class="nav-label">CODIR</span></div>
+  <div class="nav-item" data-tab="codir"><span class="nav-icon">📋</span><span class="nav-label">Synthèse direction</span></div>
   <div class="nav-item" data-tab="utilisateurs"><span class="nav-icon">👥</span><span class="nav-label">Utilisateurs</span></div>
 
   <!-- Journal d'audit (ajouté août 2026) : masqué aux non-admins par appliquerVisibiliteJournal(),
@@ -768,7 +768,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     <div class="bnav-item" data-tab="documents" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📄</span><span>FDS</span></div>
     <div class="bnav-item" data-tab="maintenance" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🔧</span><span>Maint.</span></div>
     <div class="bnav-item" data-tab="analyses" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📈</span><span>Analyses</span></div>
-    <div class="bnav-item" data-tab="codir" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🏛️</span><span>CODIR</span></div>
+    <div class="bnav-item" data-tab="codir" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📋</span><span>Synthèse</span></div>
     <div class="bnav-item" data-tab="utilisateurs" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">👥</span><span>Users</span></div>
     <div class="bnav-item" data-tab="absences" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🧑‍💼</span><span>Absences</span></div>
     <div class="bnav-item" onclick="closeMobileMenu()"><span class="bi">✕</span><span>Fermer</span></div>
@@ -6677,7 +6677,7 @@ function renderCodir(){
   var sortArrow=function(key){return codirReformeSortKey===key?(codirReformeSortDir>0?' ▲':' ▼'):'';};
   var html='';
   html+='<div id="codir-print-header" style="display:none">'+
-    '<h2 style="margin:0 0 4px">🏛️ Tableau de bord CODIR — Immo Tracker</h2>'+
+    '<h2 style="margin:0 0 4px">📋 Synthèse direction — Immo Tracker</h2>'+
     '<p style="margin:0 0 14px;font-size:12px;color:#555">Electricité Services Réunion — Généré le '+fmtDT(new Date().toISOString())+' — Territoire : '+(fs?territoireLabel(fs):'La Réunion + Mayotte')+'</p></div>';
 
   html+='<div class="card"><div class="card-head"><h3>💰 Bloc 1 — Valeur du parc</h3></div><div style="padding:14px">';
@@ -6756,11 +6756,13 @@ function renderCodir(){
   html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">⏱</div><div class="kv">'+Math.round(tempsEconomiseH)+'h</div><div class="kl">Temps estimé économisé</div></div>';
   html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">💶</div><div class="kv">'+eur(valeurTempsEconomise)+'</div><div class="kl">Valeur estimée (hypothèse)</div></div>';
   html+='</div>';
-  html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Comparaison de coût (chiffres Note de synthèse direction, juillet 2026)</h4>';
-  html+='<div class="tbl-wrap"><table><thead><tr><th>Solution</th><th>Coût mensuel</th><th>Coût annuel</th></tr></thead><tbody>'+
-    '<tr style="font-weight:800;color:var(--green)"><td>Immo Tracker (interne)</td><td>&lt; 17 €</td><td>&lt; 200 €</td></tr>'+
-    '<tr><td>Marché (Organilog / Hector)</td><td>500 – 1 500 €</td><td>6 000 – 18 000 €</td></tr>'+
+  html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Comparaison de coût</h4>';
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Solution</th><th>Coût mensuel</th><th>Coût annuel récurrent</th><th>Mise en route (une fois)</th></tr></thead><tbody>'+
+    '<tr style="font-weight:800;color:var(--green)"><td>Immo Tracker (interne)</td><td>&lt; 17 €</td><td>&lt; 200 €</td><td>0 €</td></tr>'+
+    '<tr><td>Hector (Armure, 501-1000 actifs, -10% annuel)</td><td>≈ 167 €</td><td>≈ 2 004 €</td><td>≈ 699 € (activation 30 € + banque 6h accompagnement 669 €)</td></tr>'+
+    '<tr><td>Organilog</td><td colspan="3">non chiffré — pas de devis reçu (tarif public annoncé : 19-59 €/utilisateur/mois, à vérifier)</td></tr>'+
     '</tbody></table></div>';
+  html+='<p style="font-size:11px;color:var(--grey);margin-top:6px">Hector : devis réel reçu le 25/06/2026 (réf. HECTOR-DEV-008757), palier correspondant au parc réel (~1023 immos). Total 1ère année tout compris (abonnement + mise en route, remise incluse) : 3 002 €. À partir de l\'année 2, seul l\'abonnement récurrent s\'applique (~2 004 €/an) sauf option supplémentaire. Organilog : aucun devis obtenu à ce jour, chiffre non retenu dans le total pour ne pas présenter une estimation non vérifiée comme un fait.</p>';
   html+='</div></div>';
 
   div.innerHTML=html;
@@ -6789,9 +6791,11 @@ function exporterCodir(){
     ['Photos jointes',c.adopt.nbPhotos],['Mouvements avec photo',c.adopt.nbMvtAvecPhoto],['Mouvements avec état constaté',c.adopt.nbMvtAvecEtat+'/'+c.adopt.totalMvt],
     [],['Coût réparations suivies (total)',c.coutReparationsTotal],['Immos réformées à temps (12 mois, valeur)',c.sortie.valeur],['Immos sorties (12 mois, nb)',c.sortie.nb],['Taux de sortie annuel',c.sortie.taux+'%'],
     [],['Hypothèse ROI — consultations retenues',c.nbConsultations],['Hypothèse ROI — minutes/consultation',CODIR_MIN_PAR_RECHERCHE],['Hypothèse ROI — taux horaire (€/h)',CODIR_TAUX_HORAIRE],['Hypothèse ROI — temps économisé (h)',Math.round(c.tempsEconomiseH)],['Hypothèse ROI — valeur estimée (€)',Math.round(c.valeurTempsEconomise)],
-    [],['Immo Tracker — coût annuel','< 200 €'],['Marché (Organilog/Hector) — coût annuel','6 000 – 18 000 €']
+    [],['Immo Tracker — coût annuel récurrent','< 200 €'],['Immo Tracker — mise en route','0 €'],
+    ['Hector (Armure 501-1000 actifs, -10% annuel) — coût annuel récurrent','≈ 2 004 €'],['Hector — mise en route (une fois : activation + banque 6h)','≈ 699 €'],['Hector — total 1ère année (devis HECTOR-DEV-008757, 25/06/2026)','3 002 €'],
+    ['Organilog — coût','non chiffré (pas de devis reçu)']
   ];
-  exporterExcel(nomFichierExport('CODIR'),[
+  exporterExcel(nomFichierExport('SyntheseDirection'),[
     {nom:'Filtres',entetes:['Filtres actifs'],lignes:[[ligneFiltresActifs({Territoire:c.fs})]]},
     {nom:'Valeur du parc',entetes:['',''],lignes:r1,cols:[30,18]},
     {nom:'Couts trimestriels',entetes:['Trimestre','Cout (€)','Nb réparations/entretiens'],lignes:r2,cols:[14,16,20]},
