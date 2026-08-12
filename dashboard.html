@@ -99,9 +99,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #header-actions button{border:none;color:#fff;padding:7px 14px;border-radius:var(--ds-radius-sm,6px);cursor:pointer;font-weight:700;font-size:12px;transition:filter var(--ds-transition-fast,.15s ease),transform var(--ds-transition-fast,.15s ease);}
 #header-actions button:hover{filter:brightness(1.08);}
 #header-actions button:active{transform:translateY(1px);}
-#btn-export{background:var(--green);}
-#btn-refresh{background:var(--orange);}
-#last-upd{font-size:11px;opacity:.6;white-space:nowrap;}
 
 /* ── Recherche globale (header) ── */
 #gsearch-wrap{position:relative;flex:0 1 320px;min-width:120px;}
@@ -198,10 +195,12 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 .es{text-align:center;padding:36px 20px;color:var(--ds-text-muted,var(--grey));font-size:13px;line-height:1.5;}
 .es::before{content:'🗂️';display:block;font-size:26px;margin-bottom:8px;opacity:.55;}
 
-/* ── Liens cliquables ── */
-.link-im,.link-emp{cursor:pointer;text-decoration:underline;font-weight:600;}
-.link-im{color:var(--blue);font-family:monospace;font-size:12px;}
-.link-emp{color:var(--blue);}
+/* ── Liens cliquables ── couleur d'accent (signale l'affordance « cliquable », distincte de --blue
+   réservé aux titres/valeurs), soulignement au survol seulement (voir design-system.css pour le
+   détail et le cas .link-plain — code dupliqué avec un nom sur la même ligne, ex. Historique EPI). */
+.link-im,.link-emp{cursor:pointer;text-decoration:none;font-weight:600;color:var(--ds-accent,var(--blue));}
+.link-im{font-family:monospace;font-size:12px;}
+.link-im:hover,.link-emp:hover{text-decoration:underline;}
 
 /* ── Filtres ── */
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
@@ -389,10 +388,9 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   </div>
   <div id="header-actions">
     <span id="admin-identite-badge" style="font-size:11px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px;white-space:nowrap;cursor:pointer" onclick="changerIdentite()" title="Changer d'identité"></span>
-    <span id="last-upd"></span>
     <button id="btn-theme" onclick="toggleTheme()" title="Basculer clair / sombre" style="background:rgba(255,255,255,.15)"></button>
     <button id="btn-export" onclick="exportExcel()">📥 Excel</button>
-    <button id="btn-refresh" onclick="refreshAll()">🔄 Actualiser</button>
+    <button id="btn-refresh" onclick="refreshAll()" title="Actualiser">🔄 Actualiser</button>
   </div>
 </div>
 
@@ -402,29 +400,29 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div class="nav-item active" data-tab="vue-generale"><span class="nav-icon">📊</span><span class="nav-label">Vue générale</span></div>
 
   <div class="nav-group">INVENTAIRE</div>
-  <div class="nav-item" data-tab="circulation"><span class="nav-icon">🔄</span><span class="nav-label">En circulation</span><span class="nav-badge blue" id="nb-circ">—</span></div>
-  <div class="nav-item" data-tab="depot"><span class="nav-icon">🏭</span><span class="nav-label">Au dépôt</span><span class="nav-badge green" id="nb-depot">—</span></div>
+  <div class="nav-item" data-tab="circulation"><span class="nav-icon">🔄</span><span class="nav-label">En circulation</span><span class="nav-badge blue" id="nb-circ"></span></div>
+  <div class="nav-item" data-tab="depot"><span class="nav-icon">🏭</span><span class="nav-label">Au dépôt</span><span class="nav-badge green" id="nb-depot"></span></div>
   <div class="nav-item" data-tab="historique"><span class="nav-icon">📋</span><span class="nav-label">Historique</span></div>
   <div class="nav-item" data-tab="inventaire-stock"><span class="nav-icon">📦</span><span class="nav-label">Inventaire stock</span></div>
   <div class="nav-item" data-tab="inventaire-immos"><span class="nav-icon">📸</span><span class="nav-label">Inventaire immos (scan)</span></div>
 
   <div class="nav-group">LOGISTIQUE</div>
-  <div class="nav-item" data-tab="transferts"><span class="nav-icon">📦</span><span class="nav-label">Transferts</span><span class="nav-badge" id="nb-transf">—</span></div>
-  <div class="nav-item" data-tab="reservations"><span class="nav-icon">📅</span><span class="nav-label">Réservations</span><span class="nav-badge orange" id="nb-resa">—</span></div>
+  <div class="nav-item" data-tab="transferts"><span class="nav-icon">📦</span><span class="nav-label">Transferts</span><span class="nav-badge" id="nb-transf"></span></div>
+  <div class="nav-item" data-tab="reservations"><span class="nav-icon">📅</span><span class="nav-label">Réservations</span><span class="nav-badge orange" id="nb-resa"></span></div>
 
   <div class="nav-group">ÉQUIPEMENTS</div>
-  <div class="nav-item" data-tab="documents"><span class="nav-icon">📄</span><span class="nav-label">Documents FDS</span><span class="nav-badge orange" id="nb-docs">—</span></div>
-  <div class="nav-item" data-tab="maintenance"><span class="nav-icon">🔧</span><span class="nav-label">Maintenance</span><span class="nav-badge" id="nb-maint">—</span></div>
+  <div class="nav-item" data-tab="documents"><span class="nav-icon">📄</span><span class="nav-label">Documents FDS</span><span class="nav-badge orange" id="nb-docs"></span></div>
+  <div class="nav-item" data-tab="maintenance"><span class="nav-icon">🔧</span><span class="nav-label">Maintenance</span><span class="nav-badge" id="nb-maint"></span></div>
   <div class="nav-item" data-tab="materiel-it"><span class="nav-icon">📱</span><span class="nav-label">Matériel IT</span></div>
   <div class="nav-item" data-tab="brasseurs"><span class="nav-icon">🌀</span><span class="nav-label">Brasseurs d'air</span></div>
 
   <div class="nav-group">PERSONNEL</div>
-  <div class="nav-item" data-tab="absences"><span class="nav-icon">🧑‍💼</span><span class="nav-label">Absences</span><span class="nav-badge" id="nb-absences">—</span></div>
+  <div class="nav-item" data-tab="absences"><span class="nav-icon">🧑‍💼</span><span class="nav-label">Absences</span><span class="nav-badge" id="nb-absences"></span></div>
   <div class="nav-item" data-tab="epi"><span class="nav-icon">🦺</span><span class="nav-label">EPI</span></div>
   <div class="nav-item" data-tab="outillage"><span class="nav-icon">🧰</span><span class="nav-label">Prime d'outillage</span></div>
 
   <div class="nav-group">ANALYTICS</div>
-  <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
+  <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert"></span></div>
   <div class="nav-item" data-tab="analyses"><span class="nav-icon">📈</span><span class="nav-label">Analyses</span></div>
   <div class="nav-item" data-tab="codir"><span class="nav-icon">📋</span><span class="nav-label">Synthèse direction</span></div>
   <div class="nav-item" data-tab="utilisateurs"><span class="nav-icon">👥</span><span class="nav-label">Utilisateurs</span></div>
@@ -559,8 +557,8 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     <!-- Historique -->
     <div id="pane-historique" class="tab-pane">
       <div class="card"><div class="card-head"><h3>Historique des mouvements</h3><span class="card-cnt" id="cnt-hist"></span></div>
-        <div style="padding:12px;display:flex;gap:8px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap;align-items:center">
-          <input type="text" id="hist-q" style="flex:1;min-width:180px;padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:13px" placeholder="Code IM, numéro, nom...">
+        <div style="padding:12px;display:flex;gap:8px;border-bottom:1px solid var(--ds-border);flex-wrap:wrap;align-items:center">
+          <input type="text" id="hist-q" style="flex:1;min-width:180px;padding:8px 12px;border:2px solid var(--ds-border-strong);border-radius:8px;font-size:13px" placeholder="Code IM, numéro, nom...">
           <select id="hist-type" style="padding:8px 12px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px;background:var(--card,#fff);color:var(--ds-text,#222)">
             <option value="">Tous types</option>
             <option value="Transfert">🔄 Transferts</option>
@@ -590,7 +588,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     <div id="pane-transferts" class="tab-pane">
       <div class="card">
         <div class="card-head"><h3>Transferts en attente de validation</h3><span class="card-cnt" id="cnt-transf"></span></div>
-        <p style="padding:8px 18px;font-size:13px;color:var(--grey);border-bottom:1px solid #f0f0f0">Valider ici la réception d'un matériel depuis le dashboard, sans scanner.</p>
+        <p style="padding:8px 18px;font-size:13px;color:var(--grey);border-bottom:1px solid var(--ds-border)">Valider ici la réception d'un matériel depuis le dashboard, sans scanner.</p>
         <div style="padding:8px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="transf-site" onchange="setSiteFilter('transferts',this.value)" style="padding:7px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:13px"><option value="">🌍 Tous les sites</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select><button class="filter-btn" onclick="resetFiltresTransf()">🔄 Réinitialiser</button><button class="filter-btn" onclick="exporterTransferts()">📥 Export Excel</button></div>
         <div class="tbl-wrap"><table><thead><tr><th>Code IM</th><th>Libellé</th><th>Donneur</th><th>Receveur</th><th>État déclaré</th><th>Attente</th><th>Note</th><th>Action</th></tr></thead><tbody id="tb-transf"></tbody></table></div>
       </div>
@@ -1097,7 +1095,7 @@ function attacherRechercheEmploye(inputId,suggestId,candidats,onChoix){
     var qu=raw.toUpperCase();
     var matches=candidats.filter(function(e){return !qu||e.Code.toUpperCase().includes(qu)||(e.Nom||'').toUpperCase().includes(qu);}).slice(0,50);
     if(!matches.length){box.innerHTML='<div style="padding:8px 10px;font-size:12px;color:var(--grey)">Aucune correspondance.</div>';box.style.display='block';return;}
-    box.innerHTML=matches.map(function(e){return '<div class="emp-suggest-item" data-code="'+e.Code+'" data-nom="'+(e.Nom||e.Code).replace(/"/g,'&quot;')+'" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0"><b>'+e.Code+'</b> — '+(e.Nom||e.Code)+'</div>';}).join('');
+    box.innerHTML=matches.map(function(e){return '<div class="emp-suggest-item" data-code="'+e.Code+'" data-nom="'+(e.Nom||e.Code).replace(/"/g,'&quot;')+'" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--ds-border)"><b>'+e.Code+'</b> — '+(e.Nom||e.Code)+'</div>';}).join('');
     box.style.display='block';
   };
   input.oninput=maj;
@@ -1121,7 +1119,12 @@ function attacherRechercheEmploye(inputId,suggestId,candidats,onChoix){
 // ponctuelles EPI de groupe, "PONCTUEL-...") restent du texte brut, ce ne sont pas des employés.
 function lienEmpSiConnu(code,texteAffiche){
   var t=(texteAffiche!=null?texteAffiche:code)||'—';
-  if(code&&employesByCode[code])return '<span class="link-emp" data-emp="'+code+'" data-nom="'+String(t).replace(/"/g,'&quot;')+'">'+t+'</span>';
+  // Appelé avec le seul code (pas de texteAffiche) : c'est le code lui-même qui s'affiche, typiquement
+  // en doublon d'une colonne Nom juste à côté qui pointe vers la même fiche — le clic doit rester actif
+  // sur les deux (classe link-emp, délégation d'événement inchangée), mais seul le nom doit se lire
+  // comme un lien (voir .link-plain dans design-system.css, 12 août 2026).
+  var estCode=(texteAffiche==null);
+  if(code&&employesByCode[code])return '<span class="link-emp'+(estCode?' link-plain':'')+'" data-emp="'+code+'" data-nom="'+String(t).replace(/"/g,'&quot;')+'">'+t+'</span>';
   return t;
 }
 // Peut voir les données comptables (dates, comptes) sur les fiches : Admin, Gestionnaire Dépôt RUN (Logistique), Encadrement
@@ -1527,7 +1530,7 @@ async function loadAll(){
     renderVueGenerale();
     document.getElementById('loading-screen').style.display='none';
     document.getElementById('dash-content').style.display='block';
-    document.getElementById('last-upd').textContent='Actualisé '+fmtDT(new Date().toISOString());
+    document.getElementById('btn-refresh').title='Actualisé '+fmtDT(new Date().toISOString());
     // Charger réservations en arrière-plan
     loadReservations();
     // Charger les métadonnées immo (sites) en arrière-plan pour badges & filtres partout
@@ -1549,8 +1552,7 @@ async function loadReservations(){
 function updateBadgeAlertCount(){
   if(!d)return;
   var imminentes=(reservations||[]).filter(isImminenteSansReponse).length;
-  var el=document.getElementById('nb-alert');
-  if(el)el.textContent=(d.stats.alertes_delai+d.stats.hors_service+imminentes);
+  setNavBadge('nb-alert',d.stats.alertes_delai+d.stats.hors_service+imminentes);
 }
 
 async function loadDocs(){
@@ -1560,7 +1562,7 @@ async function loadDocs(){
     fdsMap=await fr.json(); photosMap=await pr.json();
     var sansFds=0;
     Object.keys(im).forEach(function(c){if(!getFdsUrl(c))sansFds++;});
-    document.getElementById('nb-docs').textContent=sansFds;
+    setNavBadge('nb-docs',sansFds);
     document.getElementById('docs-loading').style.display='none';
     document.getElementById('docs-content').style.display='block';
     renderDocs();
@@ -1573,7 +1575,7 @@ async function loadMaint(){
     var r=await fetch(W+'?maintenance=1');
     maintenance=await r.json();
     var n=((maintenance.maintenances_urgentes||[]).length+(maintenance.garanties_bientot||[]).length+(maintenance.garanties_expirees||[]).length);
-    document.getElementById('nb-maint').textContent=n;
+    setNavBadge('nb-maint',n);
     document.getElementById('maint-loading').style.display='none';
     document.getElementById('maint-content').style.display='block';
     renderMaint();
@@ -1589,7 +1591,7 @@ async function loadAbsences(){
     var r=await fetch(W+'?absences=1');
     absencesList=await r.json();
   }catch(e){absencesList=[];}
-  document.getElementById('nb-absences').textContent=absencesList.length;
+  setNavBadge('nb-absences',absencesList.length);
   renderAbsences();
 }
 function renderAbsences(){
@@ -1860,13 +1862,13 @@ function renderDetailCampagneInventaireImmos(nom){
   var html='<div class="card"><div class="card-head"><h3>📋 '+nom+'</h3>'+
     '<button onclick="exporterEcartsInventaireImmos(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export rapport (Excel)</button></div>';
   html+='<div style="display:flex;gap:12px;padding:12px 14px;flex-wrap:wrap">'+
-    '<div style="background:#E3F2FD;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--blue)">'+rap.totalScannees+' / '+rap.totalActives+'</div><div style="font-size:11px;color:var(--grey)">Immos vues ('+pct+'%)</div></div>'+
-    '<div style="background:'+(rap.manquantes.length?'#FBE9E7':'#E8F5E9')+';border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:'+(rap.manquantes.length?'var(--red)':'var(--green)')+'">'+rap.manquantes.length+'</div><div style="font-size:11px;color:var(--grey)">Manquantes (jamais scannées)</div></div>'+
-    '<div style="background:'+(rap.ecarts.length?'#FFF8E1':'#E8F5E9')+';border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:'+(rap.ecarts.length?'#E65100':'var(--green)')+'">'+rap.ecarts.length+'</div><div style="font-size:11px;color:var(--grey)">Écarts (mal localisées)</div></div>'+
-    '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)">'+rap.totalScans+'</div><div style="font-size:11px;color:var(--grey)">Scan(s) au total</div></div>'+
+    '<div style="background:var(--ds-info-bg);border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--blue)">'+rap.totalScannees+' / '+rap.totalActives+'</div><div style="font-size:11px;color:var(--grey)">Immos vues ('+pct+'%)</div></div>'+
+    '<div style="background:'+(rap.manquantes.length?'var(--ds-danger-bg)':'var(--ds-success-bg)')+';border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:'+(rap.manquantes.length?'var(--red)':'var(--green)')+'">'+rap.manquantes.length+'</div><div style="font-size:11px;color:var(--grey)">Manquantes (jamais scannées)</div></div>'+
+    '<div style="background:'+(rap.ecarts.length?'var(--ds-warning-bg)':'var(--ds-success-bg)')+';border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:'+(rap.ecarts.length?'var(--ds-warning-dark)':'var(--green)')+'">'+rap.ecarts.length+'</div><div style="font-size:11px;color:var(--grey)">Écarts (mal localisées)</div></div>'+
+    '<div style="background:var(--ds-neutral-100);border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)">'+rap.totalScans+'</div><div style="font-size:11px;color:var(--grey)">Scan(s) au total</div></div>'+
   '</div>';
   if(rap.ecarts.length){
-    html+='<div style="padding:0 14px"><h4 style="font-size:12px;color:#E65100;margin-bottom:6px">⚠️ Écarts</h4><div class="tbl-wrap"><table><thead><tr><th>Immo</th><th>Motif</th><th>Scannée par</th><th>Le</th></tr></thead><tbody>'+
+    html+='<div style="padding:0 14px"><h4 style="font-size:12px;color:var(--ds-warning-dark);margin-bottom:6px">⚠️ Écarts</h4><div class="tbl-wrap"><table><thead><tr><th>Immo</th><th>Motif</th><th>Scannée par</th><th>Le</th></tr></thead><tbody>'+
       rap.ecarts.map(function(e){return '<tr class="warn-row"><td>'+lienImSiConnu(e.code)+' '+getLib(e.code)+'</td><td style="font-size:12px">'+e.motif+'</td><td style="font-size:11px;color:var(--grey)">'+nomEmploye(e.scan.code_employe)+'</td><td style="font-size:11px;color:var(--grey)">'+fmtDT(e.scan.horodatage)+'</td></tr>';}).join('')+
     '</tbody></table></div></div>';
   }
@@ -1921,8 +1923,8 @@ function renderDetailCampagneInventaire(nom){
   var html='<div class="card"><div class="card-head"><h3>📋 '+nom+'</h3>'+
     '<button onclick="exporterEtatStockInventaire(\''+nom.replace(/'/g,"\\'")+'\')" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⬇ Export état du stock (Excel)</button></div>';
   html+='<div style="display:flex;gap:12px;padding:12px 14px;flex-wrap:wrap">'+
-    '<div style="background:#E3F2FD;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--blue)">'+lignes.length+'</div><div style="font-size:11px;color:var(--grey)">Ligne(s) saisie(s)</div></div>'+
-    '<div style="background:#ECEFF1;border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)" id="inv-tile-sansref">—</div><div style="font-size:11px;color:var(--grey)">Sans référence</div></div>'+
+    '<div style="background:var(--ds-info-bg);border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--blue)">'+lignes.length+'</div><div style="font-size:11px;color:var(--grey)">Ligne(s) saisie(s)</div></div>'+
+    '<div style="background:var(--ds-neutral-100);border-radius:8px;padding:10px 14px"><div style="font-size:20px;font-weight:800;color:var(--grey)" id="inv-tile-sansref">—</div><div style="font-size:11px;color:var(--grey)">Sans référence</div></div>'+
   '</div>';
   html+='<div class="filters" style="padding:0 14px 12px">'+
     '<input type="text" id="inv-stock-q" value="'+(f.q||'').replace(/"/g,'&quot;')+'" oninput="appliquerFiltresInvStock()" placeholder="Référence, désignation, zone, chantier, fabricant..." style="flex:1;min-width:180px">'+
@@ -2302,7 +2304,7 @@ function afficherPreviewImportEPI(matches,nonTrouves){
     (nonTrouves.length?' <span style="color:var(--red)">⚠️ '+nonTrouves.length+' référence(s) non trouvée(s) dans le catalogue</span> (ignorées).':'')+'</p>'+
     (nonTrouves.length?'<p style="font-size:11px;color:var(--grey);margin-bottom:10px">Non trouvées : '+nonTrouves.slice(0,20).join(', ')+(nonTrouves.length>20?'…':'')+'</p>':'')+
     '<div class="tbl-wrap" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Référence</th><th>Type</th><th>Taille</th><th>Ancien stock</th><th>Nouveau stock</th></tr></thead><tbody>'+
-    matches.map(function(m){var chg=m.ancien!==m.nouveau;return '<tr'+(chg?' style="background:#FFF8E1"':'')+'><td style="font-size:11px">'+m.reference+'</td><td>'+m.type_article+'</td><td>'+m.taille+'</td><td>'+m.ancien+'</td><td style="font-weight:700;color:'+(chg?'var(--orange)':'var(--grey)')+'">'+m.nouveau+'</td></tr>';}).join('')+
+    matches.map(function(m){var chg=m.ancien!==m.nouveau;return '<tr'+(chg?' style="background:var(--ds-warning-bg)"':'')+'><td style="font-size:11px">'+m.reference+'</td><td>'+m.type_article+'</td><td>'+m.taille+'</td><td>'+m.ancien+'</td><td style="font-weight:700;color:'+(chg?'var(--orange)':'var(--grey)')+'">'+m.nouveau+'</td></tr>';}).join('')+
     '</tbody></table></div>'+
     '<div style="display:flex;gap:8px;margin-top:14px"><button onclick="confirmerImportEPI()" style="padding:8px 18px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Confirmer l\'import ('+matches.length+' article'+(matches.length>1?'s':'')+')</button>'+
     '<button onclick="document.getElementById(\'epi-import-preview\').innerHTML=\'\'" style="padding:8px 18px;background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);border:none;border-radius:8px;cursor:pointer">Annuler</button></div>'+
@@ -2700,7 +2702,7 @@ function epiOuvrirDetailPonctuelles(code,annee){
   document.getElementById('add-titre').textContent='✋ Remises ponctuelles — '+code+' — '+annee;
   document.getElementById('add-msg').textContent='';
   document.getElementById('add-form').innerHTML=ponct.length?ponct.map(function(dd){
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">'+
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--ds-border);font-size:13px">'+
       '<span>'+dateFr(dd.genere_le)+' — '+(dd.statut==='Emargee'?'✅ Émargée':'⏳ En attente')+'</span>'+
       '<span><a href="javascript:void(0)" onclick="voirFicheEPI(\''+dd.id+'\')" style="color:var(--blue)">Voir</a>'+
       (dd.statut==='Emargee'&&dd.photo_fiche?' · <a href="javascript:void(0)" onclick="voirPhotoFicheEPI(\''+dd.id+'\',\''+dd.photo_fiche.replace(/'/g,"\\'")+'\')" style="color:var(--green)">📷</a>':'')+
@@ -3439,7 +3441,7 @@ function outilOuvrirDetailAnnee(code,annee){
   document.getElementById('add-titre').textContent='🧰 Outils reçus — '+code+' — '+annee;
   document.getElementById('add-msg').textContent='';
   document.getElementById('add-form').innerHTML=lignes.length?lignes.map(function(l){
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px">'+
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--ds-border);font-size:13px">'+
       '<span>'+l.type_article+' — '+fmtD(l.date_remise)+'</span>'+
       (l.photo_fiche?'<a href="javascript:void(0)" onclick="voirPhotoFicheOutillage(\''+code+'\',\''+l.photo_fiche.replace(/'/g,"\\'")+'\')" style="color:var(--green)">📷 Fiche</a>':'<span style="color:var(--grey);font-size:11px">Sans preuve (import historique)</span>')+
       '</div>';
@@ -3950,13 +3952,22 @@ async function sauvegarderServiceOutillage(code){
 function refreshAll(){d=null;dataLoaded={};loadEmployes(true);loadAll();loadReservations();}
 
 // ── Badges ───────────────────────────────────────────────
+// Un badge sans texte (voir .nav-badge:empty dans design-system.css) ne s'affiche pas — couvre à la
+// fois le compte à 0 et l'état "pas encore chargé" (les onglets à chargement paresseux comme
+// Documents FDS/Maintenance/Absences n'avaient sinon aucun moyen de distinguer les deux d'un tiret
+// permanent, voir 04_HISTORIQUE_DECISIONS.md).
+function setNavBadge(id,count){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.textContent=count?count:'';
+}
 function updateBadges(){
   if(!d)return;
   var s=d.stats;
-  document.getElementById('nb-circ').textContent=s.en_circulation;
-  document.getElementById('nb-depot').textContent=s.au_depot;
-  document.getElementById('nb-transf').textContent=s.transferts_en_attente;
-  document.getElementById('nb-alert').textContent=s.alertes_delai+s.hors_service;
+  setNavBadge('nb-circ',s.en_circulation);
+  setNavBadge('nb-depot',s.au_depot);
+  setNavBadge('nb-transf',s.transferts_en_attente);
+  setNavBadge('nb-alert',s.alertes_delai+s.hors_service);
   // Bandeau alertes
   var items=[];
   if(s.hors_service>0)items.push({cls:'ab-red',txt:'🔴 '+s.hors_service+' hors service',tab:'alertes'});
@@ -3974,7 +3985,7 @@ function updateBadgesResa(){
   var retards=reservations.filter(function(r){return r.statut==='En retard';}).length;
   var imminentes=reservations.filter(isImminenteSansReponse).length;
   var actives=reservations.filter(function(r){return r.statut!=='Rendue'&&r.statut!=='Annulee';}).length;
-  document.getElementById('nb-resa').textContent=actives;
+  setNavBadge('nb-resa',actives);
   var banner=document.getElementById('action-banner');
   var abItems=document.getElementById('ab-items');
   // Réinitialiser les chips résa existants pour éviter les doublons au refresh
@@ -4090,7 +4101,7 @@ function renderCirc(){
   if(!sorted.length){div.innerHTML='<p class="es">Aucun résultat.</p>';return;}
   div.innerHTML=sorted.map(function(g){
     return '<div class="det-card"><div class="det-nom"><span class="link-emp" data-emp="'+g.code+'" data-nom="'+g.nom.replace(/"/g,'')+'">'+g.nom+'</span><span><span class="det-cnt">'+g.list.length+'</span> <span style="font-size:10px;color:var(--grey)">'+g.code+'</span></span></div>'+
-      g.list.map(function(i){return'<div class="det-item"><span><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+' <span style="font-size:11px;color:#555">'+getLib(i.code_im)+'</span>'+(i.en_panne?' <span style="font-size:10px;font-weight:700;color:#E65100">📢 EN PANNE</span>':'')+'</span><span>'+ebadge(i.etat)+'</span></div>';}).join('')+'</div>';
+      g.list.map(function(i){return'<div class="det-item"><span><span class="link-im" data-cim="'+i.code_im+'" data-lib="'+getLib(i.code_im).replace(/"/g,'')+'">'+i.code_im+'</span>'+drapImmoDash(i.code_im)+' <span style="font-size:11px;color:var(--ds-text-muted)">'+getLib(i.code_im)+'</span>'+(i.en_panne?' <span style="font-size:10px;font-weight:700;color:var(--ds-warning-dark)">📢 EN PANNE</span>':'')+'</span><span>'+ebadge(i.etat)+'</span></div>';}).join('')+'</div>';
   }).join('');
 }
 
@@ -4148,7 +4159,7 @@ function renderDepot(){
       '<button onclick="depotChangerPage(1)" class="filter-btn" style="padding:6px 14px"'+(depotPage>=totalPages-1?' disabled':'')+'>Suivant ▶</button>';
   }
   var toggleEl=document.getElementById('depot-admin-toggle');
-  if(toggleEl){toggleEl.innerHTML=nbAdminDepot>0?'<button onclick="toggleAdminImmos(\'depot\')" style="padding:5px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:12px;background:'+(SHOW_ADMIN.depot?'#FFF3E0':'#fff')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.depot?'➖ Masquer':'➕ Afficher')+' les '+nbAdminDepot+' immos hors activité (mobilier, informatique, véhicules, financières…)</button>':'';}
+  if(toggleEl){toggleEl.innerHTML=nbAdminDepot>0?'<button onclick="toggleAdminImmos(\'depot\')" style="padding:5px 12px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:12px;background:'+(SHOW_ADMIN.depot?'var(--ds-warning-bg)':'var(--card)')+';cursor:pointer;color:var(--grey)">'+(SHOW_ADMIN.depot?'➖ Masquer':'➕ Afficher')+' les '+nbAdminDepot+' immos hors activité (mobilier, informatique, véhicules, financières…)</button>':'';}
   tbEl.innerHTML=affiche.length===0?'<tr><td colspan="8" class="es">Aucun résultat.</td></tr>':
     affiche.map(function(i){
       var l=getLib(i.code_im);var c=getCat(i.code_im);
@@ -4458,7 +4469,7 @@ function renderMaterielITDetail(){
       '<div><b style="font-size:11px;color:var(--grey)">COÛT MENSUEL</b><div>'+(m.cout_mensuel?nbFr(m.cout_mensuel)+'€':'—')+'</div></div>'+
     '</div>';
   if(m.n_telephone||m.n_carte_sim||m.type_materiel==='Téléphone'){
-    html+='<div style="padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;border-top:1px solid #f0f0f0;padding-top:14px">'+
+    html+='<div style="padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;border-top:1px solid var(--ds-border);padding-top:14px">'+
       '<div><b style="font-size:11px;color:var(--grey)">N° TÉLÉPHONE</b><div>'+(m.n_telephone||'—')+'</div></div>'+
       '<div><b style="font-size:11px;color:var(--grey)">OPÉRATEUR</b><div>'+(m.operateur||'—')+'</div></div>'+
       '<div><b style="font-size:11px;color:var(--grey)">N° CARTE SIM</b><div style="font-size:11px">'+(m.n_carte_sim||'—')+'</div></div>'+
@@ -5138,7 +5149,7 @@ function renderTransferts(){
     html+='<td><span class="link-im" data-cim="'+t.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+t.code_im+'</span>'+drapImmoDash(t.code_im)+'</td>';
     html+='<td style="font-size:12px">'+l+'</td>';
     html+='<td><span class="link-emp" data-emp="'+t.donneur_code+'" data-nom="'+t.donneur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.donneur_nom+'</b></span></td>';
-    html+='<td>'+(estRetour?'<span class="badge" style="background:#E3F2FD;color:#0D47A1;font-weight:700">📥 Retour dépôt</span>':'<span class="link-emp" data-emp="'+t.receveur_code+'" data-nom="'+t.receveur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.receveur_nom+'</b></span>')+'</td>';
+    html+='<td>'+(estRetour?'<span class="badge" style="background:var(--ds-info-bg);color:var(--ds-info-dark);font-weight:700">📥 Retour dépôt</span>':'<span class="link-emp" data-emp="'+t.receveur_code+'" data-nom="'+t.receveur_nom.replace(/"/g,'')+'"><b style="font-size:12px">'+t.receveur_nom+'</b></span>')+'</td>';
     html+='<td>'+ebadge(t.etat||'Inconnu')+'</td>';
     html+='<td><span class="badge '+(ret?'bret':'batt')+'">'+h+'h</span></td>';
     html+='<td style="font-size:11px;color:var(--grey)">'+(t.note||'—')+photosMouvBadge(t.code_im,t.photos)+'</td>';
@@ -5148,8 +5159,8 @@ function renderTransferts(){
     html+='<option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option>';
     html+='</select><br>';
     html+='<button class="btn-val-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">✅ Valider</button>';
-    html+='<button class="btn-ann-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" style="padding:4px 8px;background:#FFEBEE;color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">❌ Annuler</button>';
-    html+='<button class="btn-mod-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:#E3F2FD;color:var(--blue);border:1px solid var(--blue);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">✏️ Modifier</button>';
+    html+='<button class="btn-ann-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" style="padding:4px 8px;background:var(--ds-danger-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:2px">❌ Annuler</button>';
+    html+='<button class="btn-mod-t" data-tid="'+t.id+'" data-cim="'+t.code_im+'" data-rec="'+t.receveur_code+'" data-recnom="'+t.receveur_nom.replace(/"/g,'')+'" style="padding:4px 8px;background:var(--ds-info-bg);color:var(--blue);border:1px solid var(--blue);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">✏️ Modifier</button>';
     }else{
       html+='<span style="font-size:11px;color:var(--grey);font-style:italic">🔒 Validation réservée aux garants du dépôt</span>';
     }
@@ -5390,7 +5401,7 @@ function ouvrirAjoutReservation(){
     // déroulant classique — elle se filtre ensuite au fur et à mesure de la frappe.
     var matches=Object.keys(im).filter(function(c){return !code||c.includes(code)||(im[c].Libelle||'').toUpperCase().includes(code);}).slice(0,50);
     if(!matches.length){suggestBox.innerHTML='<div style="padding:8px 10px;font-size:12px;color:var(--grey)">Aucune correspondance.</div>';suggestBox.style.display='block';return;}
-    suggestBox.innerHTML=matches.map(function(c){return '<div class="ar-suggest-item" data-code="'+c+'" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0"><b>'+c+'</b> — '+(im[c].Libelle||'').replace(/</g,'&lt;')+'</div>';}).join('');
+    suggestBox.innerHTML=matches.map(function(c){return '<div class="ar-suggest-item" data-code="'+c+'" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--ds-border)"><b>'+c+'</b> — '+(im[c].Libelle||'').replace(/</g,'&lt;')+'</div>';}).join('');
     suggestBox.style.display='block';
   };
   document.getElementById('ar-code').oninput=checkCode;
@@ -5467,14 +5478,14 @@ function renderDocs(){
   if(f==='renseignees'||f==='')rows=rows.filter(function(r){return r.hasFds||r.hasPhotos;});
   rows.sort(function(a,b){return a.code_im.localeCompare(b.code_im);});
   var sansFds=rows.filter(function(r){return!r.hasFds;}).length;
-  document.getElementById('nb-docs').textContent=sansFds+' sans FDS';
+  setNavBadge('nb-docs',sansFds);
   document.getElementById('cnt-docs').textContent=rows.length+' immos';
   document.getElementById('tb-docs').innerHTML=rows.length===0?'<tr><td colspan="6" class="es">Aucune.</td></tr>':
     rows.map(function(r){var u=getFdsUrl(r.code_im);return'<tr style="'+(r.hasFds?'background:#F0FFF4':'')+'">'+'<td><span class="link-im" data-cim="'+r.code_im+'" data-lib="'+r.libelle.replace(/"/g,'')+'">'+r.code_im+'</span>'+drapImmoDash(r.code_im)+'</td>'+
       '<td style="font-size:12px">'+r.libelle+'</td>'+
       '<td style="font-size:11px;color:var(--grey)">'+r.categorie+'</td>'+
       '<td><span class="badge '+(r.statut==='En circulation'?'bb':'bn')+'">'+r.statut+'</span></td>'+
-      '<td>'+(r.hasFds?'<a href="'+u+'" target="_blank" style="color:#0D47A1;font-weight:700;font-size:12px">Voir FDS</a>':(estGarant(ADMIN_SESSION.code)?'<span onclick="ouvrirAjoutFDS(\''+r.code_im+'\')" style="color:var(--red);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">Manquante — ajouter</span>':'<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>'))+'</td>'+
+      '<td>'+(r.hasFds?'<a href="'+u+'" target="_blank" style="color:var(--ds-info-dark);font-weight:700;font-size:12px">Voir FDS</a>':(estGarant(ADMIN_SESSION.code)?'<span onclick="ouvrirAjoutFDS(\''+r.code_im+'\')" style="color:var(--red);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">Manquante — ajouter</span>':'<span style="color:var(--red);font-size:12px;font-weight:600">Manquante</span>'))+'</td>'+
       '<td>'+(r.hasPhotos?'<button onclick="ouvrirPhotosModal(\''+r.code_im+'\')" style="font-size:11px;padding:3px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Photos</button>':'<span style="font-size:11px;color:#ccc">—</span>')+'</td></tr>';}).join('');
 }
 
@@ -5588,9 +5599,9 @@ function renderMaint(){
   // Bandeau résumé
   var vncDormant=dormantes.reduce(function(s,x){return s+x.vnc;},0);
   var resume='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">'+
-    '<div style="flex:1;min-width:150px;background:#FFF8E1;border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:#F9A825">'+garanties.length+'</div><div style="font-size:12px;color:var(--grey)">garantie(s) expirant &lt; 6 mois</div></div>'+
-    '<div style="flex:1;min-width:150px;background:#FFEBEE;border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--red)">'+aEntretenir.length+'</div><div style="font-size:12px;color:var(--grey)">immo(s) à entretenir</div></div>'+
-    '<div style="flex:1;min-width:150px;background:#E8F5E9;border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--green)">'+dormantes.length+'</div><div style="font-size:12px;color:var(--grey)">dormante(s)'+(voitCompta&&vncDormant>0?' · VNC '+eur(vncDormant):'')+'</div></div>'+
+    '<div style="flex:1;min-width:150px;background:var(--ds-warning-bg);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:#F9A825">'+garanties.length+'</div><div style="font-size:12px;color:var(--grey)">garantie(s) expirant &lt; 6 mois</div></div>'+
+    '<div style="flex:1;min-width:150px;background:var(--ds-danger-bg);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--red)">'+aEntretenir.length+'</div><div style="font-size:12px;color:var(--grey)">immo(s) à entretenir</div></div>'+
+    '<div style="flex:1;min-width:150px;background:var(--ds-success-bg);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--green)">'+dormantes.length+'</div><div style="font-size:12px;color:var(--grey)">dormante(s)'+(voitCompta&&vncDormant>0?' · VNC '+eur(vncDormant):'')+'</div></div>'+
   '</div>';
 
   var html=resume;
@@ -5666,7 +5677,7 @@ function renderAlertes(){
         '<td><b style="color:'+(p.dureeJ>7?'var(--red)':'var(--orange)')+'">'+dureeStr+'</b><br><span style="font-size:10px;color:var(--grey)">'+fmtD(p.since)+'</span></td>'+
         '<td style="font-size:11px;color:var(--grey)">'+(p.note||'—')+'</td>'+
         '<td style="white-space:nowrap">'+
-          '<button class="btn-maj-p" data-cim="'+p.code_im+'" style="padding:4px 8px;background:#E3F2FD;color:#0D47A1;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:3px">✏️ Suivi</button>'+
+          '<button class="btn-maj-p" data-cim="'+p.code_im+'" style="padding:4px 8px;background:var(--ds-info-bg);color:var(--ds-info-dark);border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;margin-right:3px">✏️ Suivi</button>'+
           '<button class="btn-res-p" data-cim="'+p.code_im+'" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px">✅ Résoudre</button>'+
         '</td>';
       return row.outerHTML;
@@ -5721,7 +5732,7 @@ var FLAG_REUNION_D='<svg viewBox="0 0 60 40" width="18" height="12" style="borde
 var FLAG_MAYOTTE_D='<svg viewBox="0 0 60 40" width="18" height="12" style="border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.12)"><rect width="60" height="40" fill="#fff"/><path d="M19 8 H41 V21 Q41 31 30 35 Q19 31 19 21 Z" fill="#C1121F" stroke="#8a0d16" stroke-width="0.6"/><path d="M20.2 9.2 H39.8 V20.5 H20.2 Z" fill="#1E4F9E"/><path d="M27 15.5 a4 4 0 1 0 4.5 -3.2 a5 5 0 1 1 -4.5 3.2 Z" fill="#fff"/><g fill="#FFD100" stroke="#E8A200" stroke-width="0.3"><g transform="translate(26,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g><g transform="translate(34,27)"><circle r="1.1" fill="#C1121F"/><g fill="#FFD100"><ellipse cx="0" cy="-2.2" rx="0.9" ry="1.6"/><ellipse cx="2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(72 0 0)"/><ellipse cx="1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(144 0 0)"/><ellipse cx="-1.3" cy="1.8" rx="0.9" ry="1.6" transform="rotate(216 0 0)"/><ellipse cx="-2.1" cy="-0.7" rx="0.9" ry="1.6" transform="rotate(288 0 0)"/></g><circle r="0.9" fill="#C1121F"/></g></g></svg>';
 function normSiteD(v){var s=(v||'').trim().toLowerCase();return s.indexOf('may')===0?'Mayotte':'Reunion';}
 function drapeauSiteD(site){return normSiteD(site)==='Mayotte'?FLAG_MAYOTTE_D:FLAG_REUNION_D;}
-function badgeSiteD(site){var s=normSiteD(site);var bg=s==='Mayotte'?'#E0F2F1':'#E3F2FD';var fg=s==='Mayotte'?'#00695C':'#0D47A1';var lbl=s==='Mayotte'?'MAYOTTE':'RÉUNION';return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:'+bg+';color:'+fg+';vertical-align:middle">'+drapeauSiteD(s)+' '+lbl+'</span>';}
+function badgeSiteD(site){var s=normSiteD(site);var bg=s==='Mayotte'?'#E0F2F1':'var(--ds-info-bg)';var fg=s==='Mayotte'?'#00695C':'var(--ds-info-dark)';var lbl=s==='Mayotte'?'MAYOTTE':'RÉUNION';return '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:'+bg+';color:'+fg+';vertical-align:middle">'+drapeauSiteD(s)+' '+lbl+'</span>';}
 // Site d'une immo (depuis immoMeta chargé, défaut Reunion)
 function siteImmoDash(codeIM){return normSiteD(immoMeta[codeIM]&&immoMeta[codeIM].site);}
 // Une demande de réservation sans immo précise (catégorie) n'a pas de site propre à lire dans
@@ -6017,7 +6028,7 @@ function renderUsers(){
   html+='</div>';
 
   // Barre d'info sur la future gestion des droits
-  html+='<div style="background:#E8F5E9;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:#1B5E20"><strong>✅ Gestion des droits & sites active.</strong> Le <strong>rôle</strong> détermine qui peut réserver et sur quel périmètre. Le <strong>site</strong> définit le rattachement : un CT ne voit que le matériel de son île ; Admin, gestionnaires, RA, CT et ouvriers spécialisés accèdent aux deux.</div>';
+  html+='<div style="background:var(--ds-success-bg);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--ds-success-dark)"><strong>✅ Gestion des droits & sites active.</strong> Le <strong>rôle</strong> détermine qui peut réserver et sur quel périmètre. Le <strong>site</strong> définit le rattachement : un CT ne voit que le matériel de son île ; Admin, gestionnaires, RA, CT et ouvriers spécialisés accèdent aux deux.</div>';
   if(ADMIN_SESSION.code&&estAdmin(ADMIN_SESSION.code)){
     // Boutons d'ajout (mis en avant)
     html+='<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">'+
@@ -6025,7 +6036,7 @@ function renderUsers(){
       '<button onclick="ouvrirAjoutEmploye()" style="padding:11px 18px;background:#00695C;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px">➕ Ajouter un employé</button>'+
     '</div>';
     // Outils de maintenance (repliés — usage ponctuel)
-    html+='<details style="margin-bottom:16px"><summary style="cursor:pointer;font-size:13px;color:#8D6E00;background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:10px 16px;font-weight:700">⚙️ Outils de maintenance avancés (réimport, doublons…)</summary>'+
+    html+='<details style="margin-bottom:16px"><summary style="cursor:pointer;font-size:13px;color:#8D6E00;background:var(--ds-warning-bg);border:1px solid #FFE082;border-radius:10px;padding:10px 16px;font-weight:700">⚙️ Outils de maintenance avancés (réimport, doublons…)</summary>'+
       '<div style="background:#FFFDF5;border:1px solid #FFE082;border-top:none;border-radius:0 0 10px 10px;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
       '<span style="flex:1;min-width:200px;color:#8D6E00;font-size:12px">Actions ponctuelles : à utiliser seulement après un réimport de données.</span>'+
       '<button onclick="lancerSeedRolesSites()" style="padding:8px 14px;background:#F57F17;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">Rôles & sites employés</button>'+
@@ -6036,7 +6047,7 @@ function renderUsers(){
         EXPORTABLE_LISTS.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')+
       '</select>'+
       '<button onclick="exporterListeSauvegarde()" style="padding:8px 14px;background:#2E7D32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">💾 Exporter une liste (sauvegarde)</button>'+
-      '<button onclick="sauvegardeComplete()" style="padding:8px 14px;background:#1B5E20;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">🗄️ Sauvegarde complète (toutes les listes)</button>'+
+      '<button onclick="sauvegardeComplete()" style="padding:8px 14px;background:var(--ds-success-dark);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:12px">🗄️ Sauvegarde complète (toutes les listes)</button>'+
       '<div id="ebp-statut" style="flex-basis:100%;font-size:12px;color:var(--grey);margin-top:6px"></div>'+
       '</div></details>';
   }
@@ -6094,8 +6105,8 @@ function filterUsers(){
       '<td style="font-family:monospace;font-size:12px;color:var(--grey)">'+u.code+'</td>'+
       '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:'+u.color+'22;color:'+u.color+'">'+u.role+'</span>'+(u.explicite?'':' <span style="font-size:9px;color:#bbb" title="Rôle déduit automatiquement">(auto)</span>')+'</td>'+
       '<td>'+badgeSiteD(u.site)+'<select class="site-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="display:block;margin-top:3px;font-size:10px;padding:2px 4px;border:1px solid var(--ds-border,#eee);border-radius:5px;background:var(--card,#fff);color:var(--ds-text,#222)">'+siteOpts+'</select></td>'+
-      '<td style="text-align:center"><button class="actif-toggle" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" data-actif="'+(u.actif?'1':'0')+'" style="border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;background:'+(u.actif?'var(--ds-success-bg,#E8F5E9)':'var(--ds-danger-bg,#FFEBEE)')+';color:'+(u.actif?'var(--ds-success-dark,#1B5E20)':'var(--ds-danger-dark,#B71C1C)')+'">'+(u.actif?'✓ Actif':'✕ Inactif')+'</button></td>'+
-      '<td style="text-align:center">'+(u.hasPwd?'<span title="Mot de passe défini" style="color:#1B5E20;font-size:13px">🔒 Défini</span><br><button class="pwd-reset" data-code="'+u.code+'" style="margin-top:3px;border:none;background:#FFF3E0;color:#E65100;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">Réinitialiser</button>':'<span title="Aucun mot de passe" style="color:#B71C1C;font-size:12px">🔓 Non défini</span>')+'</td>'+
+      '<td style="text-align:center"><button class="actif-toggle" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" data-actif="'+(u.actif?'1':'0')+'" style="border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;background:'+(u.actif?'var(--ds-success-bg)':'var(--ds-danger-bg)')+';color:'+(u.actif?'var(--ds-success-dark)':'var(--ds-danger-dark)')+'">'+(u.actif?'✓ Actif':'✕ Inactif')+'</button></td>'+
+      '<td style="text-align:center">'+(u.hasPwd?'<span title="Mot de passe défini" style="color:var(--ds-success-dark);font-size:13px">🔒 Défini</span><br><button class="pwd-reset" data-code="'+u.code+'" style="margin-top:3px;border:none;background:var(--ds-warning-bg);color:var(--ds-warning-dark);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">Réinitialiser</button>':'<span title="Aucun mot de passe" style="color:var(--ds-danger-dark);font-size:12px">🔓 Non défini</span>')+'</td>'+
       '<td style="text-align:center">'+(u.nb>0?'<b style="color:var(--orange)">'+u.nb+'</b>':'<span style="color:#ccc">0</span>')+'</td>'+
       '<td><select class="role-edit-sel" data-code="'+u.code+'" data-item="'+(u.itemId||'')+'" style="font-size:11px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px">'+opts+'</select></td>'+
     '</tr>';
@@ -6427,7 +6438,7 @@ function renderAnalyse(){
     candidats.push({code_im:code,libelle:getLib(code),nb_pannes:nbPannes,val_achat:r.valAchat,vnc:r.vnc,vnc_epuisee:r.vncEpuisee,cout_rep:r.coutTotal,ratio_achat:r.ratioAchat,ratio_vnc:r.ratioVNC,age_mois:ageMois,cout_mensuel:coutMensuel,raison:raison,alerte:alerte});
   });
   candidats.sort(function(a,b){return (b.alerte?1:0)-(a.alerte?1:0)||b.ratio_vnc-a.ratio_vnc||b.ratio_achat-a.ratio_achat||b.nb_pannes-a.nb_pannes;});
-  html+='<div class="card" style="border-top:3px solid #B71C1C"><div class="card-head"><h3>🚨 Candidats à la réforme</h3>'+
+  html+='<div class="card" style="border-top:3px solid var(--ds-danger-dark)"><div class="card-head"><h3>🚨 Candidats à la réforme</h3>'+
     '<label style="font-size:12px;color:var(--grey)">Seuil : <select onchange="setSeuilReforme(this.value)" style="padding:6px 8px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;font-size:12px">'+
     '<option value="40"'+(SEUIL_REFORME_PCT===40?' selected':'')+'>40%</option>'+
     '<option value="60"'+(SEUIL_REFORME_PCT===60?' selected':'')+'>60%</option>'+
@@ -6710,7 +6721,7 @@ function renderCodir(){
   var html='';
   html+='<div id="codir-print-header" style="display:none">'+
     '<h2 style="margin:0 0 4px">📋 Synthèse direction — Immo Tracker</h2>'+
-    '<p style="margin:0 0 14px;font-size:12px;color:#555">Electricité Services Réunion — Généré le '+fmtDT(new Date().toISOString())+' — Territoire : '+(fs?territoireLabel(fs):'La Réunion + Mayotte')+'</p></div>';
+    '<p style="margin:0 0 14px;font-size:12px;color:var(--ds-text-muted)">Electricité Services Réunion — Généré le '+fmtDT(new Date().toISOString())+' — Territoire : '+(fs?territoireLabel(fs):'La Réunion + Mayotte')+'</p></div>';
 
   html+='<div class="card"><div class="card-head"><h3>💰 Bloc 1 — Valeur du parc</h3></div><div style="padding:14px">';
   html+='<div class="kpi-grid" style="margin-bottom:12px">';
@@ -6879,8 +6890,8 @@ async function chargerFicheImmo(codeIM){
     var siteImmoF=(immoMeta[codeIM]&&immoMeta[codeIM].site)||'Reunion';
     var drapImmoF=' '+badgeSiteD(siteImmoF);
     if(prestaF) locHtml='<div class="loc-card" style="background:#F3E5F5;color:#6A1B9A">🔧 Chez le prestataire : <strong>'+prestaF+'</strong>'+drapImmoF+'</div>';
-    else if(estDepot) locHtml='<div class="loc-card" style="background:#E8F5E9;color:#1B5E20">🏭 Au dépôt'+drapImmoF+panneTagF+'</div>';
-    else locHtml='<div class="loc-card" style="background:#FFF3E0;color:#E65100">👤 Avec <strong>'+loc.nom_employe+'</strong> depuis le '+fmtD(loc.horodatage)+drapImmoF+panneTagF+'</div>';
+    else if(estDepot) locHtml='<div class="loc-card" style="background:var(--ds-success-bg);color:var(--ds-success-dark)">🏭 Au dépôt'+drapImmoF+panneTagF+'</div>';
+    else locHtml='<div class="loc-card" style="background:var(--ds-warning-bg);color:var(--ds-warning-dark)">👤 Avec <strong>'+loc.nom_employe+'</strong> depuis le '+fmtD(loc.horodatage)+drapImmoF+panneTagF+'</div>';
     var nbDet=new Set(hist.filter(function(m){return m.type_mouvement!=='Retour';}).map(function(m){return m.code_employe;})).size;
     var mt2=immoMeta[codeIM]||{};
     var html='<div class="fiche-stat-row">';
@@ -6891,15 +6902,15 @@ async function chargerFicheImmo(codeIM){
     // Valeur et date d'achat
     if(mt2.valeur_achat||mt2.date_achat){
       html+='<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">';
-      if(mt2.valeur_achat)html+='<div style="background:#E8F5E9;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Valeur d achat :</span> <strong style="color:var(--green)">'+mt2.valeur_achat.toLocaleString('fr-FR')+'€</strong></div>';
-      if(mt2.date_achat)html+='<div style="background:#E3F2FD;border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Date d achat :</span> <strong style="color:var(--blue)">'+fmtD(mt2.date_achat)+'</strong></div>';
+      if(mt2.valeur_achat)html+='<div style="background:var(--ds-success-bg);border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Valeur d achat :</span> <strong style="color:var(--green)">'+mt2.valeur_achat.toLocaleString('fr-FR')+'€</strong></div>';
+      if(mt2.date_achat)html+='<div style="background:var(--ds-info-bg);border-radius:8px;padding:8px 14px;font-size:13px"><span style="color:var(--grey)">Date d achat :</span> <strong style="color:var(--blue)">'+fmtD(mt2.date_achat)+'</strong></div>';
       // Coût réparations cumulé + double ratio (valeur d'achat et VNC) + alerte seuil de réforme
       var rF=ratiosReforme(codeIM,d.all_movements||[]);
       if(rF.coutTotal>0){
         var alerteF=franchitSeuilReforme(rF);
         var vncTxt=rF.vncEpuisee?'VNC épuisée':(rF.vnc>0?rF.ratioVNC+'% VNC':'—');
         var ratioColorF=alerteF?'var(--red)':((rF.ratioAchat>=SEUIL_REFORME_PCT*0.66||rF.ratioVNC>=SEUIL_REFORME_PCT*0.66)?'var(--orange)':'var(--green)');
-        html+='<div style="background:#FFF3E0;border-radius:8px;padding:8px 14px;font-size:13px">'+
+        html+='<div style="background:var(--ds-warning-bg);border-radius:8px;padding:8px 14px;font-size:13px">'+
           '<span style="color:var(--grey)">Coût réparations :</span> <strong style="color:'+ratioColorF+'">'+rF.coutTotal.toFixed(0)+'€ ('+rF.ratioAchat+'% achat · '+vncTxt+')</strong>'+
           (alerteF?'<br><span style="font-size:11px;font-weight:700;color:var(--red)">🚨 Seuil de réforme atteint ('+SEUIL_REFORME_PCT+'%) — proposer une mise en cession/réforme.</span>':'')+
           '</div>';
@@ -6941,7 +6952,7 @@ async function chargerFicheImmo(codeIM){
           '<div style="margin-top:8px;height:8px;background:#E0E0E0;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+vncColor+'"></div></div>'+
         '</div>';
       }else{
-        html+='<div style="background:#F5F5F5;border-radius:8px;padding:8px 14px;font-size:12px;color:var(--grey);margin-bottom:12px">Immobilisation non amortissable (caution — compte '+((immoMeta[codeIM]||{}).compte_amort||'?')+')</div>';
+        html+='<div style="background:var(--ds-neutral-100);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--grey);margin-bottom:12px">Immobilisation non amortissable (caution — compte '+((immoMeta[codeIM]||{}).compte_amort||'?')+')</div>';
       }
     }
     html+=locHtml;
@@ -6959,7 +6970,7 @@ async function chargerFicheImmo(codeIM){
         if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
         else if(m.type_mouvement==='Retour'&&m.code_chantier&&m.code_chantier.indexOf('DEPOT|')===0){var vp=m.code_chantier.split('|');donneurCode=vp[1]||'';donneur=vp[2]||'—';estValidation=true;}
         var donneurCell=donneur==='—'?'—':(estValidation?'✅ <span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>':'<span class="link-emp" data-emp="'+donneurCode+'" data-nom="'+donneur.replace(/"/g,'')+'">'+donneur+'</span>');
-        return '<tr style="border-bottom:1px solid #f0f0f0">'+
+        return '<tr style="border-bottom:1px solid var(--ds-border)">'+
           '<td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
           '<td>'+(m.type_mouvement==='Retour'?'📥':'🔄')+' '+m.type_mouvement+'</td>'+
           '<td><span class="link-emp" data-emp="'+m.code_employe+'" data-nom="'+m.nom_employe.replace(/"/g,'')+'">'+m.nom_employe+'</span></td>'+
@@ -6977,15 +6988,15 @@ async function chargerFicheImmo(codeIM){
       var btnRet=document.createElement('button');btnRet.className='fiche-btn green';btnRet.textContent='📥 Créer un retour';(function(_c,_l){btnRet.onclick=function(){fermerFiche();ouvrirActionMouvement('Retour',_c,_l,'','');};})(codeIM,l);actDiv.appendChild(btnRet);
       var btnTr=document.createElement('button');btnTr.className='fiche-btn blue';btnTr.textContent='🔄 Transférer';(function(_c,_l){btnTr.onclick=function(){fermerFiche();ouvrirActionMouvement('Transfert',_c,_l,'','');};})(codeIM,l);actDiv.appendChild(btnTr);
       // Bouton panne
-      var panneBtn2=document.createElement('button');panneBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#FFF3E0;color:#E65100;border:2px solid #E65100';
+      var panneBtn2=document.createElement('button');panneBtn2.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:var(--ds-warning-bg);color:var(--ds-warning-dark);border:2px solid var(--ds-warning-dark)';
       var estEnPanneDash=(hist.length>0&&hist[0].type_mouvement==='Panne');
       panneBtn2.textContent=estEnPanneDash?'✅ Résoudre la panne':'📢 Déclarer une panne';
       (function(_c,_ep){panneBtn2.onclick=function(){if(_ep)resoudrePanneComplet(_c);else declarerPanneDash(_c);};})(codeIM,estEnPanneDash);actDiv.appendChild(panneBtn2);
       // Bouton réparation/entretien indépendant d'une panne (coût structuré, sans passer par le circuit panne)
-      var repBtn2=document.createElement('button');repBtn2.style.cssText='padding:8px 14px;border:2px solid var(--blue);border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#E3F2FD;color:var(--blue)';repBtn2.textContent='🔧 Enregistrer réparation';
+      var repBtn2=document.createElement('button');repBtn2.style.cssText='padding:8px 14px;border:2px solid var(--blue);border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:var(--ds-info-bg);color:var(--blue)';repBtn2.textContent='🔧 Enregistrer réparation';
       (function(_c){repBtn2.onclick=function(){ouvrirEnregistrerReparation(_c);};})(codeIM);actDiv.appendChild(repBtn2);
       // Boutons HS / Perdu / Volé / Disparu
-      var sortieBtn=document.createElement('button');sortieBtn.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#B71C1C;color:#fff';sortieBtn.textContent='⛔ Sortie définitive';
+      var sortieBtn=document.createElement('button');sortieBtn.style.cssText='padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:var(--ds-danger-dark);color:#fff';sortieBtn.textContent='⛔ Sortie définitive';
       (function(_c,_l){sortieBtn.onclick=function(){ouvrirModalSortie(_c,_l);};})(codeIM,l);actDiv.appendChild(sortieBtn);
     }
   }catch(e){body.innerHTML='<p style="color:var(--red);padding:20px">Erreur : '+e.message+'</p>';}
@@ -7069,8 +7080,8 @@ async function chargerFicheEmploye(code,nom){
           (kitOutil.length>lignesOutil.length?' — <a href="javascript:void(0)" onclick="fermerFiche();goTab(\'outillage\');changerVueOutillage(\'distribution\');changerEmployeOutillage(\''+code+'\')" style="color:var(--orange)">compléter</a>':'')+'</p>';
         var empInactif=employesByCode[code]&&employesByCode[code].actif===false;
         if(lignesOutil.length&&canEditOutil){
-          html+='<div style="margin-top:8px;padding:10px 12px;background:'+(empInactif?'#FFF3E0':'#F4F6FA')+';border-radius:8px">'+
-            (empInactif?'<span style="font-size:11px;font-weight:700;color:#E65100">⏳ EN ATTENTE RETOUR FICHE DE SORTIE</span>':'<span style="font-size:11px;font-weight:700;color:var(--grey)">RETOUR DE MATÉRIEL</span>')+
+          html+='<div style="margin-top:8px;padding:10px 12px;background:'+(empInactif?'var(--ds-warning-bg)':'var(--ds-surface-alt)')+';border-radius:8px">'+
+            (empInactif?'<span style="font-size:11px;font-weight:700;color:var(--ds-warning-dark)">⏳ EN ATTENTE RETOUR FICHE DE SORTIE</span>':'<span style="font-size:11px;font-weight:700;color:var(--grey)">RETOUR DE MATÉRIEL</span>')+
             '<p style="font-size:11px;color:var(--grey);margin:4px 0 8px">Après remise en main propre du matériel, valide le retour ligne par ligne pour créditer le stock.</p>'+
             lignesOutil.map(function(l){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px"><span>'+l.type_article+'</span><button onclick="validerRetourOutillage(\''+l.id+'\',\''+code+'\')" style="padding:3px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">↩️ Retour en stock</button></div>';}).join('')+
             '</div>';
@@ -7087,11 +7098,11 @@ async function chargerFicheEmploye(code,nom){
     html+='</div><div class="fiche-actions" id="fiche-act-emp-'+code+'"></div>';
     html+='<h3 style="color:var(--blue);font-size:14px;margin-bottom:8px">En sa possession ('+actuel.length+')</h3>';
     if(!actuel.length)html+='<p style="color:var(--grey);font-size:13px;margin-bottom:14px">Aucun matériel.</p>';
-    else html+='<div style="margin-bottom:14px">'+actuel.map(function(m){var l=getLib(m.code_im);return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0"><span><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span> <span style="font-size:12px">'+l+'</span></span>'+ebadge(m.etat||'')+'</div>';}).join('')+'</div>';
+    else html+='<div style="margin-bottom:14px">'+actuel.map(function(m){var l=getLib(m.code_im);return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--ds-border)"><span><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span> <span style="font-size:12px">'+l+'</span></span>'+ebadge(m.etat||'')+'</div>';}).join('')+'</div>';
     html+='<h3 style="color:var(--blue);font-size:14px;margin-bottom:8px">Historique ('+Math.min(hist.length,80)+'</h3>';
     html+='<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Code IM</th><th>Libellé</th><th>Type</th><th>Donneur</th><th>État</th></tr></thead><tbody>'+
       hist.slice(0,80).map(function(m){var l=getLib(m.code_im);var donneur='—';var donneurCode='';if(m.type_mouvement==='Transfert'&&m.code_chantier&&m.code_chantier.includes('|')){var dp=m.code_chantier.split('|');donneurCode=dp[0]||'';donneur=dp[1]||'—';}
-        return'<tr style="border-bottom:1px solid #f0f0f0">'+
+        return'<tr style="border-bottom:1px solid var(--ds-border)">'+
           '<td style="font-size:11px;white-space:nowrap">'+fmtDT(m.horodatage)+'</td>'+
           '<td><span class="link-im" data-cim="'+m.code_im+'" data-lib="'+l.replace(/"/g,'')+'">'+m.code_im+'</span></td>'+
           '<td style="font-size:11px">'+l+'</td>'+
@@ -7971,12 +7982,12 @@ function ouvrirActionMouvement(type,codeIM,libIM,codeEmp,nomEmp){
   var immoOpts='<option value="">-- Sélectionner --</option>'+(d.inventory||[]).map(function(i){var l=getLib(i.code_im);return'<option value="'+i.code_im+'">'+i.code_im+' — '+l+'</option>';}).join('');
   var html='';
   html+='<div class="frow"><label>Immo</label>';
-  if(codeIM)html+='<input type="text" value="'+codeIM+' — '+libIM+'" readonly style="background:#F8FAFC">';
+  if(codeIM)html+='<input type="text" value="'+codeIM+' — '+libIM+'" readonly style="background:var(--ds-surface-alt)">';
   else html+='<select id="act-immo">'+immoOpts+'</select>';
   html+='</div>';
   if(type==='Transfert'){html+='<div class="frow"><label>Transférer à</label>';
-    if(codeEmp)html+='<input type="text" id="act-emp-fix" value="'+nomEmp+' ('+codeEmp+')" readonly style="background:#F8FAFC">';
-    else html+='<div style="position:relative"><input type="text" id="act-emp" autocomplete="off" placeholder="Tape un code ou un nom..." style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px">'+
+    if(codeEmp)html+='<input type="text" id="act-emp-fix" value="'+nomEmp+' ('+codeEmp+')" readonly style="background:var(--ds-surface-alt)">';
+    else html+='<div style="position:relative"><input type="text" id="act-emp" autocomplete="off" placeholder="Tape un code ou un nom..." style="width:100%;padding:10px;border:2px solid var(--ds-border-strong);border-radius:8px;font-size:14px">'+
       '<div id="act-emp-suggest" style="position:absolute;top:100%;left:0;right:0;background:var(--card,#fff);color:var(--ds-text,#222);border:1px solid var(--ds-border,#ddd);border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div>';
     html+='</div>';}
   html+='<div class="frow"><label>État</label><select id="act-etat"><option value="Bon état">✅ Bon état</option><option value="Neuf">⭐ Neuf</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option><option value="Hors service">🔴 Hors service</option></select></div>';
@@ -8260,9 +8271,9 @@ async function annulerTransfert(tid){
 function ouvrirModifTransfert(tid,cim,recCode,recNom){
   document.getElementById('act-titre').textContent='✏️ Modifier le transfert — '+getLib(cim);
   document.getElementById('act-form').innerHTML=
-    '<div class="frow"><label>Code IM</label><input type="text" value="'+cim+' — '+getLib(cim)+'" readonly style="background:#F8FAFC"></div>'+
+    '<div class="frow"><label>Code IM</label><input type="text" value="'+cim+' — '+getLib(cim)+'" readonly style="background:var(--ds-surface-alt)"></div>'+
     '<div class="frow"><label>Changer le receveur (optionnel)</label><div style="position:relative">'+
-      '<input type="text" id="mt-receveur" autocomplete="off" placeholder="Garder '+recNom+' — ou tape un code/nom pour changer" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px">'+
+      '<input type="text" id="mt-receveur" autocomplete="off" placeholder="Garder '+recNom+' — ou tape un code/nom pour changer" style="width:100%;padding:10px;border:2px solid var(--ds-border-strong);border-radius:8px;font-size:14px">'+
       '<div id="mt-receveur-suggest" style="position:absolute;top:100%;left:0;right:0;background:var(--card,#fff);color:var(--ds-text,#222);border:1px solid var(--ds-border,#ddd);border-radius:8px;max-height:220px;overflow:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none"></div></div></div>'+
     '<div class="frow"><label>Note</label><textarea id="mt-note" rows="2" placeholder="Motif de la modification..."></textarea></div>';
   document.getElementById('act-overlay').classList.add('open');
@@ -8283,7 +8294,7 @@ function ouvrirModifTransfert(tid,cim,recCode,recNom){
 function ouvrirSuiviPanne(codeIM){
   document.getElementById('act-titre').textContent = '✏️ Suivi panne — ' + getLib(codeIM);
   document.getElementById('act-form').innerHTML =
-    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:#F8FAFC"></div>' +
+    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:var(--ds-surface-alt)"></div>' +
     '<div class="frow"><label>Prestataire SAV</label><input type="text" id="sp-prest" placeholder="Nom du réparateur / atelier..."></div>' +
     '<p style="font-size:11px;color:#6A1B9A;background:#F3E5F5;border-radius:8px;padding:6px 10px;margin:-4px 0 8px">🔧 Renseigner le prestataire affichera "Chez le prestataire" comme localisation de l\'immo, le temps de la réparation.</p>' +
     '<div class="frow"><label>Coût estimé (€)</label><input type="number" id="sp-cout" placeholder="0" step="0.01"></div>' +
@@ -8306,7 +8317,7 @@ function ouvrirSuiviPanne(codeIM){
 function resoudrePanneComplet(codeIM){
   document.getElementById('act-titre').textContent = '✅ Résoudre la panne — ' + getLib(codeIM);
   document.getElementById('act-form').innerHTML =
-    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:#F8FAFC"></div>' +
+    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:var(--ds-surface-alt)"></div>' +
     '<div class="frow"><label>État après réparation</label><select id="rp-etat"><option value="Bon état">✅ Bon état</option><option value="Usé">🔶 Usé</option><option value="Abîmé">⚠️ Abîmé</option><option value="Neuf">⭐ Neuf</option></select></div>' +
     '<div class="frow"><label>Prestataire SAV</label><input type="text" id="rp-prest" placeholder="Nom du réparateur..."></div>' +
     '<div class="frow"><label>Coût réel de réparation (€)</label><input type="number" id="rp-cout" placeholder="0" step="0.01"></div>' +
@@ -8336,7 +8347,7 @@ function ouvrirEnregistrerReparation(codeIM){
   document.getElementById('act-titre').textContent = '🔧 Enregistrer une réparation/entretien — ' + getLib(codeIM);
   var today=new Date().toISOString().slice(0,10);
   document.getElementById('act-form').innerHTML =
-    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:#F8FAFC"></div>' +
+    '<div class="frow"><label>Code IM</label><input type="text" value="' + codeIM + '" readonly style="background:var(--ds-surface-alt)"></div>' +
     '<div class="frow"><label>Date de l\'intervention</label><input type="date" id="er-date" value="'+today+'"></div>' +
     '<div class="frow"><label>Prestataire</label><input type="text" id="er-prest" placeholder="Nom du réparateur/prestataire..."></div>' +
     '<div class="frow"><label>Coût (€) <span style="color:var(--red)">*</span></label><input type="number" id="er-cout" placeholder="0" step="0.01"></div>' +
@@ -8394,15 +8405,15 @@ function ouvrirModalSortie(codeIM,libelle){
   document.getElementById('act-titre').textContent='⛔ Sortie définitive — '+libelle;
   document.getElementById('act-form').innerHTML=
     '<div class="frow"><label>Raison de la sortie <span style="color:var(--red)">*</span></label>'+
-    '<select id="sd-type" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:4px">'+
+    '<select id="sd-type" style="width:100%;padding:10px 12px;border:2px solid var(--ds-border-strong);border-radius:8px;font-size:14px;margin-bottom:4px">'+
     '<option value="Hors service définitif">⚫ Hors service définitif (réparation impossible)</option>'+
     '<option value="Perdu">❌ Perdu</option>'+
     '<option value="Volé">🚨 Volé</option>'+
     '<option value="Disparu">🔍 Disparu / introuvable</option>'+
     '</select></div>'+
     '<div class="frow"><label>Justification détaillée <span style="color:var(--red)">*</span></label>'+
-    '<textarea id="sd-motif" rows="3" placeholder="Minimum 10 caractères obligatoires..." style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:14px"></textarea></div>'+
-    '<p style="font-size:12px;color:var(--red);font-weight:700;text-align:center;padding:8px;background:#FFEBEE;border-radius:8px">⚠️ Cette action est définitive et irréversible</p>';
+    '<textarea id="sd-motif" rows="3" placeholder="Minimum 10 caractères obligatoires..." style="width:100%;padding:10px;border:2px solid var(--ds-border-strong);border-radius:8px;font-size:14px"></textarea></div>'+
+    '<p style="font-size:12px;color:var(--red);font-weight:700;text-align:center;padding:8px;background:var(--ds-danger-bg);border-radius:8px">⚠️ Cette action est définitive et irréversible</p>';
   window._sdCim=codeIM;window._sdLib=libelle;
   document.getElementById('act-overlay').classList.add('open');
   var btn=document.getElementById('act-confirm-btn');

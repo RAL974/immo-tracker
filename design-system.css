@@ -91,8 +91,12 @@
   --ds-text-inverse:#FFFFFF;
   /* Zébrage des lignes de tableau (ajouté 11 août 2026, retour de William : contraste insuffisant
      avec --ds-surface-alt, trop proche du blanc) — token dédié plutôt que réutiliser
-     --ds-surface-alt, pour ne pas assombrir au passage les en-têtes/survols qui s'en servent aussi. */
-  --ds-zebra:#EDE7DC;
+     --ds-surface-alt, pour ne pas assombrir au passage les en-têtes/survols qui s'en servent aussi.
+     Adouci le 12 août 2026 (retour de William : la teinte chaude/dorée d'origine faisait "mur de
+     couleur" sur les tableaux) : simple surimpression neutre à faible opacité (~3% d'encre) plutôt
+     qu'un hex propre — s'adapte seule au thème (texte sombre en clair, clair en sombre) sans avoir à
+     recalibrer une valeur séparée par thème comme avant. */
+  --ds-zebra:rgba(18,21,27,.035);
   /* Barres de navigation (header/sidebar/bottom-nav) : couleur dédiée, distincte de --blue-chrome
      (dashboard.html) qui reste utilisé par les boutons d'action — demande explicite de William
      (11 août 2026) de faire tendre les barres de navigation vers le rose, avec une valeur propre à
@@ -178,10 +182,10 @@
      resté largement au-dessus du seuil AA malgré l'éclaircissement. */
   --ds-bg:#1D2128;
   --ds-surface:#262B34;
-  /* Zébrage plus marqué qu'avant (même retour que le mode clair) et barres de navigation en rose
-     sombre — cohérent avec la version claire de --ds-nav-bg ci-dessus, mais assez sombre pour rester
-     un mode sombre (l'inverse du rose vif du mode clair, pas un simple alias). */
-  --ds-zebra:#333A45;
+  /* Même logique de surimpression neutre que le mode clair (voir --ds-zebra dans :root), avec le
+     blanc plutôt que le noir comme encre — opacité légèrement plus élevée (~4.5%) car une surface
+     déjà sombre a besoin d'un contraste un peu plus marqué pour que le zébrage reste perceptible. */
+  --ds-zebra:rgba(255,255,255,.045);
   /* Éclaircie en même temps que la version claire ci-dessus (12 août 2026), pour le même besoin de
      lisibilité — reste nettement plus sombre que la version claire, cohérent avec le "miroir sombre"
      déjà en place sur le reste de la palette. */
@@ -343,3 +347,63 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
 .ds-sort-btn{position:relative;}
 .ds-sort-btn.ds-sort-active{background:var(--ds-accent)!important;color:var(--ds-accent-contrast)!important;}
 .ds-sort-btn .ds-sort-arrow{margin-left:4px;font-size:10px;}
+
+/* ============================================================================
+   Finition visuelle (12 août 2026) — tableaux, header, sidebar, mode sombre.
+   Voir 04_HISTORIQUE_DECISIONS.md pour le détail de chaque point.
+   ============================================================================ */
+
+/* ── Colonnes de statut/badge bornées ── dans un tableau à mise en page
+   automatique étiré à 100% (table{width:100%} dans dashboard.html), une cellule
+   ne contenant qu'un badge/statut recevait sa propre part de l'espace excédentaire
+   au même titre que les colonnes de texte libre voisines — l'écartant visuellement
+   du contenu auquel elle se rapporte (cas témoin : Historique EPI, où NOM et
+   DOTATION doivent rester visuellement associés). width:1%;white-space:nowrap sur
+   ces cellules force le navigateur à ne leur donner que le strict nécessaire ; le
+   surplus va aux colonnes de texte libre adjacentes, qui l'absorbent mieux
+   (texte aligné à gauche) qu'un badge centré perdu au milieu d'une large cellule. */
+.tbl-wrap td:has(> .badge),
+.tbl-wrap td:has(> a.badge){width:1%;white-space:nowrap;}
+
+/* ── Chiffres alignés dans les tableaux (montants, quantités, dates) ── */
+.tbl-wrap td{font-variant-numeric:tabular-nums;}
+
+/* ── Liens cliquables dans les tableaux — cas à deux liens vers la même fiche ──
+   La couleur d'accent + soulignement au survol seulement sont posés directement
+   sur .link-im/.link-emp dans le <style> inline de dashboard.html (même bloc
+   « Liens cliquables » que jusqu'ici, pour rester prioritaire sur la cascade —
+   voir le commentaire en tête de ce fichier sur les alias --blue/--orange).
+   Ici : uniquement le modificateur .link-plain (voir lienEmpSiConnu() dans
+   dashboard.html), pour le cas d'une ligne à deux liens vers la même fiche
+   (ex. colonne Code + colonne Nom) : le clic reste actif sur les deux (même
+   classe .link-emp/.link-im pour la délégation d'événement), mais seul le nom
+   doit se lire comme un lien — le code reste du texte normal à côté. Sélecteur
+   composé (.link-emp.link-plain) pour rester prioritaire sur .link-emp seul
+   quel que soit l'ordre de déclaration. */
+.link-emp.link-plain,.link-im.link-plain,
+.link-emp.link-plain:hover,.link-im.link-plain:hover{
+  color:var(--ds-text-muted);font-weight:var(--ds-weight-regular);text-decoration:none;
+}
+
+/* ── Header : boutons secondaires (Excel, Actualiser) ── un seul CTA à fond
+   plein (l'accent doré) doit suffire par écran ; ces deux actions deviennent des
+   boutons discrets sur le fond du header, cohérents avec le bouton de bascule de
+   thème déjà traité ainsi. ── */
+#btn-export,#btn-refresh{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);}
+#btn-export:hover,#btn-refresh:hover{background:rgba(255,255,255,.2);}
+
+/* ── Sidebar : badges honnêtes ── un badge vide (compte à 0, ou donnée pas
+   encore chargée — voir setNavBadge() dans dashboard.html) ne s'affiche pas,
+   plutôt qu'un tiret permanent dont le sens n'est pas évident. ── */
+.nav-badge:empty{display:none;}
+
+/* ── Mode sombre : champ de recherche du header ── #gsearch-input (dashboard.html)
+   pose un fond blanc translucide (rgba(255,255,255,.12)) directement sur
+   --ds-nav-bg. En mode clair, --ds-nav-bg reste assez lumineux pour que ce blanc
+   translucide se lise comme un champ neutre ; en sombre, --ds-nav-bg devient un
+   bordeaux profond (#5A2038) et ce même blanc translucide se teinte alors
+   nettement de rose/mauve au lieu de rester neutre, en plus d'un contraste plus
+   faible. Fond opaque neutre (encre --ds-ink-900), indépendant de la teinte du
+   header, réservé au thème sombre — le mode clair n'est pas concerné. ── */
+:root[data-theme="dark"] #gsearch-input{background:rgba(18,21,27,.55);border-color:rgba(255,255,255,.3);}
+:root[data-theme="dark"] #gsearch-input:focus{background:rgba(18,21,27,.7);}
