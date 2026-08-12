@@ -811,5 +811,31 @@ Session de finition pure (aucun changement de comportement métier, gabarits imp
 - **`creer_mouvement_brasseur` (dashboard) volontairement non touché** : cette action, déjà réservée aux garants (`requireGarant`), applique le même garde-fou de stock négatif sans aucune exception de rôle — hors périmètre de cette demande, qui ne portait que sur l'écran PWA. Une incohérence en résulte (un garant peut régulariser via la PWA mais pas depuis le dashboard) mais n'a pas été signalée par William ni demandée — à réévaluer si le besoin se confirme côté dashboard.
 - **4 nouveaux tests** (`tests/worker.brasseurs.test.js`) : rejet standard à stock zéro, acceptation pour les 3 rôles garants à stock zéro, et un cas de stock partiellement insuffisant (2 en stock, 5 demandés) pour couvrir la généralisation au-delà du zéro strict. `npm run verify` : 253/253. `npm run sync:staging` relancé après modification de `app.js`/`worker.js`.
 
+## CLAUDE.md transformé en index (12 août 2026)
+
+- **Constat** : `CLAUDE.md` (226 Ko) était une copie intégrale et manuellement resynchronisée des 6
+  documents `00_*`-`05_*`, chargée automatiquement à chaque session — coûteuse en contexte pour un
+  contenu déjà entièrement présent ailleurs. Vérification faite avant toute suppression : chaque
+  section de `CLAUDE.md` correspondait à un **préfixe strictement plus ancien** des documents `00-05`
+  actuels (comparaison ligne à ligne) — aucune information n'existait uniquement dans `CLAUDE.md`,
+  qui avait au contraire pris du retard sur `04_HISTORIQUE_DECISIONS.md` (dernière recopie le 10
+  août, alors que le journal avait déjà grossi de plusieurs sessions depuis, module Brasseurs
+  inclus). Rien n'a donc eu besoin d'être déplacé vers `00-05` : uniquement supprimé de `CLAUDE.md`.
+- **Décision** : `CLAUDE.md` devient un **index court** (< 15 Ko, 6,7 Ko en pratique) — règles
+  permanentes de travail, table « quel document lire pour quel sujet » (étendue aux documents de
+  procédure `PROCEDURE_ROLLBACK.md`/`PROCEDURE_RESTAURATION.md`/`PROCEDURE_RECETTE.md`,
+  `ARCHITECTURE_GLOBALE.md`, `SECURITE_ETAT.md`, `README.md` — jusqu'ici non référencés depuis
+  `CLAUDE.md`), commandes utiles (`npm run verify`, scripts `session:*`/`sync:staging`). Consigne
+  écrite dans le fichier lui-même : ne plus jamais y recopier de contenu daté/historique.
+- **Nouvelle section « Règles du chantier Industrialisation 2.0 »** ajoutée à `CLAUDE.md`, en
+  anticipation du prochain chantier de modularisation du code (Worker en particulier, aujourd'hui
+  un unique `worker.js` de ~324 Ko) : zéro build conservé côté PWA/Dashboard (modules ES natifs),
+  `wrangler` seul autorisé à assembler des modules côté Worker au déploiement, aucune donnée réelle
+  dans le dépôt (fixtures synthétiques uniquement — rappel direct de l'incident
+  `materiel_it_catalogue.json`), fin de session = `npm run verify` vert + entrée datée ici, ne plus
+  faire grossir les 3 fichiers monolithiques, recette sur staging jamais sur la production.
+- **Portée strictement documentaire** : aucun fichier de code touché, `npm run verify` repassé
+  (253/253) pour confirmer l'absence de régression avant de considérer la tâche terminée.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
