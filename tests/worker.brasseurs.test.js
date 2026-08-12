@@ -800,6 +800,57 @@ test('sortie_stock_brasseur_pwa : destination Maintenance pour un garant — inc
   assert.equal(ecrit.Tiers, '');
 });
 
+// ── sortie_stock_brasseur_pwa — régularisation à stock zéro, garants uniquement (ajouté 12/08/2026) ──
+// Retour terrain de William : en mode Sortie, une référence à stock 0 est bloquée à la sélection côté
+// PWA pour les profils standards (défense purement client, voir app.js) ; le Worker reste la vraie
+// barrière et refuse toute sortie qui ferait passer le stock sous 0 pour ces rôles. Les rôles garants
+// du module (estGarantBrasseurServeur — même population que peutGererBrasseurs au dashboard) gardent
+// la main pour régulariser un stock théorique faux : le garde-fou de stock négatif est levé pour eux.
+
+test('sortie_stock_brasseur_pwa : stock à zéro, rôle standard (CT) → refusé, rien écrit', async (t) => {
+  let wrote = false;
+  mockBrasseurs(t, { depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_CT], mouvements: [], onWrite: () => { wrote = true; } });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'CTXX', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 3 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'stock_insuffisant');
+  assert.equal(data.stock_actuel, 0);
+  assert.equal(wrote, false);
+});
+
+for (const emp of [EMP_LOGI, EMP_ADMIN, { Title: 'LGMA', field_1: 'Logistique Mayotte Test', field_2: 'Oui', Code_CT: 'Logistique_Mayotte' }]) {
+  test('sortie_stock_brasseur_pwa : stock à zéro, ' + emp.Code_CT + ' (garant) → accepté malgré le stock insuffisant', async (t) => {
+    let ecrit = null;
+    mockBrasseurs(t, {
+      depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [emp], mouvements: [],
+      onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+    });
+    const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+      code_employe: emp.Title, depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 3 }],
+    }));
+    const data = await res.json();
+    assert.equal(data.success, true, JSON.stringify(data));
+    assert.equal(ecrit.Quantit_x00e9_, -3, 'la quantité pleine demandée est écrite, quitte à faire passer le stock sous 0');
+  });
+}
+
+test('sortie_stock_brasseur_pwa : stock partiellement insuffisant (pas seulement à zéro), garant (Admin) → accepté malgré tout', async (t) => {
+  let ecrit = null;
+  mockBrasseurs(t, {
+    depots: [DEPOT_TC2], catalogue: [CAT_BA], employes: [EMP_ADMIN],
+    mouvements: [{ Title: 'DCF-FS52920B', Depot: 'TC2', Proprietaire: PROP_ESR, Quantit_x00e9_: 2 }],
+    onWrite: (evt) => { if (evt.batch && evt.method === 'POST') ecrit = evt.body.fields; },
+  });
+  const res = await W.handleRequest(postRequest('sortie_stock_brasseur_pwa', {
+    code_employe: 'ADMX', depot: 'TC2', destination: 'Maintenance', lignes: [{ reference: 'DCF-FS52920B', quantite: 5 }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(ecrit.Quantit_x00e9_, -5);
+});
+
 // ── transfert_stock_brasseur_pwa (PWA, sans jeton, réservé aux garants — ajouté août 2026) ──────
 
 test('transfert_stock_brasseur_pwa : rôle non-garant (CT) → droits_insuffisants, rien écrit', async (t) => {

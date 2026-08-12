@@ -3501,9 +3501,12 @@ async function handleRequest(request) {
       if (lignes.length > 5) return json({ success: false, error: 'trop_de_lignes', max: 5 });
       if (!destination) return json({ success: false, error: 'destination_requise' });
       const estNegoce = /^n[ée]goce$/i.test(destination);
-      let estGarant = false;
+      // Calculé systématiquement (pas seulement pour Négoce) : sert aussi à lever le garde-fou de
+      // stock négatif ci-dessous pour cette même population (Admin/Logistique/Logistique_Mayotte —
+      // décision de William du 12/08/2026, voir 03_REGLES_METIER_ET_ROLES.md § Sortie de stock
+      // Brasseurs — régularisation d'un stock théorique faux).
+      const estGarant = await estGarantBrasseurServeur(codeEmploye);
       if (estNegoce) {
-        estGarant = await estGarantBrasseurServeur(codeEmploye);
         if (!estGarant) return json({ success: false, error: 'destination_reservee_dashboard', message: 'Une sortie vers le Négoce doit être enregistrée par un gestionnaire au dashboard.' });
         if (!tiersSaisi) return json({ success: false, error: 'client_requis', message: 'Le nom du client est obligatoire pour une sortie Négoce.' });
       }
@@ -3529,7 +3532,12 @@ async function handleRequest(request) {
         if (isNaN(saisie) || saisie <= 0) return json({ success: false, error: 'quantite_invalide', reference: l.reference });
         if (saisie > plafond) return json({ success: false, error: 'quantite_plafonnee', reference: l.reference, plafond: plafond });
         const stockActuel = await brasseurStockActuel(depot, reference, proprietaire);
-        if (stockActuel - saisie < 0) return json({ success: false, error: 'stock_insuffisant', reference: l.reference, stock_actuel: stockActuel, demande: saisie });
+        // Garde-fou stock négatif — défense en profondeur, la sélection est déjà bloquée côté PWA pour
+        // les rôles standards (voir app.js, choisirReferenceSortieBrasseurs). EXCEPTION Admin/Logistique/
+        // Logistique_Mayotte (estGarant, calculé plus haut) : ces rôles peuvent valider une sortie malgré
+        // un stock insuffisant/à zéro — cas de régularisation d'un stock théorique faux (William, 12/08/2026).
+        // Le mouvement s'écrit alors avec la quantité pleine demandée, quitte à faire passer le stock sous 0.
+        if (!estGarant && stockActuel - saisie < 0) return json({ success: false, error: 'stock_insuffisant', reference: l.reference, stock_actuel: stockActuel, demande: saisie });
         lignesValidees.push({ reference, quantite: -Math.abs(saisie) });
       }
       const document = await nextBrasseurDocument(depotInfo.Prefixe_Document || depot, 'Brasseurs_Mouvements', 'Document');

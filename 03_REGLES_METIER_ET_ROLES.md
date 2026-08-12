@@ -451,8 +451,10 @@ lui-même.
   explicitement. Un rôle vide/inconnu (ou un employé absent de la liste Employés) est plafonné par
   défaut prudent, comme un Ouvrier. Les codes super-admins permanents (`AIWI`/`CONI`/`NAXA`/`BAKA`) ne
   sont jamais plafonnés au niveau métier, quel que soit leur rôle SharePoint.
-- **Garde-fou stock négatif** : identique à `creer_mouvement_brasseur` (refus explicite si la sortie
-  ferait passer le stock sous 0).
+- **Garde-fou stock négatif** : identique à `creer_mouvement_brasseur` pour les rôles standards (refus
+  explicite si la sortie ferait passer le stock sous 0) — **sauf pour la population garant du module**,
+  voir « Sélection bloquée à stock zéro » ci-dessous (ajouté 12/08/2026, `sortie_stock_brasseur_pwa`
+  uniquement — `creer_mouvement_brasseur`, dashboard, reste sans exception).
 - **Au plus 5 références par sortie** (contre 20 pour l'action dashboard) — cohérent avec un usage
   terrain ponctuel (une intervention, pas une opération de masse).
 
@@ -468,6 +470,24 @@ dans le journal des mouvements — sans nouvelle colonne SharePoint.
 **Pas de liaison automatique pales↔brasseur sur cet écran** (contrairement au dashboard, voir
 paragraphe précédent) — le technicien ajoute une ligne PALES lui-même s'il en prend. Évolution
 possible si le besoin se confirme à l'usage.
+
+**Sélection bloquée à stock zéro, exception garant (règle ajoutée 12/08/2026)** — en **mode Sortie
+uniquement** (aucun changement en mode Transfert) : une référence à stock 0 au dépôt source choisi
+devient non sélectionnable au tap pour les profils standards, toast d'erreur « Rupture de stock —
+sortie impossible pour cette référence. ». **Exception : la population garant du module (Admin,
+Logistique, Logistique_Mayotte — même capacité `garant` de `ROLE_CAPS` que le mode avancé décrit au
+paragraphe suivant, réutilisée telle quelle plutôt qu'une nouvelle capacité dédiée) garde la
+possibilité de sélectionner et de valider la sortie malgré un stock à zéro** — cas de régularisation
+d'un stock théorique faux (le stock, entièrement calculé depuis les mouvements, peut être inexact si
+une sortie physique a eu lieu sans être ressaisie) — avec un avertissement non bloquant affiché à la
+sélection : « Stock théorique à 0 — la sortie créera un écart⚠️ », pour que le contournement reste
+conscient. Défense en profondeur côté Worker : `sortie_stock_brasseur_pwa` lève son garde-fou de stock
+négatif pour cette même population (`estGarantBrasseurServeur`), et ce **pour tout stock insuffisant,
+pas seulement un stock strictement nul** — la distinction n'a pas de sens côté serveur (même condition
+`stockActuel - demande < 0`) et un garant régularisant un stock partiellement faux (ex. 2 en stock,
+5 réellement sortis) doit pouvoir le faire au même titre qu'un stock à 0. Les profils standards restent
+bloqués dans tous les cas. `creer_mouvement_brasseur` (dashboard) n'a **pas** cette exception — hors
+périmètre de cette règle, qui ne porte que sur cet écran PWA.
 
 ### Mode avancé PWA (garant) : transfert inter-dépôts, client, bon signé archivé (ajouté août 2026)
 

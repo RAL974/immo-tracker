@@ -2265,9 +2265,20 @@ function renderListeReferencesSortieBrasseurs() {
   }).join('');
 }
 
+// En mode Sortie uniquement, une référence à stock 0 (au dépôt choisi) est bloquée à la sélection
+// pour les profils standards (décision de William, 12/08/2026 — voir 03_REGLES_METIER_ET_ROLES.md) :
+// simple garde-fou d'usage, pas de contrôle de sécurité (le Worker revérifie indépendamment, voir
+// sortie_stock_brasseur_pwa/estGarantBrasseurServeur). SB.estGarant (même capacité ROLE_CAPS.garant
+// qu'estGarant(), Admin/Logistique/Logistique_Mayotte) garde la main pour régulariser un stock
+// théorique faux, avec un avertissement non bloquant pour que le contournement reste conscient. En
+// mode Transfert, aucune restriction (comportement inchangé).
 function choisirReferenceSortieBrasseurs(reference) {
-  SB.refChoisie = reference;
   const stock = stockBrasseurPour(SB.depotActuel, reference);
+  if (SB.mode === 'sortie' && stock <= 0) {
+    if (!SB.estGarant) { toast('Rupture de stock — sortie impossible pour cette référence.', 'error'); return; }
+    toast('⚠️ Stock théorique à 0 — la sortie créera un écart.', 'warning');
+  }
+  SB.refChoisie = reference;
   document.getElementById('sb-ref-choisie').textContent = reference + ' (' + stock + ' en stock à ' + SB.depotActuel + ')';
   document.getElementById('sb-ligne-en-cours').classList.remove('hidden');
   const qte = document.getElementById('sb-quantite');
