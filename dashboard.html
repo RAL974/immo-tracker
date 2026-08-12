@@ -109,8 +109,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #gsearch-results{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;max-height:70vh;overflow-y:auto;background:var(--card);color:var(--ds-text,#222);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);z-index:200;text-align:left;}
 #gsearch-results.open{display:block;}
 #gsearch-results .gs-group-label{padding:8px 12px 4px;font-size:11px;font-weight:800;color:var(--grey);text-transform:uppercase;letter-spacing:.4px;}
-#gsearch-results .gs-item{padding:8px 12px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;align-items:center;}
+#gsearch-results .gs-item{padding:8px 12px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;align-items:center;border-left:3px solid transparent;}
 #gsearch-results .gs-item:hover{background:var(--ds-surface-alt,#f0f4f8);}
+/* Sélection clavier (↑/↓) — même souris : gsHover() pose la même classe au survol, pour que le
+   surlignage reste cohérent qu'on navigue au clavier ou à la souris. --ds-gold-50 vaut déjà un
+   ton doré tinté-sombre en mode sombre (voir design-system.css), donc theme-aware sans code dédié. */
+#gsearch-results .gs-item.sel{background:var(--ds-gold-50,#FDF8EC);border-left-color:var(--orange);}
 #gsearch-results .gs-item small{color:var(--grey);font-size:11px;white-space:nowrap;}
 #gsearch-results .gs-empty{padding:16px;text-align:center;color:var(--grey);font-size:13px;}
 @media (max-width:768px){#gsearch-wrap{display:none;}}
@@ -7837,86 +7841,181 @@ async function soumettreReceptionBrasseur(){
   }catch(e){msg.textContent='Erreur réseau : '+e.message;btn.disabled=false;btn.textContent='Confirmer';}
 }
 
-// ── Recherche globale (header, raccourci "/") ────────────
+// ── Recherche globale / palette de commande (header, raccourci "/") ─────
 // Purement client-side sur les données déjà chargées en mémoire (im, employesList, epiCatalogue,
-// outilCatalogue) — aucun nouvel appel Worker (voir 03_REGLES_METIER_ET_ROLES.md). Résultats
-// groupés par type, plafonnés par groupe pour rester lisible. Immos/employés ont une fiche
-// (drawer) qui s'ouvre sans changer d'onglet ; les articles EPI/outillage n'ont pas de fiche
-// individuelle, donc la navigation bascule vers l'onglet + sous-vue Stock concernés, filtrée
-// sur la référence (réutilise les champs de recherche déjà existants sur ces vues).
+// outilCatalogue, brasseursCatalogue) — aucun nouvel appel Worker (voir 03_REGLES_METIER_ET_ROLES.md).
+// Résultats groupés par type au fil de la frappe, plafonnés par groupe. Immos/employés ont une fiche
+// (drawer) qui s'ouvre sans changer d'onglet ; les articles EPI/outillage/brasseurs n'ont pas de fiche
+// individuelle, donc la sélection bascule vers l'onglet + sous-vue Stock concernés, filtrée sur la
+// référence (réutilise les champs de recherche déjà existants sur ces vues). Un groupe "Navigation"
+// (NAV_INDEX ci-dessous) permet en plus de sauter directement à un onglet/sous-onglet par son nom.
 var GSEARCH_MAX=8;
+var GSEARCH_ITEMS=[]; // liste à plat, ordre d'affichage, reconstruite à chaque rendu — {action:fn}
+var GSEARCH_SEL=-1;   // index (dans GSEARCH_ITEMS) du résultat actuellement surligné
+
+// Normalisation insensible aux accents et à la casse (ex. "anapotelivoua" doit retrouver
+// "ANAPOTÉLIVOUA") — fonction pure, testée isolément (tests/dashboard.global-search.test.js).
+var GS_DIACRITICS_RE=new RegExp('[' + String.fromCharCode(0x0300) + '-' + String.fromCharCode(0x036f) + ']','g');
+function gsNormalize(s){
+  return (s==null?'':String(s)).normalize('NFD').replace(GS_DIACRITICS_RE,'').toUpperCase().trim();
+}
+// Un résultat correspond si chaque mot tapé (séparé par des espaces) se retrouve quelque part dans
+// le texte cherchable, dans n'importe quel ordre — permet "epi hist" → "EPI › Historique" sans
+// exiger la casse, les accents, ni l'ordre exact des mots.
+function gsMatchesTokens(searchText,tokens){
+  var norm=gsNormalize(searchText);
+  for(var i=0;i<tokens.length;i++){if(norm.indexOf(tokens[i])===-1)return false;}
+  return true;
+}
+
+// Index des onglets/sous-onglets pour le groupe "Navigation" — purement déclaratif, aucune donnée
+// chargée : réutilise goTab() (mécanisme data-tab existant) et les variables de sous-vue déjà en
+// place (epiVue/outilVue/brasseursVue/matItVue), sur le même principe que changerVueEPI() & co.
+var NAV_INDEX=[
+  {label:'Vue générale',tab:'vue-generale'},
+  {label:'En circulation',tab:'circulation'},
+  {label:'Au dépôt',tab:'depot'},
+  {label:'Historique des mouvements',tab:'historique'},
+  {label:'Inventaire stock',tab:'inventaire-stock'},
+  {label:'Inventaire immos (scan)',tab:'inventaire-immos'},
+  {label:'Transferts',tab:'transferts'},
+  {label:'Réservations',tab:'reservations'},
+  {label:'Documents FDS',tab:'documents'},
+  {label:'Maintenance',tab:'maintenance'},
+  {label:'Matériel IT › Téléphones',tab:'materiel-it',vueVar:'matItVue',vue:'telephones'},
+  {label:'Matériel IT › Lignes',tab:'materiel-it',vueVar:'matItVue',vue:'lignes'},
+  {label:"Brasseurs d'air › Stock",tab:'brasseurs',vueVar:'brasseursVue',vue:'stock'},
+  {label:"Brasseurs d'air › Mouvements",tab:'brasseurs',vueVar:'brasseursVue',vue:'mouvements'},
+  {label:"Brasseurs d'air › Commandes",tab:'brasseurs',vueVar:'brasseursVue',vue:'commandes'},
+  {label:'Absences',tab:'absences'},
+  {label:'EPI › Stock',tab:'epi',vueVar:'epiVue',vue:'stock'},
+  {label:'EPI › Suggestion de commande',tab:'epi',vueVar:'epiVue',vue:'commande'},
+  {label:'EPI › Grille de dotation',tab:'epi',vueVar:'epiVue',vue:'grille'},
+  {label:'EPI › Dotations employés',tab:'epi',vueVar:'epiVue',vue:'dotations'},
+  {label:'EPI › Remise ponctuelle',tab:'epi',vueVar:'epiVue',vue:'ponctuelle'},
+  {label:'EPI › Historique',tab:'epi',vueVar:'epiVue',vue:'historique'},
+  {label:"Prime d'outillage › Stock",tab:'outillage',vueVar:'outilVue',vue:'stock'},
+  {label:"Prime d'outillage › Suggestion de commande",tab:'outillage',vueVar:'outilVue',vue:'commande'},
+  {label:"Prime d'outillage › Grille par service",tab:'outillage',vueVar:'outilVue',vue:'grille'},
+  {label:"Prime d'outillage › Reste à distribuer",tab:'outillage',vueVar:'outilVue',vue:'manquant'},
+  {label:"Prime d'outillage › Distribution par employé",tab:'outillage',vueVar:'outilVue',vue:'distribution'},
+  {label:"Prime d'outillage › Prime annuelle",tab:'outillage',vueVar:'outilVue',vue:'prime'},
+  {label:"Prime d'outillage › Historique",tab:'outillage',vueVar:'outilVue',vue:'historique'},
+  {label:'Alertes',tab:'alertes'},
+  {label:'Analyses',tab:'analyses'},
+  {label:'Synthèse direction',tab:'codir'},
+  {label:'Utilisateurs',tab:'utilisateurs'},
+  {label:"Journal d'audit",tab:'journal',adminOnly:true}
+];
+
 function renderGlobalSearch(qRaw){
   var box=document.getElementById('gsearch-results');
   if(!box)return;
-  var q=(qRaw||'').trim().toUpperCase();
-  if(q.length<2){box.classList.remove('open');box.innerHTML='';return;}
+  GSEARCH_ITEMS=[];GSEARCH_SEL=-1;
+  try{
+    var qTrim=(qRaw||'').trim();
+    if(qTrim.length<2){box.classList.remove('open');box.innerHTML='';return;}
+    var tokens=gsNormalize(qTrim).split(/\s+/).filter(Boolean);
 
-  var immos=Object.keys(im).filter(function(c){
-    var i=im[c]||{};
-    return c.toUpperCase().includes(q)||(i.Libelle||'').toUpperCase().includes(q)||(i.N_Serie||'').toUpperCase().includes(q);
-  }).slice(0,GSEARCH_MAX);
-
-  var employes=(employesList||[]).filter(function(e){
-    return (e.Code||'').toUpperCase().includes(q)||(e.Nom||'').toUpperCase().includes(q);
-  }).slice(0,GSEARCH_MAX);
-
-  var epiRes=(epiCatalogue||[]).filter(function(a){
-    return (a.type_article||'').toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.designation||'').toUpperCase().includes(q)||(a.taille_affichage||'').toString().toUpperCase().includes(q);
-  }).slice(0,GSEARCH_MAX);
-
-  var outilRes=(outilCatalogue||[]).filter(function(a){
-    return (a.type_article||'').toUpperCase().includes(q)||(a.reference||'').toUpperCase().includes(q)||(a.marque||'').toUpperCase().includes(q);
-  }).slice(0,GSEARCH_MAX);
-
-  var brasseursRes=(brasseursCatalogue||[]).filter(function(a){
-    return (a.reference||'').toUpperCase().includes(q)||(a.designation||'').toUpperCase().includes(q)||(a.categorie||'').toUpperCase().includes(q);
-  }).slice(0,GSEARCH_MAX);
-
-  if(!immos.length&&!employes.length&&!epiRes.length&&!outilRes.length&&!brasseursRes.length){
-    box.innerHTML='<div class="gs-empty">Aucun résultat pour "'+qRaw.replace(/</g,'&lt;')+'".</div>';
-    box.classList.add('open');
-    return;
-  }
-
-  var html='';
-  if(immos.length){
-    html+='<div class="gs-group-label">📦 Immobilisations</div>';
-    html+=immos.map(function(c){
+    var immos=Object.keys(im).filter(function(c){
       var i=im[c]||{};
-      var lib=(i.Libelle||c).replace(/'/g,"\\'").replace(/"/g,'&quot;');
-      return '<div class="gs-item" onclick="fermerGSearch();ouvrirFiche(\'immo\',\''+c+'\',\''+lib+'\')"><span>'+c+' — '+(i.Libelle||'—')+'</span><small>'+(i.N_Serie?'N° '+i.N_Serie:'')+'</small></div>';
-    }).join('');
+      return gsMatchesTokens(c+' '+(i.Libelle||'')+' '+(i.N_Serie||''),tokens);
+    }).slice(0,GSEARCH_MAX);
+
+    var employes=(employesList||[]).filter(function(e){
+      return gsMatchesTokens((e.Code||'')+' '+(e.Nom||''),tokens);
+    }).slice(0,GSEARCH_MAX);
+
+    var epiRes=(epiCatalogue||[]).filter(function(a){
+      return gsMatchesTokens((a.type_article||'')+' '+(a.reference||'')+' '+(a.designation||'')+' '+(a.taille_affichage||''),tokens);
+    }).slice(0,GSEARCH_MAX);
+
+    var outilRes=(outilCatalogue||[]).filter(function(a){
+      return gsMatchesTokens((a.type_article||'')+' '+(a.reference||'')+' '+(a.marque||''),tokens);
+    }).slice(0,GSEARCH_MAX);
+
+    var brasseursRes=(brasseursCatalogue||[]).filter(function(a){
+      return gsMatchesTokens((a.reference||'')+' '+(a.designation||'')+' '+(a.categorie||''),tokens);
+    }).slice(0,GSEARCH_MAX);
+
+    var navRes=NAV_INDEX.filter(function(n){
+      if(n.adminOnly&&!estAdmin(ADMIN_SESSION.code))return false;
+      return gsMatchesTokens(n.label,tokens);
+    }).slice(0,GSEARCH_MAX);
+
+    if(!immos.length&&!employes.length&&!epiRes.length&&!outilRes.length&&!brasseursRes.length&&!navRes.length){
+      box.innerHTML='<div class="gs-empty">Aucun résultat pour "'+qTrim.replace(/</g,'&lt;')+'".</div>';
+      box.classList.add('open');
+      return;
+    }
+
+    // Enregistre une ligne cliquable/navigable au clavier : l'action réelle vit dans une closure
+    // (GSEARCH_ITEMS), donc plus besoin d'échapper les guillemets pour l'injecter dans un attribut
+    // onclick comme avant — seul l'index est posé sur l'élément.
+    function gsRow(labelHtml,smallHtml,action){
+      var idx=GSEARCH_ITEMS.length;
+      GSEARCH_ITEMS.push({action:action});
+      return '<div class="gs-item" data-gs-idx="'+idx+'" onmouseenter="gsHover('+idx+')" onclick="gsActivate('+idx+')"><span>'+labelHtml+'</span><small>'+(smallHtml||'')+'</small></div>';
+    }
+
+    var html='';
+    if(immos.length){
+      html+='<div class="gs-group-label">📦 Immobilisations</div>';
+      html+=immos.map(function(c){
+        var i=im[c]||{};
+        var lib=i.Libelle||c;
+        return gsRow(c+' — '+(i.Libelle||'—'),i.N_Serie?'N° '+i.N_Serie:'',function(){fermerGSearch();ouvrirFiche('immo',c,lib);});
+      }).join('');
+    }
+    if(employes.length){
+      html+='<div class="gs-group-label">👤 Employés</div>';
+      html+=employes.map(function(e){
+        var nom=e.Nom||e.Code;
+        return gsRow(e.Code+' — '+(e.Nom||'—'),e.Poste||'',function(){fermerGSearch();ouvrirFiche('emp',e.Code,nom);});
+      }).join('');
+    }
+    if(epiRes.length){
+      html+='<div class="gs-group-label">🦺 Articles EPI</div>';
+      html+=epiRes.map(function(a){
+        var ref=a.reference||'';
+        return gsRow(a.type_article+' '+(a.taille_affichage||''),ref,function(){fermerGSearch();irVersArticleEPI(ref);});
+      }).join('');
+    }
+    if(outilRes.length){
+      html+='<div class="gs-group-label">🧰 Outillage</div>';
+      html+=outilRes.map(function(a){
+        var ref=a.reference||'';
+        return gsRow(a.type_article,ref,function(){fermerGSearch();irVersArticleOutillage(ref);});
+      }).join('');
+    }
+    if(brasseursRes.length){
+      html+='<div class="gs-group-label">🌀 Brasseurs d\'air</div>';
+      html+=brasseursRes.map(function(a){
+        var ref=a.reference||'';
+        return gsRow(a.reference,a.designation||'',function(){fermerGSearch();irVersReferenceBrasseur(ref);});
+      }).join('');
+    }
+    if(navRes.length){
+      html+='<div class="gs-group-label">🧭 Navigation</div>';
+      html+=navRes.map(function(n){
+        return gsRow(n.label,'',function(){gsGoToNav(n);});
+      }).join('');
+    }
+
+    box.innerHTML=html;
+    box.classList.add('open');
+    if(GSEARCH_ITEMS.length){GSEARCH_SEL=0;gsUpdateSelectionUI();}
+  }catch(err){
+    // Dégradation gracieuse : une erreur de rendu de la palette ne doit jamais empêcher de continuer
+    // à taper dans le champ — elle reste utilisable, seuls les résultats de cette frappe manquent.
+    console.error('Recherche globale : erreur de rendu',err);
   }
-  if(employes.length){
-    html+='<div class="gs-group-label">👤 Employés</div>';
-    html+=employes.map(function(e){
-      var nom=(e.Nom||e.Code).replace(/'/g,"\\'").replace(/"/g,'&quot;');
-      return '<div class="gs-item" onclick="fermerGSearch();ouvrirFiche(\'emp\',\''+e.Code+'\',\''+nom+'\')"><span>'+e.Code+' — '+(e.Nom||'—')+'</span><small>'+(e.Poste||'')+'</small></div>';
-    }).join('');
-  }
-  if(epiRes.length){
-    html+='<div class="gs-group-label">🦺 Articles EPI</div>';
-    html+=epiRes.map(function(a){
-      var ref=(a.reference||'').replace(/'/g,"\\'");
-      return '<div class="gs-item" onclick="fermerGSearch();irVersArticleEPI(\''+ref+'\')"><span>'+a.type_article+' '+(a.taille_affichage||'')+'</span><small>'+(a.reference||'')+'</small></div>';
-    }).join('');
-  }
-  if(outilRes.length){
-    html+='<div class="gs-group-label">🧰 Outillage</div>';
-    html+=outilRes.map(function(a){
-      var ref=(a.reference||'').replace(/'/g,"\\'");
-      return '<div class="gs-item" onclick="fermerGSearch();irVersArticleOutillage(\''+ref+'\')"><span>'+a.type_article+'</span><small>'+(a.reference||'')+'</small></div>';
-    }).join('');
-  }
-  if(brasseursRes.length){
-    html+='<div class="gs-group-label">🌀 Brasseurs d\'air</div>';
-    html+=brasseursRes.map(function(a){
-      var ref=(a.reference||'').replace(/'/g,"\\'");
-      return '<div class="gs-item" onclick="fermerGSearch();irVersReferenceBrasseur(\''+ref+'\')"><span>'+a.reference+'</span><small>'+(a.designation||'')+'</small></div>';
-    }).join('');
-  }
-  box.innerHTML=html;
-  box.classList.add('open');
+}
+
+function gsGoToNav(entry){
+  fermerGSearch();
+  if(entry.vueVar)window[entry.vueVar]=entry.vue;
+  goTab(entry.tab);
 }
 
 function fermerGSearch(){
@@ -7924,10 +8023,43 @@ function fermerGSearch(){
   if(box){box.classList.remove('open');box.innerHTML='';}
   var input=document.getElementById('gsearch-input');
   if(input)input.value='';
+  GSEARCH_ITEMS=[];GSEARCH_SEL=-1;
+}
+
+// Survol souris : synchronise la sélection surlignée sur l'élément survolé (cohérent avec la
+// navigation clavier ↑/↓, qui met à jour le même état GSEARCH_SEL).
+function gsHover(idx){
+  GSEARCH_SEL=idx;
+  gsUpdateSelectionUI();
+}
+// Active un résultat par son index — utilisé par le clic (indépendant de GSEARCH_SEL pour éviter
+// tout décalage si le survol n'a pas encore eu le temps de se mettre à jour) et par Entrée.
+function gsActivate(idx){
+  if(GSEARCH_ITEMS[idx])GSEARCH_ITEMS[idx].action();
+}
+function gsMove(delta){
+  if(!GSEARCH_ITEMS.length)return;
+  GSEARCH_SEL=(GSEARCH_SEL+delta+GSEARCH_ITEMS.length)%GSEARCH_ITEMS.length;
+  gsUpdateSelectionUI();
+}
+function gsUpdateSelectionUI(){
+  var box=document.getElementById('gsearch-results');
+  if(!box)return;
+  box.querySelectorAll('.gs-item').forEach(function(el){
+    var isSel=parseInt(el.dataset.gsIdx,10)===GSEARCH_SEL;
+    el.classList.toggle('sel',isSel);
+    if(isSel&&el.scrollIntoView)el.scrollIntoView({block:'nearest'});
+  });
 }
 
 function onGSearchKeydown(e){
-  if(e.key==='Escape'){fermerGSearch();e.target.blur();}
+  if(e.key==='Escape'){fermerGSearch();e.target.blur();return;}
+  if(e.key==='ArrowDown'){if(GSEARCH_ITEMS.length){e.preventDefault();gsMove(1);}return;}
+  if(e.key==='ArrowUp'){if(GSEARCH_ITEMS.length){e.preventDefault();gsMove(-1);}return;}
+  if(e.key==='Enter'){
+    if(GSEARCH_SEL>=0&&GSEARCH_ITEMS[GSEARCH_SEL]){e.preventDefault();GSEARCH_ITEMS[GSEARCH_SEL].action();}
+    return;
+  }
 }
 
 async function irVersArticleEPI(reference){
