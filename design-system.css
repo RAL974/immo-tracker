@@ -96,8 +96,11 @@
   /* Barres de navigation (header/sidebar/bottom-nav) : couleur dédiée, distincte de --blue-chrome
      (dashboard.html) qui reste utilisé par les boutons d'action — demande explicite de William
      (11 août 2026) de faire tendre les barres de navigation vers le rose, avec une valeur propre à
-     chaque thème plutôt qu'une teinte fixe identique en clair et en sombre. */
-  --ds-nav-bg:#7A1F44;
+     chaque thème plutôt qu'une teinte fixe identique en clair et en sombre. Éclaircie le 12 août
+     2026 (retour de William : le premier ton, trop sombre, rendait les en-têtes de section du menu
+     ("TABLEAU DE BORD", "INVENTAIRE"...) difficiles à lire) — reste clairement rose/bordeaux, pas un
+     pastel, voir aussi l'opacité de .nav-group remontée en parallèle dans dashboard.html. */
+  --ds-nav-bg:#9C3D63;
 
   /* ── Typographie ── */
   --ds-font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
@@ -179,7 +182,10 @@
      sombre — cohérent avec la version claire de --ds-nav-bg ci-dessus, mais assez sombre pour rester
      un mode sombre (l'inverse du rose vif du mode clair, pas un simple alias). */
   --ds-zebra:#333A45;
-  --ds-nav-bg:#3D0F26;
+  /* Éclaircie en même temps que la version claire ci-dessus (12 août 2026), pour le même besoin de
+     lisibilité — reste nettement plus sombre que la version claire, cohérent avec le "miroir sombre"
+     déjà en place sur le reste de la palette. */
+  --ds-nav-bg:#5A2038;
   --ds-surface-alt:#2E343E;
   --ds-border:#3A4049;
   --ds-border-strong:#4A515C;

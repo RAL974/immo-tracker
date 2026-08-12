@@ -41,7 +41,10 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       caches.open(CACHE_NAME).then(cache => cache.match(req).then(cached => {
         const network = fetch(req).then(res => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
-        return cached || network;
+        // Si rien en cache ET que le réseau échoue (hors-ligne, erreur), `network` résout à `null` —
+        // renvoyer `null` à respondWith() plante le service worker ("Failed to convert value to
+        // 'Response'"). Toujours renvoyer une vraie Response, même une 503 explicite, jamais null.
+        return cached || network.then(res => res || new Response(null, { status: 503, statusText: 'Hors ligne, aucune version en cache' }));
       }))
     );
     return;
@@ -59,7 +62,9 @@ self.addEventListener('fetch', event => {
       }
       return res;
     }).catch(() =>
-      caches.match(req).then(cached => cached || caches.match('./index.html'))
+      // Même précaution que ci-dessus : si ni le cache de la requête ni index.html ne sont
+      // disponibles (tout premier chargement, hors-ligne), ne jamais résoudre à undefined/null.
+      caches.match(req).then(cached => cached || caches.match('./index.html')).then(res => res || new Response('Hors ligne et rien en cache.', { status: 503, headers: { 'Content-Type': 'text/plain;charset=utf-8' } }))
     )
   );
 });

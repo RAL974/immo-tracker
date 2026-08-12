@@ -93,7 +93,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* ── Header ── */
 #header{background:var(--ds-nav-bg,var(--blue-chrome));color:#fff;height:var(--header);display:flex;align-items:center;padding:0 16px;gap:10px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:var(--ds-shadow-sm,0 2px 8px rgba(0,0,0,.3));border-bottom:1px solid rgba(255,255,255,.06);}
-#header img{height:30px;}
+#header img{height:38px;}
 #header h1{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.2px;}
 #header-actions{display:flex;gap:8px;align-items:center;}
 #header-actions button{border:none;color:#fff;padding:7px 14px;border-radius:var(--ds-radius-sm,6px);cursor:pointer;font-weight:700;font-size:12px;transition:filter var(--ds-transition-fast,.15s ease),transform var(--ds-transition-fast,.15s ease);}
@@ -120,7 +120,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* ── Sidebar ── */
 #sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:var(--ds-nav-bg,var(--blue-chrome));overflow-y:auto;z-index:90;padding:8px 0 20px;border-right:1px solid rgba(255,255,255,.05);}
-.nav-group{padding:18px 16px 6px;font-size:10px;font-weight:800;color:rgba(255,255,255,.35);letter-spacing:1.5px;text-transform:uppercase;}
+.nav-group{padding:18px 16px 6px;font-size:10px;font-weight:800;color:rgba(255,255,255,.78);letter-spacing:1.5px;text-transform:uppercase;}
 .nav-group:first-child{padding-top:8px;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 11px;cursor:pointer;color:rgba(255,255,255,.72);border-radius:var(--ds-radius-sm,8px);margin:1px 8px;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease),border-color var(--ds-transition-fast,.15s ease);position:relative;border-left:3px solid transparent;}
 .nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
@@ -377,7 +377,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 
 <!-- Header -->
 <div id="header">
-  <img src="logo-dark.jpg" alt="Electricité Services Réunion" onerror="this.style.display='none'">
+  <img src="logo.jpg" alt="Electricité Services Réunion" style="background:#fff;border-radius:6px;padding:3px 6px" onerror="this.style.display='none'">
   <h1>Immo Tracker — Electricité Services Réunion</h1>
   <button id="hamburger" onclick="toggleSidebar()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;display:none">☰</button>
   <!-- Recherche globale : immos, employés, articles EPI/outillage — purement client-side sur les
@@ -802,6 +802,23 @@ if(IS_RECETTE){
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
 var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit','Brasseurs_Depots','Brasseurs_Catalogue','Brasseurs_Mouvements','Brasseurs_Commandes','Brasseurs_Lignes_Commande'];
 var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur','ajouter_depot_brasseur','ajouter_reference_brasseur','migrer_mouvement_brasseur'];
+// Détection centralisée d'une session expirée (ajouté août 2026) : le jeton dure 12h — passé ce
+// délai, tout appel gated (POST action protégée, ou GET avec un jeton en paramètre d'URL comme les
+// endpoints Matériel IT/Brasseurs/Journal d'audit) échoue avec 401 {error:'session_invalide'}. Sans
+// ce point unique, chaque fonction de chargement devait le détecter elle-même — plusieurs
+// l'oubliaient ou affichaient à tort un message "droits insuffisants" trompeur pour un admin
+// légitime dont le jeton avait simplement expiré (voir 04_HISTORIQUE_DECISIONS.md).
+var SESSION_EXPIREE_EN_COURS=false;
+function gererSessionExpiree(){
+  if(SESSION_EXPIREE_EN_COURS)return;
+  SESSION_EXPIREE_EN_COURS=true;
+  if(typeof showToast==='function')showToast('🔒 Session expirée — merci de te reconnecter.','danger',6000);
+  try{if(typeof changerIdentite==='function')changerIdentite();}catch(e){}
+  // Cooldown court plutôt qu'un verrou permanent : si l'utilisateur ignore l'invite et relance une
+  // action gated peu après, on doit pouvoir la re-signaler (ex. plusieurs onglets rechargés en rafale
+  // au même instant ne doivent déclencher qu'un seul toast/une seule ouverture d'overlay).
+  setTimeout(function(){SESSION_EXPIREE_EN_COURS=false;},4000);
+}
 (function(){
   var origFetch=window.fetch.bind(window);
   window.fetch=function(input,init){
@@ -819,7 +836,19 @@ var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','ma
         }
       }
     }catch(e){}
-    return origFetch(input,init);
+    var p=origFetch(input,init);
+    try{
+      var urlStr2=typeof input==='string'?input:(input&&input.url)||'';
+      if(urlStr2.indexOf(W)===0){
+        p=p.then(function(res){
+          if(res&&res.status===401){
+            res.clone().json().then(function(d){if(d&&d.error==='session_invalide')gererSessionExpiree();}).catch(function(){});
+          }
+          return res;
+        });
+      }
+    }catch(e){}
+    return p;
   };
 })();
 
@@ -1588,7 +1617,7 @@ async function loadJournalAudit(){
   try{
     var r=await fetch(W+'?journal_audit=1&token='+encodeURIComponent(ADMIN_SESSION.token||''));
     var data=await r.json();
-    if(data&&data.error){journalAuditList=[];if(data.error==='droits_insuffisants')toast('🔒 Journal d\'audit réservé aux administrateurs.','error');}
+    if(data&&data.error){journalAuditList=[];if(data.error==='droits_insuffisants')showToast('🔒 Journal d\'audit réservé aux administrateurs.','danger');}
     else journalAuditList=Array.isArray(data)?data:[];
   }catch(e){journalAuditList=[];}
   renderJournalAudit();
@@ -4306,8 +4335,11 @@ async function loadMaterielIT(){
     var r=await fetch(W+'?materiel_it=1'+tok),r2=await fetch(W+'?lignes_telephoniques=1'+tok);
     materielItList=await r.json();
     lignesTelList=await r2.json();
-    if(materielItList&&materielItList.error==='droits_insuffisants'){materielItList=[];toast('🔒 Accès Matériel IT réservé aux gestionnaires dépôt.','error');}
-    if(lignesTelList&&lignesTelList.error){lignesTelList=[];}
+    // "session_invalide" (jeton expiré) est déjà signalé par le gestionnaire centralisé
+    // (gererSessionExpiree()) — ne montrer ce toast que pour un vrai problème de droits.
+    if(materielItList&&materielItList.error==='droits_insuffisants')showToast('🔒 Accès Matériel IT réservé aux gestionnaires dépôt.','danger');
+    if(materielItList&&materielItList.error)materielItList=[];
+    if(lignesTelList&&lignesTelList.error)lignesTelList=[];
   }catch(e){materielItList=[];lignesTelList=[];}
   renderMaterielIT();
 }
@@ -7577,7 +7609,11 @@ async function chargerBrasseursCommandes(){
   try{
     var r=await fetch(W+'?brasseurs_commandes=1'+tok),r2=await fetch(W+'?brasseurs_lignes_commande=1'+tok);
     brasseursCommandes=await r.json();brasseursLignesCommande=await r2.json();
-    if(brasseursCommandes&&brasseursCommandes.error){showToast('🔒 Accès commandes réservé aux gestionnaires dépôt.','danger');brasseursCommandes=[];brasseursLignesCommande=[];}
+    // "session_invalide" (jeton expiré) est déjà signalé par le gestionnaire centralisé
+    // (gererSessionExpiree(), voir l'interception window.fetch) — ne pas le faire passer ici pour un
+    // problème de droits, qui induirait à tort un admin légitime en erreur sur ses permissions.
+    if(brasseursCommandes&&brasseursCommandes.error==='droits_insuffisants'){showToast('🔒 Accès commandes réservé aux gestionnaires dépôt.','danger');}
+    if(brasseursCommandes&&brasseursCommandes.error){brasseursCommandes=[];brasseursLignesCommande=[];}
   }catch(e){brasseursCommandes=[];brasseursLignesCommande=[];}
   renderBrasseursCommandesResults();
 }
