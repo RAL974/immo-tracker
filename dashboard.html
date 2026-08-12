@@ -313,6 +313,30 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   #action-banner{margin-left:0!important;}
   #header h1{font-size:12px;}
 }
+
+/* ── Impression de l'onglet CODIR (ajouté août 2026) ─────────────────────────────────────────
+   Objectif : présentable tel quel en réunion de direction, 1-2 pages A4. Force l'affichage de
+   #pane-codir même si un autre onglet est actif à l'écran (le bouton Imprimer ne vit que dans ce
+   panneau) et masque tout le reste (sidebar, header, filtres, contrôles interactifs). Ne s'applique
+   qu'à cet onglet — aucune autre vue du dashboard n'a de mise en page d'impression dédiée. */
+@media print{
+  #header,#sidebar,#bottom-nav,#mobile-menu,.filters,.print-hide{display:none!important;}
+  #main{margin-left:0!important;padding:0!important;}
+  .tab-pane{display:none!important;}
+  #pane-codir{display:block!important;}
+  #codir-print-header{display:block!important;}
+  body{background:#fff!important;color:#111!important;}
+  #codir-content{font-size:11px;}
+  #codir-content h3{font-size:12px;}
+  .card{break-inside:avoid;box-shadow:none!important;border:1px solid #ccc!important;margin-bottom:6px!important;}
+  .card-head{padding:6px 10px!important;}
+  .kpi{box-shadow:none!important;border:1px solid #ddd!important;padding:8px 10px 6px!important;}
+  .kpi .kv{font-size:15px!important;}
+  .charts-grid{grid-template-columns:1fr 1fr 1fr!important;gap:6px!important;}
+  .chart-card{padding:6px!important;}
+  .chart-wrap{height:110px!important;}
+  .tbl-wrap table{font-size:9.5px!important;}
+}
 </style>
 </head>
 <body>
@@ -402,6 +426,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
   <div class="nav-group">ANALYTICS</div>
   <div class="nav-item" data-tab="alertes"><span class="nav-icon">⚠️</span><span class="nav-label">Alertes</span><span class="nav-badge" id="nb-alert">—</span></div>
   <div class="nav-item" data-tab="analyses"><span class="nav-icon">📈</span><span class="nav-label">Analyses</span></div>
+  <div class="nav-item" data-tab="codir"><span class="nav-icon">🏛️</span><span class="nav-label">CODIR</span></div>
   <div class="nav-item" data-tab="utilisateurs"><span class="nav-icon">👥</span><span class="nav-label">Utilisateurs</span></div>
 
   <!-- Journal d'audit (ajouté août 2026) : masqué aux non-admins par appliquerVisibiliteJournal(),
@@ -684,6 +709,20 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 
     <!-- Analyses -->
     <div id="pane-analyses" class="tab-pane"><div id="analyse-content" style="padding:0"></div></div>
+
+    <!-- CODIR / Pilotage direction (ajouté août 2026) — réservé Admin + Encadrement, voir
+         peutVoirCodir() et 03_REGLES_METIER_ET_ROLES.md. Lecture seule : aucune action possible
+         depuis cet onglet. -->
+    <div id="pane-codir" class="tab-pane">
+      <div class="filters">
+        <select id="codir-site" onchange="setSiteFilter('codir',this.value)"><option value="">🌍 Tous les territoires</option><option value="Reunion">Réunion</option><option value="Mayotte">Mayotte</option></select>
+        <button class="filter-btn" onclick="document.getElementById('codir-site').value='';setSiteFilter('codir','');">🔄 Réinitialiser</button>
+        <button class="filter-btn" onclick="exporterCodir()">📥 Export Excel</button>
+        <button class="filter-btn" onclick="window.print()">🖨️ Imprimer / PDF</button>
+      </div>
+      <div id="codir-content"></div>
+    </div>
+
     <div id="pane-utilisateurs" class="tab-pane"><div id="users-content" style="padding:0"></div></div>
 
     <!-- Journal d'audit des actions sensibles (ajouté août 2026) — réservé Admin, voir
@@ -729,6 +768,7 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
     <div class="bnav-item" data-tab="documents" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📄</span><span>FDS</span></div>
     <div class="bnav-item" data-tab="maintenance" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🔧</span><span>Maint.</span></div>
     <div class="bnav-item" data-tab="analyses" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">📈</span><span>Analyses</span></div>
+    <div class="bnav-item" data-tab="codir" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🏛️</span><span>CODIR</span></div>
     <div class="bnav-item" data-tab="utilisateurs" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">👥</span><span>Users</span></div>
     <div class="bnav-item" data-tab="absences" onclick="goTabMobile(this);closeMobileMenu()"><span class="bi">🧑‍💼</span><span>Absences</span></div>
     <div class="bnav-item" onclick="closeMobileMenu()"><span class="bi">✕</span><span>Fermer</span></div>
@@ -1120,6 +1160,14 @@ function peutGererBrasseurs(code){
   var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
   return role==='logistique'||role==='logistique_mayotte';
 }
+// Peut voir l'onglet CODIR / Pilotage direction : Admin + Encadrement UNIQUEMENT (pas Logistique,
+// contrairement à peutVoirCompta/peutVoirEPI) — écran de pilotage direction, pas un outil de gestion
+// courante. Voir 03_REGLES_METIER_ET_ROLES.md.
+function peutVoirCodir(code){
+  if(estAdmin(code))return true;
+  var role=(employesByCode[code]&&employesByCode[code].droits||'').toLowerCase().replace(/[\s-]+/g,'_');
+  return role==='encadrement';
+}
 var CT_CODES=['ROJO','LAHU','AUAR','BOMA','RIJB','MEJO','GOLU','SCST','CANI','DACH','TOHO'];
 var USERS_CACHE=null;
 var d=null, im={}, fdsMap={}, photosMap={}, reservations=[], maintenance=null;
@@ -1410,6 +1458,7 @@ function renderTab(name){
     case 'analyses':
       loadImmoMeta().then(function(){renderAnalyse();});
       break;
+    case 'codir': if(!dataLoaded.codir)loadCodir(); else renderCodir(); break;
     case 'utilisateurs':
       loadEmployes().then(function(){renderUsers();});
       break;
@@ -5839,7 +5888,7 @@ async function enrichirImmosEBP(){
 }
 
 // État des filtres site par onglet (Réunion/Mayotte/'' = tous)
-var SITE_FILTERS={circulation:'',depot:'',historique:'',transferts:'',reservations:'',maintenance:'',alertes:'','vue-generale':''};
+var SITE_FILTERS={circulation:'',depot:'',historique:'',transferts:'',reservations:'',maintenance:'',alertes:'','vue-generale':'',codir:''};
 function setSiteFilter(tab,val){SITE_FILTERS[tab]=val;renderTab(tab);}
 // Réinitialise une liste de champs filtres (texte/select) à leur valeur par défaut, puis exécute un callback
 function reinitialiserFiltres(ids,callback){
@@ -6406,6 +6455,350 @@ function renderAnalyse(){
   var aDiv=document.getElementById('analyse-content');
   if(!aDiv){var ap=document.getElementById('pane-analyses');if(ap){ap.innerHTML='<div id="analyse-content" style="padding:0"></div>';aDiv=document.getElementById('analyse-content');}}
   if(aDiv)aDiv.innerHTML=html;
+}
+
+// ══════════════ CODIR / Pilotage direction (ajouté août 2026) ══════════════════════════════
+// Onglet stratégique pour l'arbitrage direction Immo Tracker vs solutions du marché (Organilog,
+// Hector) — voir 00_CONTEXTE_PROJET.md et 04_HISTORIQUE_DECISIONS.md. Réservé Admin + Encadrement
+// (peutVoirCodir(), déclarée avec les autres peutVoir*/peutGerer*). Lecture seule : aucune écriture,
+// aucune nouvelle capacité ROLE_CAPS. Réutilise systématiquement ce qui existe déjà (d, immoMeta,
+// reservations, calcAmort, ratiosReforme, estImmoActivite, exporterExcel, SOCLE_IMMO_ENTETES...) —
+// la seule donnée non disponible ailleurs est l'historique complet (tous statuts) de
+// Transferts_En_Attente, servie par le nouvel endpoint Worker ?codir=1 (lecture seule, non protégé
+// par jeton, même niveau que ?dashboard=1/?immo_metadata=1 déjà consommés sans jeton par Analyses).
+var CODIR_EXTRA=null;
+var CODIR_COURANT=null;
+var CODIR_TAUX_HORAIRE_DEFAUT=25; // €/h — hypothèse modifiable à l'écran, voir 04_HISTORIQUE_DECISIONS.md
+var CODIR_MIN_PAR_RECHERCHE=15;   // minutes économisées par recherche évitée — hypothèse déclarée, jamais masquée
+var CODIR_TAUX_HORAIRE=CODIR_TAUX_HORAIRE_DEFAUT;
+var codirReformeSortKey='ratio_vnc',codirReformeSortDir=-1;
+
+// Heure de La Réunion (UTC+4), indépendamment du fuseau du navigateur : on décale l'horodatage ISO
+// (stocké en UTC par le Worker) de 4h puis on lit ses champs UTC comme si c'était l'heure locale.
+function dateReunion(iso){var dt=new Date(iso);if(isNaN(dt.getTime()))return null;return new Date(dt.getTime()+4*3600*1000);}
+function trimestreOf(iso){var dR=dateReunion(iso);if(!dR)return null;return{annee:dR.getUTCFullYear(),trim:Math.floor(dR.getUTCMonth()/3)+1};}
+function codirTrimestreLabel(a,t){return 'T'+t+' '+a;}
+// Les 5 derniers trimestres CALENDAIRES (le trimestre en cours + les 4 précédents), pas glissants.
+function codirTrimestres5(){
+  var nowR=dateReunion(new Date().toISOString());
+  var y=nowR.getUTCFullYear(),t=Math.floor(nowR.getUTCMonth()/3)+1;
+  var list=[];
+  for(var i=4;i>=0;i--){
+    var idx=(t-1)-i,yy=y;
+    while(idx<0){idx+=4;yy--;}
+    list.push({annee:yy,trim:idx+1});
+  }
+  return list;
+}
+function codirCoutsTrimestriels(all,fs){
+  var trims=codirTrimestres5();
+  var map={};trims.forEach(function(tr){map[tr.annee+'-'+tr.trim]={annee:tr.annee,trim:tr.trim,label:codirTrimestreLabel(tr.annee,tr.trim),cout:0,count:0};});
+  (all||[]).filter(function(m){return(m.type_mouvement==='Réparation'||m.type_mouvement==='Entretien')&&(!fs||siteImmoDash(m.code_im)===fs);}).forEach(function(m){
+    var to=trimestreOf(m.horodatage);if(!to)return;
+    var key=to.annee+'-'+to.trim,e=map[key];
+    if(e){var c=coutReparationMouvement(m);e.cout+=c;if(c>0)e.count++;}
+  });
+  return trims.map(function(tr){return map[tr.annee+'-'+tr.trim];});
+}
+// 12 dernières semaines glissantes (buckets de 7 jours, pas des semaines calendaires ISO — plus
+// simple et suffisant pour un graphique de tendance, sans les cas limites de numérotation ISO).
+function codirSemaines12(all,fs){
+  var nowR=dateReunion(new Date().toISOString()).getTime();
+  var buckets=[];
+  for(var i=11;i>=0;i--){var fin=nowR-i*7*86400000,deb=fin-7*86400000;buckets.push({debut:deb,fin:fin,count:0,label:i===0?'Cette sem.':'S-'+i});}
+  (all||[]).forEach(function(m){
+    if(fs&&siteImmoDash(m.code_im)!==fs)return;
+    var dR=dateReunion(m.horodatage);if(!dR)return;
+    var t=dR.getTime();
+    for(var i=0;i<buckets.length;i++){if(t>=buckets[i].debut&&t<buckets[i].fin){buckets[i].count++;return;}}
+  });
+  return buckets;
+}
+// Candidats à la réforme — même critère que l'onglet Analyses (≥2 pannes OU coût réparations >500€
+// OU seuil de ratio réglable atteint, voir SEUIL_REFORME_PCT), recalculé indépendamment ici (pas un
+// appel à renderAnalyse) pour ne rien risquer sur cet onglet déjà en production.
+function calculerCandidatsReforme(all){
+  var immoP={};all.filter(function(m){return m.type_mouvement==='Panne'&&estImmoActivite(m.code_im);}).forEach(function(m){immoP[m.code_im]=(immoP[m.code_im]||0)+1;});
+  var costByImmo={};
+  all.filter(function(m){return(m.type_mouvement==='Réparation'||m.type_mouvement==='Entretien')&&estImmoActivite(m.code_im);}).forEach(function(m){
+    var c=coutReparationMouvement(m);
+    if(c>0){if(!costByImmo[m.code_im])costByImmo[m.code_im]={total:0,count:0};costByImmo[m.code_im].total+=c;costByImmo[m.code_im].count++;}
+  });
+  var nowTs=Date.now();
+  var allCodes=Object.keys(immoP).concat(Object.keys(costByImmo)).filter(function(v,i,a){return a.indexOf(v)===i;});
+  var candidats=[];
+  allCodes.forEach(function(code){
+    var nbPannes=immoP[code]||0;
+    var metaC=immoMeta[code]||{};
+    var dateAchat=metaC.date_achat||'';
+    var ageMois=dateAchat?Math.max(1,Math.round((nowTs-new Date(dateAchat).getTime())/(30*86400000))):0;
+    var r=ratiosReforme(code,all);
+    var alerte=franchitSeuilReforme(r);
+    var raison='';
+    if(r.vncEpuisee)raison='VNC épuisée + réparations en cours';
+    else if(r.ratioVNC>=SEUIL_REFORME_PCT)raison=r.ratioVNC+'% de la VNC en réparations';
+    else if(r.ratioAchat>=SEUIL_REFORME_PCT)raison=r.ratioAchat+'% de la valeur d\'achat en réparations';
+    else if(nbPannes>=2)raison=nbPannes+'x en panne';
+    else if(r.coutTotal>500)raison='Coût réparations : '+r.coutTotal.toFixed(0)+'€';
+    else return;
+    candidats.push({code_im:code,libelle:getLib(code),site:siteImmoDash(code),nb_pannes:nbPannes,val_achat:r.valAchat,vnc:r.vnc,vnc_epuisee:r.vncEpuisee,cout_rep:r.coutTotal,ratio_achat:r.ratioAchat,ratio_vnc:r.ratioVNC,age_mois:ageMois,raison:raison,alerte:alerte});
+  });
+  candidats.sort(function(a,b){return(b.alerte?1:0)-(a.alerte?1:0)||b.ratio_vnc-a.ratio_vnc||b.ratio_achat-a.ratio_achat||b.nb_pannes-a.nb_pannes;});
+  return candidats;
+}
+// Raisons de sortie effectivement utilisées par l'app (marquer_statut_immo/declarer_vol, voir
+// ouvrirModalSortie) — pas de type "Cession" implémenté à ce jour, contrairement au libellé
+// générique "HS/Vol/Cession" employé dans les documents de cadrage direction.
+var CODIR_ETATS_SORTIE=['Hors service définitif','Perdu','Volé','Disparu'];
+function codirTauxSortie(all,fs){
+  var j365=Date.now()-365*86400000;
+  var vues={};
+  all.filter(function(m){return m.type_mouvement==='Archivage'&&CODIR_ETATS_SORTIE.indexOf(m.etat)!==-1&&new Date(m.horodatage).getTime()>=j365&&(!fs||siteImmoDash(m.code_im)===fs);})
+    .forEach(function(m){if(!vues[m.code_im]||new Date(m.horodatage)>new Date(vues[m.code_im].horodatage))vues[m.code_im]=m;});
+  var sorties=Object.values(vues);
+  var valeur=0;sorties.forEach(function(s){valeur+=(immoMeta[s.code_im]||{}).valeur_achat||0;});
+  var parcActuel=Object.keys(immoMeta).filter(function(c){return immoMeta[c].actif!==false&&(!fs||siteImmoDash(c)===fs);}).length;
+  var parcRef=parcActuel+sorties.length; // parc "avant sortie" : le dénominateur ne doit pas être amputé de ce qu'on compte au numérateur
+  var parEtat={};CODIR_ETATS_SORTIE.forEach(function(e){parEtat[e]=0;});
+  sorties.forEach(function(s){parEtat[s.etat]=(parEtat[s.etat]||0)+1;});
+  return{nb:sorties.length,valeur:valeur,parcRef:parcRef,taux:parcRef>0?Math.round(sorties.length/parcRef*1000)/10:0,parEtat:parEtat,detail:sorties};
+}
+function codirValeurParc(fs){
+  var parTerr={Reunion:0,Mayotte:0};
+  var parCat={};
+  var valCirc=0,valDepot=0,valJamais=0;
+  var invByCode={};(d.inventory||[]).forEach(function(i){invByCode[i.code_im]=i;});
+  Object.keys(immoMeta).forEach(function(code){
+    var mt=immoMeta[code];
+    if(!mt||mt.actif===false)return;
+    var site=mt.site==='Mayotte'?'Mayotte':'Reunion';
+    if(fs&&site!==fs)return;
+    var v=mt.valeur_achat||0;
+    parTerr[site]+=v;
+    var cat=getCat(code)||'Sans catégorie';
+    parCat[cat]=(parCat[cat]||0)+v;
+    var inv=invByCode[code];
+    if(!inv)valJamais+=v;
+    else if(inv.statut==='En circulation')valCirc+=v;
+    else valDepot+=v; // Au dépôt + Chez prestataire (cas marginal)
+  });
+  return{parTerr:parTerr,parCat:parCat,valCirc:valCirc,valDepot:valDepot,valJamais:valJamais,total:parTerr.Reunion+parTerr.Mayotte};
+}
+function codirAdoption(fs){
+  var j30=Date.now()-30*86400000;
+  var actifs30={};
+  (d.all_movements||[]).forEach(function(m){if(m.code_employe&&new Date(m.horodatage).getTime()>=j30&&(!fs||siteImmoDash(m.code_im)===fs))actifs30[m.code_employe]=true;});
+  (reservations||[]).forEach(function(r){if(r.code_employe&&r.statut!=='Annulee'&&r.horodatage&&new Date(r.horodatage).getTime()>=j30&&(!fs||siteEffectifResa(r)===fs))actifs30[r.code_employe]=true;});
+  var totalActifs=employesList.filter(function(e){return e.Actif!==false&&(!fs||normSiteD(e.Site)===fs);}).length;
+  var nbActifs30=Object.keys(actifs30).filter(function(c){return employesByCode[c];}).length;
+  var nbPhotos=0,nbMvtAvecPhoto=0,nbMvtAvecEtat=0,totalMvt=0;
+  (d.all_movements||[]).forEach(function(m){
+    if(fs&&siteImmoDash(m.code_im)!==fs)return;
+    totalMvt++;
+    if(m.photos&&m.photos.length){nbMvtAvecPhoto++;nbPhotos+=m.photos.length;}
+    if(m.etat)nbMvtAvecEtat++;
+  });
+  return{totalActifs:totalActifs,nbActifs30:nbActifs30,pct:totalActifs>0?Math.round(nbActifs30/totalActifs*1000)/10:0,nbPhotos:nbPhotos,nbMvtAvecPhoto:nbMvtAvecPhoto,nbMvtAvecEtat:nbMvtAvecEtat,totalMvt:totalMvt};
+}
+// Délai moyen de validation (Bloc 3) — ESTIMATION best-effort : Transferts_En_Attente ne conserve
+// aucun lien explicite vers le Mouvement créé par `valider` (voir action `valider` dans worker.js).
+// On apparie chaque demande validée (Created) au Mouvement Transfert/Retour du même code IM survenu
+// juste après (fenêtre de 30j), et on ne retient que les validations elles-mêmes tombées dans les
+// 30 derniers jours. Nombre apparié/total affiché pour rester honnête sur la fiabilité de la mesure.
+function codirDelaiValidation(all,fs){
+  if(!CODIR_EXTRA||!CODIR_EXTRA.transferts_historique)return null;
+  var j30=Date.now()-30*86400000;
+  var valides=CODIR_EXTRA.transferts_historique.filter(function(t){return t.statut==='Validé'&&t.created&&(!fs||siteImmoDash(t.code_im)===fs);});
+  var mouvementsRecents=(all||[]).filter(function(m){return(m.type_mouvement==='Transfert'||m.type_mouvement==='Retour');});
+  var delais=[];
+  valides.forEach(function(t){
+    var createdMs=new Date(t.created).getTime();
+    if(isNaN(createdMs))return;
+    var meilleur=null,meilleurEcart=Infinity;
+    mouvementsRecents.forEach(function(m){
+      if(m.code_im!==t.code_im)return;
+      var mMs=new Date(m.horodatage).getTime();
+      var ecart=mMs-createdMs;
+      if(ecart>=0&&ecart<30*86400000&&ecart<meilleurEcart){meilleur=m;meilleurEcart=ecart;}
+    });
+    if(meilleur){
+      var valMs=new Date(meilleur.horodatage).getTime();
+      if(valMs>=j30)delais.push((valMs-createdMs)/3600000);
+    }
+  });
+  if(!delais.length)return{nb:0,total:valides.length,moyenneH:null};
+  var moy=delais.reduce(function(a,b){return a+b;},0)/delais.length;
+  return{nb:delais.length,total:valides.length,moyenneH:Math.round(moy*10)/10};
+}
+function setCodirTauxHoraire(v){var n=parseFloat((v||'').toString().replace(',','.'));CODIR_TAUX_HORAIRE=(!isNaN(n)&&n>0)?n:CODIR_TAUX_HORAIRE_DEFAUT;renderCodir();}
+function sortCodirReforme(key){if(codirReformeSortKey===key)codirReformeSortDir*=-1;else{codirReformeSortKey=key;codirReformeSortDir=-1;}renderCodir();}
+
+async function loadCodir(){
+  dataLoaded.codir=true;
+  if(!peutVoirCodir(ADMIN_SESSION.code)){renderCodir();return;}
+  try{await loadImmoMeta();}catch(e){}
+  if(!CODIR_EXTRA){
+    try{var r=await fetch(W+'?codir=1');CODIR_EXTRA=await r.json();}catch(e){CODIR_EXTRA={transferts_historique:[]};}
+  }
+  renderCodir();
+}
+
+function renderCodir(){
+  var div=document.getElementById('codir-content');
+  if(!div)return;
+  if(!peutVoirCodir(ADMIN_SESSION.code)){div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à la direction (Admin, Encadrement).</p>';return;}
+  if(!d){div.innerHTML='<p class="es" style="padding:40px">Chargement...</p>';return;}
+  var fs=SITE_FILTERS.codir||'';
+  var all=fs?(d.all_movements||[]).filter(function(m){return siteImmoDash(m.code_im)===fs;}):(d.all_movements||[]);
+
+  var vp=codirValeurParc(fs);
+  var trims=codirCoutsTrimestriels(d.all_movements||[],fs);
+  var candidats=calculerCandidatsReforme(d.all_movements||[]).filter(function(x){return !fs||x.site===fs;});
+  var candidatsAff=candidats.slice(0,10).slice();
+  var sortKeyMap={code_im:1,val_achat:1,ratio_achat:1,ratio_vnc:1,nb_pannes:1,age_mois:1,cout_rep:1};
+  if(sortKeyMap[codirReformeSortKey]){
+    var sk=codirReformeSortKey;
+    candidatsAff.sort(function(a,b){
+      if(sk==='code_im')return codirReformeSortDir*a.code_im.localeCompare(b.code_im);
+      return codirReformeSortDir*((a[sk]||0)-(b[sk]||0));
+    });
+  }
+  var sortie=codirTauxSortie(d.all_movements||[],fs);
+  var semaines=codirSemaines12(d.all_movements||[],fs);
+  var adopt=codirAdoption(fs);
+  var delaiVal=codirDelaiValidation(d.all_movements||[],fs);
+  var coutReparationsTotal=all.filter(function(m){return m.type_mouvement==='Réparation'||m.type_mouvement==='Entretien';}).reduce(function(s,m){return s+coutReparationMouvement(m);},0);
+  var nbConsultations=all.length+(reservations||[]).filter(function(r){return r.statut!=='Annulee'&&(!fs||siteEffectifResa(r)===fs);}).length;
+  var tempsEconomiseH=nbConsultations*CODIR_MIN_PAR_RECHERCHE/60;
+  var valeurTempsEconomise=tempsEconomiseH*CODIR_TAUX_HORAIRE;
+
+  CODIR_COURANT={fs:fs,vp:vp,trims:trims,candidats:candidats,sortie:sortie,semaines:semaines,adopt:adopt,delaiVal:delaiVal,coutReparationsTotal:coutReparationsTotal,nbConsultations:nbConsultations,tempsEconomiseH:tempsEconomiseH,valeurTempsEconomise:valeurTempsEconomise};
+
+  var sortArrow=function(key){return codirReformeSortKey===key?(codirReformeSortDir>0?' ▲':' ▼'):'';};
+  var html='';
+  html+='<div id="codir-print-header" style="display:none">'+
+    '<h2 style="margin:0 0 4px">🏛️ Tableau de bord CODIR — Immo Tracker</h2>'+
+    '<p style="margin:0 0 14px;font-size:12px;color:#555">Electricité Services Réunion — Généré le '+fmtDT(new Date().toISOString())+' — Territoire : '+(fs?territoireLabel(fs):'La Réunion + Mayotte')+'</p></div>';
+
+  html+='<div class="card"><div class="card-head"><h3>💰 Bloc 1 — Valeur du parc</h3></div><div style="padding:14px">';
+  html+='<div class="kpi-grid" style="margin-bottom:12px">';
+  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">💰</div><div class="kv">'+eur(vp.total)+'</div><div class="kl">Valeur totale (parc actif)</div></div>';
+  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">🔄</div><div class="kv">'+eur(vp.valCirc)+'</div><div class="kl">Valeur en circulation</div></div>';
+  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">🏭</div><div class="kv">'+eur(vp.valDepot)+'</div><div class="kl">Valeur au dépôt</div></div>';
+  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">❔</div><div class="kv">'+eur(vp.valJamais)+'</div><div class="kl">Jamais mouvementées</div></div>';
+  html+='</div>';
+  html+='<div class="charts-grid">'+
+    '<div class="chart-card"><h3>Valeur par territoire</h3><div class="chart-wrap"><canvas id="ch-codir-terr"></canvas></div></div>'+
+    '<div class="chart-card"><h3>Valeur par catégorie</h3><div class="chart-wrap"><canvas id="ch-codir-cat"></canvas></div></div>'+
+    '<div class="chart-card"><h3>Circulation vs dépôt (valeur)</h3><div class="chart-wrap"><canvas id="ch-codir-circdep"></canvas></div></div>'+
+    '</div></div></div>';
+
+  html+='<div class="card"><div class="card-head"><h3>🔧 Bloc 2 — Coûts et réforme</h3></div><div style="padding:14px">';
+  html+='<div class="chart-card" style="margin-bottom:14px"><h3>Coût réparations par trimestre</h3><div class="chart-wrap"><canvas id="ch-codir-trim"></canvas></div></div>';
+  html+='<div class="kpi-grid" style="margin-bottom:12px">';
+  html+='<div class="kpi red" style="cursor:default"><div class="kpi-icon">🚨</div><div class="kv">'+candidats.length+'</div><div class="kl">Candidates à la réforme</div></div>';
+  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">⛔</div><div class="kv">'+sortie.nb+'</div><div class="kl">Sorties (12 mois glissants)</div></div>';
+  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">💶</div><div class="kv">'+eur(sortie.valeur)+'</div><div class="kl">Valeur sortie à temps</div></div>';
+  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">📉</div><div class="kv">'+sortie.taux+'%</div><div class="kl">Taux de sortie annuel</div></div>';
+  html+='</div>';
+  html+='<p style="font-size:11px;color:var(--grey);margin:0 0 8px">Sorties par motif (12 derniers mois) : '+CODIR_ETATS_SORTIE.map(function(e){return e+' : '+(sortie.parEtat[e]||0);}).join(' · ')+'. Raisons réellement utilisées par l\'app — pas de motif « Cession » implémenté à ce jour.</p>';
+  html+='<div class="tbl-wrap"><table><thead><tr>'+
+    '<th style="cursor:pointer" onclick="sortCodirReforme(\'code_im\')">Code IM'+sortArrow('code_im')+'</th>'+
+    '<th>Libellé</th><th>Territoire</th>'+
+    '<th style="cursor:pointer" onclick="sortCodirReforme(\'nb_pannes\')">Pannes'+sortArrow('nb_pannes')+'</th>'+
+    '<th style="cursor:pointer" onclick="sortCodirReforme(\'val_achat\')">Valeur achat'+sortArrow('val_achat')+'</th>'+
+    '<th>VNC</th>'+
+    '<th style="cursor:pointer" onclick="sortCodirReforme(\'cout_rep\')">Coût répar.'+sortArrow('cout_rep')+'</th>'+
+    '<th style="cursor:pointer" onclick="sortCodirReforme(\'ratio_achat\')">% achat'+sortArrow('ratio_achat')+'</th>'+
+    '<th style="cursor:pointer" onclick="sortCodirReforme(\'ratio_vnc\')">% VNC'+sortArrow('ratio_vnc')+'</th>'+
+    '<th style="cursor:pointer" onclick="sortCodirReforme(\'age_mois\')">Âge'+sortArrow('age_mois')+'</th>'+
+    '</tr></thead><tbody>';
+  if(!candidatsAff.length)html+='<tr><td colspan="10" class="es">Aucun candidat au seuil actuel.</td></tr>';
+  else candidatsAff.forEach(function(x){
+    html+='<tr class="'+(x.alerte?'urgent-row':'')+'">'+
+      '<td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td>'+
+      '<td style="font-size:12px">'+x.libelle+'</td>'+
+      '<td>'+badgeSiteD(x.site)+'</td>'+
+      '<td style="text-align:center">'+x.nb_pannes+'</td>'+
+      '<td>'+(x.val_achat?eur(x.val_achat):'--')+'</td>'+
+      '<td>'+(x.vnc_epuisee?'épuisée':(x.vnc?eur(x.vnc):'--'))+'</td>'+
+      '<td>'+(x.cout_rep?eur(x.cout_rep):'--')+'</td>'+
+      '<td>'+(x.ratio_achat?x.ratio_achat+'%':'--')+'</td>'+
+      '<td>'+(x.ratio_vnc?x.ratio_vnc+'%':'--')+'</td>'+
+      '<td>'+(x.age_mois?x.age_mois+'m':'--')+'</td></tr>';
+  });
+  html+='</tbody></table></div></div></div>';
+
+  html+='<div class="card"><div class="card-head"><h3>👷 Bloc 3 — Adoption terrain</h3></div><div style="padding:14px">';
+  html+='<div class="chart-card" style="margin-bottom:14px"><h3>Mouvements par semaine (12 dern. sem.)</h3><div class="chart-wrap"><canvas id="ch-codir-sem"></canvas></div></div>';
+  html+='<div class="kpi-grid">';
+  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">👷</div><div class="kv">'+adopt.pct+'%</div><div class="kl">Employés actifs (30j) — '+adopt.nbActifs30+'/'+adopt.totalActifs+'</div></div>';
+  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">⏱</div><div class="kv">'+(delaiVal&&delaiVal.moyenneH!=null?delaiVal.moyenneH+'h':'—')+'</div><div class="kl">Délai moy. validation (30j, estim.'+(delaiVal?' '+delaiVal.nb+'/'+delaiVal.total:'')+')</div></div>';
+  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">📷</div><div class="kv">'+adopt.nbPhotos+'</div><div class="kl">Photos jointes ('+adopt.nbMvtAvecPhoto+' mouvements)</div></div>';
+  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">📋</div><div class="kv">'+adopt.nbMvtAvecEtat+'/'+adopt.totalMvt+'</div><div class="kl">États constatés saisis</div></div>';
+  html+='</div>';
+  html+='<p style="font-size:11px;color:var(--grey);margin-top:8px">Employé « actif » = au moins un mouvement ou une réservation (hors annulées) sur 30 jours. Les scans de campagne d\'inventaire immos ne sont pas comptés séparément (campagne ponctuelle, pas continue).</p>';
+  html+='</div></div>';
+
+  html+='<div class="card"><div class="card-head"><h3>📊 Bloc 4 — ROI</h3></div><div style="padding:14px">';
+  html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Éléments factuels suivis par l\'app (preuve de valeur, pas un gain chiffré)</h4>';
+  html+='<div class="kpi-grid" style="margin-bottom:14px">';
+  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">🔧</div><div class="kv">'+eur(coutReparationsTotal)+'</div><div class="kl">Coût réparations suivies (total)</div></div>';
+  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">✅</div><div class="kv">'+eur(sortie.valeur)+'</div><div class="kl">Immos réformées à temps (12 mois)</div></div>';
+  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">📦</div><div class="kv">n/d</div><div class="kl">Écarts d\'inventaire résolus (ouvrir Inventaire immos)</div></div>';
+  html+='</div>';
+  html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Hypothèse chiffrée (déclarée, modifiable)</h4>';
+  html+='<div class="print-hide" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px">'+
+    '<span>Taux horaire chargé :</span><input type="number" id="codir-taux-h" value="'+CODIR_TAUX_HORAIRE+'" min="1" step="1" style="width:70px;padding:6px 8px;border:2px solid var(--ds-border-strong,#ddd);border-radius:8px" onchange="setCodirTauxHoraire(this.value)"> €/h'+
+    '</div>';
+  html+='<p style="font-size:12px;background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:10px">⚠️ Hypothèse : chaque mouvement/réservation enregistré dans l\'app ('+nbConsultations+' au total'+(fs?', territoire filtré':'')+') fait économiser en moyenne <b>'+CODIR_MIN_PAR_RECHERCHE+' minutes</b> de recherche physique évitée, valorisées à <b>'+CODIR_TAUX_HORAIRE+' €/h</b>. Ce n\'est pas une mesure directe de l\'usage de la fonction Rechercher (non télémétrée) — un chiffre honnête avec hypothèse visible plutôt qu\'un chiffre gonflé.</p>';
+  html+='<div class="kpi-grid" style="margin-bottom:14px">';
+  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">⏱</div><div class="kv">'+Math.round(tempsEconomiseH)+'h</div><div class="kl">Temps estimé économisé</div></div>';
+  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">💶</div><div class="kv">'+eur(valeurTempsEconomise)+'</div><div class="kl">Valeur estimée (hypothèse)</div></div>';
+  html+='</div>';
+  html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Comparaison de coût (chiffres Note de synthèse direction, juillet 2026)</h4>';
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Solution</th><th>Coût mensuel</th><th>Coût annuel</th></tr></thead><tbody>'+
+    '<tr style="font-weight:800;color:var(--green)"><td>Immo Tracker (interne)</td><td>&lt; 17 €</td><td>&lt; 200 €</td></tr>'+
+    '<tr><td>Marché (Organilog / Hector)</td><td>500 – 1 500 €</td><td>6 000 – 18 000 €</td></tr>'+
+    '</tbody></table></div>';
+  html+='</div></div>';
+
+  div.innerHTML=html;
+
+  ['codirTerr','codirCat','codirCircdep','codirTrim','codirSem'].forEach(function(k){if(charts[k]){charts[k].destroy();}});
+  charts.codirTerr=new Chart(document.getElementById('ch-codir-terr'),{type:'doughnut',data:{labels:['Réunion','Mayotte'],datasets:[{data:[vp.parTerr.Reunion,vp.parTerr.Mayotte],backgroundColor:['#2980B9','#1E9E5A'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  var catKeys=Object.keys(vp.parCat).sort(function(a,b){return vp.parCat[b]-vp.parCat[a];}).slice(0,8);
+  charts.codirCat=new Chart(document.getElementById('ch-codir-cat'),{type:'bar',data:{labels:catKeys,datasets:[{data:catKeys.map(function(k){return vp.parCat[k];}),backgroundColor:'#A67A1E',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});
+  charts.codirCircdep=new Chart(document.getElementById('ch-codir-circdep'),{type:'bar',data:{labels:['Circulation','Dépôt','Jamais sorties'],datasets:[{data:[vp.valCirc,vp.valDepot,vp.valJamais],backgroundColor:['#A67A1E','#1E9E5A','#BDC3C7'],borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+  charts.codirTrim=new Chart(document.getElementById('ch-codir-trim'),{type:'bar',data:{labels:trims.map(function(t){return t.label;}),datasets:[{data:trims.map(function(t){return Math.round(t.cout);}),backgroundColor:'#DC3545',borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  charts.codirSem=new Chart(document.getElementById('ch-codir-sem'),{type:'bar',data:{labels:semaines.map(function(s){return s.label;}),datasets:[{data:semaines.map(function(s){return s.count;}),backgroundColor:'#2980B9',borderRadius:4,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+
+function exporterCodir(){
+  if(!CODIR_COURANT){alert('Données non chargées.');return;}
+  var c=CODIR_COURANT;
+  var r1=[['Territoire','Valeur totale (€)'],['Réunion',c.vp.parTerr.Reunion],['Mayotte',c.vp.parTerr.Mayotte],[],['Répartition','Valeur (€)'],['En circulation',c.vp.valCirc],['Au dépôt',c.vp.valDepot],['Jamais mouvementées',c.vp.valJamais],[],['Catégorie','Valeur (€)']].concat(
+    Object.keys(c.vp.parCat).sort(function(a,b){return c.vp.parCat[b]-c.vp.parCat[a];}).map(function(k){return[k,c.vp.parCat[k]];})
+  );
+  var r2=c.trims.map(function(t){return[t.label,t.cout,t.count];});
+  var r3=c.candidats.map(function(x){return[x.code_im,x.libelle,territoireLabel(x.site),x.nb_pannes,x.val_achat,x.vnc,x.cout_rep,x.ratio_achat,x.ratio_vnc,x.age_mois,x.raison];});
+  var r4=c.semaines.map(function(s){return[s.label,s.count];});
+  var r5=[['Indicateur','Valeur'],
+    ['Employés actifs (30j)',c.adopt.nbActifs30+'/'+c.adopt.totalActifs+' ('+c.adopt.pct+'%)'],
+    ['Délai moy. validation transferts (estim., 30j)',c.delaiVal&&c.delaiVal.moyenneH!=null?c.delaiVal.moyenneH+'h ('+c.delaiVal.nb+'/'+c.delaiVal.total+' appariés)':'n/d'],
+    ['Photos jointes',c.adopt.nbPhotos],['Mouvements avec photo',c.adopt.nbMvtAvecPhoto],['Mouvements avec état constaté',c.adopt.nbMvtAvecEtat+'/'+c.adopt.totalMvt],
+    [],['Coût réparations suivies (total)',c.coutReparationsTotal],['Immos réformées à temps (12 mois, valeur)',c.sortie.valeur],['Immos sorties (12 mois, nb)',c.sortie.nb],['Taux de sortie annuel',c.sortie.taux+'%'],
+    [],['Hypothèse ROI — consultations retenues',c.nbConsultations],['Hypothèse ROI — minutes/consultation',CODIR_MIN_PAR_RECHERCHE],['Hypothèse ROI — taux horaire (€/h)',CODIR_TAUX_HORAIRE],['Hypothèse ROI — temps économisé (h)',Math.round(c.tempsEconomiseH)],['Hypothèse ROI — valeur estimée (€)',Math.round(c.valeurTempsEconomise)],
+    [],['Immo Tracker — coût annuel','< 200 €'],['Marché (Organilog/Hector) — coût annuel','6 000 – 18 000 €']
+  ];
+  exporterExcel(nomFichierExport('CODIR'),[
+    {nom:'Filtres',entetes:['Filtres actifs'],lignes:[[ligneFiltresActifs({Territoire:c.fs})]]},
+    {nom:'Valeur du parc',entetes:['',''],lignes:r1,cols:[30,18]},
+    {nom:'Couts trimestriels',entetes:['Trimestre','Cout (€)','Nb réparations/entretiens'],lignes:r2,cols:[14,16,20]},
+    {nom:'Candidats reforme',entetes:['Code IM','Libellé','Territoire','Pannes','Valeur achat','VNC','Coût répar.','% achat','% VNC','Âge (mois)','Raison'],lignes:r3,cols:[12,40,10,10,14,14,14,10,10,12,30]},
+    {nom:'Mouvements par semaine',entetes:['Semaine','Mouvements'],lignes:r4,cols:[14,14]},
+    {nom:'Adoption et ROI',entetes:['Indicateur','Valeur'],lignes:r5,cols:[42,24]}
+  ]);
 }
 
 // ── Fiche immo ───────────────────────────────────────────

@@ -1150,6 +1150,29 @@ async function handleRequest(request) {
     }));
   }
 
+  // ── CODIR / Pilotage direction (lecture seule, ajouté août 2026) ────────────────────────────
+  // Fournit uniquement ce que les endpoints existants ne couvrent pas déjà : la Vue générale/
+  // Analyses recomposent tout côté dashboard depuis ?dashboard=1 (mouvements, inventaire),
+  // ?immo_metadata=1 (valeur d'achat, site, compte...) et ?reservations=1, déjà chargés en mémoire
+  // — l'onglet CODIR réutilise exactement ces mêmes données pour le Bloc 1 (valeur du parc) et une
+  // bonne partie des Blocs 2/3, sans nouvel appel Worker. La seule donnée manquante : l'historique
+  // COMPLET (tous statuts, y compris déjà validés) de Transferts_En_Attente — nécessaire pour
+  // estimer le délai moyen de validation (Bloc 3), calculé côté client en appariant le `created` de
+  // la demande au `Horodatage` du Mouvement résultant le plus proche (aucun identifiant commun
+  // n'est stocké entre les deux listes, voir 04_HISTORIQUE_DECISIONS.md — estimation, pas un calcul
+  // exact). Non protégé par jeton, comme ?dashboard=1/?immo_metadata=1 déjà consommés sans jeton par
+  // l'onglet Analyses : ces données (codes IM, statuts, dates — aucun montant) sont strictement
+  // moins sensibles que ce qu'expose déjà ?dashboard=1 (donneur/receveur nommés) — même niveau de
+  // protection que ce que voit déjà Analyses, pas un nouveau palier de confidentialité.
+  if (p.get('codir') === '1') {
+    const items = await paginate(GL + '/Transferts_En_Attente/items?$expand=fields&$orderby=fields/Created%20desc&$top=200', 6);
+    const transfertsHistorique = items.map(i => {
+      const f = i.fields || {};
+      return { code_im: f.Title || '', statut: f.Statut || 'En attente', created: f.Created || '' };
+    });
+    return json({ transferts_historique: transfertsHistorique });
+  }
+
   // ── Campagnes d'inventaire de stock (articles/consommables) ─────────────────
   if (p.get('campagnes_inventaire') === '1') {
     const [campItems, ligneItems] = await Promise.all([
