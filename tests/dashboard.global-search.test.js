@@ -10,7 +10,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const dashboardSrc = fs.readFileSync(path.join(__dirname, '..', 'dashboard.html'), 'utf8');
+// \r\n -> \n : un checkout Windows (core.autocrlf=true) peut convertir dashboard.html en CRLF sur
+// disque alors que le blob Git reste en LF — sans cette normalisation, les marqueurs multi-lignes
+// ci-dessous (littéraux \n) ne matchent plus après un `git stash`/checkout frais, exactement comme
+// le \r?\n déjà utilisé pour la même raison dans tests/security.gated-actions.test.js.
+const dashboardSrc = fs.readFileSync(path.join(__dirname, '..', 'dashboard.html'), 'utf8').replace(/\r\n/g, '\n');
 
 function extractBetween(src, startMarker, endMarker, label) {
   const start = src.indexOf(startMarker);

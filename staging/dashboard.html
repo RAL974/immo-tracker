@@ -8126,12 +8126,32 @@ function ouvrirActionMouvement(type,codeIM,libIM,codeEmp,nomEmp){
   html+='<div class="frow"><label>Note</label><textarea id="act-note" rows="2" placeholder="Motif..."></textarea></div>';
   document.getElementById('act-form').innerHTML=html;
   document.getElementById('act-overlay').classList.add('open');
+  // Réassigné explicitement à chaque ouverture (comme tous les autres flux de cette modale
+  // partagée), plutôt que de compter sur le fait que le bouton pointe déjà vers soumettreAction —
+  // sinon un onclick laissé par un autre flux (suivi panne, réparation...) tourne silencieusement
+  // à la place.
+  resetActBtn().onclick=soumettreAction;
   if(type==='Transfert'&&!codeEmp)attacherRechercheEmploye('act-emp','act-emp-suggest',empListeCandidats(true));
+}
+// Bouton "Confirmer" (#act-confirm-btn) partagé par les ~7 flux qui ouvrent la modale #act-overlay
+// (créer un transfert/retour, suivi panne, résoudre panne, réparation, contre-proposition, sortie
+// définitive, modifier un transfert en attente) — chaque flux réassigne .onclick à son propre
+// gestionnaire à l'ouverture. resetActBtn() remet aussi l'état visuel (texte, disabled) au défaut :
+// sans ce reset, un flux qui désactive le bouton pendant l'envoi (état "…", voir soumettreAction)
+// le laissait désactivé pour TOUS les usages suivants de la modale une fois fermée avec succès —
+// fermerAction() ne réinitialisait auparavant que .onclick, jamais disabled/textContent. Un
+// transfert créé avec succès rendait donc silencieusement "Confirmer" inopérant (clic sur bouton
+// disabled = aucun événement) à la prochaine ouverture, sans erreur ni trace (bug signalé par
+// William, voir 04_HISTORIQUE_DECISIONS.md).
+function resetActBtn(){
+  var btn=document.getElementById('act-confirm-btn');
+  if(btn){btn.disabled=false;btn.textContent='✅ Confirmer';btn.dataset.busy='';}
+  return btn;
 }
 function fermerAction(){
   document.getElementById('act-overlay').classList.remove('open');
   actionCourante=null;
-  var btn=document.getElementById('act-confirm-btn');
+  var btn=resetActBtn();
   if(btn){btn.onclick=soumettreAction;}
 }
 
@@ -8153,7 +8173,7 @@ async function soumettreAction(){
     if(!ec){alert('Sélectionne un employé dans la liste de suggestions.');return;}
     payload.type_mouvement='Transfert';payload.code_employe_receveur=ec;payload.nom_receveur=en;
   }
-  var btn=document.querySelector('#act-overlay .fact-btns button');
+  var btn=document.getElementById('act-confirm-btn');
   if(btn){btn.textContent='...';btn.disabled=true;}
   try{
     var r=await fetch(W+'?action=creer_mouvement_direct',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -8410,13 +8430,18 @@ function ouvrirModifTransfert(tid,cim,recCode,recNom){
     '<div class="frow"><label>Note</label><textarea id="mt-note" rows="2" placeholder="Motif de la modification..."></textarea></div>';
   document.getElementById('act-overlay').classList.add('open');
   attacherRechercheEmploye('mt-receveur','mt-receveur-suggest',empListeCandidats(true));
-  document.querySelector('#act-overlay .fact-btns button').onclick=function(){
+  var btn=resetActBtn();
+  btn.onclick=function(){
     var input=document.getElementById('mt-receveur');
     var newRec=input.dataset.code||'';
     var note=document.getElementById('mt-note').value;
     // Mettre à jour le transfert dans Transferts_En_Attente
     if(newRec){
-      fetch(W+'?action=maj_transfert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_employe_receveur:newRec,nom_receveur:input.dataset.nom||newRec,note:note})}).then(function(){fermerAction();renderTransferts();});
+      if(btn.dataset.busy==='1')return; // anti double-clic
+      btn.dataset.busy='1';btn.disabled=true;btn.textContent='...';
+      fetch(W+'?action=maj_transfert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tid,code_employe_receveur:newRec,nom_receveur:input.dataset.nom||newRec,note:note})})
+        .then(function(){fermerAction();renderTransferts();})
+        .catch(function(e){btn.dataset.busy='';btn.disabled=false;btn.textContent='✅ Confirmer';alert('Erreur : '+e.message);});
     }else{fermerAction();}
   };
 }
@@ -8431,7 +8456,7 @@ function ouvrirSuiviPanne(codeIM){
     '<p style="font-size:11px;color:#6A1B9A;background:#F3E5F5;border-radius:8px;padding:6px 10px;margin:-4px 0 8px">🔧 Renseigner le prestataire affichera "Chez le prestataire" comme localisation de l\'immo, le temps de la réparation.</p>' +
     '<div class="frow"><label>Coût estimé (€)</label><input type="number" id="sp-cout" placeholder="0" step="0.01"></div>' +
     '<div class="frow"><label>Note de suivi</label><textarea id="sp-note" rows="3" placeholder="Avancement, pièces commandées, délai estimé..."></textarea></div>';
-  var btn = document.getElementById('act-confirm-btn');
+  var btn = resetActBtn();
   if(btn) btn.onclick = function(){
     var prest = (document.getElementById('sp-prest')||{}).value||'';
     var cout  = (document.getElementById('sp-cout')||{}).value||'';
@@ -8454,7 +8479,7 @@ function resoudrePanneComplet(codeIM){
     '<div class="frow"><label>Prestataire SAV</label><input type="text" id="rp-prest" placeholder="Nom du réparateur..."></div>' +
     '<div class="frow"><label>Coût réel de réparation (€)</label><input type="number" id="rp-cout" placeholder="0" step="0.01"></div>' +
     '<div class="frow"><label>Note de résolution <span style="color:var(--red)">*</span></label><textarea id="rp-note" rows="3" placeholder="Obligatoire — détailler la réparation effectuée..."></textarea></div>';
-  var btn = document.getElementById('act-confirm-btn');
+  var btn = resetActBtn();
   if(btn) btn.onclick = function(){
     var etat  = (document.getElementById('rp-etat')||{}).value||'Bon état';
     var prest = (document.getElementById('rp-prest')||{}).value||'';
@@ -8484,7 +8509,7 @@ function ouvrirEnregistrerReparation(codeIM){
     '<div class="frow"><label>Prestataire</label><input type="text" id="er-prest" placeholder="Nom du réparateur/prestataire..."></div>' +
     '<div class="frow"><label>Coût (€) <span style="color:var(--red)">*</span></label><input type="number" id="er-cout" placeholder="0" step="0.01"></div>' +
     '<div class="frow"><label>Note <span style="color:var(--red)">*</span></label><textarea id="er-note" rows="3" placeholder="Obligatoire — détailler l\'intervention effectuée..."></textarea></div>';
-  var btn = document.getElementById('act-confirm-btn');
+  var btn = resetActBtn();
   if(btn) btn.onclick = function(){
     var date  = (document.getElementById('er-date')||{}).value||today;
     var prest = (document.getElementById('er-prest')||{}).value||'';
@@ -8515,7 +8540,7 @@ function ouvrirContreProposition(id,cim,nom,deb,fin){
     '<div class="frow"><label>Note / explication</label><textarea id="cp-note" rows="3" placeholder="Ex : immo indisponible cette semaine..."></textarea></div>';
   window._cpId=id;window._cpCodeIM=cim;window._cpNom=nom;
   document.getElementById('act-overlay').classList.add('open');
-  var btn=document.getElementById('act-confirm-btn');
+  var btn=resetActBtn();
   if(btn) btn.onclick=soumettreContreProposition;
 }
 
@@ -8548,7 +8573,7 @@ function ouvrirModalSortie(codeIM,libelle){
     '<p style="font-size:12px;color:var(--red);font-weight:700;text-align:center;padding:8px;background:var(--ds-danger-bg);border-radius:8px">⚠️ Cette action est définitive et irréversible</p>';
   window._sdCim=codeIM;window._sdLib=libelle;
   document.getElementById('act-overlay').classList.add('open');
-  var btn=document.getElementById('act-confirm-btn');
+  var btn=resetActBtn();
   if(btn) btn.onclick=validerSortieDefinitive;
 }
 
