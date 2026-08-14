@@ -415,9 +415,10 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
    sidebar, bloc héros, cartes/graphiques polis) — AUCUN changement de contenu ni
    de structure de blocs sur l'écran (les 4 blocs existants, tous les chiffres, le
    tableau des candidates à la réforme restent strictement ceux déjà en place).
-   Pas d'onglets ajoutés dans Bloc 1/Bloc 2 (le prototype de référence en montre,
-   mais ça aurait exigé de nouveaux calculs jamais validés avec William — hors
-   périmètre retenu).
+   Onglets Bloc 1/Bloc 2 (Aujourd'hui/Évolution/Âge du parc, Coûts/Top immos
+   coûteux/Utilisation) ajoutés dans un second temps (voir .codir-tabs/.codir-tab
+   plus bas et setCodirTab1/setCodirTab2 dans dashboard.html) — la réserve initiale
+   ci-dessus ne tient plus, laissée en mémoire pour l'historique de la décision.
 
    Tokens nouveaux ci-dessous (--ds-card-grad, --ds-nav-grad, --ds-accent-2,
    --ds-accent-soft, --ds-grid, --ds-hero-*, --ds-glow-*, --ds-*-text) : aucun ne
@@ -471,8 +472,12 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
 @keyframes omFade{from{opacity:0}to{opacity:1}}
 @keyframes omSheen{from{transform:translateX(-120%)}to{transform:translateX(220%)}}
 @keyframes omGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+/* Remplissage des barres horizontales (onglet Utilisation, Bloc 2) — seul graphique de l'écran
+   rendu en HTML/CSS brut plutôt qu'en Chart.js (les autres passent par des <canvas>, qui n'ont pas
+   besoin de cette classe). Voir renderCodir() dans dashboard.html. */
+.codir-bar-fill{transform-origin:left;animation:omGrow .8s cubic-bezier(.2,.8,.2,1) both;}
 @media (prefers-reduced-motion:reduce){
-  .codir-hero,.codir-hero-sheen{animation:none!important;}
+  .codir-hero,.codir-hero-sheen,.codir-bar-fill{animation:none!important;}
 }
 
 /* ── Halo ambiant + bloc héros ── rendus uniquement par renderCodir() (dashboard.html),
