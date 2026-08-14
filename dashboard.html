@@ -6714,6 +6714,171 @@ function codirDelaiValidation(all,fs){
 function setCodirTauxHoraire(v){var n=parseFloat((v||'').toString().replace(',','.'));CODIR_TAUX_HORAIRE=(!isNaN(n)&&n>0)?n:CODIR_TAUX_HORAIRE_DEFAUT;renderCodir();}
 function sortCodirReforme(key){if(codirReformeSortKey===key)codirReformeSortDir*=-1;else{codirReformeSortKey=key;codirReformeSortDir=-1;}renderCodir();}
 
+// ── Onglets Bloc 1 / Bloc 2 (refonte visuelle du 14 août 2026, voir 04_HISTORIQUE_DECISIONS.md) ──
+var codirTab1='today',codirTab2='costs';
+function setCodirTab1(v){codirTab1=v;renderCodir();}
+function setCodirTab2(v){codirTab2=v;renderCodir();}
+
+// Reconstruction de la valeur du parc sur les 12 derniers mois, à partir des deux seuls mécanismes
+// qui font varier cette valeur dans l'app (entrées = immos actives achetées, sorties = Archivage,
+// mêmes champs que codirVariation12Mois/codirTauxSortie) — une valeur d'achat éditée après coup
+// n'est pas historisée, donc non reconstituable, cas marginal non traité. Le point le plus récent
+// est calé sur le total réel actuel (totalActuel), les points précédents remontés mois par mois.
+function codirEvolution12Mois(fs,totalActuel){
+  var now=new Date();
+  var months=[];
+  for(var i=11;i>=0;i--){
+    var d0=new Date(now.getFullYear(),now.getMonth()-i,1);
+    var d1=new Date(now.getFullYear(),now.getMonth()-i+1,1);
+    months.push({label:d0.toLocaleDateString('fr-FR',{month:'short'}),start:d0.getTime(),end:d1.getTime(),net:0});
+  }
+  var inMonth=function(t){for(var i=0;i<months.length;i++){if(t>=months[i].start&&t<months[i].end)return i;}return -1;};
+  Object.keys(immoMeta).forEach(function(code){
+    var mt=immoMeta[code];
+    if(!mt||mt.actif===false||!mt.date_achat)return;
+    var site=mt.site==='Mayotte'?'Mayotte':'Reunion';
+    if(fs&&site!==fs)return;
+    var idx=inMonth(new Date(mt.date_achat).getTime());
+    if(idx!==-1)months[idx].net+=mt.valeur_achat||0;
+  });
+  var vues={};
+  (d.all_movements||[]).forEach(function(m){
+    if(m.type_mouvement!=='Archivage'||CODIR_ETATS_SORTIE.indexOf(m.etat)===-1)return;
+    if(fs&&siteImmoDash(m.code_im)!==fs)return;
+    if(!vues[m.code_im]||new Date(m.horodatage)>new Date(vues[m.code_im].horodatage))vues[m.code_im]=m;
+  });
+  Object.keys(vues).forEach(function(code){
+    var idx=inMonth(new Date(vues[code].horodatage).getTime());
+    if(idx!==-1)months[idx].net-=(immoMeta[code]||{}).valeur_achat||0;
+  });
+  var values=new Array(months.length);
+  values[months.length-1]=totalActuel;
+  for(var i=months.length-2;i>=0;i--)values[i]=values[i+1]-months[i+1].net;
+  return{labels:months.map(function(m){return m.label;}),values:values};
+}
+
+// Âge du parc (valeur par tranche) + vétusté — âge = date_achat, indépendant de la date de mise en
+// service utilisée par l'amortissement (calcAmort/pctAmort déjà existants, réutilisés tels quels).
+// « Sous garantie constructeur » réutilise exactement GARANTIE_ANS et la date de référence de
+// renderMaint() (date_mise_service||date_achat), sans le filtre « expire sous 6 mois » de cet écran.
+function codirAgeParc(fs){
+  var now=Date.now();
+  var buckets=[{label:'< 2 ans',min:0,max:2,val:0},{label:'2 – 5 ans',min:2,max:5,val:0},{label:'5 – 10 ans',min:5,max:10,val:0},{label:'> 10 ans',min:10,max:Infinity,val:0}];
+  var sumAgeVal=0,sumVal=0,amorti80=0,pastUsage=0,sousGarantie=0;
+  Object.keys(immoMeta).forEach(function(code){
+    var mt=immoMeta[code];
+    if(!mt||mt.actif===false)return;
+    var site=mt.site==='Mayotte'?'Mayotte':'Reunion';
+    if(fs&&site!==fs)return;
+    var val=mt.valeur_achat||0;
+    if(mt.date_achat){
+      var ageAns=(now-new Date(mt.date_achat).getTime())/(365.25*86400000);
+      if(!isNaN(ageAns)&&ageAns>=0){
+        sumAgeVal+=ageAns*val;sumVal+=val;
+        for(var i=0;i<buckets.length;i++){if(ageAns>=buckets[i].min&&ageAns<buckets[i].max){buckets[i].val+=val;break;}}
+      }
+    }
+    var pct=pctAmort(code);
+    if(pct>=80)amorti80+=val;
+    if(pct>=100)pastUsage+=val;
+    var dref=mt.date_mise_service||mt.date_achat;
+    if(dref){
+      var fin=new Date(dref);
+      if(!isNaN(fin.getTime())){fin.setFullYear(fin.getFullYear()+GARANTIE_ANS);if(fin.getTime()>now)sousGarantie+=val;}
+    }
+  });
+  return{buckets:buckets,ageMoyen:sumVal>0?Math.round(sumAgeVal/sumVal*10)/10:0,amorti80:amorti80,pastUsage:pastUsage,sousGarantie:sousGarantie};
+}
+
+function codirMergeIntervals(list){
+  if(!list.length)return[];
+  var sorted=list.slice().sort(function(a,b){return a[0]-b[0];});
+  var out=[sorted[0].slice()];
+  for(var i=1;i<sorted.length;i++){
+    var last=out[out.length-1],cur=sorted[i];
+    if(cur[0]<=last[1])last[1]=Math.max(last[1],cur[1]);
+    else out.push(cur.slice());
+  }
+  return out;
+}
+// Taux d'utilisation par catégorie sur 30 jours = part du temps où au moins un exemplaire de la
+// catégorie est « en circulation ». Reconstruit les intervalles de sortie/retour de chaque immo à
+// partir de all_movements (Transfert hors DEPOT = départ ; Retour/Réparation/Transfert vers DEPOT =
+// retour — même définition que loc/estDepot dans chargerFicheImmo), fusionne les intervalles par
+// catégorie (une immo qui rentre pendant qu'une autre de la même catégorie sort ne doit pas compter
+// double), puis mesure la couverture sur les 30 derniers jours.
+function codirUtilisationCategories(fs){
+  var now=Date.now(),j30=now-30*86400000;
+  var invByCode={};(d.inventory||[]).forEach(function(i){invByCode[i.code_im]=i;});
+  var isDeparture=function(m){return m.type_mouvement==='Transfert'&&m.code_chantier!=='DEPOT';};
+  var isReturn=function(m){return m.type_mouvement==='Retour'||m.type_mouvement==='Réparation'||(m.type_mouvement==='Transfert'&&m.code_chantier==='DEPOT');};
+  var mvsByCode={};
+  (d.all_movements||[]).forEach(function(m){
+    if(!isDeparture(m)&&!isReturn(m))return;
+    if(!mvsByCode[m.code_im])mvsByCode[m.code_im]=[];
+    mvsByCode[m.code_im].push(m);
+  });
+  Object.keys(mvsByCode).forEach(function(c){mvsByCode[c].sort(function(a,b){return new Date(a.horodatage)-new Date(b.horodatage);});});
+  var byCat={};
+  Object.keys(immoMeta).forEach(function(code){
+    var mt=immoMeta[code];
+    if(!mt||mt.actif===false||!estImmoActivite(code))return;
+    var site=mt.site==='Mayotte'?'Mayotte':'Reunion';
+    if(fs&&site!==fs)return;
+    var cat=getCat(code)||'Sans catégorie';
+    var mvs=mvsByCode[code]||[];
+    var inWindow=mvs.filter(function(m){return new Date(m.horodatage).getTime()>=j30;});
+    var currentlyOut=!!(invByCode[code]&&invByCode[code].statut==='En circulation');
+    var intervals=[];
+    if(!inWindow.length){
+      if(currentlyOut)intervals.push([j30,now]);
+    }else{
+      var curOut=isReturn(inWindow[0]);
+      var curStart=curOut?j30:null;
+      inWindow.forEach(function(m){
+        var t=new Date(m.horodatage).getTime();
+        if(isDeparture(m)){if(!curOut){curStart=t;curOut=true;}}
+        else{if(curOut){intervals.push([curStart,t]);curOut=false;curStart=null;}}
+      });
+      if(curOut)intervals.push([curStart,now]);
+    }
+    if(!intervals.length)return;
+    if(!byCat[cat])byCat[cat]=[];
+    byCat[cat]=byCat[cat].concat(intervals);
+  });
+  var result={};
+  Object.keys(byCat).forEach(function(cat){
+    var merged=codirMergeIntervals(byCat[cat]);
+    var covered=merged.reduce(function(s,iv){return s+(iv[1]-iv[0]);},0);
+    result[cat]=Math.round(covered/(30*86400000)*1000)/10;
+  });
+  return result;
+}
+// Matériel dormant : même règle et même seuil réglable que l'onglet Maintenance (SEUIL_DORMANT_MOIS,
+// d.au_depot[].since, estImmoActivite) — pas un second seuil fixe « 90 jours » qui aurait introduit
+// une deuxième définition de « dormant » dans l'app. Rotations moyennes = départs (Transfert hors
+// DEPOT) sur 12 mois glissants / nombre d'immos d'activité, proxy simple de fréquence d'usage.
+function codirMaterielDormant(fs){
+  var now=Date.now(),seuilJ=SEUIL_DORMANT_MOIS*30;
+  var dormantes=[];
+  (d.au_depot||[]).forEach(function(i){
+    if(fs&&siteImmoDash(i.code_im)!==fs)return;
+    if(!estImmoActivite(i.code_im)||!i.since)return;
+    var jours=Math.round((now-new Date(i.since).getTime())/86400000);
+    if(jours>=seuilJ)dormantes.push({code:i.code_im,valeur:(immoMeta[i.code_im]||{}).valeur_achat||0});
+  });
+  var valeur=dormantes.reduce(function(s,x){return s+x.valeur;},0);
+  var valeurMayotte=dormantes.reduce(function(s,x){return s+(siteImmoDash(x.code)==='Mayotte'?x.valeur:0);},0);
+  var nbImmosActivite=0;
+  Object.keys(immoMeta).forEach(function(c){
+    var mt=immoMeta[c];if(!mt||mt.actif===false||!estImmoActivite(c))return;
+    var site=mt.site==='Mayotte'?'Mayotte':'Reunion';if(fs&&site!==fs)return;
+    nbImmosActivite++;
+  });
+  var deps12=(d.all_movements||[]).filter(function(m){return m.type_mouvement==='Transfert'&&m.code_chantier!=='DEPOT'&&estImmoActivite(m.code_im)&&new Date(m.horodatage).getTime()>=now-365*86400000&&(!fs||siteImmoDash(m.code_im)===fs);}).length;
+  return{nb:dormantes.length,valeur:valeur,valeurMayotte:valeurMayotte,rotations:nbImmosActivite>0?Math.round(deps12/nbImmosActivite*10)/10:0};
+}
+
 async function loadCodir(){
   dataLoaded.codir=true;
   if(!peutVoirCodir(ADMIN_SESSION.code)){renderCodir();return;}
@@ -6804,54 +6969,133 @@ function renderCodir(){
     '<h2 style="margin:0 0 4px">📋 Synthèse direction — Immo Tracker</h2>'+
     '<p style="margin:0 0 14px;font-size:12px;color:var(--ds-text-muted)">Electricité Services Réunion — Généré le '+fmtDT(new Date().toISOString())+' — Territoire : '+(fs?territoireLabel(fs):'La Réunion + Mayotte')+'</p></div>';
 
-  html+='<div class="card"><div class="card-head"><h3>💰 Bloc 1 — Valeur du parc</h3></div><div style="padding:14px">';
+  var ageP,evo,utilCats,dorm,t2Insight='';
+
+  html+='<div class="card"><div class="card-head"><h3>💰 Bloc 1 — Valeur du parc</h3><div class="codir-tabs">'+
+    '<button class="codir-tab'+(codirTab1==='today'?' active':'')+'" onclick="setCodirTab1(\'today\')">Aujourd\'hui</button>'+
+    '<button class="codir-tab'+(codirTab1==='evo'?' active':'')+'" onclick="setCodirTab1(\'evo\')">Évolution</button>'+
+    '<button class="codir-tab'+(codirTab1==='age'?' active':'')+'" onclick="setCodirTab1(\'age\')">Âge du parc</button>'+
+    '</div></div><div style="padding:14px">';
   html+='<div class="kpi-grid" style="margin-bottom:12px">';
   html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">💰</div><div class="kv">'+eur(vp.total)+'</div><div class="kl">Valeur totale (parc actif)</div></div>';
   html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">🔄</div><div class="kv">'+eur(vp.valCirc)+'</div><div class="kl">Valeur en circulation</div></div>';
   html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">🏭</div><div class="kv">'+eur(vp.valDepot)+'</div><div class="kl">Valeur au dépôt</div></div>';
   html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">❔</div><div class="kv">'+eur(vp.valJamais)+'</div><div class="kl">Jamais mouvementées</div></div>';
   html+='</div>';
-  html+='<div class="charts-grid">'+
-    '<div class="chart-card"><h3>Valeur par territoire</h3><div class="chart-wrap"><canvas id="ch-codir-terr"></canvas></div></div>'+
-    '<div class="chart-card"><h3>Valeur par catégorie</h3><div class="chart-wrap"><canvas id="ch-codir-cat"></canvas></div></div>'+
-    '<div class="chart-card"><h3>Circulation vs dépôt (valeur)</h3><div class="chart-wrap"><canvas id="ch-codir-circdep"></canvas></div></div>'+
-    '</div></div></div>';
+  if(codirTab1==='today'){
+    html+='<div class="charts-grid">'+
+      '<div class="chart-card"><h3>Valeur par territoire</h3><div class="chart-wrap"><canvas id="ch-codir-terr"></canvas></div></div>'+
+      '<div class="chart-card"><h3>Valeur par catégorie</h3><div class="chart-wrap"><canvas id="ch-codir-cat"></canvas></div></div>'+
+      '<div class="chart-card"><h3>Circulation vs dépôt (valeur)</h3><div class="chart-wrap"><canvas id="ch-codir-circdep"></canvas></div></div>'+
+      '</div>';
+  }else if(codirTab1==='evo'){
+    var acqMoy=heroEntrees.nb>0?Math.round(heroEntrees.valeur/heroEntrees.nb):0;
+    html+='<div class="chart-card" style="margin-bottom:14px"><h3>Évolution de la valeur du parc — 12 mois glissants</h3><div class="chart-wrap" style="height:220px"><canvas id="ch-codir-evo"></canvas></div></div>';
+    html+='<div class="kpi-grid">';
+    html+='<div class="kpi grey" style="cursor:default"><div class="kv">'+(heroNetVar>=0?'+':'−')+eur(Math.abs(heroNetVar))+'</div><div class="kl">Variation sur 12 mois</div></div>';
+    html+='<div class="kpi grey" style="cursor:default"><div class="kv">'+heroEntrees.nb+'</div><div class="kl">Immos entrées</div></div>';
+    html+='<div class="kpi grey" style="cursor:default"><div class="kv">'+sortie.nb+'</div><div class="kl">Immos sorties</div></div>';
+    html+='<div class="kpi grey" style="cursor:default"><div class="kv">'+(heroEntrees.nb>0?eur(acqMoy):'—')+'</div><div class="kl">Acquisition moyenne</div></div>';
+    html+='</div>';
+  }else if(codirTab1==='age'){
+    ageP=codirAgeParc(fs);
+    html+='<div class="charts-grid" style="grid-template-columns:1.2fr 1fr">';
+    html+='<div class="chart-card"><h3>Âge du parc (valeur par tranche)</h3><div class="chart-wrap"><canvas id="ch-codir-age"></canvas></div></div>';
+    html+='<div class="chart-card">'+
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.07em;color:var(--grey);margin-bottom:10px">VÉTUSTÉ</div>'+
+      '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px"><span style="font-size:30px;font-weight:800">'+ageP.ageMoyen.toLocaleString('fr-FR')+'</span><span style="font-size:12px;color:var(--grey)">ans d\'âge moyen, pondéré par la valeur</span></div>'+
+      '<div style="display:flex;flex-direction:column;gap:9px;font-size:13px;margin-bottom:14px">'+
+        '<div style="display:flex;justify-content:space-between"><span>Amorti à plus de 80 %</span><b>'+eur(ageP.amorti80)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between"><span>Au-delà de la durée d\'usage</span><b style="color:var(--red)">'+eur(ageP.pastUsage)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between"><span>Sous garantie constructeur</span><b>'+eur(ageP.sousGarantie)+'</b></div>'+
+      '</div>'+
+      (ageP.pastUsage>0?'<div style="padding:10px 12px;border-radius:8px;background:var(--ds-danger-bg);border:1px solid var(--red);font-size:12.5px;line-height:1.5"><b>'+eur(ageP.pastUsage)+' de matériel a dépassé sa durée d\'usage.</b> À rapprocher des '+candidats.length+' candidate'+(candidats.length>1?'s':'')+' à la réforme du Bloc 2.</div>':'')+
+    '</div></div>';
+  }
+  html+='</div></div>';
 
-  html+='<div class="card"><div class="card-head"><h3>🔧 Bloc 2 — Coûts et réforme</h3></div><div style="padding:14px">';
-  html+='<div class="chart-card" style="margin-bottom:14px"><h3>Coût réparations par trimestre</h3><div class="chart-wrap"><canvas id="ch-codir-trim"></canvas></div></div>';
+  if(trims.length>=2){
+    var lastTrim=trims[trims.length-1],prevTrim=trims[trims.length-2];
+    if(prevTrim&&prevTrim.cout>0&&lastTrim.cout>prevTrim.cout*1.15){
+      var ratioT=Math.round(lastTrim.cout/prevTrim.cout*10)/10;
+      var immosSetT={};
+      all.filter(function(m){return(m.type_mouvement==='Réparation'||m.type_mouvement==='Entretien')&&coutReparationMouvement(m)>0;}).forEach(function(m){
+        var to=trimestreOf(m.horodatage);
+        if(to&&to.annee===lastTrim.annee&&to.trim===lastTrim.trim)immosSetT[m.code_im]=true;
+      });
+      var nbImmosT=Object.keys(immosSetT).length;
+      t2Insight='Le coût de réparation a été multiplié par '+ratioT.toLocaleString('fr-FR')+' entre '+prevTrim.label+' et '+lastTrim.label+' — concentré sur '+nbImmosT+' immo'+(nbImmosT>1?'s':'')+' (voir l\'onglet <b>Top immos coûteux</b>).';
+    }
+  }
+
+  html+='<div class="card"><div class="card-head"><h3>🔧 Bloc 2 — Coûts et réforme</h3><div class="codir-tabs">'+
+    '<button class="codir-tab'+(codirTab2==='costs'?' active':'')+'" onclick="setCodirTab2(\'costs\')">Coûts</button>'+
+    '<button class="codir-tab'+(codirTab2==='top'?' active':'')+'" onclick="setCodirTab2(\'top\')">Top immos coûteux</button>'+
+    '<button class="codir-tab'+(codirTab2==='util'?' active':'')+'" onclick="setCodirTab2(\'util\')">Utilisation</button>'+
+    '</div></div><div style="padding:14px">';
   html+='<div class="kpi-grid" style="margin-bottom:12px">';
   html+='<div class="kpi red" style="cursor:default"><div class="kpi-icon">🚨</div><div class="kv">'+candidats.length+'</div><div class="kl">Candidates à la réforme</div></div>';
   html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">⛔</div><div class="kv">'+sortie.nb+'</div><div class="kl">Sorties (12 mois glissants)</div></div>';
   html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">💶</div><div class="kv">'+eur(sortie.valeur)+'</div><div class="kl">Valeur sortie à temps</div></div>';
   html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">📉</div><div class="kv">'+sortie.taux+'%</div><div class="kl">Taux de sortie annuel</div></div>';
   html+='</div>';
-  html+='<p style="font-size:11px;color:var(--grey);margin:0 0 8px">Sorties par motif (12 derniers mois) : '+CODIR_ETATS_SORTIE.map(function(e){return e+' : '+(sortie.parEtat[e]||0);}).join(' · ')+'. Raisons réellement utilisées par l\'app — pas de motif « Cession » implémenté à ce jour.</p>';
-  html+='<div class="tbl-wrap"><table><thead><tr>'+
-    '<th style="cursor:pointer" onclick="sortCodirReforme(\'code_im\')">Code IM'+sortArrow('code_im')+'</th>'+
-    '<th>Libellé</th><th>Territoire</th>'+
-    '<th style="cursor:pointer" onclick="sortCodirReforme(\'nb_pannes\')">Pannes'+sortArrow('nb_pannes')+'</th>'+
-    '<th style="cursor:pointer" onclick="sortCodirReforme(\'val_achat\')">Valeur achat'+sortArrow('val_achat')+'</th>'+
-    '<th>VNC</th>'+
-    '<th style="cursor:pointer" onclick="sortCodirReforme(\'cout_rep\')">Coût répar.'+sortArrow('cout_rep')+'</th>'+
-    '<th style="cursor:pointer" onclick="sortCodirReforme(\'ratio_achat\')">% achat'+sortArrow('ratio_achat')+'</th>'+
-    '<th style="cursor:pointer" onclick="sortCodirReforme(\'ratio_vnc\')">% VNC'+sortArrow('ratio_vnc')+'</th>'+
-    '<th style="cursor:pointer" onclick="sortCodirReforme(\'age_mois\')">Âge'+sortArrow('age_mois')+'</th>'+
-    '</tr></thead><tbody>';
-  if(!candidatsAff.length)html+='<tr><td colspan="10" class="es">Aucun candidat au seuil actuel.</td></tr>';
-  else candidatsAff.forEach(function(x){
-    html+='<tr class="'+(x.alerte?'urgent-row':'')+'">'+
-      '<td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td>'+
-      '<td style="font-size:12px">'+x.libelle+'</td>'+
-      '<td>'+badgeSiteD(x.site)+'</td>'+
-      '<td style="text-align:center">'+x.nb_pannes+'</td>'+
-      '<td>'+(x.val_achat?eur(x.val_achat):'--')+'</td>'+
-      '<td>'+(x.vnc_epuisee?'épuisée':(x.vnc?eur(x.vnc):'--'))+'</td>'+
-      '<td>'+(x.cout_rep?eur(x.cout_rep):'--')+'</td>'+
-      '<td>'+(x.ratio_achat?x.ratio_achat+'%':'--')+'</td>'+
-      '<td>'+(x.ratio_vnc?x.ratio_vnc+'%':'--')+'</td>'+
-      '<td>'+(x.age_mois?x.age_mois+'m':'--')+'</td></tr>';
-  });
-  html+='</tbody></table></div></div></div>';
+  if(codirTab2==='costs'){
+    html+='<div class="chart-card" style="margin-bottom:14px"><h3>Coût réparations par trimestre</h3><div class="chart-wrap"><canvas id="ch-codir-trim"></canvas></div></div>';
+    html+='<p style="font-size:11px;color:var(--grey);margin:0 0 8px">Sorties par motif (12 derniers mois) : '+CODIR_ETATS_SORTIE.map(function(e){return e+' : '+(sortie.parEtat[e]||0);}).join(' · ')+'. Raisons réellement utilisées par l\'app — pas de motif « Cession » implémenté à ce jour.</p>';
+    if(t2Insight)html+='<div style="padding:10px 12px;border-radius:8px;background:var(--ds-warning-bg);border:1px solid var(--orange);font-size:12.5px;line-height:1.5">'+t2Insight+'</div>';
+  }else if(codirTab2==='top'){
+    html+='<div class="tbl-wrap"><table><thead><tr>'+
+      '<th style="cursor:pointer" onclick="sortCodirReforme(\'code_im\')">Code IM'+sortArrow('code_im')+'</th>'+
+      '<th>Libellé</th><th>Territoire</th>'+
+      '<th style="cursor:pointer" onclick="sortCodirReforme(\'nb_pannes\')">Pannes'+sortArrow('nb_pannes')+'</th>'+
+      '<th style="cursor:pointer" onclick="sortCodirReforme(\'val_achat\')">Valeur achat'+sortArrow('val_achat')+'</th>'+
+      '<th>VNC</th>'+
+      '<th style="cursor:pointer" onclick="sortCodirReforme(\'cout_rep\')">Coût répar.'+sortArrow('cout_rep')+'</th>'+
+      '<th style="cursor:pointer" onclick="sortCodirReforme(\'ratio_achat\')">% achat'+sortArrow('ratio_achat')+'</th>'+
+      '<th style="cursor:pointer" onclick="sortCodirReforme(\'ratio_vnc\')">% VNC'+sortArrow('ratio_vnc')+'</th>'+
+      '<th style="cursor:pointer" onclick="sortCodirReforme(\'age_mois\')">Âge'+sortArrow('age_mois')+'</th>'+
+      '</tr></thead><tbody>';
+    if(!candidatsAff.length)html+='<tr><td colspan="10" class="es">Aucun candidat au seuil actuel.</td></tr>';
+    else candidatsAff.forEach(function(x){
+      html+='<tr class="'+(x.alerte?'urgent-row':'')+'">'+
+        '<td><span class="link-im" data-cim="'+x.code_im+'" data-lib="'+x.libelle.replace(/"/g,'')+'">'+x.code_im+'</span></td>'+
+        '<td style="font-size:12px">'+x.libelle+'</td>'+
+        '<td>'+badgeSiteD(x.site)+'</td>'+
+        '<td style="text-align:center">'+x.nb_pannes+'</td>'+
+        '<td>'+(x.val_achat?eur(x.val_achat):'--')+'</td>'+
+        '<td>'+(x.vnc_epuisee?'épuisée':(x.vnc?eur(x.vnc):'--'))+'</td>'+
+        '<td>'+(x.cout_rep?eur(x.cout_rep):'--')+'</td>'+
+        '<td>'+(x.ratio_achat?x.ratio_achat+'%':'--')+'</td>'+
+        '<td>'+(x.ratio_vnc?x.ratio_vnc+'%':'--')+'</td>'+
+        '<td>'+(x.age_mois?x.age_mois+'m':'--')+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }else if(codirTab2==='util'){
+    utilCats=codirUtilisationCategories(fs);
+    dorm=codirMaterielDormant(fs);
+    var utilKeys=Object.keys(utilCats).sort(function(a,b){return utilCats[b]-utilCats[a];});
+    html+='<div class="charts-grid" style="grid-template-columns:1.2fr 1fr">';
+    html+='<div class="chart-card"><h3>Taux d\'utilisation par catégorie — 30 derniers jours</h3>';
+    if(!utilKeys.length)html+='<div class="es" style="padding:20px">Aucune donnée de circulation sur les 30 derniers jours.</div>';
+    else{
+      html+='<div style="display:flex;flex-direction:column;gap:10px;padding:6px 2px 2px">';
+      utilKeys.forEach(function(k){
+        html+='<div style="display:flex;align-items:center;gap:10px"><span style="width:150px;font-size:12.5px;text-align:right;color:var(--grey);flex-shrink:0">'+k+'</span><div style="flex:1;height:16px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="width:'+Math.min(100,utilCats[k])+'%;height:100%;background:linear-gradient(90deg,var(--ds-accent),var(--ds-accent-2))"></div></div><b style="width:50px;text-align:right;font-size:12px">'+utilCats[k].toLocaleString('fr-FR')+' %</b></div>';
+      });
+      html+='</div><div style="margin-top:12px;font-size:11.5px;color:var(--grey)">Part du temps où au moins un exemplaire de la catégorie est sorti du dépôt.</div>';
+    }
+    html+='</div>';
+    html+='<div class="chart-card">'+
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.07em;color:var(--grey);margin-bottom:10px">MATÉRIEL DORMANT</div>'+
+      '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px"><span style="font-size:30px;font-weight:800;color:var(--red)">'+dorm.nb+'</span><span style="font-size:12px;color:var(--grey)">immos sans sortie depuis plus de '+SEUIL_DORMANT_MOIS+' mois</span></div>'+
+      '<div style="display:flex;flex-direction:column;gap:9px;font-size:13px">'+
+        '<div style="display:flex;justify-content:space-between"><span>Valeur immobilisée</span><b>'+eur(dorm.valeur)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between"><span>Dont Mayotte</span><b>'+eur(dorm.valeurMayotte)+'</b></div>'+
+        '<div style="display:flex;justify-content:space-between"><span>Rotations moyennes / immo / an</span><b>'+dorm.rotations.toLocaleString('fr-FR')+'</b></div>'+
+      '</div>'+
+    '</div></div>';
+  }
+  html+='</div></div>';
 
   html+='<div class="card"><div class="card-head"><h3>👷 Bloc 3 — Adoption terrain</h3></div><div style="padding:14px">';
   html+='<div class="chart-card" style="margin-bottom:14px"><h3>Mouvements par semaine (12 dern. sem.)</h3><div class="chart-wrap"><canvas id="ch-codir-sem"></canvas></div></div>';
@@ -6891,13 +7135,26 @@ function renderCodir(){
 
   div.innerHTML=html;
 
-  ['codirTerr','codirCat','codirCircdep','codirTrim','codirSem'].forEach(function(k){if(charts[k]){charts[k].destroy();}});
-  charts.codirTerr=new Chart(document.getElementById('ch-codir-terr'),{type:'doughnut',data:{labels:['Réunion','Mayotte'],datasets:[{data:[vp.parTerr.Reunion,vp.parTerr.Mayotte],backgroundColor:['#2980B9','#1E9E5A'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
-  var catKeys=Object.keys(vp.parCat).sort(function(a,b){return vp.parCat[b]-vp.parCat[a];}).slice(0,8);
-  charts.codirCat=new Chart(document.getElementById('ch-codir-cat'),{type:'bar',data:{labels:catKeys,datasets:[{data:catKeys.map(function(k){return vp.parCat[k];}),backgroundColor:'#A67A1E',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});
-  charts.codirCircdep=new Chart(document.getElementById('ch-codir-circdep'),{type:'bar',data:{labels:['Circulation','Dépôt','Jamais sorties'],datasets:[{data:[vp.valCirc,vp.valDepot,vp.valJamais],backgroundColor:['#A67A1E','#1E9E5A','#BDC3C7'],borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
-  charts.codirTrim=new Chart(document.getElementById('ch-codir-trim'),{type:'bar',data:{labels:trims.map(function(t){return t.label;}),datasets:[{data:trims.map(function(t){return Math.round(t.cout);}),backgroundColor:'#DC3545',borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-  charts.codirSem=new Chart(document.getElementById('ch-codir-sem'),{type:'bar',data:{labels:semaines.map(function(s){return s.label;}),datasets:[{data:semaines.map(function(s){return s.count;}),backgroundColor:'#2980B9',borderRadius:4,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  // Onglets Bloc 1/Bloc 2 (14 août 2026) : un seul panneau existe dans le DOM à la fois, donc chaque
+  // graphique est créé seulement si son canevas est réellement présent — sinon Chart.js échoue sur
+  // un contexte introuvable.
+  ['codirTerr','codirCat','codirCircdep','codirTrim','codirSem','codirEvo','codirAge'].forEach(function(k){if(charts[k]){charts[k].destroy();charts[k]=null;}});
+  if(document.getElementById('ch-codir-terr'))charts.codirTerr=new Chart(document.getElementById('ch-codir-terr'),{type:'doughnut',data:{labels:['Réunion','Mayotte'],datasets:[{data:[vp.parTerr.Reunion,vp.parTerr.Mayotte],backgroundColor:['#2980B9','#1E9E5A'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  if(document.getElementById('ch-codir-cat')){
+    var catKeys=Object.keys(vp.parCat).sort(function(a,b){return vp.parCat[b]-vp.parCat[a];}).slice(0,8);
+    charts.codirCat=new Chart(document.getElementById('ch-codir-cat'),{type:'bar',data:{labels:catKeys,datasets:[{data:catKeys.map(function(k){return vp.parCat[k];}),backgroundColor:'#A67A1E',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});
+  }
+  if(document.getElementById('ch-codir-circdep'))charts.codirCircdep=new Chart(document.getElementById('ch-codir-circdep'),{type:'bar',data:{labels:['Circulation','Dépôt','Jamais sorties'],datasets:[{data:[vp.valCirc,vp.valDepot,vp.valJamais],backgroundColor:['#A67A1E','#1E9E5A','#BDC3C7'],borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+  if(document.getElementById('ch-codir-evo')){
+    evo=codirEvolution12Mois(fs,vp.total);
+    charts.codirEvo=new Chart(document.getElementById('ch-codir-evo'),{type:'line',data:{labels:evo.labels,datasets:[{data:evo.values,borderColor:'#A67A1E',backgroundColor:'rgba(166,122,30,.16)',fill:true,tension:.3,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:function(v){return Math.round(v/1000)+' k€';}}}}}});
+  }
+  if(document.getElementById('ch-codir-age')){
+    if(!ageP)ageP=codirAgeParc(fs);
+    charts.codirAge=new Chart(document.getElementById('ch-codir-age'),{type:'bar',data:{labels:ageP.buckets.map(function(b){return b.label;}),datasets:[{data:ageP.buckets.map(function(b){return Math.round(b.val);}),backgroundColor:['#1E9E5A','#A67A1E','#BDC3C7','#DC3545'],borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  }
+  if(document.getElementById('ch-codir-trim'))charts.codirTrim=new Chart(document.getElementById('ch-codir-trim'),{type:'bar',data:{labels:trims.map(function(t){return t.label;}),datasets:[{data:trims.map(function(t){return Math.round(t.cout);}),backgroundColor:'#DC3545',borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  if(document.getElementById('ch-codir-sem'))charts.codirSem=new Chart(document.getElementById('ch-codir-sem'),{type:'bar',data:{labels:semaines.map(function(s){return s.label;}),datasets:[{data:semaines.map(function(s){return s.count;}),backgroundColor:'#2980B9',borderRadius:4,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 }
 
 function exporterCodir(){
