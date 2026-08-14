@@ -407,3 +407,122 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
    header, réservé au thème sombre — le mode clair n'est pas concerné. ── */
 :root[data-theme="dark"] #gsearch-input{background:rgba(18,21,27,.55);border-color:rgba(255,255,255,.3);}
 :root[data-theme="dark"] #gsearch-input:focus{background:rgba(18,21,27,.7);}
+
+/* ============================================================================
+   Refonte premium — Synthèse direction (14 août 2026, voir 04_HISTORIQUE_DECISIONS.md)
+   ----------------------------------------------------------------------------
+   Portée décidée avec William : habillage visuel uniquement (nouveau bandeau/
+   sidebar, bloc héros, cartes/graphiques polis) — AUCUN changement de contenu ni
+   de structure de blocs sur l'écran (les 4 blocs existants, tous les chiffres, le
+   tableau des candidates à la réforme restent strictement ceux déjà en place).
+   Pas d'onglets ajoutés dans Bloc 1/Bloc 2 (le prototype de référence en montre,
+   mais ça aurait exigé de nouveaux calculs jamais validés avec William — hors
+   périmètre retenu).
+
+   Tokens nouveaux ci-dessous (--ds-card-grad, --ds-nav-grad, --ds-accent-2,
+   --ds-accent-soft, --ds-grid, --ds-hero-*, --ds-glow-*, --ds-*-text) : aucun ne
+   porte un nom déjà utilisé ailleurs dans ce fichier ou dans le :root inline de
+   dashboard.html (qui alias --bg/--card/--border/etc. vers les tokens --ds-*
+   existants) — donc aucune collision, aucun risque de repeindre silencieusement
+   le reste de l'app. Les nouveaux tokens sont consommés uniquement par les règles
+   #header/#sidebar (dashboard.html, chrome partagé — voir commentaire sur place)
+   et par les règles scopées #codir-content ci-dessous (écran Synthèse direction
+   uniquement).
+   ============================================================================ */
+:root{
+  --ds-card-grad:linear-gradient(180deg,#FFFFFF 0%,#FDFCF9 100%);
+  --ds-nav-grad:linear-gradient(104deg,#6F2542 0%,#8E3358 48%,#A94570 100%);
+  --ds-accent-2:#D9AE45;
+  --ds-accent-soft:#F6ECCF;
+  --ds-grid:rgba(30,34,42,.09);
+  --ds-hero-bg:linear-gradient(120deg,#FFFFFF 0%,#FDF9EF 58%,#F8EFDC 100%);
+  --ds-hero-ink:#1B1F26;
+  --ds-hero-line:rgba(27,31,38,.10);
+  /* Dégradé or FONCÉ (pas --ds-accent-2 clair) : un or clair sur fond crème tombe
+     à ~1.7:1 de contraste — voir la vérification de contraste du 14 août 2026. */
+  --ds-hero-num:linear-gradient(96deg,#7A5710,#A67A1E);
+  --ds-glow-1:radial-gradient(900px 380px at 12% -6%, rgba(217,174,69,.20), transparent 70%);
+  --ds-glow-2:radial-gradient(700px 320px at 92% 2%, rgba(142,51,88,.12), transparent 70%);
+  /* Alias theme-aware : texte success/danger/info lisible aussi bien sur --ds-surface
+     (clair) que sur un fond sombre (bascule vers les variantes -dark déjà prévues à
+     cet effet, voir plus haut dans ce fichier). */
+  --ds-success-text:var(--ds-success);
+  --ds-danger-text:var(--ds-danger);
+  --ds-info-text:var(--ds-info);
+}
+:root[data-theme="dark"]{
+  --ds-card-grad:linear-gradient(180deg,#1E232B 0%,#181C22 100%);
+  --ds-nav-grad:linear-gradient(104deg,#2A0F1C 0%,#4A1A2E 52%,#5F2440 100%);
+  --ds-accent-2:#F0D68A;
+  --ds-accent-soft:#3A2F14;
+  --ds-grid:rgba(255,255,255,.09);
+  --ds-hero-bg:linear-gradient(120deg,#1E232B 0%,#232019 55%,#2A2214 100%);
+  --ds-hero-ink:#F4F1E9;
+  --ds-hero-line:rgba(255,255,255,.10);
+  --ds-hero-num:linear-gradient(96deg,var(--ds-accent),var(--ds-accent-2));
+  --ds-glow-1:radial-gradient(900px 380px at 12% -6%, rgba(227,188,85,.16), transparent 70%);
+  --ds-glow-2:radial-gradient(700px 320px at 92% 2%, rgba(160,60,100,.16), transparent 70%);
+  --ds-success-text:var(--ds-success-dark);
+  --ds-danger-text:var(--ds-danger-dark);
+  --ds-info-text:var(--ds-info-dark);
+}
+
+@keyframes omRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes omFade{from{opacity:0}to{opacity:1}}
+@keyframes omSheen{from{transform:translateX(-120%)}to{transform:translateX(220%)}}
+@keyframes omGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){
+  .codir-hero,.codir-hero-sheen{animation:none!important;}
+}
+
+/* ── Halo ambiant + bloc héros ── rendus uniquement par renderCodir() (dashboard.html),
+   jamais présents ailleurs dans le DOM. .print-hide (déjà existant dans le <style>
+   inline de dashboard.html, voir @media print) masque les deux à l'impression — la
+   page A4 dédiée (#codir-print-header) reste strictement celle d'avant.
+   .codir-halo est en z-index négatif : il peint derrière tout contenu non repositionné
+   (header/sidebar restent au-dessus via leurs z-index déjà élevés) et derrière .codir-hero/
+   .card/.kpi (voir plus bas, position:relative ajouté pour leurs propres pastilles ::before
+   — effet de bord utile qui garantit aussi qu'ils passent au-dessus du halo). ── */
+.codir-halo{position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--ds-glow-1),var(--ds-glow-2);}
+.codir-hero{
+  position:relative;overflow:hidden;border-radius:var(--ds-radius-xl);
+  border:1px solid var(--ds-border);background:var(--ds-hero-bg);color:var(--ds-hero-ink);
+  box-shadow:var(--ds-shadow-lg);padding:28px 32px;margin-bottom:18px;
+  animation:omRise .65s cubic-bezier(.2,.8,.2,1) both;
+  font-family:var(--ds-font-sans);
+}
+.codir-hero-line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--ds-accent-2),var(--ds-accent),transparent);}
+.codir-hero-sheen{position:absolute;top:0;bottom:0;width:34%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);animation:omSheen 2.6s cubic-bezier(.4,0,.2,1) .5s both;pointer-events:none;}
+.codir-hero-inner{position:relative;display:flex;flex-wrap:wrap;align-items:flex-end;gap:38px;}
+.codir-hero-text{flex:1 1 260px;min-width:240px;}
+.codir-hero-eyebrow{display:flex;align-items:center;gap:9px;font-size:10.5px;font-weight:800;letter-spacing:.14em;color:var(--ds-accent);}
+.codir-hero-eyebrow span{width:22px;height:1px;background:var(--ds-accent);display:inline-block;}
+.codir-hero-title{font-family:'Instrument Serif',Georgia,serif;font-size:40px;line-height:1.06;letter-spacing:-.01em;margin-top:12px;}
+.codir-hero-tagline{font-size:13px;line-height:1.55;color:var(--ds-text-muted);margin-top:10px;max-width:44ch;}
+.codir-hero-stats{display:flex;flex-wrap:wrap;align-items:flex-end;gap:30px;}
+.codir-hero-stat{min-width:112px;}
+.codir-hero-sep{align-self:stretch;width:1px;background:var(--ds-hero-line);}
+.codir-hero-lbl{font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--ds-text-muted);}
+.codir-hero-num{font-size:52px;font-weight:800;letter-spacing:-.035em;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums;background:var(--ds-hero-num);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.codir-hero-num-sm{font-size:26px;letter-spacing:-.02em;background:none;-webkit-text-fill-color:currentColor;color:var(--ds-hero-ink);}
+.codir-hero-num-sm.codir-hero-danger{color:var(--ds-danger-text);}
+.codir-hero-sub{font-size:12px;color:var(--ds-text-muted);margin-top:8px;font-weight:600;}
+.codir-hero-sub.codir-hero-up{color:var(--ds-success-text);font-weight:700;}
+.codir-hero-sub.codir-hero-down{color:var(--ds-danger-text);font-weight:700;}
+@media(max-width:900px){.codir-hero-inner{flex-wrap:wrap;}}
+
+/* ── Cartes/panneaux/graphiques « premium » — scopés à l'écran Synthèse direction
+   uniquement (#codir-content). Le reste du dashboard garde .card/.kpi/.chart-card
+   tels qu'ils sont déjà (radius 12, box-shadow sm) — voir note de portée ci-dessus. ── */
+#codir-content .card{border-radius:18px;background:var(--ds-card-grad);box-shadow:var(--ds-shadow-lg);}
+#codir-content .card-head{padding:16px 20px;}
+#codir-content .chart-card{border-radius:14px;background:var(--ds-card-grad);box-shadow:var(--ds-shadow-sm);position:relative;}
+#codir-content .kpi{
+  border-top:none;border-radius:14px;padding:17px 18px;background:var(--ds-card-grad);
+  box-shadow:var(--ds-shadow-sm);position:relative;overflow:hidden;
+  transition:transform .28s cubic-bezier(.2,.8,.2,1),box-shadow .28s;
+}
+#codir-content .kpi:hover{transform:translateY(-3px);box-shadow:var(--ds-shadow-lg);}
+#codir-content .kpi::before{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--ds-border-strong),transparent);}
+#codir-content .kpi.blue::before,#codir-content .kpi.orange::before,#codir-content .kpi.green::before,#codir-content .kpi.yellow::before{background:linear-gradient(90deg,var(--ds-accent),var(--ds-accent-2));}
+#codir-content .kpi.red::before{background:linear-gradient(90deg,var(--ds-danger),color-mix(in oklab,var(--ds-danger) 55%,var(--ds-accent)));}

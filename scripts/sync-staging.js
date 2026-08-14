@@ -27,6 +27,7 @@ const FILES_TO_SYNC = [
   'logo.jpg',
   'logo-icon.jpg',
   'logo-dark.jpg',
+  'logo-light-text.png',
 ];
 
 function sync() {

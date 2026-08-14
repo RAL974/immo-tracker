@@ -66,8 +66,14 @@ if(window.Sentry)Sentry.init({
      sont conservées telles quelles — des centaines d'usages dans ce fichier s'y réfèrent — mais
      pointent désormais vers les nouveaux tokens --ds-* plutôt que des couleurs figées en dur. -->
 <link rel="stylesheet" href="design-system.css">
+<!-- Instrument Serif (14 août 2026) : réservée au seul titre du bloc héros de la Synthèse direction
+     (.codir-hero-title, voir renderCodir() et design-system.css) — la police système reste la police
+     de toute l'interface, aucun changement de typographie globale. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
-:root{--blue:var(--ds-primary);--orange:var(--ds-accent);--green:var(--ds-success);--red:var(--ds-danger);--yellow:var(--ds-warning);--grey:var(--ds-neutral-500);--bg:var(--ds-bg);--card:var(--ds-surface);--sidebar:220px;--header:54px;
+:root{--blue:var(--ds-primary);--orange:var(--ds-accent);--green:var(--ds-success);--red:var(--ds-danger);--yellow:var(--ds-warning);--grey:var(--ds-neutral-500);--bg:var(--ds-bg);--card:var(--ds-surface);--sidebar:220px;--header:64px;
   /* --blue est utilisé à la fois comme fond de chrome (header/sidebar/boutons, toujours du texte
      blanc dessus) et comme couleur de texte/accent (titres, valeurs, liens sur fond --card). En
      mode sombre --ds-primary devient volontairement clair (lisible en texte sur carte sombre) —
@@ -91,10 +97,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #pin-btn:hover,#pin-btn2:hover,#pin-btn3:hover{background:#0d2a52;}
 #pin-error{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
 
-/* ── Header ── */
-#header{background:var(--ds-nav-bg,var(--blue-chrome));color:#fff;height:var(--header);display:flex;align-items:center;padding:0 16px;gap:10px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:var(--ds-shadow-sm,0 2px 8px rgba(0,0,0,.3));border-bottom:1px solid rgba(255,255,255,.06);}
-#header img{height:38px;}
-#header h1{font-size:14px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.2px;}
+/* ── Header ── refonte premium 14 août 2026 (bandeau prune + filet doré, logo
+   transparent sans plaque, séparateur vertical) — voir 04_HISTORIQUE_DECISIONS.md
+   et design-system.css pour les tokens --ds-nav-grad/--ds-accent-2. --header est
+   passé de 54 à 64px (une seule variable, répercutée automatiquement sur #sidebar
+   top et #main padding-top plus bas dans ce fichier). */
+#header{background:var(--ds-nav-grad,var(--ds-nav-bg,var(--blue-chrome)));color:#fff;height:var(--header);display:flex;align-items:center;padding:0 18px;gap:14px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:inset 0 -1px 0 rgba(240,214,138,.38),0 10px 30px -18px rgba(0,0,0,.6);}
+#header img{height:36px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
+.header-sep{width:1px;height:26px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.32),transparent);flex-shrink:0;}
+#header h1{font-size:15px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;}
 #header-actions{display:flex;gap:8px;align-items:center;}
 #header-actions button{border:none;color:#fff;padding:7px 14px;border-radius:var(--ds-radius-sm,6px);cursor:pointer;font-weight:700;font-size:12px;transition:filter var(--ds-transition-fast,.15s ease),transform var(--ds-transition-fast,.15s ease);}
 #header-actions button:hover{filter:brightness(1.08);}
@@ -120,7 +131,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 @media (max-width:768px){#gsearch-wrap{display:none;}}
 
 /* ── Sidebar ── */
-#sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:var(--ds-nav-bg,var(--blue-chrome));overflow-y:auto;z-index:90;padding:8px 0 20px;border-right:1px solid rgba(255,255,255,.05);}
+#sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:linear-gradient(180deg,var(--ds-nav-bg) 0%,color-mix(in oklab,var(--ds-nav-bg) 82%,#000) 100%);overflow-y:auto;z-index:90;padding:8px 0 20px;box-shadow:inset -1px 0 0 rgba(255,255,255,.06);}
 .nav-group{padding:18px 16px 6px;font-size:10px;font-weight:800;color:rgba(255,255,255,.78);letter-spacing:1.5px;text-transform:uppercase;}
 .nav-group:first-child{padding-top:8px;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 11px;cursor:pointer;color:rgba(255,255,255,.72);border-radius:var(--ds-radius-sm,8px);margin:1px 8px;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease),border-color var(--ds-transition-fast,.15s ease);position:relative;border-left:3px solid transparent;}
@@ -380,7 +391,8 @@ tr:hover td{background:var(--ds-gold-50,#FDF8EC);}
 
 <!-- Header -->
 <div id="header">
-  <img src="logo.jpg" alt="Electricité Services Réunion" style="background:#fff;border-radius:6px;padding:3px 6px" onerror="this.style.display='none'">
+  <img src="logo-light-text.png" alt="Electricité Services Réunion" onerror="this.style.display='none'">
+  <span class="header-sep" aria-hidden="true"></span>
   <h1>Immo Tracker — Electricité Services Réunion</h1>
   <button id="hamburger" onclick="toggleSidebar()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;display:none">☰</button>
   <!-- Recherche globale : immos, employés, articles EPI/outillage — purement client-side sur les
@@ -6631,6 +6643,21 @@ function codirValeurParc(fs){
   });
   return{parTerr:parTerr,parCat:parCat,valCirc:valCirc,valDepot:valDepot,valJamais:valJamais,total:parTerr.Reunion+parTerr.Mayotte};
 }
+// Valeur des immos actives acquises dans les 12 derniers mois (miroir « entrées » de
+// codirTauxSortie côté « sorties ») — sert uniquement à la variation affichée dans le bloc héros
+// de la Synthèse direction (refonte visuelle du 14 août 2026), pas un nouvel indicateur de bloc.
+function codirVariation12Mois(fs){
+  var j365=Date.now()-365*86400000;
+  var valeur=0,nb=0;
+  Object.keys(immoMeta).forEach(function(code){
+    var mt=immoMeta[code];
+    if(!mt||mt.actif===false)return;
+    var site=mt.site==='Mayotte'?'Mayotte':'Reunion';
+    if(fs&&site!==fs)return;
+    if(mt.date_achat&&new Date(mt.date_achat).getTime()>=j365){valeur+=mt.valeur_achat||0;nb++;}
+  });
+  return{valeur:valeur,nb:nb};
+}
 function codirAdoption(fs){
   var j30=Date.now()-30*86400000;
   var actifs30={};
@@ -6711,6 +6738,14 @@ function renderCodir(){
     });
   }
   var sortie=codirTauxSortie(d.all_movements||[],fs);
+  // ── Valeurs du bloc héros (refonte visuelle du 14 août 2026, voir 04_HISTORIQUE_DECISIONS.md) —
+  // toutes dérivées des calculs ci-dessus, aucune nouvelle donnée métier introduite.
+  var heroNbImmos=sortie.parcRef-sortie.nb;
+  var heroValAchatCandidats=candidats.reduce(function(s,x){return s+(x.val_achat||0);},0);
+  var heroEntrees=codirVariation12Mois(fs);
+  var heroNetVar=heroEntrees.valeur-sortie.valeur;
+  var heroNetVarPct=vp.total>0?Math.round(heroNetVar/vp.total*1000)/10:0;
+  var heroPctCirc=vp.total>0?Math.round(vp.valCirc/vp.total*1000)/10:0;
   var semaines=codirSemaines12(d.all_movements||[],fs);
   var adopt=codirAdoption(fs);
   var delaiVal=codirDelaiValidation(d.all_movements||[],fs);
@@ -6722,7 +6757,42 @@ function renderCodir(){
   CODIR_COURANT={fs:fs,vp:vp,trims:trims,candidats:candidats,sortie:sortie,semaines:semaines,adopt:adopt,delaiVal:delaiVal,coutReparationsTotal:coutReparationsTotal,nbConsultations:nbConsultations,tempsEconomiseH:tempsEconomiseH,valeurTempsEconomise:valeurTempsEconomise};
 
   var sortArrow=function(key){return codirReformeSortKey===key?(codirReformeSortDir>0?' ▲':' ▼'):'';};
-  var html='';
+  var dateHeroLbl=new Date().toLocaleDateString('fr-FR',{timeZone:TZ,day:'2-digit',month:'long',year:'numeric'}).toUpperCase();
+  var heroTerritoireTxt=fs?('du territoire '+territoireLabel(fs)):'sur deux territoires';
+  var heroArbitrageTxt=candidats.length===0?'Aucun arbitrage attendu ce mois-ci.':(candidats.length===1?'Un arbitrage attendu ce mois-ci.':(candidats.length+' arbitrages attendus ce mois-ci.'));
+  var heroVarArrow=heroNetVarPct>=0?'▲':'▼';
+  var heroVarCls=heroNetVarPct>=0?'codir-hero-up':'codir-hero-down';
+  var html='<div class="codir-halo print-hide" aria-hidden="true"></div>';
+  html+='<section class="codir-hero print-hide">'+
+    '<div class="codir-hero-line"></div>'+
+    '<div class="codir-hero-sheen"></div>'+
+    '<div class="codir-hero-inner">'+
+      '<div class="codir-hero-text">'+
+        '<div class="codir-hero-eyebrow"><span></span>PARC IMMOBILISÉ · '+dateHeroLbl+'</div>'+
+        '<div class="codir-hero-title">Le parc en un regard</div>'+
+        '<div class="codir-hero-tagline">'+heroNbImmos.toLocaleString('fr-FR')+' immobilisations suivies '+heroTerritoireTxt+'. '+heroArbitrageTxt+'</div>'+
+      '</div>'+
+      '<div class="codir-hero-stats">'+
+        '<div class="codir-hero-stat">'+
+          '<div class="codir-hero-lbl">VALEUR TOTALE</div>'+
+          '<div class="codir-hero-num">'+eur(vp.total)+'</div>'+
+          '<div class="codir-hero-sub '+heroVarCls+'">'+heroVarArrow+' '+Math.abs(heroNetVarPct).toLocaleString('fr-FR')+' % sur 12 mois</div>'+
+        '</div>'+
+        '<span class="codir-hero-sep"></span>'+
+        '<div class="codir-hero-stat">'+
+          '<div class="codir-hero-lbl">EN CIRCULATION</div>'+
+          '<div class="codir-hero-num codir-hero-num-sm">'+eur(vp.valCirc)+'</div>'+
+          '<div class="codir-hero-sub">'+heroPctCirc.toLocaleString('fr-FR')+' % du parc</div>'+
+        '</div>'+
+        '<span class="codir-hero-sep"></span>'+
+        '<div class="codir-hero-stat">'+
+          '<div class="codir-hero-lbl">À ARBITRER</div>'+
+          '<div class="codir-hero-num codir-hero-num-sm codir-hero-danger">'+candidats.length+'</div>'+
+          '<div class="codir-hero-sub">'+eur(heroValAchatCandidats)+' de valeur</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</section>';
   html+='<div id="codir-print-header" style="display:none">'+
     '<h2 style="margin:0 0 4px">📋 Synthèse direction — Immo Tracker</h2>'+
     '<p style="margin:0 0 14px;font-size:12px;color:var(--ds-text-muted)">Electricité Services Réunion — Généré le '+fmtDT(new Date().toISOString())+' — Territoire : '+(fs?territoireLabel(fs):'La Réunion + Mayotte')+'</p></div>';
