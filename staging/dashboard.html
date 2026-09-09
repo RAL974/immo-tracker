@@ -822,7 +822,7 @@ if(IS_RECETTE){
 // Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
 var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit','Brasseurs_Depots','Brasseurs_Catalogue','Brasseurs_Mouvements','Brasseurs_Commandes','Brasseurs_Lignes_Commande','Fournisseurs','EPI_Consultations','EPI_Consultation_Lignes','EPI_Offres','EPI_Offres_Lignes'];
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur','ajouter_depot_brasseur','ajouter_reference_brasseur','migrer_mouvement_brasseur','creer_fournisseur','editer_fournisseur','creer_consultation_epi','editer_consultation_epi','editer_ligne_consultation_epi','changer_statut_consultation_epi','creer_offre_epi','editer_offre_epi','editer_ligne_offre_epi','reporter_catalogue_epi'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur','ajouter_depot_brasseur','ajouter_reference_brasseur','migrer_mouvement_brasseur','creer_fournisseur','editer_fournisseur','creer_consultation_epi','editer_consultation_epi','editer_ligne_consultation_epi','changer_statut_consultation_epi','creer_offre_epi','editer_offre_epi','editer_ligne_offre_epi','reporter_catalogue_epi','importer_lignes_offre_epi'];
 // Détection centralisée d'une session expirée (ajouté août 2026) : le jeton dure 12h — passé ce
 // délai, tout appel gated (POST action protégée, ou GET avec un jeton en paramètre d'URL comme les
 // endpoints Matériel IT/Brasseurs/Journal d'audit) échoue avec 401 {error:'session_invalide'}. Sans
@@ -2913,6 +2913,168 @@ function epiCalculerComparatifOffres(lignesBesoin,offresBrutes){
 }
 // === EPI_COMPARATIF_FIN ===
 
+// === EPI_IMPORT_OFFRE_DEBUT ===
+// Cadre de réponse fournisseur : export d'un fichier Excel pré-rempli avec les lignes de besoin
+// d'une consultation, réimport du fichier renvoyé par le fournisseur (session 4, sept. 2026). Blocs
+// purs (aucune dépendance DOM/File), testés isolément dans tests/dashboard.epi-import-offre.test.js —
+// la lecture SheetJS elle-même (chargerFichierImportOffreEPI, plus bas, hors de ce bloc) leur délègue
+// tout le travail dès que les lignes brutes du fichier sont disponibles.
+//
+// Détection des colonnes par LIBELLÉ (pas par position) : robuste à un fournisseur qui réordonne les
+// colonnes en ouvrant le fichier. Les libellés sont traités du plus long au plus court pour qu'un
+// intitulé comme "Designation proposee" ne se fasse jamais voler sa colonne par le plus court
+// "Designation" (la colonne interne, en lecture seule) — les deux coexistent dans le même fichier.
+var EPI_IMPORT_OFFRE_COLONNES=[
+  {cle:'id_ligne',label:'id ligne',oblig:true},
+  {cle:'reference_interne',label:'reference interne',oblig:false},
+  {cle:'reference_fournisseur',label:'reference fournisseur',oblig:true},
+  {cle:'designation_proposee',label:'designation proposee',oblig:false},
+  {cle:'designation',label:'designation',oblig:false},
+  {cle:'quantite_reunion',label:'quantite reunion',oblig:false},
+  {cle:'quantite_mayotte',label:'quantite mayotte',oblig:false},
+  {cle:'quantite_totale',label:'quantite totale demandee',oblig:false},
+  {cle:'quantite_minimum',label:'quantite minimum',oblig:false},
+  {cle:'type_article',label:'type article',oblig:false},
+  {cle:'taille',label:'taille',oblig:false},
+  {cle:'prix_unitaire_ht',label:'prix unitaire ht',oblig:true},
+  {cle:'conditionnement',label:'conditionnement',oblig:false},
+  {cle:'delai_jours',label:'delai jours',oblig:false},
+  {cle:'non_propose',label:'non propose',oblig:false},
+  {cle:'commentaire',label:'commentaire',oblig:false}
+];
+function epiNormaliserEnteteImport(h){return String(h||'').trim().toLowerCase().replace(/\s+/g,' ');}
+function epiDetecterColonnesImportOffre(headerRow){
+  var norm=(headerRow||[]).map(epiNormaliserEnteteImport);
+  var used={};var index={};
+  var specsTriees=EPI_IMPORT_OFFRE_COLONNES.slice().sort(function(a,b){return b.label.length-a.label.length;});
+  specsTriees.forEach(function(spec){
+    for(var i=0;i<norm.length;i++){
+      if(used[i])continue;
+      if(norm[i].indexOf(spec.label)===0){index[spec.cle]=i;used[i]=true;break;}
+    }
+  });
+  var manquantes=EPI_IMPORT_OFFRE_COLONNES.filter(function(s){return s.oblig&&index[s.cle]===undefined;}).map(function(s){return s.label;});
+  return{ok:manquantes.length===0,index:index,manquantes:manquantes};
+}
+function epiParseNombreImport(v){if(v===''||v==null)return null;var n=parseFloat(String(v).replace(',','.'));return isNaN(n)?null:n;}
+// rows : tableau de tableaux (XLSX.utils.sheet_to_json(ws,{header:1})), rows[0] = en-têtes déjà
+// utilisées pour construire `index`. Une ligne sans id ni référence fournisseur ni prix est une ligne
+// vide de mise en page (souvent laissée par le fournisseur) — ignorée silencieusement, pas une erreur.
+function epiConstruireLignesImportOffre(rows,index){
+  var out=[];
+  for(var i=1;i<(rows||[]).length;i++){
+    var row=rows[i];
+    if(!row||!row.length)continue;
+    var get=function(cle){var idx=index[cle];return idx==null?'':row[idx];};
+    var idLigne=String(get('id_ligne')||'').trim();
+    var refFourn=String(get('reference_fournisseur')||'').trim();
+    var prixRaw=get('prix_unitaire_ht');
+    if(!idLigne&&!refFourn&&(prixRaw===''||prixRaw==null))continue;
+    var nonProposeRaw=String(get('non_propose')||'').trim().toLowerCase();
+    out.push({
+      id_ligne:idLigne,type_article:String(get('type_article')||'').trim(),taille:String(get('taille')||'').trim(),
+      reference_interne:String(get('reference_interne')||'').trim(),designation:String(get('designation')||'').trim(),
+      reference_fournisseur:refFourn,designation_proposee:String(get('designation_proposee')||'').trim(),
+      prix_unitaire_ht:(prixRaw===''||prixRaw==null)?null:epiParseNombreImport(prixRaw),
+      conditionnement:epiParseNombreImport(get('conditionnement')),quantite_minimum:epiParseNombreImport(get('quantite_minimum')),
+      delai_jours:epiParseNombreImport(get('delai_jours')),
+      non_propose:(nonProposeRaw==='oui'||nonProposeRaw==='yes'||nonProposeRaw==='x'||nonProposeRaw==='true'),
+      commentaire:String(get('commentaire')||'').trim()
+    });
+  }
+  return out;
+}
+// Rapproche chaque ligne du fichier avec une ligne de besoin (par id, puis par correspondance
+// type+taille+référence interne si l'id est absent/inconnu), détecte les conflits avec une ligne
+// d'offre déjà saisie à la MAIN (jamais un simple gabarit vide créé en attendant le fichier), signale
+// les prix aberrants (zéro/négatif, ou écart de plus d'un facteur 10 avec une autre offre déjà reçue
+// sur la même ligne) et les libellés modifiés par le fournisseur (colonne "Désignation", en lecture
+// seule côté cadre exporté). Ne décide jamais d'écrire quoi que ce soit — action_defaut n'est qu'une
+// suggestion, l'écran de contrôle (dashboard) garde la main via un champ mutable `action` séparé.
+function epiAnalyserImportOffre(lignesFichier,consultationLignes,offreExistante,autresOffres){
+  lignesFichier=lignesFichier||[];consultationLignes=consultationLignes||[];
+  var lignesExistantes=(offreExistante&&offreExistante.lignes)||[];
+  autresOffres=(autresOffres||[]).filter(function(o){return o.statut!=='Ecartee';});
+  var besoinParId={};consultationLignes.forEach(function(l){besoinParId[l.id]=l;});
+  var existanteParConsultationId={};lignesExistantes.forEach(function(l){if(l.ligne_consultation_id)existanteParConsultationId[l.ligne_consultation_id]=l;});
+  var norm=function(s){return String(s||'').trim().toUpperCase();};
+
+  var lignes=lignesFichier.map(function(row){
+    var matchType='aucun';var besoin=null;var ligneConsultationId=row.id_ligne||'';
+    if(ligneConsultationId&&besoinParId[ligneConsultationId]){matchType='id';besoin=besoinParId[ligneConsultationId];}
+    else{
+      var candidats=consultationLignes.filter(function(l){
+        return (row.type_article||row.reference_interne)&&norm(l.type_article)===norm(row.type_article)&&norm(l.taille)===norm(row.taille)&&norm(l.reference_interne)===norm(row.reference_interne);
+      });
+      if(candidats.length===1){matchType='fallback';besoin=candidats[0];ligneConsultationId=besoin.id;}
+    }
+    var ligneOffreExistante=ligneConsultationId?(existanteParConsultationId[ligneConsultationId]||null):null;
+    var valeurs={
+      reference_fournisseur:row.reference_fournisseur||'',designation_proposee:row.designation_proposee||'',
+      prix_unitaire_ht:row.prix_unitaire_ht,conditionnement:row.conditionnement,quantite_minimum:row.quantite_minimum,
+      delai_jours:row.delai_jours,non_propose:!!row.non_propose,commentaire:row.commentaire||''
+    };
+
+    var conflit=false,conflitDetails=[];
+    if(ligneOffreExistante){
+      var existanteSignificative=!!(ligneOffreExistante.reference_fournisseur||ligneOffreExistante.designation_proposee||ligneOffreExistante.commentaire||
+        ligneOffreExistante.prix_unitaire_ht!=null||ligneOffreExistante.conditionnement!=null||ligneOffreExistante.quantite_minimum!=null||
+        ligneOffreExistante.delai_jours!=null||ligneOffreExistante.non_propose);
+      if(existanteSignificative){
+        ['reference_fournisseur','designation_proposee','prix_unitaire_ht','conditionnement','quantite_minimum','delai_jours','non_propose','commentaire'].forEach(function(champ){
+          var a=ligneOffreExistante[champ],b=valeurs[champ];var diff;
+          if(typeof a==='number'||typeof b==='number')diff=Math.abs((a||0)-(b||0))>0.0001&&!(a==null&&b==null);
+          else diff=String(a||'').trim()!==String(b||'').trim();
+          if(diff){conflit=true;conflitDetails.push({champ:champ,existant:a,importe:b});}
+        });
+      }
+    }
+
+    var prixFlag=null;
+    if(!valeurs.non_propose&&valeurs.prix_unitaire_ht!=null){
+      if(valeurs.prix_unitaire_ht<=0)prixFlag='zero_negatif';
+      else if(ligneConsultationId){
+        var autresPrix=[];
+        autresOffres.forEach(function(o){
+          var ol=(o.lignes||[]).find(function(x){return x.ligne_consultation_id===ligneConsultationId;});
+          if(ol&&!ol.non_propose&&ol.prix_unitaire_ht!=null&&ol.prix_unitaire_ht>0)autresPrix.push(ol.prix_unitaire_ht);
+        });
+        if(autresPrix.length){
+          var maxAutre=Math.max.apply(null,autresPrix),minAutre=Math.min.apply(null,autresPrix);
+          if(valeurs.prix_unitaire_ht>10*maxAutre||valeurs.prix_unitaire_ht<minAutre/10)prixFlag='ecart_10x';
+        }
+      }
+    }
+
+    var libelleModifie=!!(besoin&&row.designation&&norm(row.designation)!==norm(besoin.designation));
+
+    var actionDefaut;
+    if(matchType==='aucun')actionDefaut='ignore';
+    else if(ligneOffreExistante&&conflit)actionDefaut='garder_existant';
+    else if(prixFlag)actionDefaut='ignore';
+    else actionDefaut=ligneOffreExistante?'maj':'creer';
+
+    return{
+      ligne_consultation_id:ligneConsultationId||null,match_type:matchType,
+      fichier:{type_article:row.type_article,taille:row.taille,reference_interne:row.reference_interne,designation:row.designation},
+      besoin:besoin?{type_article:besoin.type_article,taille:besoin.taille,reference_interne:besoin.reference_interne,designation:besoin.designation,quantite_reunion:besoin.quantite_reunion,quantite_mayotte:besoin.quantite_mayotte,quantite_totale:besoin.quantite_calculee}:null,
+      ligne_offre_existante_id:ligneOffreExistante?ligneOffreExistante.id:null,
+      valeurs:valeurs,conflit:conflit,conflit_details:conflitDetails,prix_flag:prixFlag,libelle_modifie:libelleModifie,
+      action_defaut:actionDefaut
+    };
+  });
+
+  var resume={
+    total:lignes.length,reconnues:lignes.filter(function(l){return l.match_type!=='aucun';}).length,
+    non_rapprochees:lignes.filter(function(l){return l.match_type==='aucun';}).length,
+    conflits:lignes.filter(function(l){return l.conflit;}).length,
+    prix_aberrants:lignes.filter(function(l){return l.prix_flag;}).length,
+    libelles_modifies:lignes.filter(function(l){return l.libelle_modifie;}).length
+  };
+  return{lignes:lignes,resume:resume};
+}
+// === EPI_IMPORT_OFFRE_FIN ===
+
 // ── Vue Consultations (liste + détail : lignes de besoin figées + offres reçues) ─────────────
 async function chargerConsultationsEPI(force){
   if(dataLoadedEPIConsultations&&!force)return;
@@ -3015,7 +3177,11 @@ function renderConsultationDetailEPIInner(c){
     }).join('')+
     '</tbody></table></div></div>';
   html+='<div class="card" style="margin-top:14px"><div class="card-head"><h3>🏭 Offres reçues</h3>'+
-    (canEdit?'<button onclick="ouvrirAjoutOffreEPI(\''+c.id+'\')" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Enregistrer une offre</button>':'')+
+    (canEdit?'<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button onclick="ouvrirAjoutOffreEPI(\''+c.id+'\')" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Enregistrer une offre</button>'+
+      '<button class="filter-btn" onclick="ouvrirExportCadreOffreEPI(\''+c.id+'\')">📤 Cadre de réponse</button>'+
+      '<button class="filter-btn" onclick="ouvrirImportCadreOffreEPI(\''+c.id+'\')">📥 Importer un cadre</button>'+
+      '</div>':'')+
     '</div>';
   if(!offres.length)html+='<p class="es" style="padding:16px">Aucune offre enregistrée pour cette consultation.</p></div>';
   else{
@@ -3308,6 +3474,201 @@ async function soumettreEditionOffreEPI(consultationId,offreId){
     }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
   }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
 }
+// ── Cadre de réponse fournisseur : export puis réimport du fichier rempli (session 4) ──────────
+// Colonnes A à H (identifiant technique + rappel du besoin) : lecture seule, échouées telles quelles
+// au réimport pour le rapprochement et la détection d'un libellé modifié — jamais utilisées pour
+// autre chose. Colonnes I à P : à remplir par le fournisseur.
+var EPI_CADRE_ENTETES=['ID Ligne (ne pas modifier)','Type article','Taille','Reference interne','Designation','Quantite Reunion','Quantite Mayotte','Quantite totale demandee','Reference fournisseur','Designation proposee','Prix unitaire HT','Conditionnement','Quantite minimum','Delai jours','Non propose (Oui/Non)','Commentaire'];
+function exporterCadreOffreEPI(consultationId,fournisseurNom){
+  var c=epiConsultationsList.find(function(x){return x.id===consultationId;});
+  if(!c)return;
+  var lignes=epiConsultationLignesCache[consultationId]||[];
+  if(!lignes.length){alert('Cette consultation n\'a aucune ligne de besoin.');return;}
+  var lignesXls=lignes.map(function(l){return[l.id,l.type_article,l.taille,l.reference_interne,l.designation,l.quantite_reunion,l.quantite_mayotte,l.quantite_calculee,'','','','','','','',''];});
+  var ongletsSpec=[
+    {nom:'Instructions',entetes:['Cadre de réponse — '+c.titre],lignes:[
+      ['Fournisseur : '+fournisseurNom],
+      ['Merci de compléter uniquement les colonnes I à P de l\'onglet « Lignes à compléter » : Référence fournisseur, Désignation proposée, Prix unitaire HT, Conditionnement, Quantité minimum, Délai (jours), Non proposé (Oui/Non), Commentaire.'],
+      ['Les colonnes A à H sont fournies à titre de référence — NE PAS LES MODIFIER, en particulier la colonne A (identifiant technique de ligne), indispensable au réimport.'],
+      ['Laissez le prix vide et indiquez « Oui » dans « Non proposé » si vous ne proposez pas un article donné.']
+    ],cols:[110]},
+    {nom:'Lignes à compléter',entetes:EPI_CADRE_ENTETES,lignes:lignesXls,cols:[14,16,8,16,26,10,10,12,18,24,12,12,12,10,14,26]}
+  ];
+  exporterExcel(nomFichierExport('Cadre_Reponse_'+fournisseurNom.replace(/[^A-Za-z0-9_-]+/g,'_')+'_'+c.titre.replace(/[^A-Za-z0-9_-]+/g,'_')),ongletsSpec);
+}
+function ouvrirExportCadreOffreEPI(consultationId){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  var lignes=epiConsultationLignesCache[consultationId]||[];
+  if(!lignes.length){alert('Cette consultation n\'a aucune ligne de besoin.');return;}
+  var fournOptions=fournisseursList.filter(function(f){return f.actif;});
+  if(!fournOptions.length){alert('Aucun fournisseur actif dans le répertoire — ajoutez-en un depuis l\'onglet 🏭 Fournisseurs.');return;}
+  resetAddBtnEPI();
+  document.getElementById('add-titre').textContent='📤 Exporter le cadre de réponse';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML='<div class="frow"><label style="'+addLabelStyle+'">Fournisseur *</label><select id="ecf-fourn" style="'+addFieldStyle+'"><option value="">-- Sélectionner --</option>'+
+    fournOptions.map(function(f){return '<option value="'+f.nom.replace(/"/g,'&quot;')+'">'+f.nom+'</option>';}).join('')+'</select></div>'+
+    '<p style="font-size:11px;color:var(--grey);margin-top:8px">Génère un fichier Excel avec les lignes de besoin de cette consultation, à envoyer au fournisseur pour qu\'il indique ses prix — colonnes I à P à compléter, colonnes A à H à ne pas modifier (identifiant technique de rapprochement).</p>';
+  document.getElementById('add-confirm-btn').textContent='📤 Générer le fichier';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=function(){
+    var fourn=(document.getElementById('ecf-fourn').value||'').trim();
+    var msg=document.getElementById('add-msg');
+    if(!fourn){msg.style.color='var(--red)';msg.textContent='Sélectionnez un fournisseur.';return;}
+    exporterCadreOffreEPI(consultationId,fourn);
+    fermerAjout();
+  };
+}
+
+// ── Réimport du cadre rempli : rapprochement, écran de contrôle, arbitrage des conflits ────────
+var EPI_IMPORT_OFFRE_ETAT=null;
+function ouvrirImportCadreOffreEPI(consultationId){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  var lignes=epiConsultationLignesCache[consultationId]||[];
+  if(!lignes.length){alert('Cette consultation n\'a aucune ligne de besoin.');return;}
+  var fournOptions=fournisseursList.filter(function(f){return f.actif;});
+  if(!fournOptions.length){alert('Aucun fournisseur actif dans le répertoire — ajoutez-en un depuis l\'onglet 🏭 Fournisseurs.');return;}
+  resetAddBtnEPI();
+  EPI_IMPORT_OFFRE_ETAT=null;
+  document.getElementById('add-titre').textContent='📥 Importer un cadre rempli';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML='<div class="frow"><label style="'+addLabelStyle+'">Fournisseur *</label><select id="eif-fourn" style="'+addFieldStyle+'"><option value="">-- Sélectionner --</option>'+
+    fournOptions.map(function(f){return '<option value="'+f.nom.replace(/"/g,'&quot;')+'">'+f.nom+'</option>';}).join('')+'</select></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Fichier Excel rempli</label><input type="file" id="eif-fichier" accept=".xlsx,.xls" style="'+addFieldStyle+'" onchange="chargerFichierImportOffreEPI(\''+consultationId+'\')"></div>'+
+    '<div id="eif-preview"></div>';
+  document.getElementById('add-confirm-btn').style.display='none';
+  document.getElementById('add-overlay').style.display='flex';
+}
+function chargerFichierImportOffreEPI(consultationId){
+  var fourn=(document.getElementById('eif-fourn').value||'').trim();
+  var msg=document.getElementById('add-msg');
+  msg.style.color='var(--red)';
+  var input=document.getElementById('eif-fichier');
+  if(!fourn){msg.textContent='Sélectionnez d\'abord un fournisseur.';input.value='';return;}
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  msg.textContent='';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var nomFeuille=wb.SheetNames.find(function(n){return /lignes/i.test(n);})||wb.SheetNames[wb.SheetNames.length-1];
+      var ws=wb.Sheets[nomFeuille];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(!rows.length){msg.textContent='Fichier vide.';input.value='';return;}
+      var detection=epiDetecterColonnesImportOffre(rows[0]);
+      if(!detection.ok){
+        msg.textContent='❌ Colonnes obligatoires introuvables : '+detection.manquantes.join(', ')+'. Utilisez le fichier généré par « 📤 Cadre de réponse », sans en modifier les en-têtes.';
+        input.value='';return;
+      }
+      var lignesFichier=epiConstruireLignesImportOffre(rows,detection.index);
+      if(!lignesFichier.length){msg.textContent='Aucune ligne de données trouvée dans le fichier.';input.value='';return;}
+      var consultationLignes=epiConsultationLignesCache[consultationId]||[];
+      var offreExistante=(epiOffresCache[consultationId]||[]).find(function(o){return o.fournisseur===fourn;})||null;
+      var autresOffres=(epiOffresCache[consultationId]||[]).filter(function(o){return o.fournisseur!==fourn;});
+      var analyse=epiAnalyserImportOffre(lignesFichier,consultationLignes,offreExistante,autresOffres);
+      analyse.lignes.forEach(function(l){l.action=l.action_defaut;});
+      EPI_IMPORT_OFFRE_ETAT={consultationId:consultationId,fournisseur:fourn,offreExistante:offreExistante,analyse:analyse};
+      renderPreviewImportOffreEPI();
+    }catch(err){msg.textContent='Erreur de lecture du fichier : '+err.message;}
+    input.value='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+function renderPreviewImportOffreEPI(){
+  var el=document.getElementById('eif-preview');
+  if(!el||!EPI_IMPORT_OFFRE_ETAT)return;
+  var r=EPI_IMPORT_OFFRE_ETAT.analyse.resume;
+  var html='<div class="card" style="border-top:3px solid var(--orange);margin-top:10px"><div style="padding:12px">'+
+    '<p style="font-size:12px;margin-bottom:8px"><b>'+r.total+'</b> ligne(s) lue(s) — <b>'+r.reconnues+'</b> reconnue(s)'+
+    (r.non_rapprochees?', <span style="color:var(--red)">⚠️ '+r.non_rapprochees+' non rapprochée(s)</span>':'')+
+    (r.conflits?', <span style="color:var(--orange)">⚠️ '+r.conflits+' en conflit avec une saisie existante</span>':'')+
+    (r.prix_aberrants?', <span style="color:var(--red)">⚠️ '+r.prix_aberrants+' prix suspect(s)</span>':'')+
+    (r.libelles_modifies?', <span style="color:var(--grey)">ℹ️ '+r.libelles_modifies+' libellé(s) modifié(s) par le fournisseur</span>':'')+'.</p>'+
+    '<div class="tbl-wrap" style="max-height:340px"><table style="font-size:11px"><thead><tr><th>Ligne</th><th>État</th><th>Réf. fourn.</th><th>Désignation prop.</th><th>Prix HT</th><th>Cond.</th><th>Non prop.</th><th>Action</th></tr></thead><tbody>'+
+    EPI_IMPORT_OFFRE_ETAT.analyse.lignes.map(function(l,idx){return renderLigneImportOffreEPI(l,idx);}).join('')+
+    '</tbody></table></div>'+
+    '<div id="eif-statut" style="margin-top:10px;font-size:12px;color:var(--grey)"></div>'+
+    '</div></div>';
+  el.innerHTML=html;
+  var btn=document.getElementById('add-confirm-btn');
+  btn.style.display='';
+  btn.onclick=function(){confirmerImportOffreEPI();};
+  majBoutonImportOffreEPI();
+}
+function renderLigneImportOffreEPI(l,idx){
+  var etatTxt,etatColor;
+  if(l.match_type==='aucun'){etatTxt='❌ Non rapprochée';etatColor='var(--red)';}
+  else if(l.conflit){etatTxt='⚠️ Conflit';etatColor='var(--orange)';}
+  else if(l.prix_flag==='zero_negatif'){etatTxt='⚠️ Prix nul/négatif';etatColor='var(--red)';}
+  else if(l.prix_flag==='ecart_10x'){etatTxt='⚠️ Prix très écarté';etatColor='var(--red)';}
+  else{etatTxt=l.match_type==='fallback'?'✅ Reconnue (par correspondance)':'✅ Reconnue';etatColor='var(--green)';}
+  var libelleTag=l.libelle_modifie?' <span title="Désignation modifiée par le fournisseur">ℹ️</span>':'';
+  var ref=l.besoin||l.fichier||{};
+  var nomLigne=(ref.type_article||'—')+(ref.taille?' ('+ref.taille+')':'');
+  var actionCell;
+  if(l.match_type==='aucun'){
+    actionCell='<span style="color:var(--grey)">Ignorée</span>';
+  }else if(l.ligne_offre_existante_id&&l.conflit){
+    actionCell='<select onchange="EPI_IMPORT_OFFRE_ETAT.analyse.lignes['+idx+'].action=this.value;majBoutonImportOffreEPI()" style="font-size:11px;padding:3px">'+
+      '<option value="garder_existant"'+(l.action==='garder_existant'?' selected':'')+'>Garder l\'existant</option>'+
+      '<option value="maj"'+(l.action==='maj'?' selected':'')+'>Utiliser l\'import</option></select>';
+  }else{
+    var coche=l.action!=='ignore';
+    var actionSiCoche=l.ligne_offre_existante_id?'maj':'creer';
+    actionCell='<label style="cursor:pointer"><input type="checkbox" '+(coche?'checked':'')+' onchange="EPI_IMPORT_OFFRE_ETAT.analyse.lignes['+idx+'].action=this.checked?\''+actionSiCoche+'\':\'ignore\';majBoutonImportOffreEPI()"> Inclure</label>';
+  }
+  return '<tr style="color:'+etatColor+'"><td>'+nomLigne+libelleTag+'</td><td>'+etatTxt+'</td>'+
+    '<td>'+(l.valeurs.reference_fournisseur||'—')+'</td><td>'+(l.valeurs.designation_proposee||'—')+'</td>'+
+    '<td>'+(l.valeurs.prix_unitaire_ht!=null?nbFr(l.valeurs.prix_unitaire_ht):'—')+'</td><td>'+(l.valeurs.conditionnement!=null?l.valeurs.conditionnement:'—')+'</td>'+
+    '<td style="text-align:center">'+(l.valeurs.non_propose?'✅':'—')+'</td><td>'+actionCell+'</td></tr>';
+}
+function majBoutonImportOffreEPI(){
+  var btn=document.getElementById('add-confirm-btn');
+  if(!btn||!EPI_IMPORT_OFFRE_ETAT)return;
+  var n=EPI_IMPORT_OFFRE_ETAT.analyse.lignes.filter(function(l){return l.action==='creer'||l.action==='maj';}).length;
+  btn.disabled=n===0;
+  btn.textContent='✅ Valider l\'import ('+n+')';
+}
+async function confirmerImportOffreEPI(){
+  if(!EPI_IMPORT_OFFRE_ETAT)return;
+  var etat=EPI_IMPORT_OFFRE_ETAT;
+  var lignesAEcrire=etat.analyse.lignes.filter(function(l){return l.action==='creer'||l.action==='maj';});
+  if(!lignesAEcrire.length)return;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';msg.textContent='';
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var payloadLignes=lignesAEcrire.map(function(l){
+      var champs={ligne_consultation_id:l.ligne_consultation_id,type_article:(l.besoin||{}).type_article||'',taille:(l.besoin||{}).taille||'',
+        reference_fournisseur:l.valeurs.reference_fournisseur,designation_proposee:l.valeurs.designation_proposee,
+        prix_unitaire_ht:l.valeurs.prix_unitaire_ht,conditionnement:l.valeurs.conditionnement,quantite_minimum:l.valeurs.quantite_minimum,
+        delai_jours:l.valeurs.delai_jours,non_propose:l.valeurs.non_propose,commentaire:l.valeurs.commentaire};
+      if(l.action==='maj'&&l.ligne_offre_existante_id)champs.ligne_offre_id=l.ligne_offre_existante_id;
+      return champs;
+    });
+    var res;
+    if(etat.offreExistante){
+      var r=await fetch(W+'?action=importer_lignes_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({offre_id:etat.offreExistante.id,lignes:payloadLignes})});
+      res=await r.json();
+    }else{
+      var r2=await fetch(W+'?action=creer_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consultation_id:etat.consultationId,fournisseur:etat.fournisseur,statut:'Recue',date_reception:new Date().toISOString().slice(0,10),devise:'EUR',lignes:payloadLignes})});
+      res=await r2.json();
+    }
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Import terminé : '+(res.ok||res.lignes_ecrites||lignesAEcrire.length)+' ligne(s) écrite(s).';
+      delete epiOffresCache[etat.consultationId];
+      await chargerDetailConsultationEPI(etat.consultationId,true);
+      setTimeout(function(){fermerAjout();EPI_IMPORT_OFFRE_ETAT=null;renderConsultationDetailEPI();},1200);
+    }else{
+      btn.disabled=false;btn.textContent='✅ Valider l\'import ('+lignesAEcrire.length+')';
+      msg.textContent='❌ '+(res.message||res.error||(res.erreurs_validation&&res.erreurs_validation.length?(res.erreurs_validation.length+' ligne(s) rejetée(s) — rapprochement invalide'):'Échec'));
+    }
+  }catch(e){
+    btn.disabled=false;btn.textContent='✅ Valider l\'import ('+lignesAEcrire.length+')';
+    msg.textContent='Erreur réseau : '+e.message;
+  }
+}
+
 // Export à 4 volets (session 3) : Synthèse et scénarios / Comparatif détaillé / un onglet par
 // fournisseur (son offre complète) / Attribution retenue — la ventilation Réunion/Mayotte des
 // quantités est conservée sur chaque onglet qui porte des quantités, jamais réduite au seul total.

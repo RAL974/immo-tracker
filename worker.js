@@ -545,7 +545,7 @@ const GATED_ACTIONS_AUDIT = new Set([
   'migrer_mouvement_brasseur',
   'creer_fournisseur', 'editer_fournisseur', 'creer_consultation_epi', 'editer_consultation_epi',
   'editer_ligne_consultation_epi', 'changer_statut_consultation_epi', 'creer_offre_epi', 'editer_offre_epi',
-  'editer_ligne_offre_epi', 'reporter_catalogue_epi'
+  'editer_ligne_offre_epi', 'reporter_catalogue_epi', 'importer_lignes_offre_epi'
 ]);
 // Réponses renvoyées par requireAdmin/requireGarant AVANT toute exécution métier : ne jamais
 // journaliser ces cas. Deux raisons : (1) aucune écriture n'a eu lieu, rien à auditer côté métier ;
@@ -4368,6 +4368,68 @@ async function handleRequest(request) {
         const r = await fetch(GL + '/EPI_Offres_Lignes/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
         if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
         return json({ success: true });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Importe en masse des lignes d'offre dans une offre EXISTANTE (créer une nouvelle offre passe par
+    // creer_offre_epi, qui ne sait créer qu'un en-tête + ses lignes en une seule fois — jamais ajouter/
+    // mettre à jour des lignes sur un en-tête déjà là). Utilisé par le réimport du cadre de réponse
+    // rempli par un fournisseur (dashboard) : l'arbitrage conflit garder-l'existant/utiliser-l'import
+    // est déjà tranché côté client avant cet appel — chaque ligne de `lignes` porte soit
+    // `ligne_offre_id` (met à jour une ligne EPI_Offres_Lignes déjà existante, PATCH) soit rien (crée
+    // une nouvelle ligne, POST). Défense en profondeur : `ligne_consultation_id` doit correspondre à
+    // une vraie ligne de besoin de la MÊME consultation que l'offre, et `ligne_offre_id` (si fourni)
+    // doit appartenir à cette même offre — sinon la ligne est rejetée individuellement
+    // (erreurs_validation[]), sans bloquer les autres lignes valides du même import.
+    if (action === 'importer_lignes_offre_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const offreId = body.offre_id;
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!offreId || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (lignes.length > EPI_OFFRE_LIGNES_MAX) return json({ success: false, error: 'trop_de_lignes', max: EPI_OFFRE_LIGNES_MAX });
+      try {
+        const offreRes = await fetch(GL + '/EPI_Offres/items/' + offreId + '?$expand=fields', { headers: H });
+        const offreData = await offreRes.json();
+        if (!offreRes.ok || !offreData.fields) return json({ success: false, error: 'offre_introuvable' });
+        const consultationId = offreData.fields.Title;
+        const [consLignesRes, offreLignesRes] = await Promise.all([
+          fetch(GL + "/EPI_Consultation_Lignes/items?$expand=fields&$filter=fields/Title eq '" + String(consultationId).replace(/'/g, "''") + "'&$top=1000", { headers: H }),
+          fetch(GL + "/EPI_Offres_Lignes/items?$expand=fields&$filter=fields/Title eq '" + String(offreId).replace(/'/g, "''") + "'&$top=1000", { headers: H }),
+        ]);
+        const consLignesData = await consLignesRes.json();
+        const consLigneIds = new Set((consLignesData.value || []).map(i => String(i.id)));
+        const offreLignesData = await offreLignesRes.json();
+        const ligneOffreIds = new Set((offreLignesData.value || []).map(i => String(i.id)));
+        const requests = []; const erreursValidation = [];
+        lignes.forEach((l, idx) => {
+          const ligneConsultationId = String(l.ligne_consultation_id || '');
+          if (!consLigneIds.has(ligneConsultationId)) { erreursValidation.push({ index: idx, error: 'ligne_consultation_id_invalide' }); return; }
+          const prixUnitaireHt = (l.prix_unitaire_ht != null && l.prix_unitaire_ht !== '') ? parseFloat(l.prix_unitaire_ht) : null;
+          const conditionnement = (l.conditionnement != null && l.conditionnement !== '') ? parseFloat(l.conditionnement) : null;
+          const quantiteMinimum = (l.quantite_minimum != null && l.quantite_minimum !== '') ? parseFloat(l.quantite_minimum) : null;
+          const delaiJours = (l.delai_jours != null && l.delai_jours !== '') ? parseFloat(l.delai_jours) : null;
+          if (l.ligne_offre_id) {
+            const ligneOffreId = String(l.ligne_offre_id);
+            if (!ligneOffreIds.has(ligneOffreId)) { erreursValidation.push({ index: idx, error: 'ligne_offre_id_invalide' }); return; }
+            requests.push({ id: String(idx), method: 'PATCH', url: '/sites/' + SITE_ID + '/lists/EPI_Offres_Lignes/items/' + ligneOffreId + '/fields', headers: { 'Content-Type': 'application/json' }, body: {
+              Reference_Fournisseur: l.reference_fournisseur || '', Designation_Proposee: l.designation_proposee || '', Prix_Unitaire_HT: prixUnitaireHt,
+              Conditionnement: conditionnement, Quantite_Minimum: quantiteMinimum, Delai_Jours: delaiJours, Non_Propose: l.non_propose ? 'Oui' : 'Non', Commentaire: l.commentaire || '',
+            } });
+          } else {
+            requests.push({ id: String(idx), method: 'POST', url: '/sites/' + SITE_ID + '/lists/EPI_Offres_Lignes/items', headers: { 'Content-Type': 'application/json' }, body: { fields: {
+              Title: offreId, Ligne_Consultation_Id: ligneConsultationId, Type_Article: l.type_article || '', Taille_Article: l.taille || l.taille_article || '',
+              Reference_Fournisseur: l.reference_fournisseur || '', Designation_Proposee: l.designation_proposee || '', Prix_Unitaire_HT: prixUnitaireHt,
+              Conditionnement: conditionnement, Quantite_Minimum: quantiteMinimum, Delai_Jours: delaiJours, Non_Propose: l.non_propose ? 'Oui' : 'Non', Commentaire: l.commentaire || '',
+            } } });
+          }
+        });
+        if (!requests.length) return json({ success: false, error: 'donnees_invalides', erreurs_validation: erreursValidation });
+        let ok = 0, ko = 0; const erreurs = [];
+        for (let i = 0; i < requests.length; i += 20) {
+          const res = await graphBatch(requests.slice(i, i + 20));
+          ok += res.ok; ko += res.ko; if (res.erreurs.length) erreurs.push(...res.erreurs.slice(0, Math.max(0, 3 - erreurs.length)));
+        }
+        return json({ success: ko === 0 && !erreursValidation.length, ok: ok, ko: ko, erreurs: erreurs, erreurs_validation: erreursValidation });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 

@@ -697,3 +697,57 @@ retenue, modifiable avant validation comme n'importe quelle autre ligne du table
 **Droits inchangés** : lecture seule pour Encadrement (`peutVoirEPI`) sur l'ensemble de ces écrans
 (comparatif compris) ; toute action d'écriture reste `peutGererEPI` + `requireGarant`, sans nouvelle
 capacité `ROLE_CAPS`.
+
+## Cadre de réponse fournisseur — export et réimport (session 4, sept. 2026)
+
+*Les offres se saisissaient jusqu'ici entièrement à la main (« Enregistrer une offre », ligne par
+ligne) — long et faillible dès qu'un fournisseur répond sur plusieurs dizaines de références. Cette
+session ajoute, sur l'écran de détail d'une consultation (à côté d'« ➕ Enregistrer une offre ») :
+« 📤 Cadre de réponse » (génère un fichier Excel à envoyer au fournisseur) et « 📥 Importer un cadre »
+(réimporte le fichier qu'il renvoie rempli). Aucune nouvelle liste ni colonne SharePoint.*
+
+**Cadre exporté** : deux onglets (Instructions, Lignes à compléter). La 2ᵉ reprend chaque ligne de
+besoin de la consultation — colonnes A à H en lecture seule (dont la colonne A, l'identifiant
+technique `EPI_Consultation_Lignes` de la ligne, marquée « ne pas modifier », indispensable au
+rapprochement au réimport) — suivies des colonnes I à P à remplir par le fournisseur (Référence
+fournisseur, Désignation proposée, Prix unitaire HT, Conditionnement, Quantité minimum, Délai
+(jours), Non proposé, Commentaire) — exactement les champs de `EPI_Offres_Lignes`.
+
+**Détection des colonnes par libellé, pas par position** (`epiDetecterColonnesImportOffre`) : robuste
+à un fournisseur qui réordonne les colonnes en ouvrant le fichier dans son propre tableur. Rejette
+explicitement un fichier non conforme (identifiant de ligne, référence fournisseur ou prix introuvables)
+avant toute tentative de lecture des données — pas d'erreur silencieuse.
+
+**Rapprochement** (`epiAnalyserImportOffre`) : par l'identifiant technique de ligne en priorité, puis,
+s'il est absent ou inconnu, par correspondance exacte type d'article + taille + référence interne
+(seulement si le résultat est un match **unique** — une correspondance ambiguë reste non rapprochée,
+jamais devinée). Une ligne non rapprochée est affichée pour information mais **jamais écrite**.
+
+**Écran de contrôle obligatoire avant toute écriture**, quatre signaux : lignes reconnues/non
+rapprochées, prix aberrants (nul, négatif, ou écart de plus d'un facteur 10 avec une autre offre déjà
+reçue sur la même ligne — les offres `Ecartee` sont exclues de cette comparaison), et libellé modifié
+(la colonne « Désignation », en lecture seule côté cadre, renvoyée différente de l'originale — purement
+informatif, jamais bloquant). Une ligne à prix suspect est décochée par défaut ; l'utilisateur doit la
+recocher consciemment après vérification.
+
+**Un import ne peut jamais écraser silencieusement une offre déjà saisie à la main** : une ligne
+d'offre existante n'est considérée « en conflit » que si elle porte un contenu réellement saisi
+(au moins un champ non vide/non nul/`Non_Propose`) ET que ce contenu diffère de l'import — un simple
+gabarit vide créé en attendant le fichier (cas courant : une offre a été enregistrée tôt avec des
+lignes à prix nul, en attendant justement ce cadre) est mis à jour directement, sans arbitrage inutile.
+En cas de vrai conflit, l'action par défaut est **« Garder l'existant »** — l'utilisateur doit
+explicitement choisir « Utiliser l'import » ligne par ligne pour écraser.
+
+**Écriture, deux chemins selon qu'une offre existe déjà pour ce fournisseur sur cette consultation** :
+- **Aucune offre existante** : réutilise `creer_offre_epi` (action déjà existante, aucune modification)
+  avec toutes les lignes retenues par l'écran de contrôle.
+- **Une offre existe déjà** : nouvelle action `importer_lignes_offre_epi` (`requireGarant`) — chaque
+  ligne porte soit un `ligne_offre_id` (met à jour une ligne `EPI_Offres_Lignes` déjà là, PATCH sur les
+  mêmes champs qu'`editer_ligne_offre_epi`) soit rien (nouvelle ligne, POST, mêmes champs que
+  `creer_offre_epi`). Défense en profondeur côté serveur : `ligne_consultation_id` doit appartenir à la
+  MÊME consultation que l'offre visée, `ligne_offre_id` (si fourni) doit appartenir à cette MÊME offre —
+  une ligne qui échoue à cette vérification est rejetée individuellement (`erreurs_validation`), sans
+  bloquer l'écriture des autres lignes valides du même import.
+
+**Aucune nouvelle dépendance** : réutilise SheetJS 0.18.5 (déjà chargé, déjà utilisé pour l'import du
+comptage de stock EPI) et `exporterExcel` tels quels. Aucun gabarit imprimable existant modifié.

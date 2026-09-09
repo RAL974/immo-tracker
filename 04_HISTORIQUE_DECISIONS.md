@@ -1053,5 +1053,101 @@ Session de finition pure (aucun changement de comportement métier, gabarits imp
   l'attribution — cette session n'a touché à aucune nouvelle liste ni colonne, donc aucune étape
   supplémentaire ne s'ajoute à celle déjà signalée.
 
+## Cadre de réponse fournisseur EPI — export et réimport (session 4, sept. 2026)
+
+- **Contexte** : suite directe des sessions 2-3 (Consultations EPI, comparatif, attribution) — les
+  offres se saisissent entièrement à la main depuis leur création, ce qui devient long et faillible
+  dès qu'un fournisseur répond sur plusieurs dizaines de références. Objectif de session : produire un
+  fichier « cadre de réponse » exportable par fournisseur, puis réimporter le fichier rempli, avec un
+  écran de contrôle obligatoire et un arbitrage explicite en cas de conflit avec une saisie manuelle
+  déjà en place.
+- **Recherche préalable systématique avant tout code** : plutôt que de deviner les conventions du
+  fichier (`worker.js` ~4400 lignes, `dashboard.html` ~10200 lignes), une passe de lecture complète des
+  actions EPI existantes (`creer_offre_epi`, `editer_offre_epi`, `editer_ligne_offre_epi`,
+  `reporter_catalogue_epi`), du pattern d'import Excel déjà en place (`bulk_maj_stock_epi` + son
+  appelant côté dashboard, import du comptage de stock EPI), du pattern d'écran de contrôle le plus
+  proche (`ouvrirReportCatalogueEPI`, tableau décochable ligne à ligne) et des conventions de test
+  (mock Graph de `worker.epi-consultations.test.js`, extraction `vm` de
+  `dashboard.epi-comparatif.test.js`) a précédé toute écriture — confirmé ensuite ligne par ligne
+  directement dans le code réel avant de s'en servir de modèle.
+- **Aucune action existante ne permettait d'ajouter des lignes à une offre déjà créée** : `creer_offre_epi`
+  crée toujours un en-tête + ses lignes ensemble (jamais sur un en-tête déjà là) ; `editer_ligne_offre_epi`
+  ne PATCH qu'une ligne déjà existante par son id, jamais une création. Une nouvelle action
+  `importer_lignes_offre_epi` a donc été ajoutée, seule écriture serveur réellement nouvelle de cette
+  session — mixte création/mise à jour dans le même appel (chaque ligne du tableau porte ou non un
+  `ligne_offre_id`), avec double garde-fou référentiel (la ligne de besoin doit appartenir à la
+  consultation de l'offre visée, la ligne d'offre à mettre à jour doit appartenir à cette même offre) —
+  une ligne qui échoue est rejetée individuellement, sans bloquer les lignes valides du même import.
+- **Décision structurante : réutiliser `creer_offre_epi` tel quel quand aucune offre n'existe encore**
+  pour ce fournisseur sur cette consultation, plutôt que de dupliquer la logique de création d'en-tête
+  dans la nouvelle action — seul le cas « une offre existe déjà » (mise à jour/ajout de lignes) exigeait
+  réellement une nouvelle action.
+- **Détection des colonnes du fichier par libellé, pas par position** (`epiDetecterColonnesImportOffre`,
+  dashboard.html) : un fournisseur qui réordonne les colonnes en ouvrant le fichier dans son propre
+  tableur (Excel, Numbers, Google Sheets réexporté...) ne doit pas faire échouer le rapprochement.
+  Libellés traités du plus long au plus court pour qu'« Designation proposee » ne se fasse jamais voler
+  sa colonne par le plus court « Designation » (la colonne interne, en lecture seule) — les deux
+  coexistent dans le même fichier. Fichier non conforme (colonnes obligatoires introuvables : id ligne,
+  référence fournisseur, prix unitaire) → rejeté explicitement, jamais une tentative de lecture
+  approximative.
+- **Rapprochement en deux temps, jamais une correspondance devinée à l'aveugle**
+  (`epiAnalyserImportOffre`) : par l'identifiant technique (colonne A, ID de la ligne
+  `EPI_Consultation_Lignes`) en priorité ; en repli, par correspondance exacte type d'article + taille +
+  référence interne, uniquement si le résultat est **unique** — une correspondance ambiguë (deux lignes
+  de besoin identiques par ces trois critères) reste explicitement non rapprochée plutôt que d'attribuer
+  la ligne au hasard.
+- **Définition du « conflit » pesée avec soin** : une ligne d'offre déjà existante n'est un conflit que
+  si elle porte un contenu réellement saisi (au moins un champ non vide/non nul, ou `Non_Propose=true`)
+  ET que ce contenu diffère de l'import — un simple gabarit vide (offre créée tôt, prix nuls, en
+  attendant justement ce cadre) est mis à jour directement, sans demander un arbitrage qui n'aurait
+  aucun sens. Une vraie divergence entre une saisie manuelle et l'import se résout par défaut vers
+  « Garder l'existant » (jamais un écrasement silencieux), avec un contrôle explicite (menu déroulant
+  par ligne) pour basculer vers « Utiliser l'import » si l'utilisateur le décide.
+- **Prix aberrants : deux règles distinctes, jamais mélangées** — nul/négatif (erreur de saisie quasi
+  certaine) vs écart de plus d'un facteur 10 avec une autre offre déjà reçue sur la même ligne (les
+  offres `Ecartee` exclues de cette comparaison, cohérent avec `epiCalculerComparatifOffres`). Une
+  ligne à prix suspect est décochée par défaut dans l'écran de contrôle — l'utilisateur doit la
+  recocher consciemment après avoir vérifié visuellement.
+- **Libellé modifié = informatif, jamais bloquant** : si la colonne « Désignation » (interne, en
+  lecture seule côté cadre exporté) revient différente de l'originale, c'est signalé (le fournisseur a
+  peut-être mal recopié ou volontairement précisé quelque chose) mais n'empêche jamais l'inclusion de
+  la ligne — à la différence des prix aberrants, qui eux sont exclus par défaut.
+- **Aucune nouvelle dépendance, conformément à la contrainte de session** : réutilise SheetJS 0.18.5
+  (déjà chargé, déjà utilisé par l'import Excel du comptage de stock EPI, même flux `FileReader` →
+  `XLSX.read` → `sheet_to_json`) et `exporterExcel` tels quels. Aucun des 3 gabarits imprimables
+  existants (fiches EPI/Outillage, relevé de sortie) n'a été touché.
+- **Vérification en navigateur, au-delà des tests automatisés** : serveur statique local
+  (`.claude/launch.json`), session simulée (`ADMIN_SESSION`/catalogues injectés directement),
+  `XLSX.writeFile` stubbé pour capturer le classeur exporté (2 onglets, en-têtes et lignes conformes)
+  sans déclencher de téléchargement réel ; **le réimport a été exercé avec un VRAI aller-retour SheetJS**
+  (écriture d'un classeur en mémoire via `XLSX.write`, relecture via `XLSX.read`/`sheet_to_json`,
+  exactement le chemin que `chargerFichierImportOffreEPI` emprunte pour un vrai fichier) plutôt qu'avec
+  des lignes construites à la main — confirme que la détection de colonnes et le rapprochement
+  fonctionnent sur des données réellement issues du moteur SheetJS, pas seulement sur des fixtures de
+  test. Les deux chemins d'écriture ont été exercés de bout en bout avec `fetch` stubbé : offre déjà
+  existante (ACME Corp) → `importer_lignes_offre_epi` avec le bon `offre_id` et `ligne_offre_id` porté
+  uniquement sur la ligne où l'utilisateur a choisi « Utiliser l'import » ; aucune offre existante
+  (Beta SARL) → `creer_offre_epi` avec les 2 lignes retenues. L'écran de contrôle a été vérifié
+  interactivement (bascule du menu déroulant de conflit, case à cocher d'inclusion, compteur/activation
+  du bouton « Valider l'import » recalculés correctement à chaque changement). Zéro appel réseau réel
+  vers le Worker de production dans cette session.
+- **Tests** : 313/313 en début de session (baseline vérifiée). +6 tests serveur
+  (`tests/worker.epi-consultations.test.js` : création + mise à jour dans le même appel, ligne hors
+  périmètre de la consultation rejetée sans bloquer les autres, `ligne_offre_id` étranger à l'offre
+  rejeté, offre introuvable, données invalides, sans jeton garant) et +20 tests client
+  (`tests/dashboard.epi-import-offre.test.js`, même principe d'extraction `vm` que les sessions
+  précédentes : détection de colonnes — cas nominal, ordre indifférent, colonnes réordonnées, fichier
+  non conforme, en-tête vide —, construction des lignes — virgule décimale, lignes vides ignorées,
+  variantes de « Oui » pour non-proposé —, rapprochement par id/par repli/ambigu/introuvable, conflit
+  sur gabarit vierge vs saisie manuelle réelle, prix nul/négatif/écart de facteur 10/dans la marge/offre
+  écartée exclue, libellé modifié/inchangé, résumé cumulé sur un jeu hétérogène). `tests/worker.audit-helpers.test.js`
+  mis à jour (81 → 82 actions gated). **341/341** en fin de session, 0 régression. `npm run sync:staging`
+  relancé après modification de `dashboard.html`.
+- **Étape bloquante côté William, inchangée** : les 5 listes SharePoint du module Consultations EPI
+  (`Fournisseurs`, `EPI_Consultations`, `EPI_Consultation_Lignes`, `EPI_Offres`, `EPI_Offres_Lignes`)
+  restent à créer (production et recette) avant toute utilisation réelle — cette session n'a ajouté
+  aucune nouvelle liste ni colonne, donc aucune étape supplémentaire ne s'ajoute à celle déjà signalée
+  dans les sessions 2 et 3.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.

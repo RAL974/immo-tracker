@@ -88,6 +88,11 @@ function mockConsultationsEPI(t, config) {
       if (config.onWrite) config.onWrite({ method, url: u, body: JSON.parse(opts.body) });
       return new Response(JSON.stringify({}), { status: 200 });
     }
+    if (/\/EPI_Offres\/items\/[^/?]+\?/.test(u) && method === 'GET') {
+      const m = /\/items\/([^/?]+)\?/.exec(u);
+      const off = (config.offres || []).find((o) => o.id === m[1]);
+      return new Response(JSON.stringify(off ? { fields: off.fields } : {}), { status: off ? 200 : 404 });
+    }
     if (/\/EPI_Offres\/items\?/.test(u) && method === 'GET') {
       return new Response(JSON.stringify({ value: (config.offres || []).map((o) => ({ id: o.id, fields: o.fields })) }), { status: 200 });
     }
@@ -497,6 +502,119 @@ test('editer_ligne_offre_epi : édite le prix et le drapeau non_propose', async 
   assert.equal(data.success, true, JSON.stringify(data));
   assert.equal(patched.Prix_Unitaire_HT, 15.9);
   assert.equal(patched.Non_Propose, 'Oui');
+});
+
+// ── importer_lignes_offre_epi (cadre de réponse fournisseur, réimport — session 4) ─────────────
+// Complète une offre EXISTANTE (créer_offre_epi ne sait créer qu'un en-tête + ses lignes ensemble,
+// jamais ajouter/mettre à jour des lignes sur un en-tête déjà là) : ligne_offre_id présent -> PATCH
+// (met à jour une ligne déjà là), absent -> POST (nouvelle ligne). L'arbitrage garder-l'existant/
+// utiliser-l'import est déjà tranché côté client (dashboard.epi-import-offre.test.js) ; ce test ne
+// couvre que l'écriture elle-même et ses garde-fous serveur.
+
+test('importer_lignes_offre_epi : crée une nouvelle ligne (sans ligne_offre_id) et met à jour une ligne existante (avec ligne_offre_id) dans le même appel', async (t) => {
+  const ecrituresBatch = [];
+  mockConsultationsEPI(t, {
+    offres: [{ id: 'offre1', fields: { Title: 'cons1', Fournisseur: 'ACME Corp' } }],
+    consultationLignes: [
+      { id: 'l1', fields: { Title: 'cons1', Type_Article: 'Pantalon' } },
+      { id: 'l2', fields: { Title: 'cons1', Type_Article: 'Casque' } },
+    ],
+    offresLignes: [{ id: 'ol1', fields: { Title: 'offre1', Ligne_Consultation_Id: 'l1' } }],
+    onWrite: (evt) => { if (evt.batch) ecrituresBatch.push(evt); },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('importer_lignes_offre_epi', {
+    token, offre_id: 'offre1',
+    lignes: [
+      { ligne_consultation_id: 'l1', ligne_offre_id: 'ol1', reference_fournisseur: 'REF-1-MAJ', prix_unitaire_ht: 9.9 },
+      { ligne_consultation_id: 'l2', type_article: 'Casque', reference_fournisseur: 'REF-2-NEW', prix_unitaire_ht: 3.2 },
+    ],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.ok, 2);
+  assert.equal(ecrituresBatch.length, 2);
+  const patch = ecrituresBatch.find((e) => e.method === 'PATCH');
+  assert.match(patch.url, /items\/ol1\/fields/);
+  assert.equal(patch.body.Reference_Fournisseur, 'REF-1-MAJ');
+  assert.equal(Object.prototype.hasOwnProperty.call(patch.body, 'Title'), false, 'une mise à jour ne touche jamais Title/Ligne_Consultation_Id, comme editer_ligne_offre_epi');
+  const post = ecrituresBatch.find((e) => e.method === 'POST');
+  assert.equal(post.body.fields.Title, 'offre1');
+  assert.equal(post.body.fields.Ligne_Consultation_Id, 'l2');
+  assert.equal(post.body.fields.Reference_Fournisseur, 'REF-2-NEW');
+});
+
+test('importer_lignes_offre_epi : ligne_consultation_id hors de la consultation de l\'offre -> rejetée individuellement, les autres lignes valides sont quand même écrites', async (t) => {
+  const ecrituresBatch = [];
+  mockConsultationsEPI(t, {
+    offres: [{ id: 'offre1', fields: { Title: 'cons1', Fournisseur: 'ACME Corp' } }],
+    consultationLignes: [{ id: 'l1', fields: { Title: 'cons1', Type_Article: 'Pantalon' } }],
+    offresLignes: [],
+    onWrite: (evt) => { if (evt.batch) ecrituresBatch.push(evt); },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('importer_lignes_offre_epi', {
+    token, offre_id: 'offre1',
+    lignes: [
+      { ligne_consultation_id: 'l1', reference_fournisseur: 'OK' },
+      { ligne_consultation_id: 'appartient-a-une-autre-consultation', reference_fournisseur: 'HORS-PERIMETRE' },
+    ],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false, 'une ligne rejetée suffit à ne pas déclarer un succès total');
+  assert.equal(data.ok, 1);
+  assert.equal(ecrituresBatch.length, 1, 'la ligne valide est écrite malgré le rejet de l\'autre');
+  assert.equal(data.erreurs_validation.length, 1);
+  assert.equal(data.erreurs_validation[0].error, 'ligne_consultation_id_invalide');
+});
+
+test('importer_lignes_offre_epi : ligne_offre_id qui n\'appartient pas à cette offre -> rejetée', async (t) => {
+  mockConsultationsEPI(t, {
+    offres: [{ id: 'offre1', fields: { Title: 'cons1', Fournisseur: 'ACME Corp' } }],
+    consultationLignes: [{ id: 'l1', fields: { Title: 'cons1' } }],
+    // Le mock ne simule pas le $filter=fields/Title eq '<offreId>' de la requête serveur (même
+    // convention que les autres listes de ce fichier, ex. EPI_Consultation_Lignes) — une liste vide
+    // représente donc fidèlement ce qu'un vrai serveur Graph renverrait pour cette offre : aucune
+    // ligne "ol-autre-offre" (qui appartient à une AUTRE offre) n'en fait partie.
+    offresLignes: [],
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('importer_lignes_offre_epi', {
+    token, offre_id: 'offre1', lignes: [{ ligne_consultation_id: 'l1', ligne_offre_id: 'ol-autre-offre', reference_fournisseur: 'X' }],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.erreurs_validation[0].error, 'ligne_offre_id_invalide');
+});
+
+test('importer_lignes_offre_epi : offre introuvable -> refusé, rien écrit', async (t) => {
+  let wrote = false;
+  mockConsultationsEPI(t, { offres: [], onWrite: () => { wrote = true; } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('importer_lignes_offre_epi', { token, offre_id: 'inexistant', lignes: [{ ligne_consultation_id: 'l1' }] }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.equal(data.error, 'offre_introuvable');
+  assert.equal(wrote, false);
+});
+
+test('importer_lignes_offre_epi : offre_id manquant ou aucune ligne -> donnees_invalides', async (t) => {
+  mockConsultationsEPI(t, {});
+  const token = await garantToken();
+  const r1 = await W.handleRequest(postRequest('importer_lignes_offre_epi', { token, lignes: [{ ligne_consultation_id: 'l1' }] }));
+  assert.equal((await r1.json()).error, 'donnees_invalides');
+  const r2 = await W.handleRequest(postRequest('importer_lignes_offre_epi', { token, offre_id: 'offre1', lignes: [] }));
+  assert.equal((await r2.json()).error, 'donnees_invalides');
+});
+
+test('importer_lignes_offre_epi : sans jeton garant -> refusé, rien écrit', async (t) => {
+  let wrote = false;
+  mockConsultationsEPI(t, { onWrite: () => { wrote = true; } });
+  const res = await W.handleRequest(postRequest('importer_lignes_offre_epi', { offre_id: 'offre1', lignes: [{ ligne_consultation_id: 'l1' }] }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.ok(data.error === 'session_invalide' || data.error === 'droits_insuffisants');
+  assert.equal(wrote, false);
 });
 
 // ── reporter_catalogue_epi (report au catalogue, D8) ────────────────────────────────────────
