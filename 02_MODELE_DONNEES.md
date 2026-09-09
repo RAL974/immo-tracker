@@ -594,10 +594,10 @@ sur les mêmes lignes plutôt qu'une liste séparée.*
 | `Quantite_Reunion` | Nombre | Figée au moment de la création |
 | `Quantite_Mayotte` | Nombre | idem |
 | `Quantite_Calculee` | Nombre | Total (Réunion + Mayotte), figé — jamais recalculé |
-| `Quantite_Retenue` | Nombre | Initialisée = `Quantite_Calculee` à la création, éditable ligne à ligne tant que la consultation est `Brouillon` |
+| `Quantite_Retenue` | Nombre | Initialisée = `Quantite_Calculee` à la création, éditable ligne à ligne tant que la consultation est `Brouillon` **ou** `Depouillement` (fenêtre élargie session 3, sept. 2026 — voir plus bas) |
 | `Commentaire` | Texte | |
-| `Fournisseur_Retenu` | Texte | Vide tant que non arbitrée |
-| `Motif_Choix` | **Plusieurs lignes de texte** | |
+| `Fournisseur_Retenu` | Texte | Vide tant que non arbitrée — c'est l'attribution elle-même (session 3) |
+| `Motif_Choix` | **Plusieurs lignes de texte** | Motif libre de l'attribution (ex. "meilleur prix", "délai", "qualité") |
 
 ### `EPI_Offres`
 
@@ -642,6 +642,22 @@ libre, contrairement à `Brasseurs_Commandes.Fournisseur`).*
 
 Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et `dashboard.html`,
 synchronisation vérifiée par `tests/backup.export-structure.test.js`).
+
+### Comparatif, attribution et report au catalogue (session 3, sept. 2026)
+
+*Aucune nouvelle liste ni colonne SharePoint pour cette tranche — le comparatif des offres et les
+scénarios A/B (mono-fournisseur vs panachage ligne à ligne) sont calculés à la volée côté dashboard
+(`epiCalculerComparatifOffres`, jamais persistés) à partir des données déjà décrites ci-dessus
+(`EPI_Consultation_Lignes` + `EPI_Offres`/`EPI_Offres_Lignes`). La seule écriture nouvelle est le
+report des références/fournisseurs retenus vers le catalogue déjà existant.*
+
+**Report au catalogue (D8)** : la nouvelle action `reporter_catalogue_epi` écrit uniquement
+`Reference`/`Fournisseur` sur `Catalogue_Articles_EPI` (colonnes déjà décrites plus haut, § Liste
+`Catalogue_Articles_EPI`) — jamais `Stock_Actuel`/`Stock_Mini`/`Type_Article`/`Taille_*`. L'article
+catalogue cible est retrouvé via `epiTrouverArticleCatalogue(type_article, taille)` (déjà utilisé
+partout ailleurs dans le module EPI, aucune 3e logique de correspondance inventée) ; une ligne de
+besoin sans article catalogue correspondant n'est simplement pas reportable (signalé à l'écran, pas
+une erreur bloquante).
 
 ## Recherche globale dashboard (ajoutée août 2026)
 

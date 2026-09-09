@@ -289,7 +289,7 @@ test('editer_ligne_consultation_epi : édite Quantite_Retenue/Fournisseur_Retenu
   assert.equal(patched.Motif_Choix, 'Meilleur prix');
 });
 
-test('editer_ligne_consultation_epi : refusé si la consultation parente n\'est plus Brouillon', async (t) => {
+test('editer_ligne_consultation_epi : refusé si la consultation parente est Envoyee (pas encore dépouillée)', async (t) => {
   let wrote = false;
   mockConsultationsEPI(t, {
     consultationLignes: [{ id: 'l1', fields: { Title: 'cons1', Type_Article: 'Pantalon', Quantite_Retenue: 7 } }],
@@ -303,6 +303,38 @@ test('editer_ligne_consultation_epi : refusé si la consultation parente n\'est 
   assert.equal(data.error, 'consultation_non_modifiable');
   assert.equal(data.statut, 'Envoyee');
   assert.equal(wrote, false);
+});
+
+test('editer_ligne_consultation_epi : refusé si la consultation parente est Attribuee/Cloturee/Annulee (arbitrage déjà acté)', async (t) => {
+  for (const statut of ['Attribuee', 'Cloturee', 'Annulee']) {
+    let wrote = false;
+    mockConsultationsEPI(t, {
+      consultationLignes: [{ id: 'l1', fields: { Title: 'cons1', Type_Article: 'Pantalon', Quantite_Retenue: 7 } }],
+      consultation: { Title: 'Consultation', Statut: statut },
+      onWrite: () => { wrote = true; },
+    });
+    const token = await garantToken();
+    const res = await W.handleRequest(postRequest('editer_ligne_consultation_epi', { token, id: 'l1', fournisseur_retenu: 'ACME Corp' }));
+    const data = await res.json();
+    assert.equal(data.success, false, 'statut ' + statut);
+    assert.equal(data.error, 'consultation_non_modifiable');
+    assert.equal(wrote, false, 'statut ' + statut);
+  }
+});
+
+test('editer_ligne_consultation_epi : AUTORISÉ pendant Depouillement (attribution : fournisseur retenu + motif), après réception des offres', async (t) => {
+  let patched = null;
+  mockConsultationsEPI(t, {
+    consultationLignes: [{ id: 'l1', fields: { Title: 'cons1', Type_Article: 'Pantalon', Quantite_Retenue: 7 } }],
+    consultation: { Title: 'Consultation', Statut: 'Depouillement' },
+    onWrite: (evt) => { if (!evt.batch && evt.method === 'PATCH' && /EPI_Consultation_Lignes/.test(evt.url)) patched = evt.body; },
+  });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('editer_ligne_consultation_epi', { token, id: 'l1', fournisseur_retenu: 'ACME Corp', motif_choix: 'Meilleur prix ligne à ligne' }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(patched.Fournisseur_Retenu, 'ACME Corp');
+  assert.equal(patched.Motif_Choix, 'Meilleur prix ligne à ligne');
 });
 
 test('editer_ligne_consultation_epi : quantite_retenue négative -> refusé', async (t) => {
@@ -465,6 +497,65 @@ test('editer_ligne_offre_epi : édite le prix et le drapeau non_propose', async 
   assert.equal(data.success, true, JSON.stringify(data));
   assert.equal(patched.Prix_Unitaire_HT, 15.9);
   assert.equal(patched.Non_Propose, 'Oui');
+});
+
+// ── reporter_catalogue_epi (report au catalogue, D8) ────────────────────────────────────────
+// Écrit Reference/Fournisseur sur Catalogue_Articles_EPI par lots de 20 ($batch) — jamais Stock_*
+// ni Type_Article/Taille_*, uniquement les deux champs concernés par l'attribution.
+
+test('reporter_catalogue_epi : écrit Reference/Fournisseur en $batch pour chaque ligne cochée', async (t) => {
+  const ecrituresBatch = [];
+  mockConsultationsEPI(t, { onWrite: (evt) => { if (evt.batch) ecrituresBatch.push(evt); } });
+  const token = await garantToken();
+  const res = await W.handleRequest(postRequest('reporter_catalogue_epi', {
+    token,
+    rows: [
+      { id: 'cat1', reference: 'PANT-42-ACME', fournisseur: 'ACME Corp' },
+      { id: 'cat2', reference: 'CASQ-STD-BETA', fournisseur: 'Beta SARL' },
+    ],
+  }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.ok, 2);
+  assert.equal(ecrituresBatch.length, 2);
+  const p1 = ecrituresBatch.find((e) => /items\/cat1\/fields/.test(e.url));
+  assert.equal(p1.method, 'PATCH');
+  assert.equal(p1.body.Reference, 'PANT-42-ACME');
+  assert.equal(p1.body.Fournisseur, 'ACME Corp');
+  assert.equal(Object.prototype.hasOwnProperty.call(p1.body, 'Stock_Actuel'), false, 'ne doit jamais toucher le stock');
+});
+
+test('reporter_catalogue_epi : plus de 20 lignes -> écrites en plusieurs lots $batch (chunks de 20)', async (t) => {
+  const ecrituresBatch = [];
+  mockConsultationsEPI(t, { onWrite: (evt) => { if (evt.batch) ecrituresBatch.push(evt); } });
+  const token = await garantToken();
+  const rows = Array.from({ length: 25 }, (_, i) => ({ id: 'cat' + i, reference: 'REF' + i, fournisseur: 'ACME Corp' }));
+  const res = await W.handleRequest(postRequest('reporter_catalogue_epi', { token, rows }));
+  const data = await res.json();
+  assert.equal(data.success, true, JSON.stringify(data));
+  assert.equal(data.ok, 25);
+  assert.equal(ecrituresBatch.length, 25);
+});
+
+test('reporter_catalogue_epi : aucune ligne / lignes sans id -> donnees_invalides, rien écrit', async (t) => {
+  let wrote = false;
+  mockConsultationsEPI(t, { onWrite: () => { wrote = true; } });
+  const token = await garantToken();
+  const res1 = await W.handleRequest(postRequest('reporter_catalogue_epi', { token, rows: [] }));
+  assert.equal((await res1.json()).error, 'donnees_invalides');
+  const res2 = await W.handleRequest(postRequest('reporter_catalogue_epi', { token, rows: [{ reference: 'X', fournisseur: 'Y' }] }));
+  assert.equal((await res2.json()).error, 'donnees_invalides');
+  assert.equal(wrote, false);
+});
+
+test('reporter_catalogue_epi : sans jeton garant -> refusé, rien écrit', async (t) => {
+  let wrote = false;
+  mockConsultationsEPI(t, { onWrite: () => { wrote = true; } });
+  const res = await W.handleRequest(postRequest('reporter_catalogue_epi', { rows: [{ id: 'cat1', reference: 'X', fournisseur: 'Y' }] }));
+  const data = await res.json();
+  assert.equal(data.success, false);
+  assert.ok(data.error === 'session_invalide' || data.error === 'droits_insuffisants');
+  assert.equal(wrote, false);
 });
 
 // ── Lectures GET ─────────────────────────────────────────────────────────────────────────────

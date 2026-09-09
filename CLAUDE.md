@@ -895,10 +895,10 @@ sur les mêmes lignes plutôt qu'une liste séparée.*
 | `Quantite_Reunion` | Nombre | Figée au moment de la création |
 | `Quantite_Mayotte` | Nombre | idem |
 | `Quantite_Calculee` | Nombre | Total (Réunion + Mayotte), figé — jamais recalculé |
-| `Quantite_Retenue` | Nombre | Initialisée = `Quantite_Calculee` à la création, éditable ligne à ligne tant que la consultation est `Brouillon` |
+| `Quantite_Retenue` | Nombre | Initialisée = `Quantite_Calculee` à la création, éditable ligne à ligne tant que la consultation est `Brouillon` **ou** `Depouillement` (fenêtre élargie session 3, sept. 2026 — voir plus bas) |
 | `Commentaire` | Texte | |
-| `Fournisseur_Retenu` | Texte | Vide tant que non arbitrée |
-| `Motif_Choix` | **Plusieurs lignes de texte** | |
+| `Fournisseur_Retenu` | Texte | Vide tant que non arbitrée — c'est l'attribution elle-même (session 3) |
+| `Motif_Choix` | **Plusieurs lignes de texte** | Motif libre de l'attribution (ex. "meilleur prix", "délai", "qualité") |
 
 ### `EPI_Offres`
 
@@ -943,6 +943,22 @@ libre, contrairement à `Brasseurs_Commandes.Fournisseur`).*
 
 Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et `dashboard.html`,
 synchronisation vérifiée par `tests/backup.export-structure.test.js`).
+
+### Comparatif, attribution et report au catalogue (session 3, sept. 2026)
+
+*Aucune nouvelle liste ni colonne SharePoint pour cette tranche — le comparatif des offres et les
+scénarios A/B (mono-fournisseur vs panachage ligne à ligne) sont calculés à la volée côté dashboard
+(`epiCalculerComparatifOffres`, jamais persistés) à partir des données déjà décrites ci-dessus
+(`EPI_Consultation_Lignes` + `EPI_Offres`/`EPI_Offres_Lignes`). La seule écriture nouvelle est le
+report des références/fournisseurs retenus vers le catalogue déjà existant.*
+
+**Report au catalogue (D8)** : la nouvelle action `reporter_catalogue_epi` écrit uniquement
+`Reference`/`Fournisseur` sur `Catalogue_Articles_EPI` (colonnes déjà décrites plus haut, § Liste
+`Catalogue_Articles_EPI`) — jamais `Stock_Actuel`/`Stock_Mini`/`Type_Article`/`Taille_*`. L'article
+catalogue cible est retrouvé via `epiTrouverArticleCatalogue(type_article, taille)` (déjà utilisé
+partout ailleurs dans le module EPI, aucune 3e logique de correspondance inventée) ; une ligne de
+besoin sans article catalogue correspondant n'est simplement pas reportable (signalé à l'écran, pas
+une erreur bloquante).
 
 ## Recherche globale dashboard (ajoutée août 2026)
 
@@ -1549,14 +1565,20 @@ atteignable depuis n'importe quel état non terminal — un abandon reste possib
 moment avant clôture. **Aucune suppression** : comme les mouvements Brasseurs annulés, le motif est
 tracé dans `Notes` en préfixant sans écraser l'existant (`[ANNULÉ par CODE le ISO — motif]`).
 
-**Édition d'une ligne de besoin (`editer_ligne_consultation_epi`) limitée au statut `Brouillon`** :
-`Quantite_Retenue`/`Fournisseur_Retenu`/`Motif_Choix`/`Commentaire` ne sont modifiables que tant que
-la consultation parente est encore `Brouillon` — au-delà (dès `Envoyee`), le besoin figé sert de
-référence stable envoyée aux fournisseurs et ne doit plus bouger silencieusement. Vérifié côté
-serveur à chaque appel (relit le statut de la consultation parente avant d'écrire), pas seulement
-côté affichage. L'en-tête de la consultation (nom, date limite de réponse, notes — jamais
-`Annee_Cible`/`Parametres`/`Statut`, qui définissent le besoin figé lui-même ou son cycle de vie)
-reste éditable quel que soit le statut via `editer_consultation_epi`, simple métadonnée
+**Édition d'une ligne de besoin (`editer_ligne_consultation_epi`) limitée à `Brouillon` et
+`Depouillement`** (fenêtre élargie session 3, sept. 2026) : `Quantite_Retenue`/`Fournisseur_Retenu`/
+`Motif_Choix`/`Commentaire` ne sont modifiables que tant que la consultation parente est `Brouillon`
+(ajuster le besoin avant envoi) ou `Depouillement` (l'attribution elle-même, une fois les offres
+reçues et comparées) — au-delà (`Envoyee` : déjà partie chez les fournisseurs ; `Attribuee`/
+`Cloturee`/`Annulee` : décision actée), plus aucune modification silencieuse. **`Envoyee` reste
+volontairement exclue** : le besoin est alors sorti, entre les mains des fournisseurs, avant tout
+retour de leur part — l'élargir à `Depouillement` seulement (pas dès `Envoyee`) reflète le moment où
+l'attribution a effectivement un sens (des offres à comparer). Sans cet élargissement au-delà du seul
+`Brouillon` d'origine, l'attribution n'aurait jamais pu se faire dans le cycle de vie normal d'une
+consultation. Vérifié côté serveur à chaque appel (relit le statut de la consultation parente avant
+d'écrire), pas seulement côté affichage. L'en-tête de la consultation (nom, date limite de réponse,
+notes — jamais `Annee_Cible`/`Parametres`/`Statut`, qui définissent le besoin figé lui-même ou son
+cycle de vie) reste éditable quel que soit le statut via `editer_consultation_epi`, simple métadonnée
 administrative.
 
 **Fournisseurs — répertoire indépendant** (`creer_fournisseur`/`editer_fournisseur`) : un fournisseur
@@ -1583,14 +1605,81 @@ d'endpoint séparé pour les lignes d'offre). `?fournisseurs=1`/`?epi_consultati
 existants plutôt qu'avec le cadrage initial (qui proposait de protéger aussi les quantités du besoin,
 jugées RH-adjacentes).
 
-**Portée volontairement non couverte cette session** (voir `CADRAGE_MODULE_BESOIN_EPI.md` pour le
-cadrage complet qui les envisageait) : pas de tableau comparatif à deux scénarios (fournisseur unique
-moins-disant vs meilleur prix ligne à ligne panaché) — la comparaison se fait aujourd'hui en lisant le
-détail de chaque offre, `Fournisseur_Retenu`/`Motif_Choix` par ligne servant de trace d'arbitrage ; pas
-d'étape distincte « reporter au catalogue » (report des références retenues vers
-`Catalogue_Articles_EPI`) — l'arbitrage ligne à ligne (`Fournisseur_Retenu`, `Quantite_Retenue`) reste
-dans la consultation, jamais recopié ailleurs automatiquement. À construire dans une session dédiée
-si le besoin se confirme.
+## Comparatif des offres, attribution et report au catalogue (session 3, sept. 2026)
+
+*Complète le module Consultations EPI ci-dessus : jusqu'ici, comparer des offres se faisait en lisant
+le détail de chaque offre une par une, et l'attribution (`Fournisseur_Retenu`/`Motif_Choix`) restait
+bloquée en `Brouillon` — avant même qu'aucune offre ne puisse raisonnablement exister. Cette session
+ajoute le comparatif chiffré, l'attribution ligne à ligne pendant `Depouillement`, l'export complet et
+le report vers le catalogue — sans nouvelle liste ni colonne SharePoint (voir `02_MODELE_DONNEES.md`
+§ Comparatif, attribution et report au catalogue).*
+
+**Comparatif, calculé à la volée, jamais persisté** (`epiCalculerComparatifOffres`, bloc pur côté
+dashboard, testé isolément) : pour chaque ligne de besoin × chaque fournisseur ayant une offre `Recue`
+(les offres `Ecartee` sont exclues), le prix, la quantité réellement commandable et le total sont
+calculés en tenant compte du **conditionnement** et de la **quantité minimum** du fournisseur —
+la quantité retenue est arrondie au multiple de conditionnement supérieur (après avoir été relevée au
+minimum de commande si besoin), et le surcoût correspondant est affiché, jamais masqué : c'est
+souvent lui qui renverse le classement d'une ligne (un prix unitaire plus bas ne l'emporte pas
+forcément une fois le conditionnement appliqué). **« Non proposé » est un état à part entière**,
+jamais confondu avec un prix à 0 — un article gratuit et un article non chiffré doivent rester
+distinguables.
+
+**Totaux par fournisseur sur leur seul périmètre proposé**, jamais complété par un autre fournisseur
+pour les lignes manquantes — un total sur un périmètre incomplet n'est pas comparable, d'où le taux
+de couverture affiché juste à côté du montant.
+
+**Deux scénarios, hypothèses toujours affichées à l'écran (jamais implicites)** :
+- **Scénario A (mono-fournisseur le moins cher)** : ne considère que les fournisseurs couvrant 100%
+  des lignes de besoin — on ne peut pas acheter l'intégralité de la commande à qui n'en propose
+  qu'une partie. Si aucun fournisseur n'atteint 100%, le scénario est explicitement signalé comme non
+  calculable plutôt que de forcer un résultat trompeur.
+- **Scénario B (panachage au meilleur prix ligne à ligne)** : chaque ligne part au fournisseur le
+  moins cher pour elle (après arrondi conditionnement) ; les frais de port/franco/remise de chaque
+  fournisseur retenu sont recalculés sur le **seul sous-ensemble de lignes qu'il remporte** dans ce
+  scénario, jamais sur son sous-total complet (qui porte sur tout ce qu'il propose, pas sur ce qu'il
+  remporte réellement ici).
+- **Écart A → B** (montant et pourcentage), affiché seulement quand le scénario A est calculable.
+
+**Attribution** : le tableau des lignes de besoin (déjà existant) porte désormais une colonne Motif en
+plus de Fournisseur retenu, éditable pendant `Brouillon`/`Depouillement` (voir plus haut). Deux
+raccourcis, qui pré-remplissent sans jamais verrouiller — l'utilisateur peut toujours revenir dessus
+ligne par ligne : **« Tout attribuer au moins-disant »** (fournisseur le moins cher ligne à ligne,
+scénario B) et **« Tout attribuer à un fournisseur »** (toutes les lignes qu'il propose réellement,
+les autres restent inchangées). Le passage au statut `Attribuee` reste une transition manuelle
+(`changer_statut_consultation_epi`, déjà existante) — pas de blocage serveur sur "toutes les lignes
+tranchées", cohérent avec le reste du module (le compteur "X/Y tranchée(s)" affiché à l'écran suffit
+comme signal).
+
+**Offre : saisie interrompue et reprise à tout moment** — `creer_offre_epi` acceptait déjà des lignes
+incomplètes (prix nul, `non_propose`) sans contrainte ; ce qui manquait, c'était de pouvoir revenir
+dessus. Le détail d'une offre (`voirOffreEPI`) devient éditable ligne à ligne (chaque cellule
+s'enregistre immédiatement via `editer_ligne_offre_epi`, déjà existante) — aucune nouvelle action
+Worker nécessaire, seulement l'écran qui manquait pour l'utiliser pleinement.
+
+**Export à 4 volets** (`exporterConsultationEPI`, réutilise `exporterExcel` tel quel) : Synthèse et
+scénarios (hypothèses comprises), Comparatif détaillé (une colonne Prix/Qté cmd./Total par
+fournisseur), un onglet par fournisseur (son offre complète), et Attribution retenue — la ventilation
+Réunion/Mayotte des quantités est conservée sur chaque onglet qui porte des quantités.
+
+**Synthèse d'attribution imprimable** (`genererSyntheseAttributionEPI`) : **nouveau gabarit
+indépendant**, aucun des 3 gabarits imprimables existants (fiches EPI/Outillage, relevé de sortie)
+n'est réutilisé ni modifié — cohérent avec la consigne de session de ne jamais toucher un gabarit déjà
+en production.
+
+**Report au catalogue (D8)**, jamais automatique : bouton dédié ouvrant un tableau de contrôle
+(valeur actuelle du catalogue vs valeur proposée par la ligne attribuée), décochable ligne à ligne
+avant tout envoi — même principe que l'import OCR de fiches en lot. Nouvelle action
+`reporter_catalogue_epi` (`requireGarant`, `GATED_ACTIONS`), voir `02_MODELE_DONNEES.md` pour le
+détail des colonnes touchées. **Rappel explicite** : la table de correspondance taille → référence du
+catalogue EPI a été confirmée exacte par William malgré des apparences de doublons entre tailles
+voisines (voir `04_HISTORIQUE_DECISIONS.md`, module EPI) — ce report ne "corrige" jamais une
+correspondance de sa propre initiative, il ne fait que proposer la référence/le fournisseur de l'offre
+retenue, modifiable avant validation comme n'importe quelle autre ligne du tableau de contrôle.
+
+**Droits inchangés** : lecture seule pour Encadrement (`peutVoirEPI`) sur l'ensemble de ces écrans
+(comparatif compris) ; toute action d'écriture reste `peutGererEPI` + `requireGarant`, sans nouvelle
+capacité `ROLE_CAPS`.
 
 ---
 
@@ -2548,6 +2637,106 @@ Session de finition pure (aucun changement de comportement métier, gabarits imp
   colonnes détaillées dans `02_MODELE_DONNEES.md`) sur les deux sites (production **et** recette, si la
   recette est utilisée pour ce module) — vérifiable après création via `?debug_columns=<liste>` sur les
   deux Workers, exactement la méthode utilisée en début de session pour constater leur absence.
+
+## Comparatif des offres, attribution et report au catalogue EPI (session 3, sept. 2026)
+
+- **Contexte** : les listes SharePoint du module (`Fournisseurs`, `EPI_Consultations`,
+  `EPI_Consultation_Lignes`, `EPI_Offres`, `EPI_Offres_Lignes`) restaient encore à créer par William
+  au moment de démarrer cette session (vérifié à nouveau via `?debug_columns=<liste>` sur les deux
+  Workers, même constat qu'en fin de session 2) — même mode de fonctionnement déjà établi pour ce
+  module (Brasseurs d'air notamment) : le code est écrit et vérifié en isolation (Microsoft Graph
+  entièrement mocké côté tests, données factices injectées côté client pour la vérification
+  navigateur), la création des listes restant une étape bloquante côté William avant mise en service
+  réelle, sans bloquer le développement.
+- **Blocage de conception détecté avant tout code, pas anticipé lors de la session précédente** :
+  l'attribution (`Fournisseur_Retenu`/`Motif_Choix` sur `EPI_Consultation_Lignes`) n'avait de sens que
+  pendant `Depouillement` (une fois des offres reçues à comparer), mais `editer_ligne_consultation_epi`
+  bloquait toute édition dès que la consultation quittait `Brouillon` — un choix délibéré de la session
+  2 pour figer le besoin envoyé aux fournisseurs, mais qui aurait rendu l'attribution tout simplement
+  impossible dans le cycle de vie normal d'une consultation. **Décision** : élargir la fenêtre éditable
+  à `Brouillon` **et** `Depouillement` (mais pas `Envoyee`, où le besoin est déjà parti chez les
+  fournisseurs sans encore de retour) — changement minimal et ciblé côté Worker, testé explicitement
+  pour les 3 statuts refusés (`Envoyee`/`Attribuee`/`Cloturee`/`Annulee`) et le nouveau cas autorisé
+  (`Depouillement`).
+- **Comparatif construit comme un bloc pur, jamais persisté** (`epiCalculerComparatifOffres`,
+  `dashboard.html`, entre marqueurs `EPI_COMPARATIF_DEBUT`/`FIN` — même méthode d'extraction/test que
+  `epiCalculerBesoinAnnuel` de la session précédente) : recalculé à chaque affichage à partir des
+  lignes de besoin et des offres déjà chargées, jamais stocké — cohérent avec le principe déjà en place
+  pour le besoin annuel (aucun nouveau "score" figé qui pourrait diverger silencieusement des données
+  sources).
+- **Conditionnement et quantité minimum, décision de conception clé** : le classement "meilleur prix
+  ligne à ligne" est fait sur le **total de ligne après arrondi** (conditionnement + MOQ), pas sur le
+  seul prix unitaire — conformément à la consigne explicite ("c'est souvent ce qui renverse un
+  classement : ne le masque pas"). Vérifié par un test dédié construisant délibérément un cas où le
+  fournisseur le moins cher à l'unité devient le plus cher au global une fois son conditionnement
+  appliqué.
+- **Totaux par fournisseur jamais complétés artificiellement** : un fournisseur qui ne propose que
+  50% des lignes de besoin voit son total calculé sur ces seules lignes (avec son taux de couverture
+  affiché à côté, jamais masqué) — jamais comblé par un prix à 0 ou par le prix d'un concurrent, qui
+  aurait rendu deux totaux partiels faussement comparables.
+- **Scénario A (mono-fournisseur) restreint aux fournisseurs à 100% de couverture** : décision
+  nécessaire pour que "mono-fournisseur" garde un sens réel — on ne peut matériellement pas acheter
+  l'intégralité d'une commande à un fournisseur qui n'en propose qu'une partie. Quand aucun fournisseur
+  n'atteint 100%, le scénario est explicitement marqué non calculable (jamais un résultat partiel
+  présenté comme complet) et l'écart A/B n'est alors pas calculé non plus.
+- **Scénario B : frais de port/franco/remise recalculés par sous-ensemble gagné, pas sur le total
+  complet de chaque fournisseur** — un fournisseur qui ne remporte qu'une seule ligne dans le
+  panachage voit ses frais de port s'appliquer sur cette seule ligne, jamais sur l'ensemble de ce
+  qu'il aurait pu proposer par ailleurs. Vérifié par un test avec deux fournisseurs se partageant les
+  lignes, chacun avec son propre frais de port distinct.
+- **« Non proposé » traité comme un état à part entière dans tout le calcul** (jamais un prix à 0) —
+  repris du modèle de données déjà en place côté Worker (`Non_Propose`) et propagé fidèlement dans le
+  comparatif : un article gratuit (prix 0€ réellement chiffré) et un article non chiffré produisent
+  des résultats visuellement et numériquement distincts (`total_ligne: 0` vs `total_ligne: null`).
+- **Attribution : deux raccourcis qui pré-remplissent sans jamais verrouiller** — « Tout attribuer au
+  moins-disant » (scénario B ligne à ligne) et « Tout attribuer à un fournisseur » (uniquement les
+  lignes qu'il propose réellement, les autres inchangées, avec un message explicite sur le nombre de
+  lignes ignorées). Le passage au statut `Attribuee` reste une transition manuelle existante
+  (`changer_statut_consultation_epi`) — décision de ne pas ajouter un blocage serveur sur "toutes les
+  lignes tranchées" (le compteur affiché à l'écran suffit comme signal, cohérent avec le reste du
+  module qui n'impose jamais ce genre de contrainte bloquante côté serveur pour un simple oubli).
+- **Offre : la "saisie interrompue et reprise" ne demandait aucune nouvelle action Worker** — en
+  revérifiant `creer_offre_epi`/`editer_ligne_offre_epi` (session 2), les deux acceptaient déjà des
+  lignes incomplètes sans contrainte. Le vrai manque était côté écran : le détail d'une offre
+  (`voirOffreEPI`) n'affichait ses lignes qu'en lecture seule. Rendu éditable ligne à ligne (chaque
+  cellule s'enregistre immédiatement), sans toucher au Worker.
+- **Nouvelle action `reporter_catalogue_epi`, seule écriture réellement nouvelle de cette session** :
+  écrit `Reference`/`Fournisseur` sur `Catalogue_Articles_EPI` par lots de 20 (`$batch`, même pattern
+  que `creer_offre_epi`/`bulk_maj_stock_epi`), jamais `Stock_Actuel`/`Stock_Mini`. Tableau de contrôle
+  (valeur actuelle vs proposée) décochable ligne à ligne avant tout appel — même principe que l'import
+  OCR de fiches EPI en lot, pour ne jamais écrire silencieusement. **Rappel appliqué à la lettre** :
+  aucune tentative de "corriger" une correspondance taille → référence perçue comme étrange (la table
+  a été confirmée exacte par William en amont, voir plus haut dans ce journal) — le report ne fait que
+  proposer la référence/le fournisseur de l'offre retenue par l'attribution, modifiable comme toute
+  autre valeur du tableau de contrôle.
+- **Export à 4 volets et nouveau gabarit imprimable, conformément à la consigne explicite** : le
+  gabarit de synthèse d'attribution (`genererSyntheseAttributionEPI`) a été écrit intégralement à part
+  (CSS et structure propres), sans réutiliser ni modifier `EPI_FICHE_CSS_RULES`/`EPI_FICHE_LOGO_URL`
+  (fiches EPI/Outillage) ni le gabarit du relevé de sortie — vérifié par relecture qu'aucun des 3
+  gabarits existants n'a été touché par cette session.
+- **Vérification en navigateur, pas seulement par les tests automatisés** : serveur statique local,
+  session simulée (`ADMIN_SESSION`/`employesByCode` injectés directement, `fetch` stubbé pour les 3
+  actions concernées plutôt que d'appeler le Worker de production) — comparatif recalculé correctement
+  après une modification de prix en direct dans la modale d'offre (conditionnement, remise, franco
+  tous vérifiés sur des montants recalculés à la main), "Tout attribuer au moins-disant" vérifié de
+  bout en bout jusqu'à l'écriture simulée, report au catalogue vérifié jusqu'à la mise à jour du
+  catalogue en mémoire, export Excel vérifié sur les 7 onglets produits (dont un par fournisseur), et
+  le rôle Encadrement confirmé strictement lecture seule (aucun bouton d'écriture, aucun champ
+  éditable) sur l'ensemble de ces nouveaux écrans. Zéro appel réseau réel vers le Worker de production
+  dans cette session.
+- **Tests** : 19 nouveaux tests — `tests/dashboard.epi-comparatif.test.js` (13, sur le même principe
+  d'extraction/exécution isolée en contexte `vm` que `dashboard.epi-besoin-annuel.test.js`) couvrant
+  arrondi conditionnement/MOQ, distinction non-proposé/prix à 0, effet du conditionnement sur le
+  classement, couverture par fournisseur, scénario A calculable/non calculable, scénario B avec frais
+  de port par sous-ensemble gagné, écart A/B ; `tests/worker.epi-consultations.test.js` (+6 :
+  élargissement Brouillon/Depouillement de `editer_ligne_consultation_epi`, refus sur les 3 statuts
+  restants, 4 tests pour `reporter_catalogue_epi`). `tests/worker.audit-helpers.test.js` mis à jour
+  (80 → 81 actions gated). `npm run verify` : 294/294 en début de session, **313/313** après (19
+  nouveaux tests, 0 régression). `npm run sync:staging` relancé après modification de `dashboard.html`.
+- **Étape bloquante côté William, inchangée depuis la session précédente** : les 5 listes SharePoint du
+  module restent à créer (production **et** recette) avant toute utilisation réelle du comparatif/de
+  l'attribution — cette session n'a touché à aucune nouvelle liste ni colonne, donc aucune étape
+  supplémentaire ne s'ajoute à celle déjà signalée.
 
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.

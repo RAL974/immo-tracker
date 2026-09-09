@@ -822,7 +822,7 @@ if(IS_RECETTE){
 // Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
 var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit','Brasseurs_Depots','Brasseurs_Catalogue','Brasseurs_Mouvements','Brasseurs_Commandes','Brasseurs_Lignes_Commande','Fournisseurs','EPI_Consultations','EPI_Consultation_Lignes','EPI_Offres','EPI_Offres_Lignes'];
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur','ajouter_depot_brasseur','ajouter_reference_brasseur','migrer_mouvement_brasseur','creer_fournisseur','editer_fournisseur','creer_consultation_epi','editer_consultation_epi','editer_ligne_consultation_epi','changer_statut_consultation_epi','creer_offre_epi','editer_offre_epi','editer_ligne_offre_epi'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur','ajouter_depot_brasseur','ajouter_reference_brasseur','migrer_mouvement_brasseur','creer_fournisseur','editer_fournisseur','creer_consultation_epi','editer_consultation_epi','editer_ligne_consultation_epi','changer_statut_consultation_epi','creer_offre_epi','editer_offre_epi','editer_ligne_offre_epi','reporter_catalogue_epi'];
 // Détection centralisée d'une session expirée (ajouté août 2026) : le jeton dure 12h — passé ce
 // délai, tout appel gated (POST action protégée, ou GET avec un jeton en paramètre d'URL comme les
 // endpoints Matériel IT/Brasseurs/Journal d'audit) échoue avec 401 {error:'session_invalide'}. Sans
@@ -2783,6 +2783,136 @@ function exporterFournisseursEPI(){
   ]);
 }
 
+// === EPI_COMPARATIF_DEBUT ===
+// Comparatif des offres EPI (session 3, sept. 2026) : bloc pur (aucune dépendance DOM), testé
+// isolément dans tests/dashboard.epi-comparatif.test.js. Prend les lignes de besoin figées d'une
+// consultation (EPI_Consultation_Lignes) et les offres reçues (EPI_Offres + leurs lignes imbriquées,
+// déjà chargées via ?epi_offres=) et produit : le prix par (ligne × fournisseur), le meilleur prix
+// par ligne, les totaux par fournisseur (sur leur SEUL périmètre proposé, jamais complété par un
+// autre fournisseur — un total sur un périmètre incomplet n'est pas comparable, d'où le taux de
+// couverture affiché à côté), le scénario A (mono-fournisseur le moins cher, uniquement parmi ceux
+// couvrant 100% du besoin — on ne peut pas acheter l'intégralité de la commande à qui n'en propose
+// qu'une partie), le scénario B (panachage au meilleur prix ligne à ligne, frais de port/franco/
+// remise de chaque fournisseur retenu recalculés sur le seul sous-ensemble qu'il remporte dans ce
+// scénario) et l'écart A/B.
+//
+// Conditionnement et quantité minimum (cadrage §3) : arrondis à la quantité réellement commandable
+// AVANT de calculer un prix total de ligne — c'est cet arrondi, pas le seul prix unitaire, qui décide
+// du "meilleur prix ligne à ligne" : un fournisseur moins cher à l'unité mais imposant un gros
+// conditionnement peut se retrouver plus cher au global sur cette ligne précise. Le surcoût
+// correspondant est exposé (jamais masqué) dans chaque entrée par_fournisseur.
+//
+// "Non proposé" est un état à part entière, jamais confondu avec un prix à 0 (cadrage §2) : une
+// ligne sans offre exploitable pour un fournisseur donné a prix_unitaire=null et total_ligne=null,
+// jamais 0 — sinon un article gratuit et un article non chiffré seraient indiscernables dans les
+// totaux.
+function epiArrondirQuantiteCommandee(quantiteRetenue,conditionnement,quantiteMinimum){
+  var q=quantiteRetenue||0;
+  if(quantiteMinimum&&q<quantiteMinimum)q=quantiteMinimum;
+  if(conditionnement&&conditionnement>0)q=Math.ceil(q/conditionnement)*conditionnement;
+  return q;
+}
+// Frais de port / franco / remise d'une offre, appliqués à un sous-total DÉJÀ délimité par l'appelant
+// (soit le périmètre complet proposé par ce fournisseur, soit le seul sous-ensemble qu'il remporte
+// dans le scénario B) — jamais sur le total de toute la consultation.
+function epiAppliquerFraisOffre(offre,sousTotal){
+  offre=offre||{};
+  var fraisPort=offre.frais_port!=null?offre.frais_port:0;
+  var francoApplique=offre.franco_a_partir_de!=null&&sousTotal>=offre.franco_a_partir_de;
+  if(francoApplique)fraisPort=0;
+  var remiseMontant=sousTotal*((offre.remise_globale_pct||0)/100);
+  return{frais_port:fraisPort,franco_applique:francoApplique,remise_montant:remiseMontant,total:sousTotal-remiseMontant+fraisPort};
+}
+function epiCalculerComparatifOffres(lignesBesoin,offresBrutes){
+  lignesBesoin=lignesBesoin||[];
+  var offres=(offresBrutes||[]).filter(function(o){return o.statut!=='Ecartee';});
+  var fournisseurs=offres.map(function(o){return o.fournisseur;});
+  var offreParFournisseur={};
+  offres.forEach(function(o){offreParFournisseur[o.fournisseur]=o;});
+
+  var lignes=lignesBesoin.map(function(l){
+    var quantiteRetenue=l.quantite_retenue!=null?l.quantite_retenue:(l.quantite_calculee||0);
+    var parFournisseur={};
+    var meilleur=null; // {fournisseur, total_ligne}
+    fournisseurs.forEach(function(fourn){
+      var offre=offreParFournisseur[fourn];
+      var ol=(offre.lignes||[]).find(function(x){return x.ligne_consultation_id===l.id;});
+      var nonPropose=!ol||ol.non_propose||ol.prix_unitaire_ht==null;
+      var entry;
+      if(nonPropose){
+        entry={non_propose:true,prix_unitaire:null,quantite_commandee:null,surcout_conditionnement:0,total_ligne:null,
+          conditionnement:ol?ol.conditionnement:null,quantite_minimum:ol?ol.quantite_minimum:null,delai_jours:ol?ol.delai_jours:null,
+          reference_fournisseur:ol?ol.reference_fournisseur:''};
+      }else{
+        var qCommandee=epiArrondirQuantiteCommandee(quantiteRetenue,ol.conditionnement,ol.quantite_minimum);
+        var totalLigne=ol.prix_unitaire_ht*qCommandee;
+        entry={non_propose:false,prix_unitaire:ol.prix_unitaire_ht,quantite_commandee:qCommandee,
+          surcout_conditionnement:(qCommandee-quantiteRetenue)*ol.prix_unitaire_ht,total_ligne:totalLigne,
+          conditionnement:ol.conditionnement,quantite_minimum:ol.quantite_minimum,delai_jours:ol.delai_jours,
+          reference_fournisseur:ol.reference_fournisseur};
+        if(!meilleur||totalLigne<meilleur.total_ligne)meilleur={fournisseur:fourn,total_ligne:totalLigne};
+      }
+      parFournisseur[fourn]=entry;
+    });
+    return{id:l.id,type_article:l.type_article,taille:l.taille,designation:l.designation,quantite_retenue:quantiteRetenue,
+      par_fournisseur:parFournisseur,meilleur_fournisseur:meilleur?meilleur.fournisseur:null,meilleur_total_ligne:meilleur?meilleur.total_ligne:null};
+  });
+
+  // Totaux par fournisseur — sur leur seul périmètre proposé (nb_lignes_proposees), jamais complété.
+  var totauxParFournisseur={};
+  fournisseurs.forEach(function(fourn){
+    var sousTotal=0,nbProposees=0;
+    lignes.forEach(function(l){var e=l.par_fournisseur[fourn];if(e&&!e.non_propose){sousTotal+=e.total_ligne;nbProposees++;}});
+    var frais=epiAppliquerFraisOffre(offreParFournisseur[fourn],sousTotal);
+    totauxParFournisseur[fourn]={sous_total:sousTotal,nb_lignes_proposees:nbProposees,nb_lignes_total:lignes.length,
+      couverture_pct:lignes.length?(nbProposees/lignes.length*100):0,frais_port:frais.frais_port,franco_applique:frais.franco_applique,
+      remise_montant:frais.remise_montant,total:frais.total,devise:(offreParFournisseur[fourn]||{}).devise||'EUR'};
+  });
+
+  // Scénario A : mono-fournisseur le moins cher, uniquement parmi ceux couvrant 100% du besoin.
+  var candidatsA=fournisseurs.filter(function(f){return lignes.length>0&&totauxParFournisseur[f].nb_lignes_proposees===lignes.length;});
+  var scenarioA=null;
+  if(candidatsA.length){
+    var meilleurA=candidatsA.reduce(function(best,f){return(!best||totauxParFournisseur[f].total<totauxParFournisseur[best].total)?f:best;},null);
+    var tA=totauxParFournisseur[meilleurA];
+    scenarioA={fournisseur:meilleurA,sous_total:tA.sous_total,frais_port:tA.frais_port,franco_applique:tA.franco_applique,remise_montant:tA.remise_montant,total:tA.total};
+  }
+
+  // Scénario B : panachage au meilleur prix ligne à ligne — frais de chaque fournisseur retenu
+  // recalculés sur le SEUL sous-ensemble de lignes qu'il remporte ici (pas son sous-total complet).
+  var groupesB={};
+  var lignesNonCouvertes=0;
+  lignes.forEach(function(l){
+    if(l.meilleur_fournisseur)groupesB[l.meilleur_fournisseur]=(groupesB[l.meilleur_fournisseur]||0)+l.meilleur_total_ligne;
+    else lignesNonCouvertes++;
+  });
+  var detailsB=Object.keys(groupesB).map(function(f){
+    var frais=epiAppliquerFraisOffre(offreParFournisseur[f],groupesB[f]);
+    return{fournisseur:f,sous_total:groupesB[f],frais_port:frais.frais_port,franco_applique:frais.franco_applique,remise_montant:frais.remise_montant,total:frais.total};
+  });
+  var totalB=detailsB.reduce(function(s,d){return s+d.total;},0);
+  var scenarioB={details_par_fournisseur:detailsB,total:totalB,lignes_non_couvertes:lignesNonCouvertes};
+
+  var ecart=null;
+  if(scenarioA){
+    var montant=scenarioA.total-scenarioB.total;
+    ecart={montant:montant,pourcentage:scenarioA.total?(montant/scenarioA.total*100):0};
+  }
+
+  var hypotheses=[
+    'Franco de port appliqué quand le sous-total réellement acheté à un fournisseur atteint son seuil « Franco à partir de ».',
+    'Remise globale (%) appliquée sur le sous-total des lignes effectivement achetées à ce fournisseur, jamais sur le total de la consultation.',
+    'Quand le fournisseur impose un conditionnement et/ou une quantité minimum, la quantité commandée est arrondie au multiple supérieur (et relevée au minimum) ; le surcoût correspondant est inclus dans le total de la ligne.',
+    'Scénario A (mono-fournisseur) ne considère que les fournisseurs couvrant 100% des lignes de besoin — un total sur un périmètre incomplet ne peut pas remplacer l\'intégralité de la commande.',
+    'Les offres au statut « Écartée » sont exclues du comparatif.'
+  ];
+  if(!scenarioA)hypotheses.push('Aucun fournisseur ne couvre l\'intégralité du besoin : le scénario A (mono-fournisseur) n\'est pas calculable.');
+  if(scenarioB.lignes_non_couvertes)hypotheses.push(scenarioB.lignes_non_couvertes+' ligne(s) de besoin sans aucune offre exploitable — exclue(s) du scénario B.');
+
+  return{fournisseurs:fournisseurs,lignes:lignes,totaux_par_fournisseur:totauxParFournisseur,scenario_a:scenarioA,scenario_b:scenarioB,ecart:ecart,hypotheses:hypotheses};
+}
+// === EPI_COMPARATIF_FIN ===
+
 // ── Vue Consultations (liste + détail : lignes de besoin figées + offres reçues) ─────────────
 async function chargerConsultationsEPI(force){
   if(dataLoadedEPIConsultations&&!force)return;
@@ -2828,16 +2958,26 @@ function renderConsultationDetailEPI(){
   elWrap.innerHTML='<div id="epi-cons-detail">Chargement du détail…</div>';
   chargerDetailConsultationEPI(c.id).then(function(){renderConsultationDetailEPIInner(c);});
 }
+// L'attribution (Fournisseur_Retenu/Motif_Choix/Quantite_Retenue) doit pouvoir se faire pendant le
+// dépouillement (une fois les offres reçues), pas seulement en Brouillon — voir le commentaire côté
+// Worker (editer_ligne_consultation_epi) pour le raisonnement complet.
+function epiLigneEditable(c,canEdit){return canEdit&&(c.statut==='Brouillon'||c.statut==='Depouillement');}
 function renderConsultationDetailEPIInner(c){
   var el=document.getElementById('epi-cons-detail');
   if(!el)return;
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var lignes=epiConsultationLignesCache[c.id]||[];
   var offres=epiOffresCache[c.id]||[];
+  var offresRecues=offres.filter(function(o){return o.statut!=='Ecartee';});
   var transitions=EPI_CONSULTATION_TRANSITIONS_CLIENT[c.statut]||[];
+  var editable=epiLigneEditable(c,canEdit);
+  var comparatif=offresRecues.length?epiCalculerComparatifOffres(lignes,offres):null;
   var totR=0,totM=0,totT=0;lignes.forEach(function(l){totR+=l.quantite_reunion;totM+=l.quantite_mayotte;totT+=l.quantite_calculee;});
+  var nbSansAttribution=lignes.filter(function(l){return!l.fournisseur_retenu;}).length;
   var html='<div class="card"><div class="card-head"><h3>'+c.titre+' <span class="badge '+(EPI_STATUT_BADGE[c.statut]||'bn')+'" style="margin-left:8px">'+(EPI_STATUT_LABELS[c.statut]||c.statut)+'</span></h3>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="fermerConsultationEPI()" style="padding:6px 14px;background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);border:none;border-radius:8px;font-size:12px;cursor:pointer">← Retour à la liste</button>'+
+    '<button class="filter-btn" onclick="genererSyntheseAttributionEPI(\''+c.id+'\')">🖨️ Synthèse d\'attribution</button>'+
+    (canEdit?'<button class="filter-btn" onclick="ouvrirReportCatalogueEPI(\''+c.id+'\')">🗂️ Reporter au catalogue</button>':'')+
     '<button class="filter-btn" onclick="exporterConsultationEPI(\''+c.id+'\')">📥 Export Excel</button></div></div>'+
     '<div style="padding:0 14px 10px;font-size:12px;color:var(--grey)">Année cible <b>'+c.annee_cible+'</b> · Créée le '+(c.date_creation?fmtDT(c.date_creation):'—')+' par '+lienEmpSiConnu(c.cree_par)+
     (c.date_limite_reponse?' · Limite de réponse '+fmtD(c.date_limite_reponse):'')+' · '+lignes.length+' ligne(s), '+totT+' unité(s) au total ('+totR+' Réunion / '+totM+' Mayotte)</div>';
@@ -2851,16 +2991,26 @@ function renderConsultationDetailEPIInner(c){
     html+='</div>';
   }
   if(c.notes)html+='<p style="padding:0 14px 10px;font-size:11px;color:var(--grey)"><b>Notes :</b> '+c.notes+'</p>';
-  html+='<div style="padding:0 14px 6px"><h4 style="font-size:13px;margin:6px 0">Lignes de besoin'+(c.statut==='Brouillon'?' (quantité retenue modifiable tant que la consultation est en Brouillon)':'')+'</h4></div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Réf. interne</th><th>Désignation</th><th>Qté Réunion</th><th>Qté Mayotte</th><th>Qté calculée</th><th>Qté retenue</th><th>Fournisseur retenu</th><th>Commentaire</th></tr></thead><tbody>'+
+  html+='<div style="padding:0 14px 6px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
+    '<h4 style="font-size:13px;margin:6px 0">Lignes de besoin & attribution'+(editable?' (attribution modifiable — '+(lignes.length-nbSansAttribution)+'/'+lignes.length+' tranchée(s))':'')+'</h4>';
+  if(editable&&offresRecues.length){
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
+      (comparatif&&comparatif.lignes.some(function(l){return l.meilleur_fournisseur;})?'<button onclick="epiAttribuerTousMoinsDisant(\''+c.id+'\')" style="padding:5px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🏆 Tout attribuer au moins-disant</button>':'')+
+      '<select id="epi-attrib-fourn-select" style="padding:5px 8px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222);font-size:11px">'+
+      offresRecues.map(function(o){return '<option value="'+o.fournisseur.replace(/"/g,'&quot;')+'">'+o.fournisseur+'</option>';}).join('')+'</select>'+
+      '<button onclick="epiAttribuerTousFournisseur(\''+c.id+'\',document.getElementById(\'epi-attrib-fourn-select\').value)" style="padding:5px 10px;background:var(--ds-neutral-200,#e5e5e5);color:var(--ds-ink-900,#222);border:none;border-radius:6px;font-size:11px;cursor:pointer">Tout attribuer à ce fournisseur</button>'+
+      '</div>';
+  }
+  html+='</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Réf. interne</th><th>Désignation</th><th>Qté Réunion</th><th>Qté Mayotte</th><th>Qté calculée</th><th>Qté retenue</th><th>Fournisseur retenu</th><th>Motif</th><th>Commentaire</th></tr></thead><tbody>'+
     lignes.map(function(l){
       var ecart=l.quantite_retenue!==l.quantite_calculee;
-      var editable=canEdit&&c.statut==='Brouillon';
       return '<tr'+(ecart?' style="background:var(--ds-warning-bg)"':'')+'><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td><td>'+(l.reference_interne||'—')+'</td><td>'+(l.designation||'—')+'</td>'+
         '<td>'+l.quantite_reunion+'</td><td>'+l.quantite_mayotte+'</td><td>'+l.quantite_calculee+'</td>'+
         '<td>'+(editable?'<input type="number" min="0" value="'+l.quantite_retenue+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'quantite_retenue\',this.value)" style="width:70px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;text-align:center;background:var(--card);color:var(--ds-text,#222)">':'<b>'+l.quantite_retenue+'</b>')+'</td>'+
         '<td>'+(editable?'<input value="'+(l.fournisseur_retenu||'').replace(/"/g,'&quot;')+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'fournisseur_retenu\',this.value)" style="width:110px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222)">':(l.fournisseur_retenu||'—'))+'</td>'+
-        '<td>'+(editable?'<input value="'+(l.commentaire||'').replace(/"/g,'&quot;')+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'commentaire\',this.value)" style="width:130px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222)">':(l.commentaire||'—'))+'</td>'+
+        '<td>'+(editable?'<input value="'+(l.motif_choix||'').replace(/"/g,'&quot;')+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'motif_choix\',this.value)" placeholder="Ex: meilleur prix, délai, qualité..." style="width:130px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222)">':(l.motif_choix||'—'))+'</td>'+
+        '<td>'+(editable?'<input value="'+(l.commentaire||'').replace(/"/g,'&quot;')+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'commentaire\',this.value)" style="width:120px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222)">':(l.commentaire||'—'))+'</td>'+
         '</tr>';
     }).join('')+
     '</tbody></table></div></div>';
@@ -2869,16 +3019,92 @@ function renderConsultationDetailEPIInner(c){
     '</div>';
   if(!offres.length)html+='<p class="es" style="padding:16px">Aucune offre enregistrée pour cette consultation.</p></div>';
   else{
-    html+='<div class="tbl-wrap"><table><thead><tr><th>Fournisseur</th><th>Statut</th><th>Reçue le</th><th>Validité</th><th>Délai livraison</th><th>Frais port</th><th>Remise</th><th>Devise</th><th></th></tr></thead><tbody>'+
+    html+='<p style="font-size:11px;color:var(--grey);padding:0 14px 4px">Une offre incomplète s\'enregistre normalement — cliquez « 🔎 Détail » pour reprendre sa saisie ligne à ligne à tout moment.</p>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>Fournisseur</th><th>Statut</th><th>Reçue le</th><th>Validité</th><th>Délai livraison</th><th>Frais port</th><th>Franco à partir de</th><th>Remise</th><th>Devise</th><th></th></tr></thead><tbody>'+
       offres.map(function(o){
         return '<tr><td style="font-weight:700">'+o.fournisseur+'</td><td><span class="badge '+(EPI_OFFRE_STATUT_BADGE[o.statut]||'bn')+'">'+(o.statut==='Ecartee'?'❌ Écartée':'✅ Reçue')+'</span></td>'+
           '<td>'+(o.date_reception?fmtD(o.date_reception):'—')+'</td><td>'+(o.validite_offre?fmtD(o.validite_offre):'—')+'</td><td>'+(o.delai_livraison_jours!=null?o.delai_livraison_jours+' j':'—')+'</td>'+
-          '<td>'+(o.frais_port!=null?nbFr(o.frais_port):'—')+'</td><td>'+(o.remise_globale_pct!=null?o.remise_globale_pct+'%':'—')+'</td><td>'+(o.devise||'—')+'</td>'+
+          '<td>'+(o.frais_port!=null?nbFr(o.frais_port):'—')+'</td><td>'+(o.franco_a_partir_de!=null?nbFr(o.franco_a_partir_de):'—')+'</td><td>'+(o.remise_globale_pct!=null?o.remise_globale_pct+'%':'—')+'</td><td>'+(o.devise||'—')+'</td>'+
           '<td><button onclick="voirOffreEPI(\''+c.id+'\',\''+o.id+'\')" style="padding:4px 10px;background:var(--ds-neutral-200,#e5e5e5);color:var(--ds-ink-900,#222);border:none;border-radius:6px;font-size:11px;cursor:pointer">🔎 Détail</button></td></tr>';
       }).join('')+
       '</tbody></table></div></div>';
   }
+  html+=renderEPIComparatifCard(comparatif,offresRecues);
   el.innerHTML=html;
+}
+// ── Comparatif des offres (session 3) ───────────────────────────────────────────────────────
+// Tableau lignes de besoin × fournisseurs à partir de epiCalculerComparatifOffres (bloc pur,
+// EPI_COMPARATIF_DEBUT/FIN plus haut) — cette fonction ne fait QUE construire le HTML, aucun calcul.
+function renderEPIComparatifCard(comparatif,offresRecues){
+  if(!offresRecues.length)return '';
+  if(!comparatif||!comparatif.fournisseurs.length)return '<div class="card" style="margin-top:14px"><div class="card-head"><h3>📊 Comparatif des offres</h3></div><p class="es" style="padding:16px">Aucune offre exploitable (toutes écartées ou sans lignes chiffrées).</p></div>';
+  var fourns=comparatif.fournisseurs;
+  var html='<div class="card" style="margin-top:14px"><div class="card-head"><h3>📊 Comparatif des offres</h3></div>'+
+    '<div class="tbl-wrap"><table style="font-size:12px"><thead>'+
+    '<tr><th rowspan="2">Ligne</th><th rowspan="2">Qté retenue</th>'+fourns.map(function(f){return '<th colspan="3" style="text-align:center">'+f+'</th>';}).join('')+'<th rowspan="2">Meilleur</th></tr>'+
+    '<tr>'+fourns.map(function(){return '<th>Prix unit.</th><th>Qté cmd.</th><th>Total</th>';}).join('')+'</tr>'+
+    '</thead><tbody>'+
+    comparatif.lignes.map(function(l){
+      var cells=fourns.map(function(f){
+        var e=l.par_fournisseur[f];
+        var meilleur=l.meilleur_fournisseur===f;
+        var style=meilleur?'background:var(--ds-success-bg);font-weight:700':'';
+        if(e.non_propose)return '<td colspan="3" style="text-align:center;color:var(--grey);font-style:italic" title="Non proposé par ce fournisseur">— non proposé —</td>';
+        var surcoutTxt=e.surcout_conditionnement>0?' <span title="Surcoût lié au conditionnement/quantité minimum" style="color:var(--orange)">⚠️</span>':'';
+        return '<td style="'+style+'">'+nbFr(e.prix_unitaire)+'</td><td style="'+style+'">'+e.quantite_commandee+surcoutTxt+'</td><td style="'+style+'">'+nbFr(e.total_ligne)+'</td>';
+      }).join('');
+      return '<tr><td>'+l.type_article+(l.taille?' ('+l.taille+')':'')+'</td><td>'+l.quantite_retenue+'</td>'+cells+'<td style="font-weight:700">'+(l.meilleur_fournisseur||'—')+'</td></tr>';
+    }).join('')+
+    '</tbody><tfoot>'+
+    '<tr style="font-weight:700"><td colspan="2">Total (périmètre proposé par chacun)</td>'+
+    fourns.map(function(f){var t=comparatif.totaux_par_fournisseur[f];return '<td colspan="3">'+nbFr(t.total)+' <span style="font-weight:400;font-size:10px;color:var(--grey)">('+Math.round(t.couverture_pct)+'% couvert, port '+nbFr(t.frais_port)+(t.franco_applique?' franco':'')+')</span></td>';}).join('')+
+    '<td></td></tr>'+
+    '</tfoot></table></div>'+
+    '<div style="padding:12px 14px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">'+
+    '<div class="card" style="margin:0;padding:10px 12px"><div style="font-weight:700;font-size:12px;margin-bottom:4px">Scénario A — Mono-fournisseur le moins cher</div>'+
+    (comparatif.scenario_a?('<div style="font-size:20px;font-weight:700">'+nbFr(comparatif.scenario_a.total)+'</div><div style="font-size:11px;color:var(--grey)">'+comparatif.scenario_a.fournisseur+' · sous-total '+nbFr(comparatif.scenario_a.sous_total)+' + port '+nbFr(comparatif.scenario_a.frais_port)+(comparatif.scenario_a.franco_applique?' (franco)':'')+(comparatif.scenario_a.remise_montant?' − remise '+nbFr(comparatif.scenario_a.remise_montant):'')+'</div>'):
+      '<p class="es" style="padding:4px 0;margin:0;font-size:11px">Aucun fournisseur ne couvre 100% du besoin — non calculable.</p>')+
+    '</div>'+
+    '<div class="card" style="margin:0;padding:10px 12px"><div style="font-weight:700;font-size:12px;margin-bottom:4px">Scénario B — Panachage au meilleur prix ligne à ligne</div>'+
+    '<div style="font-size:20px;font-weight:700">'+nbFr(comparatif.scenario_b.total)+'</div>'+
+    '<div style="font-size:11px;color:var(--grey)">'+comparatif.scenario_b.details_par_fournisseur.map(function(d){return d.fournisseur+' : '+nbFr(d.total);}).join(' · ')+
+    (comparatif.scenario_b.lignes_non_couvertes?' · ⚠️ '+comparatif.scenario_b.lignes_non_couvertes+' ligne(s) non couverte(s)':'')+'</div>'+
+    '</div>'+
+    (comparatif.ecart?('<div class="card" style="margin:0;padding:10px 12px;border-top:3px solid var(--orange)"><div style="font-weight:700;font-size:12px;margin-bottom:4px">Écart A → B</div>'+
+      '<div style="font-size:20px;font-weight:700;color:var(--green)">'+nbFr(comparatif.ecart.montant)+' ('+comparatif.ecart.pourcentage.toFixed(1)+'%)</div>'+
+      '<div style="font-size:11px;color:var(--grey)">Économie potentielle du panachage par rapport au mono-fournisseur le moins cher.</div></div>'):'')+
+    '</div>'+
+    '<div style="padding:0 14px 14px"><details><summary style="cursor:pointer;font-size:11px;color:var(--grey)">Hypothèses du calcul</summary>'+
+    '<ul style="margin:6px 0 0;padding-left:18px;font-size:11px;color:var(--grey)">'+comparatif.hypotheses.map(function(h){return '<li>'+h+'</li>';}).join('')+'</ul></details></div>'+
+    '</div>';
+  return html;
+}
+async function epiAttribuerTousMoinsDisant(consultationId){
+  var lignes=epiConsultationLignesCache[consultationId]||[];
+  var offres=(epiOffresCache[consultationId]||[]);
+  var comparatif=epiCalculerComparatifOffres(lignes,offres);
+  var aFaire=comparatif.lignes.filter(function(l){return l.meilleur_fournisseur;});
+  if(!aFaire.length){alert('Aucune ligne avec une offre exploitable à attribuer.');return;}
+  if(!(await confirmModal('Attribuer les '+aFaire.length+' ligne(s) chiffrée(s) au fournisseur le moins cher LIGNE À LIGNE (scénario B) ? Les motifs existants seront complétés, rien n\'est verrouillé.')))return;
+  for(var i=0;i<aFaire.length;i++){
+    await majLigneConsultationEPI(consultationId,aFaire[i].id,'fournisseur_retenu',aFaire[i].meilleur_fournisseur);
+    await majLigneConsultationEPI(consultationId,aFaire[i].id,'motif_choix','Meilleur prix ligne à ligne (moins-disant)');
+  }
+  renderConsultationDetailEPI();
+}
+async function epiAttribuerTousFournisseur(consultationId,fournisseur){
+  if(!fournisseur)return;
+  var lignes=epiConsultationLignesCache[consultationId]||[];
+  var offres=(epiOffresCache[consultationId]||[]);
+  var comparatif=epiCalculerComparatifOffres(lignes,offres);
+  var aFaire=comparatif.lignes.filter(function(l){return l.par_fournisseur[fournisseur]&&!l.par_fournisseur[fournisseur].non_propose;});
+  var ignorees=comparatif.lignes.length-aFaire.length;
+  if(!aFaire.length){alert(fournisseur+' ne propose aucune ligne de ce besoin.');return;}
+  if(!(await confirmModal('Attribuer les '+aFaire.length+' ligne(s) proposée(s) par « '+fournisseur+' » à ce fournisseur ?'+(ignorees?' ('+ignorees+' ligne(s) qu\'il ne propose pas resteront inchangée(s).)':''))))return;
+  for(var i=0;i<aFaire.length;i++){
+    await majLigneConsultationEPI(consultationId,aFaire[i].id,'fournisseur_retenu',fournisseur);
+  }
+  renderConsultationDetailEPI();
 }
 async function majLigneConsultationEPI(consultationId,ligneId,champ,valeur){
   var payload={id:ligneId};payload[champ]=(champ==='quantite_retenue')?parseFloat(valeur):valeur;
@@ -3010,18 +3236,58 @@ function voirOffreEPI(consultationId,offreId){
     '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Devise</label><input id="ofd-devise" value="'+(o.devise||'').replace(/"/g,'&quot;')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div></div>'+
     '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Reçue le</label><input type="date" id="ofd-date" value="'+(o.date_reception?o.date_reception.slice(0,10):'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div>'+
     '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Validité</label><input type="date" id="ofd-validite" value="'+(o.validite_offre?o.validite_offre.slice(0,10):'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Délai livraison (jours)</label><input type="number" id="ofd-delai" value="'+(o.delai_livraison_jours!=null?o.delai_livraison_jours:'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Frais de port</label><input type="number" step="0.01" id="ofd-port" value="'+(o.frais_port!=null?o.frais_port:'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Franco à partir de</label><input type="number" step="0.01" id="ofd-franco" value="'+(o.franco_a_partir_de!=null?o.franco_a_partir_de:'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Remise globale (%)</label><input type="number" step="0.1" id="ofd-remise" value="'+(o.remise_globale_pct!=null?o.remise_globale_pct:'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div></div>'+
     '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="ofd-notes" value="'+(o.notes||'').replace(/"/g,'&quot;')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div>'+
-    '<div class="frow"><label style="'+addLabelStyle+'">Lignes proposées</label>'+
-    '<div class="tbl-wrap" style="max-height:300px"><table style="font-size:11px"><thead><tr><th>Type</th><th>Taille</th><th>Réf. fourn.</th><th>Prix unit. HT</th><th>Cond.</th><th>Qté mini</th><th>Délai</th><th>Non proposé</th></tr></thead><tbody>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Lignes proposées'+(canEdit?' — la saisie peut être interrompue et reprise à tout moment : chaque cellule s\'enregistre dès qu\'elle est modifiée':'')+'</label>'+
+    '<div class="tbl-wrap" style="max-height:320px"><table style="font-size:11px"><thead><tr><th>Type</th><th>Taille</th><th>Réf. fourn.</th><th>Désignation proposée</th><th>Prix unit. HT</th><th>Cond.</th><th>Qté mini</th><th>Délai (j)</th><th>Non proposé</th><th>Commentaire</th></tr></thead><tbody>'+
     (o.lignes||[]).map(function(l){
-      return '<tr'+(l.non_propose?' style="opacity:.55"':'')+'><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td><td>'+(l.reference_fournisseur||'—')+'</td>'+
-        '<td>'+(l.prix_unitaire_ht!=null?nbFr(l.prix_unitaire_ht):'—')+'</td><td>'+(l.conditionnement!=null?l.conditionnement:'—')+'</td><td>'+(l.quantite_minimum!=null?l.quantite_minimum:'—')+'</td><td>'+(l.delai_jours!=null?l.delai_jours+' j':'—')+'</td>'+
-        '<td style="text-align:center">'+(l.non_propose?'✅':'—')+'</td></tr>';
+      if(!canEdit){
+        return '<tr'+(l.non_propose?' style="opacity:.55"':'')+'><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td><td>'+(l.reference_fournisseur||'—')+'</td><td>'+(l.designation_proposee||'—')+'</td>'+
+          '<td>'+(l.prix_unitaire_ht!=null?nbFr(l.prix_unitaire_ht):'—')+'</td><td>'+(l.conditionnement!=null?l.conditionnement:'—')+'</td><td>'+(l.quantite_minimum!=null?l.quantite_minimum:'—')+'</td><td>'+(l.delai_jours!=null?l.delai_jours+' j':'—')+'</td>'+
+          '<td style="text-align:center">'+(l.non_propose?'✅':'—')+'</td><td>'+(l.commentaire||'—')+'</td></tr>';
+      }
+      var qc="'"+consultationId+"','"+offreId+"','"+l.id+"'";
+      return '<tr'+(l.non_propose?' style="opacity:.55"':'')+'>'+
+        '<td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td>'+
+        '<td><input value="'+(l.reference_fournisseur||'').replace(/"/g,'&quot;')+'" onchange="majLigneOffreEPI('+qc+',\'reference_fournisseur\',this.value)" style="width:80px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input value="'+(l.designation_proposee||'').replace(/"/g,'&quot;')+'" onchange="majLigneOffreEPI('+qc+',\'designation_proposee\',this.value)" style="width:100px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" step="0.01" min="0" value="'+(l.prix_unitaire_ht!=null?l.prix_unitaire_ht:'')+'" onchange="majLigneOffreEPI('+qc+',\'prix_unitaire_ht\',this.value)" style="width:80px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" min="0" value="'+(l.conditionnement!=null?l.conditionnement:'')+'" onchange="majLigneOffreEPI('+qc+',\'conditionnement\',this.value)" style="width:55px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" min="0" value="'+(l.quantite_minimum!=null?l.quantite_minimum:'')+'" onchange="majLigneOffreEPI('+qc+',\'quantite_minimum\',this.value)" style="width:55px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" min="0" value="'+(l.delai_jours!=null?l.delai_jours:'')+'" onchange="majLigneOffreEPI('+qc+',\'delai_jours\',this.value)" style="width:55px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td style="text-align:center"><input type="checkbox" '+(l.non_propose?'checked':'')+' onchange="majLigneOffreEPI('+qc+',\'non_propose\',this.checked)"></td>'+
+        '<td><input value="'+(l.commentaire||'').replace(/"/g,'&quot;')+'" onchange="majLigneOffreEPI('+qc+',\'commentaire\',this.value)" style="width:90px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '</tr>';
     }).join('')+
     '</tbody></table></div></div>';
   document.getElementById('add-form').innerHTML=html;
   document.getElementById('add-overlay').style.display='flex';
   if(canEdit)document.getElementById('add-confirm-btn').onclick=function(){soumettreEditionOffreEPI(consultationId,offreId);};
+}
+// Édition ligne à ligne d'une offre déjà créée — c'est ce mécanisme qui rend la saisie "interrompue
+// et reprise" possible : creer_offre_epi écrit déjà des lignes avec des prix nuls/non proposés sans
+// contrainte, il suffit ensuite de revenir sur cette offre pour compléter chaque cellule au fil de
+// l'eau, sans jamais devoir tout ressaisir d'un coup.
+async function majLigneOffreEPI(consultationId,offreId,ligneId,champ,valeur){
+  var payload={id:ligneId};
+  if(champ==='non_propose')payload.non_propose=!!valeur;
+  else if(champ==='prix_unitaire_ht'||champ==='conditionnement'||champ==='quantite_minimum'||champ==='delai_jours')payload[champ]=(valeur===''||valeur==null)?null:parseFloat(valeur);
+  else payload[champ]=valeur;
+  var msg=document.getElementById('add-msg');
+  try{
+    var r=await fetch(W+'?action=editer_ligne_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      var o=(epiOffresCache[consultationId]||[]).find(function(x){return x.id===offreId;});
+      var l=o&&(o.lignes||[]).find(function(x){return x.id===ligneId;});
+      if(l)l[champ]=payload[champ];
+      if(msg){msg.style.color='var(--green)';msg.textContent='✅ Ligne enregistrée.';}
+      renderConsultationDetailEPI(); // rafraîchit le comparatif derrière la modale, sans la fermer
+    }else if(msg){msg.style.color='var(--red)';msg.textContent='❌ '+(res.error||'Échec');}
+  }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent='Erreur réseau : '+e.message;}}
 }
 async function soumettreEditionOffreEPI(consultationId,offreId){
   var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
@@ -3029,7 +3295,9 @@ async function soumettreEditionOffreEPI(consultationId,offreId){
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{
     var payload={id:offreId,statut:(document.getElementById('ofd-statut').value||''),devise:(document.getElementById('ofd-devise').value||'').trim(),
-      date_reception:(document.getElementById('ofd-date').value||''),validite_offre:(document.getElementById('ofd-validite').value||''),notes:(document.getElementById('ofd-notes').value||'').trim()};
+      date_reception:(document.getElementById('ofd-date').value||''),validite_offre:(document.getElementById('ofd-validite').value||''),notes:(document.getElementById('ofd-notes').value||'').trim(),
+      delai_livraison_jours:(document.getElementById('ofd-delai').value||''),frais_port:(document.getElementById('ofd-port').value||''),
+      franco_a_partir_de:(document.getElementById('ofd-franco').value||''),remise_globale_pct:(document.getElementById('ofd-remise').value||'')};
     var r=await fetch(W+'?action=editer_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
@@ -3040,19 +3308,195 @@ async function soumettreEditionOffreEPI(consultationId,offreId){
     }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
   }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
 }
+// Export à 4 volets (session 3) : Synthèse et scénarios / Comparatif détaillé / un onglet par
+// fournisseur (son offre complète) / Attribution retenue — la ventilation Réunion/Mayotte des
+// quantités est conservée sur chaque onglet qui porte des quantités, jamais réduite au seul total.
 function exporterConsultationEPI(id){
   var c=epiConsultationsList.find(function(x){return x.id===id;});
   if(!c)return;
   var lignes=epiConsultationLignesCache[id]||[];
   var offres=epiOffresCache[id]||[];
-  var lignesBesoin=lignes.map(function(l){return[l.type_article,l.taille,l.reference_interne,l.designation,l.quantite_reunion,l.quantite_mayotte,l.quantite_calculee,l.quantite_retenue,l.fournisseur_retenu,l.commentaire];});
-  var lignesOffres=[];
-  offres.forEach(function(o){(o.lignes||[]).forEach(function(l){lignesOffres.push([o.fournisseur,o.statut,l.type_article,l.taille,l.reference_fournisseur,l.prix_unitaire_ht,l.conditionnement,l.quantite_minimum,l.delai_jours,l.non_propose?'Oui':'Non']);});});
-  exporterExcel(nomFichierExport('Consultation_EPI_'+c.titre.replace(/[^A-Za-z0-9_-]+/g,'_')),[
-    {nom:'Consultation',entetes:['Champ','Valeur'],lignes:[['Nom',c.titre],['Année cible',c.annee_cible],['Statut',c.statut],['Créée le',c.date_creation],['Créée par',c.cree_par],['Limite de réponse',c.date_limite_reponse],['Notes',c.notes]],cols:[20,50]},
-    {nom:'Lignes de besoin',entetes:['Type','Taille','Réf. interne','Désignation','Qté Réunion','Qté Mayotte','Qté calculée','Qté retenue','Fournisseur retenu','Commentaire'],lignes:lignesBesoin,cols:[18,10,16,28,12,12,12,12,20,24]},
-    {nom:'Offres',entetes:['Fournisseur','Statut','Type','Taille','Réf. fournisseur','Prix unit. HT','Conditionnement','Qté mini','Délai (j)','Non proposé'],lignes:lignesOffres,cols:[20,10,18,10,16,12,14,10,10,12]}
-  ]);
+  var offresRecues=offres.filter(function(o){return o.statut!=='Ecartee';});
+  var comparatif=offresRecues.length?epiCalculerComparatifOffres(lignes,offres):null;
+
+  // Onglet 1 : Synthèse et scénarios.
+  var lignesSynthese=[['Nom',c.titre],['Année cible',c.annee_cible],['Statut',c.statut],['Créée le',c.date_creation],['Créée par',c.cree_par],['Limite de réponse',c.date_limite_reponse],['Notes',c.notes],
+    ['Nombre de lignes de besoin',lignes.length],['Nombre d\'offres reçues (hors écartées)',offresRecues.length]];
+  if(comparatif){
+    lignesSynthese.push(['— Scénario A (mono-fournisseur le moins cher) —','']);
+    if(comparatif.scenario_a)lignesSynthese.push(['Fournisseur retenu (A)',comparatif.scenario_a.fournisseur],['Sous-total (A)',comparatif.scenario_a.sous_total],['Frais de port (A)',comparatif.scenario_a.frais_port],['Franco appliqué (A)',comparatif.scenario_a.franco_applique?'Oui':'Non'],['Remise (A)',comparatif.scenario_a.remise_montant],['Total (A)',comparatif.scenario_a.total]);
+    else lignesSynthese.push(['Scénario A','Non calculable — aucun fournisseur ne couvre 100% du besoin']);
+    lignesSynthese.push(['— Scénario B (panachage au meilleur prix ligne à ligne) —','']);
+    comparatif.scenario_b.details_par_fournisseur.forEach(function(d){lignesSynthese.push(['Part '+d.fournisseur+' (B)',d.total]);});
+    lignesSynthese.push(['Lignes non couvertes (B)',comparatif.scenario_b.lignes_non_couvertes],['Total (B)',comparatif.scenario_b.total]);
+    if(comparatif.ecart)lignesSynthese.push(['Écart A → B (montant)',comparatif.ecart.montant],['Écart A → B (%)',comparatif.ecart.pourcentage.toFixed(1)]);
+    lignesSynthese.push(['— Hypothèses —','']);
+    comparatif.hypotheses.forEach(function(h){lignesSynthese.push(['Hypothèse',h]);});
+  }
+  var ongletsSpec=[{nom:'Synthèse et scénarios',entetes:['Champ','Valeur'],lignes:lignesSynthese,cols:[32,55]}];
+
+  // Onglet 2 : Comparatif détaillé (lignes de besoin × fournisseurs), ventilation Réunion/Mayotte conservée.
+  if(comparatif&&comparatif.fournisseurs.length){
+    var entetesComp=['Type','Taille','Qté Réunion','Qté Mayotte','Qté retenue'];
+    comparatif.fournisseurs.forEach(function(f){entetesComp.push('Prix '+f,'Qté cmd. '+f,'Total '+f);});
+    entetesComp.push('Meilleur fournisseur','Meilleur total');
+    var lignesComp=comparatif.lignes.map(function(l){
+      var besoin=lignes.find(function(x){return x.id===l.id;})||{};
+      var row=[l.type_article,l.taille,besoin.quantite_reunion,besoin.quantite_mayotte,l.quantite_retenue];
+      comparatif.fournisseurs.forEach(function(f){
+        var e=l.par_fournisseur[f];
+        row.push(e.non_propose?'Non proposé':e.prix_unitaire,e.non_propose?'':e.quantite_commandee,e.non_propose?'':e.total_ligne);
+      });
+      row.push(l.meilleur_fournisseur||'—',l.meilleur_total_ligne!=null?l.meilleur_total_ligne:'');
+      return row;
+    });
+    ongletsSpec.push({nom:'Comparatif détaillé',entetes:entetesComp,lignes:lignesComp});
+  }
+
+  // Onglets 3..N : une offre complète par fournisseur (nom d'onglet tronqué à 31 caractères, limite Excel).
+  offres.forEach(function(o){
+    var lignesOffre=(o.lignes||[]).map(function(l){return[l.type_article,l.taille,l.reference_fournisseur,l.designation_proposee,l.prix_unitaire_ht,l.conditionnement,l.quantite_minimum,l.delai_jours,l.non_propose?'Oui':'Non',l.commentaire];});
+    var entete=[['Fournisseur',o.fournisseur],['Statut',o.statut],['Reçue le',o.date_reception],['Validité',o.validite_offre],['Délai livraison (j)',o.delai_livraison_jours],['Frais de port',o.frais_port],['Franco à partir de',o.franco_a_partir_de],['Remise globale (%)',o.remise_globale_pct],['Devise',o.devise],['Notes',o.notes]];
+    ongletsSpec.push({nom:('Offre '+o.fournisseur).slice(0,31),entetes:['Champ','Valeur'],lignes:entete,cols:[20,40]});
+    ongletsSpec.push({nom:('Lignes '+o.fournisseur).slice(0,31),entetes:['Type','Taille','Réf. fournisseur','Désignation proposée','Prix unit. HT','Conditionnement','Qté mini','Délai (j)','Non proposé','Commentaire'],lignes:lignesOffre,cols:[18,10,16,24,12,14,10,10,12,24]});
+  });
+
+  // Dernier onglet : attribution retenue, ventilation Réunion/Mayotte conservée.
+  var lignesAttrib=lignes.map(function(l){return[l.type_article,l.taille,l.reference_interne,l.designation,l.quantite_reunion,l.quantite_mayotte,l.quantite_calculee,l.quantite_retenue,l.fournisseur_retenu,l.motif_choix,l.commentaire];});
+  ongletsSpec.push({nom:'Attribution retenue',entetes:['Type','Taille','Réf. interne','Désignation','Qté Réunion','Qté Mayotte','Qté calculée','Qté retenue','Fournisseur retenu','Motif','Commentaire'],lignes:lignesAttrib,cols:[18,10,16,28,12,12,12,12,20,26,24]});
+
+  exporterExcel(nomFichierExport('Consultation_EPI_'+c.titre.replace(/[^A-Za-z0-9_-]+/g,'_')),ongletsSpec);
+}
+
+// ── Synthèse d'attribution imprimable (session 3) — NOUVEAU gabarit, indépendant des 3 gabarits
+// imprimables existants (fiches EPI/Outillage, relevé de sortie) : aucun gabarit existant n'est
+// réutilisé ni modifié pour cet écran, conformément à la consigne de session.
+var EPI_SYNTHESE_CSS='body{font-family:"Segoe UI",Arial,sans-serif;color:#20242B;margin:0;padding:26px 34px}'+
+  '@page{margin:15mm}'+
+  '.es-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #7A1F44;padding-bottom:12px;margin-bottom:18px}'+
+  '.es-head img{height:60px;width:auto}'+
+  '.es-head .coord{font-size:11px;color:#555;line-height:1.4}'+
+  '.es-head .coord b{color:#20242B;font-size:14px;display:block}'+
+  '.es-titre{background:#7A1F44;color:#fff;padding:9px 16px;border-radius:6px;font-size:16px;font-weight:700;margin-bottom:16px}'+
+  '.es-meta{font-size:11.5px;color:#444;margin-bottom:16px;line-height:1.6}'+
+  '.es-scenarios{display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap}'+
+  '.es-scenario{flex:1;min-width:200px;border:1px solid #DCE2EC;border-radius:8px;padding:10px 12px}'+
+  '.es-scenario b{display:block;font-size:11px;color:#7A828E;text-transform:uppercase;margin-bottom:4px}'+
+  '.es-scenario .montant{font-size:19px;font-weight:700}'+
+  'table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:11.5px}'+
+  'th{background:#20242B;color:#fff;font-size:10.5px;text-transform:uppercase;padding:7px 8px;text-align:left}'+
+  'td{border-bottom:1px solid #E4E7EC;padding:6px 8px}'+
+  'tbody tr:nth-child(even){background:#F7F9FC}'+
+  '.print-btn{padding:10px 18px;background:#20242B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;margin-bottom:18px;font-size:13px}'+
+  '@media print{.print-btn{display:none}body{padding:0}}';
+function genererSyntheseAttributionEPI(consultationId){
+  var c=epiConsultationsList.find(function(x){return x.id===consultationId;});
+  if(!c){alert('Consultation introuvable.');return;}
+  var lignes=epiConsultationLignesCache[consultationId]||[];
+  var offres=epiOffresCache[consultationId]||[];
+  if(!lignes.length){alert('Aucune ligne de besoin à synthétiser.');return;}
+  var offresRecues=offres.filter(function(o){return o.statut!=='Ecartee';});
+  var comparatif=offresRecues.length?epiCalculerComparatifOffres(lignes,offres):null;
+  var totR=0,totM=0;lignes.forEach(function(l){totR+=l.quantite_reunion||0;totM+=l.quantite_mayotte||0;});
+  var scenariosHtml='';
+  if(comparatif){
+    scenariosHtml='<div class="es-scenarios">'+
+      '<div class="es-scenario"><b>Scénario A — Mono-fournisseur</b>'+(comparatif.scenario_a?('<div class="montant">'+nbFr(comparatif.scenario_a.total)+' €</div><div style="font-size:11px;color:#7A828E">'+comparatif.scenario_a.fournisseur+'</div>'):'<div style="font-size:11px;color:#7A828E">Non calculable (aucun fournisseur à 100% du besoin)</div>')+'</div>'+
+      '<div class="es-scenario"><b>Scénario B — Panachage ligne à ligne</b><div class="montant">'+nbFr(comparatif.scenario_b.total)+' €</div></div>'+
+      (comparatif.ecart?('<div class="es-scenario"><b>Écart A → B</b><div class="montant">'+nbFr(comparatif.ecart.montant)+' € ('+comparatif.ecart.pourcentage.toFixed(1)+'%)</div></div>'):'')+
+      '</div>';
+  }
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>Synthèse d\'attribution - '+c.titre+'</title><style>'+EPI_SYNTHESE_CSS+'</style></head><body>'+
+    '<button class="print-btn" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>'+
+    '<div class="es-head"><img src="https://ral974.github.io/immo-tracker/logo.jpg" alt="Electricité Services Réunion"><div class="coord"><b>Electricité Services Réunion</b>22, rue Pierre Brossolette - Atelier B7 · 97420 Le Port</div></div>'+
+    '<div class="es-titre">SYNTHÈSE D\'ATTRIBUTION — '+c.titre.toUpperCase()+'</div>'+
+    '<div class="es-meta">Année cible <b>'+c.annee_cible+'</b> · Statut '+(EPI_STATUT_LABELS[c.statut]||c.statut)+' · '+lignes.length+' ligne(s) de besoin, '+(totR+totM)+' unité(s) ('+totR+' Réunion / '+totM+' Mayotte) · '+offresRecues.length+' offre(s) comparée(s)'+(c.date_limite_reponse?' · Limite de réponse '+fmtD(c.date_limite_reponse):'')+'</div>'+
+    scenariosHtml+
+    '<table><thead><tr><th>Type</th><th>Taille</th><th>Qté Réunion</th><th>Qté Mayotte</th><th>Qté retenue</th><th>Fournisseur retenu</th><th>Prix unit.</th><th>Total ligne</th><th>Motif</th></tr></thead><tbody>'+
+    lignes.map(function(l){
+      var offreRetenue=offresRecues.find(function(o){return o.fournisseur===l.fournisseur_retenu;});
+      var ligneOffre=offreRetenue&&(offreRetenue.lignes||[]).find(function(x){return x.ligne_consultation_id===l.id;});
+      var prix=ligneOffre&&ligneOffre.prix_unitaire_ht!=null?ligneOffre.prix_unitaire_ht:null;
+      var total=prix!=null?prix*l.quantite_retenue:null;
+      return '<tr><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td><td>'+l.quantite_reunion+'</td><td>'+l.quantite_mayotte+'</td><td>'+l.quantite_retenue+'</td>'+
+        '<td>'+(l.fournisseur_retenu||'—')+'</td><td>'+(prix!=null?nbFr(prix)+' €':'—')+'</td><td>'+(total!=null?nbFr(total)+' €':'—')+'</td><td>'+(l.motif_choix||'—')+'</td></tr>';
+    }).join('')+
+    '</tbody></table>'+
+    '</body></html>';
+  var w=window.open('','_blank');
+  if(!w){alert('Le navigateur a bloqué l\'ouverture de la fenêtre. Autorisez les pop-ups pour ce site.');return;}
+  w.document.write(html);
+  w.document.close();
+}
+
+// ── Report au catalogue (D8) — jamais automatique, tableau de contrôle décochable ligne à ligne ──
+// Même principe que l'import OCR de fiches en lot (analyserLotEPI plus haut) : un tableau d'aperçu
+// (valeur actuelle vs proposée) doit être explicitement validé avant tout appel à l'action Worker.
+var EPI_REPORT_CATALOGUE=[];
+function ouvrirReportCatalogueEPI(consultationId){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  var lignes=(epiConsultationLignesCache[consultationId]||[]).filter(function(l){return l.fournisseur_retenu;});
+  if(!lignes.length){alert('Aucune ligne avec un fournisseur retenu — attribuez d\'abord les lignes de besoin.');return;}
+  var offres=epiOffresCache[consultationId]||[];
+  EPI_REPORT_CATALOGUE=lignes.map(function(l){
+    var art=epiTrouverArticleCatalogue(l.type_article,l.taille);
+    var offreRetenue=offres.find(function(o){return o.fournisseur===l.fournisseur_retenu;});
+    var ligneOffre=offreRetenue&&(offreRetenue.lignes||[]).find(function(x){return x.ligne_consultation_id===l.id;});
+    var refProposee=(ligneOffre&&ligneOffre.reference_fournisseur)?ligneOffre.reference_fournisseur:(art?art.reference:'');
+    return{ligneId:l.id,type_article:l.type_article,taille:l.taille,catalogueId:art?art.id:'',
+      referenceActuelle:art?art.reference:'',fournisseurActuel:art?art.fournisseur:'',
+      referenceProposee:refProposee||'',fournisseurPropose:l.fournisseur_retenu,
+      inclure:!!art};
+  });
+  resetAddBtnEPI();
+  document.getElementById('add-titre').textContent='🗂️ Reporter au catalogue';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML='<p style="font-size:12px;color:var(--grey);margin:0 0 8px">Écrit Référence/Fournisseur dans le catalogue EPI pour les lignes cochées — rien n\'est écrit tant que ce n\'est pas validé explicitement. Une ligne sans article catalogue correspondant (type/taille) ne peut pas être reportée.</p>'+
+    '<div id="epi-report-cat-tbl"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=function(){confirmerReportCatalogueEPI();};
+  renderReportCatalogueEPITable();
+}
+function renderReportCatalogueEPITable(){
+  var el=document.getElementById('epi-report-cat-tbl');
+  if(!el)return;
+  el.innerHTML='<div class="tbl-wrap" style="max-height:320px"><table style="font-size:11px"><thead><tr><th></th><th>Type</th><th>Taille</th><th>Référence actuelle</th><th>Fournisseur actuel</th><th>Référence proposée</th><th>Fournisseur proposé</th></tr></thead><tbody>'+
+    EPI_REPORT_CATALOGUE.map(function(r,idx){
+      if(!r.catalogueId)return '<tr style="opacity:.5"><td></td><td>'+r.type_article+'</td><td>'+(r.taille||'—')+'</td><td colspan="4" style="color:var(--red)">⚠️ Aucun article catalogue correspondant — non reportable</td></tr>';
+      return '<tr><td><input type="checkbox" '+(r.inclure?'checked':'')+' onchange="EPI_REPORT_CATALOGUE['+idx+'].inclure=this.checked;majBoutonReportCatalogueEPI()"></td>'+
+        '<td>'+r.type_article+'</td><td>'+(r.taille||'—')+'</td><td>'+(r.referenceActuelle||'—')+'</td><td>'+(r.fournisseurActuel||'—')+'</td>'+
+        '<td><input value="'+r.referenceProposee.replace(/"/g,'&quot;')+'" onchange="EPI_REPORT_CATALOGUE['+idx+'].referenceProposee=this.value" style="width:110px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input value="'+r.fournisseurPropose.replace(/"/g,'&quot;')+'" onchange="EPI_REPORT_CATALOGUE['+idx+'].fournisseurPropose=this.value" style="width:110px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td></tr>';
+    }).join('')+
+    '</tbody></table></div>';
+  majBoutonReportCatalogueEPI();
+}
+function majBoutonReportCatalogueEPI(){
+  var btn=document.getElementById('add-confirm-btn');
+  if(!btn)return;
+  var n=EPI_REPORT_CATALOGUE.filter(function(r){return r.catalogueId&&r.inclure;}).length;
+  btn.disabled=n===0;
+  btn.textContent='✅ Reporter ('+n+')';
+}
+async function confirmerReportCatalogueEPI(){
+  var rows=EPI_REPORT_CATALOGUE.filter(function(r){return r.catalogueId&&r.inclure;});
+  if(!rows.length)return;
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  try{
+    var payload={rows:rows.map(function(r){return{id:r.catalogueId,reference:r.referenceProposee,fournisseur:r.fournisseurPropose};})};
+    var r=await fetch(W+'?action=reporter_catalogue_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ '+res.ok+' article(s) du catalogue mis à jour !';
+      rows.forEach(function(row){
+        var art=epiCatalogue.find(function(a){return a.id===row.catalogueId;});
+        if(art){art.reference=row.referenceProposee;art.fournisseur=row.fournisseurPropose;}
+      });
+      btn.textContent='Fermer';btn.disabled=false;btn.onclick=function(){fermerAjout();};
+    }else{btn.disabled=false;btn.textContent='✅ Reporter ('+rows.length+')';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Reporter ('+rows.length+')';msg.textContent='Erreur réseau : '+e.message;}
 }
 
 async function receptionCommandeEPI(catId,label){

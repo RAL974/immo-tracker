@@ -511,6 +511,9 @@ const EPI_OFFRE_STATUTS = ['Recue', 'Ecartee'];
 // manuel ligne par ligne, contrairement à un besoin calculé automatiquement).
 const EPI_CONSULTATION_LIGNES_MAX = 500;
 const EPI_OFFRE_LIGNES_MAX = 500;
+// Report vers le catalogue (Reference/Fournisseur) à l'issue d'une attribution, cap anti-typo — un
+// catalogue EPI réaliste (~60 références) reste très en dessous.
+const EPI_CATALOGUE_REPORT_MAX = 500;
 
 // ── Journal d'audit des actions sensibles (liste SharePoint Journal_Audit, ajoutée août 2026) ──
 // Périmètre : exactement les 62 actions POST protégées requireAdmin/requireGarant (mêmes noms que
@@ -542,7 +545,7 @@ const GATED_ACTIONS_AUDIT = new Set([
   'migrer_mouvement_brasseur',
   'creer_fournisseur', 'editer_fournisseur', 'creer_consultation_epi', 'editer_consultation_epi',
   'editer_ligne_consultation_epi', 'changer_statut_consultation_epi', 'creer_offre_epi', 'editer_offre_epi',
-  'editer_ligne_offre_epi'
+  'editer_ligne_offre_epi', 'reporter_catalogue_epi'
 ]);
 // Réponses renvoyées par requireAdmin/requireGarant AVANT toute exécution métier : ne jamais
 // journaliser ces cas. Deux raisons : (1) aucune écriture n'a eu lieu, rien à auditer côté métier ;
@@ -4197,8 +4200,12 @@ async function handleRequest(request) {
     }
 
     // Édite une ligne de besoin figé (Quantite_Retenue/Fournisseur_Retenu/Motif_Choix/Commentaire) —
-    // uniquement tant que la consultation parente est encore Brouillon : au-delà, le besoin figé
-    // sert de référence stable envoyée aux fournisseurs, il ne doit plus bouger silencieusement.
+    // fenêtre éditable élargie (session 3, comparatif/attribution) à Brouillon ET Depouillement :
+    // Brouillon pour ajuster le besoin avant envoi, Depouillement pour l'attribution elle-même
+    // (fournisseur retenu + motif, après réception des offres) — l'attribution n'aurait sinon jamais
+    // pu se faire, aucun autre état du cycle de vie ne s'y prêtant. Au-delà (Envoyee : déjà partie
+    // chez les fournisseurs ; Attribuee/Cloturee/Annulee : décision actée), le besoin/l'arbitrage ne
+    // doivent plus bouger silencieusement.
     if (action === 'editer_ligne_consultation_epi') {
       const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
       const id = body.id;
@@ -4211,7 +4218,8 @@ async function handleRequest(request) {
         const consRes = await fetch(GL + '/EPI_Consultations/items/' + consultationId + '?$expand=fields', { headers: H });
         const consData = await consRes.json();
         if (!consRes.ok || !consData.fields) return json({ success: false, error: 'consultation_introuvable' });
-        if ((consData.fields.Statut || 'Brouillon') !== 'Brouillon') return json({ success: false, error: 'consultation_non_modifiable', statut: consData.fields.Statut });
+        const statutActuelLigne = consData.fields.Statut || 'Brouillon';
+        if (statutActuelLigne !== 'Brouillon' && statutActuelLigne !== 'Depouillement') return json({ success: false, error: 'consultation_non_modifiable', statut: statutActuelLigne });
         const fields = {};
         if (body.quantite_retenue !== undefined) { const q = parseFloat(body.quantite_retenue); if (isNaN(q) || q < 0) return json({ success: false, error: 'quantite_invalide' }); fields.Quantite_Retenue = q; }
         if (body.commentaire !== undefined) fields.Commentaire = body.commentaire;
@@ -4360,6 +4368,35 @@ async function handleRequest(request) {
         const r = await fetch(GL + '/EPI_Offres_Lignes/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
         if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
         return json({ success: true });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Reporte au catalogue EPI (Catalogue_Articles_EPI.Reference/Fournisseur) les références/
+    // fournisseurs retenus à l'issue d'une attribution — jamais automatique : le dashboard construit
+    // un tableau de contrôle (valeur actuelle vs proposée par article) que l'utilisateur valide
+    // explicitement, ligne par ligne décochable avant l'appel (même principe que l'import OCR de
+    // fiches en lot). PATCH par lots de 20 (limite Graph $batch), même pattern que
+    // bulk_maj_stock_epi/creer_offre_epi. Ne touche jamais Stock_Actuel/Stock_Mini/Type_Article/
+    // Taille_*, uniquement les deux champs concernés par l'attribution.
+    if (action === 'reporter_catalogue_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const rows = Array.isArray(body.rows) ? body.rows : []; // [{id, reference, fournisseur}]
+      const rowsValides = rows.filter(r => r && r.id);
+      if (!rowsValides.length) return json({ success: false, error: 'donnees_invalides' });
+      if (rowsValides.length > EPI_CATALOGUE_REPORT_MAX) return json({ success: false, error: 'trop_de_lignes', max: EPI_CATALOGUE_REPORT_MAX });
+      try {
+        let ok = 0, ko = 0; const erreurs = [];
+        for (let i = 0; i < rowsValides.length; i += 20) {
+          const chunk = rowsValides.slice(i, i + 20);
+          const requests = chunk.map((r, idx) => ({
+            id: String(idx), method: 'PATCH', url: '/sites/' + SITE_ID + '/lists/Catalogue_Articles_EPI/items/' + r.id + '/fields',
+            headers: { 'Content-Type': 'application/json' },
+            body: { Reference: (r.reference || '').toString(), Fournisseur: (r.fournisseur || '').toString() }
+          }));
+          const res = await graphBatch(requests);
+          ok += res.ok; ko += res.ko; if (res.erreurs.length) erreurs.push(...res.erreurs.slice(0, Math.max(0, 3 - erreurs.length)));
+        }
+        return json({ success: ko === 0, ok: ok, ko: ko, erreurs: erreurs });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
