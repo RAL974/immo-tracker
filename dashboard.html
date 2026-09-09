@@ -113,9 +113,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* ── Recherche globale (header) ── */
 #gsearch-wrap{position:relative;flex:0 1 320px;min-width:120px;}
-#gsearch-input{width:100%;padding:7px 34px 7px 12px;border-radius:var(--ds-radius-sm,6px);border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;font-size:13px;}
+#gsearch-input{width:100%;padding:7px 34px 7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.28);background:rgba(0,0,0,.22);color:#fff;font-size:13px;}
 #gsearch-input::placeholder{color:rgba(255,255,255,.65);}
-#gsearch-input:focus{outline:none;background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5);}
+#gsearch-input:focus{outline:none;background:rgba(0,0,0,.32);border-color:rgba(255,255,255,.5);}
 #gsearch-kbd{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.15);border-radius:4px;padding:1px 5px;pointer-events:none;}
 #gsearch-results{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;max-height:70vh;overflow-y:auto;background:var(--card);color:var(--ds-text,#222);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);z-index:200;text-align:left;}
 #gsearch-results.open{display:block;}
@@ -134,7 +134,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #sidebar{position:fixed;top:var(--header);left:0;bottom:0;width:var(--sidebar);background:linear-gradient(180deg,var(--ds-nav-bg) 0%,color-mix(in oklab,var(--ds-nav-bg) 82%,#000) 100%);overflow-y:auto;z-index:90;padding:8px 0 20px;box-shadow:inset -1px 0 0 rgba(255,255,255,.06);}
 .nav-group{padding:18px 16px 6px;font-size:10px;font-weight:800;color:rgba(255,255,255,.78);letter-spacing:1.5px;text-transform:uppercase;}
 .nav-group:first-child{padding-top:8px;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 11px;cursor:pointer;color:rgba(255,255,255,.72);border-radius:var(--ds-radius-sm,8px);margin:1px 8px;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);position:relative;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;color:rgba(255,255,255,.72);border-radius:var(--ds-radius-sm,8px);margin:1px 8px;transition:background var(--ds-transition-fast,.15s ease),color var(--ds-transition-fast,.15s ease),box-shadow var(--ds-transition-fast,.15s ease);position:relative;}
 .nav-item:hover{background:rgba(255,255,255,.1);color:#fff;}
 /* Pilule pleine (14 août 2026, retour de William sur capture de référence) : fond blanc plein +
    texte à la couleur de la sidebar (--ds-nav-bg, déjà theme-aware — clair #9C3D63 / sombre #5A2038),
@@ -6650,6 +6650,36 @@ function codirValeurParc(fs){
   });
   return{parTerr:parTerr,parCat:parCat,valCirc:valCirc,valDepot:valDepot,valJamais:valJamais,total:parTerr.Reunion+parTerr.Mayotte};
 }
+// Nombre d'immos par statut — même parcours/logique que codirValeurParc (juste au comptage plutôt
+// qu'à la valeur), pour les sous-textes des cartes KPI du bloc héros/Bloc 1 (ex. « 0,5 % du parc ·
+// 7 immos ») — refonte visuelle du 14 août 2026.
+function codirComptesParStatut(fs){
+  var invByCode={};(d.inventory||[]).forEach(function(i){invByCode[i.code_im]=i;});
+  var circ=0,depot=0,jamais=0;
+  Object.keys(immoMeta).forEach(function(code){
+    var mt=immoMeta[code];
+    if(!mt||mt.actif===false)return;
+    var site=mt.site==='Mayotte'?'Mayotte':'Reunion';
+    if(fs&&site!==fs)return;
+    var inv=invByCode[code];
+    if(!inv)jamais++;
+    else if(inv.statut==='En circulation')circ++;
+    else depot++;
+  });
+  return{circ:circ,depot:depot,jamais:jamais};
+}
+// Sparkline SVG (viewBox 0 0 100 26, même gabarit que la référence) — normalise une série de valeurs
+// sur l'échelle du gabarit. Retourne '' si la série est trop courte pour être tracée.
+function codirSparklinePoints(values){
+  if(!values||values.length<2)return'';
+  var min=Math.min.apply(null,values),max=Math.max.apply(null,values);
+  var range=max-min||1,n=values.length;
+  return values.map(function(v,i){
+    var x=Math.round(i/(n-1)*100);
+    var y=Math.round(23-((v-min)/range)*20);
+    return x+','+y;
+  }).join(' ');
+}
 // Valeur des immos actives acquises dans les 12 derniers mois (miroir « entrées » de
 // codirTauxSortie côté « sorties ») — sert uniquement à la variation affichée dans le bloc héros
 // de la Synthèse direction (refonte visuelle du 14 août 2026), pas un nouvel indicateur de bloc.
@@ -6970,6 +7000,10 @@ function renderCodir(){
     '<p style="margin:0 0 14px;font-size:12px;color:var(--ds-text-muted)">Electricité Services Réunion — Généré le '+fmtDT(new Date().toISOString())+' — Territoire : '+(fs?territoireLabel(fs):'La Réunion + Mayotte')+'</p></div>';
 
   var ageP,evo,utilCats,dorm,t2Insight='';
+  var comptes=codirComptesParStatut(fs);
+  var sparkPts=codirSparklinePoints(codirEvolution12Mois(fs,vp.total).values);
+  var pctDepot=vp.total>0?Math.round(vp.valDepot/vp.total*1000)/10:0;
+  var jamaisVide=vp.valJamais===0;
 
   html+='<div class="card"><div class="card-head"><h3>💰 Bloc 1 — Valeur du parc</h3><div class="codir-tabs">'+
     '<button class="codir-tab'+(codirTab1==='today'?' active':'')+'" onclick="setCodirTab1(\'today\')">Aujourd\'hui</button>'+
@@ -6977,16 +7011,36 @@ function renderCodir(){
     '<button class="codir-tab'+(codirTab1==='age'?' active':'')+'" onclick="setCodirTab1(\'age\')">Âge du parc</button>'+
     '</div></div><div style="padding:14px">';
   html+='<div class="kpi-grid" style="margin-bottom:12px">';
-  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">💰</div><div class="kv">'+eur(vp.total)+'</div><div class="kl">Valeur totale (parc actif)</div></div>';
-  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">🔄</div><div class="kv">'+eur(vp.valCirc)+'</div><div class="kl">Valeur en circulation</div></div>';
-  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">🏭</div><div class="kv">'+eur(vp.valDepot)+'</div><div class="kl">Valeur au dépôt</div></div>';
-  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">❔</div><div class="kv">'+eur(vp.valJamais)+'</div><div class="kl">Jamais mouvementées</div></div>';
+  html+='<div class="kpi blue" style="cursor:default"><div class="kv">'+eur(vp.total)+'</div><div class="kl">💰 Valeur totale (parc actif)</div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px">'+
+      '<span style="font-size:12px;font-weight:700;color:'+(heroNetVarPct>=0?'var(--green)':'var(--red)')+'">'+heroVarArrow+' '+Math.abs(heroNetVarPct).toLocaleString('fr-FR')+' % sur 12 mois</span>'+
+      (sparkPts?'<svg viewBox="0 0 100 26" preserveAspectRatio="none" style="width:88px;height:26px;flex-shrink:0"><polyline points="'+sparkPts+'" fill="none" stroke="var(--ds-accent)" stroke-width="2" vector-effect="non-scaling-stroke"></polyline></svg>':'')+
+    '</div></div>';
+  html+='<div class="kpi orange" style="cursor:default"><div class="kv">'+eur(vp.valCirc)+'</div><div class="kl">🔄 Valeur en circulation</div>'+
+    '<div style="font-size:12px;color:var(--grey);font-weight:600;margin-top:8px">'+heroPctCirc.toLocaleString('fr-FR')+' % du parc · '+comptes.circ+' immo'+(comptes.circ>1?'s':'')+'</div></div>';
+  html+='<div class="kpi green" style="cursor:default"><div class="kv">'+eur(vp.valDepot)+'</div><div class="kl">🏭 Valeur au dépôt</div>'+
+    '<div style="font-size:12px;color:var(--grey);font-weight:600;margin-top:8px">'+pctDepot.toLocaleString('fr-FR')+' % du parc · '+comptes.depot+' immo'+(comptes.depot>1?'s':'')+'</div></div>';
+  html+='<div class="kpi grey'+(jamaisVide?' codir-kpi-empty':'')+'" style="cursor:default"><div class="kv"'+(jamaisVide?' style="font-size:22px;font-weight:700;color:var(--grey)"':'')+'>'+eur(vp.valJamais)+'</div><div class="kl">❔ Jamais mouvementées</div>'+
+    (jamaisVide?'<div style="font-size:12px;color:var(--grey);margin-top:6px">Aucune immo dormante — rien à arbitrer</div>':'')+
+  '</div>';
   html+='</div>';
   if(codirTab1==='today'){
+    var catKeysToday=Object.keys(vp.parCat).sort(function(a,b){return vp.parCat[b]-vp.parCat[a];}).slice(0,8);
+    var maxCat=catKeysToday.length?vp.parCat[catKeysToday[0]]:0;
+    var circDepTotal=vp.valCirc+vp.valDepot;
+    var pctCircBar=circDepTotal>0?vp.valCirc/circDepTotal*100:0;
     html+='<div class="charts-grid">'+
       '<div class="chart-card"><h3>Valeur par territoire</h3><div class="chart-wrap"><canvas id="ch-codir-terr"></canvas></div></div>'+
-      '<div class="chart-card"><h3>Valeur par catégorie</h3><div class="chart-wrap"><canvas id="ch-codir-cat"></canvas></div></div>'+
-      '<div class="chart-card"><h3>Circulation vs dépôt (valeur)</h3><div class="chart-wrap"><canvas id="ch-codir-circdep"></canvas></div></div>'+
+      '<div class="chart-card"><h3>Valeur par catégorie</h3><div style="display:flex;flex-direction:column;gap:9px;padding:4px 2px">'+
+        catKeysToday.map(function(k){
+          var pct=maxCat>0?Math.round(vp.parCat[k]/maxCat*100):0;
+          return '<div style="display:flex;align-items:center;gap:10px" title="'+k+' : '+eur(vp.parCat[k])+'"><span style="width:130px;font-size:12.5px;text-align:right;color:var(--grey);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+k+'</span><div style="flex:1;height:16px;background:var(--bg);border-radius:3px;overflow:hidden"><div class="codir-bar-fill" style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,var(--ds-accent),var(--ds-accent-2))"></div></div><b style="width:62px;text-align:right;font-size:12px">'+eur(vp.parCat[k])+'</b></div>';
+        }).join('')+
+      '</div></div>'+
+      '<div class="chart-card"><h3>Circulation vs dépôt (valeur)</h3>'+
+        '<div style="display:flex;height:22px;border-radius:4px;overflow:hidden;background:var(--bg);margin-top:4px"><div class="codir-bar-fill" style="width:'+pctCircBar+'%;background:var(--ds-info);min-width:3px"></div><div style="flex:1;background:var(--green)"></div></div>'+
+        '<div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--grey)"><span><b style="color:var(--ds-text)">'+eur(vp.valCirc)+'</b> en circulation</span><span><b style="color:var(--ds-text)">'+eur(vp.valDepot)+'</b> au dépôt</span></div>'+
+      '</div>'+
       '</div>';
   }else if(codirTab1==='evo'){
     var acqMoy=heroEntrees.nb>0?Math.round(heroEntrees.valeur/heroEntrees.nb):0;
@@ -7034,10 +7088,18 @@ function renderCodir(){
     '<button class="codir-tab'+(codirTab2==='util'?' active':'')+'" onclick="setCodirTab2(\'util\')">Utilisation</button>'+
     '</div></div><div style="padding:14px">';
   html+='<div class="kpi-grid" style="margin-bottom:12px">';
-  html+='<div class="kpi red" style="cursor:default"><div class="kpi-icon">🚨</div><div class="kv">'+candidats.length+'</div><div class="kl">Candidates à la réforme</div></div>';
-  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">⛔</div><div class="kv">'+sortie.nb+'</div><div class="kl">Sorties (12 mois glissants)</div></div>';
-  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">💶</div><div class="kv">'+eur(sortie.valeur)+'</div><div class="kl">Valeur sortie à temps</div></div>';
-  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">📉</div><div class="kv">'+sortie.taux+'%</div><div class="kl">Taux de sortie annuel</div></div>';
+  html+='<div class="kpi red" style="cursor:default"><div style="display:flex;align-items:baseline;gap:10px"><div class="kv">'+candidats.length+'</div>'+(heroValAchatCandidats>0?'<span style="font-size:12px;color:var(--grey)">soit '+eur(heroValAchatCandidats)+' de valeur d\'achat</span>':'')+'</div><div class="kl">🧨 Candidates à la réforme</div>'+
+    (candidats.length>0?'<div style="margin-top:10px"><span style="display:inline-block;padding:3px 9px;border-radius:999px;background:var(--ds-danger-bg);color:var(--red);font-size:11.5px;font-weight:700">Action attendue</span></div>':'')+
+  '</div>';
+  html+='<div class="kpi grey'+(sortie.nb===0?' codir-kpi-empty':'')+'" style="cursor:default"><div class="kv"'+(sortie.nb===0?' style="font-size:22px;font-weight:700;color:var(--grey)"':'')+'>'+sortie.nb+'</div><div class="kl">⛔ Sorties (12 mois glissants)</div>'+
+    (sortie.nb===0?'<div style="font-size:12px;color:var(--grey);margin-top:6px">Aucune sortie enregistrée</div>':'')+
+  '</div>';
+  html+='<div class="kpi orange'+(sortie.valeur===0?' codir-kpi-empty':'')+'" style="cursor:default"><div class="kv"'+(sortie.valeur===0?' style="font-size:22px;font-weight:700;color:var(--grey)"':'')+'>'+eur(sortie.valeur)+'</div><div class="kl">💶 Valeur sortie à temps</div>'+
+    (sortie.valeur===0?'<div style="font-size:12px;color:var(--grey);margin-top:6px">Dépend des sorties ci-contre</div>':'')+
+  '</div>';
+  html+='<div class="kpi blue'+(sortie.taux===0?' codir-kpi-empty':'')+'" style="cursor:default"><div class="kv"'+(sortie.taux===0?' style="font-size:22px;font-weight:700;color:var(--grey)"':'')+'>'+sortie.taux+'%</div><div class="kl">📉 Taux de sortie annuel</div>'+
+    (sortie.taux===0?'<div style="font-size:12px;color:var(--grey);margin-top:6px">Cible interne : 5 % / an</div>':'')+
+  '</div>';
   html+='</div>';
   if(codirTab2==='costs'){
     html+='<div class="chart-card" style="margin-bottom:14px"><h3>Coût réparations par trimestre</h3><div class="chart-wrap"><canvas id="ch-codir-trim"></canvas></div></div>';
@@ -7100,10 +7162,10 @@ function renderCodir(){
   html+='<div class="card"><div class="card-head"><h3>👷 Bloc 3 — Adoption terrain</h3></div><div style="padding:14px">';
   html+='<div class="chart-card" style="margin-bottom:14px"><h3>Mouvements par semaine (12 dern. sem.)</h3><div class="chart-wrap"><canvas id="ch-codir-sem"></canvas></div></div>';
   html+='<div class="kpi-grid">';
-  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">👷</div><div class="kv">'+adopt.pct+'%</div><div class="kl">Employés actifs (30j) — '+adopt.nbActifs30+'/'+adopt.totalActifs+'</div></div>';
-  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">⏱</div><div class="kv">'+(delaiVal&&delaiVal.moyenneH!=null?delaiVal.moyenneH+'h':'—')+'</div><div class="kl">Délai moy. validation (30j, estim.'+(delaiVal?' '+delaiVal.nb+'/'+delaiVal.total:'')+')</div></div>';
-  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">📷</div><div class="kv">'+adopt.nbPhotos+'</div><div class="kl">Photos jointes ('+adopt.nbMvtAvecPhoto+' mouvements)</div></div>';
-  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">📋</div><div class="kv">'+adopt.nbMvtAvecEtat+'/'+adopt.totalMvt+'</div><div class="kl">États constatés saisis</div></div>';
+  html+='<div class="kpi green" style="cursor:default"><div class="kv">'+adopt.pct+'%</div><div class="kl">👷 Employés actifs (30j) — '+adopt.nbActifs30+'/'+adopt.totalActifs+'</div></div>';
+  html+='<div class="kpi blue" style="cursor:default"><div class="kv">'+(delaiVal&&delaiVal.moyenneH!=null?delaiVal.moyenneH+'h':'—')+'</div><div class="kl">⏱ Délai moy. validation (30j, estim.'+(delaiVal?' '+delaiVal.nb+'/'+delaiVal.total:'')+')</div></div>';
+  html+='<div class="kpi orange" style="cursor:default"><div class="kv">'+adopt.nbPhotos+'</div><div class="kl">📷 Photos jointes ('+adopt.nbMvtAvecPhoto+' mouvements)</div></div>';
+  html+='<div class="kpi grey" style="cursor:default"><div class="kv">'+adopt.nbMvtAvecEtat+'/'+adopt.totalMvt+'</div><div class="kl">📋 États constatés saisis</div></div>';
   html+='</div>';
   html+='<p style="font-size:11px;color:var(--grey);margin-top:8px">Employé « actif » = au moins un mouvement ou une réservation (hors annulées) sur 30 jours. Les scans de campagne d\'inventaire immos ne sont pas comptés séparément (campagne ponctuelle, pas continue).</p>';
   html+='</div></div>';
@@ -7111,9 +7173,9 @@ function renderCodir(){
   html+='<div class="card"><div class="card-head"><h3>📊 Bloc 4 — ROI</h3></div><div style="padding:14px">';
   html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Éléments factuels suivis par l\'app (preuve de valeur, pas un gain chiffré)</h4>';
   html+='<div class="kpi-grid" style="margin-bottom:14px">';
-  html+='<div class="kpi orange" style="cursor:default"><div class="kpi-icon">🔧</div><div class="kv">'+eur(coutReparationsTotal)+'</div><div class="kl">Coût réparations suivies (total)</div></div>';
-  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">✅</div><div class="kv">'+eur(sortie.valeur)+'</div><div class="kl">Immos réformées à temps (12 mois)</div></div>';
-  html+='<div class="kpi grey" style="cursor:default"><div class="kpi-icon">📦</div><div class="kv">n/d</div><div class="kl">Écarts d\'inventaire résolus (ouvrir Inventaire immos)</div></div>';
+  html+='<div class="kpi orange" style="cursor:default"><div class="kv">'+eur(coutReparationsTotal)+'</div><div class="kl">🔧 Coût réparations suivies (total)</div></div>';
+  html+='<div class="kpi green" style="cursor:default"><div class="kv">'+eur(sortie.valeur)+'</div><div class="kl">✅ Immos réformées à temps (12 mois)</div></div>';
+  html+='<div class="kpi grey codir-kpi-empty" style="cursor:default"><div class="kv" style="font-size:22px;font-weight:700;color:var(--grey)">n/d</div><div class="kl">📦 Écarts d\'inventaire résolus (ouvrir Inventaire immos)</div></div>';
   html+='</div>';
   html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Hypothèse chiffrée (déclarée, modifiable)</h4>';
   html+='<div class="print-hide" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px">'+
@@ -7121,8 +7183,8 @@ function renderCodir(){
     '</div>';
   html+='<p style="font-size:12px;background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:10px">⚠️ Hypothèse : chaque mouvement/réservation enregistré dans l\'app ('+nbConsultations+' au total'+(fs?', territoire filtré':'')+') fait économiser en moyenne <b>'+CODIR_MIN_PAR_RECHERCHE+' minutes</b> de recherche physique évitée, valorisées à <b>'+CODIR_TAUX_HORAIRE+' €/h</b>. Ce n\'est pas une mesure directe de l\'usage de la fonction Rechercher (non télémétrée) — un chiffre honnête avec hypothèse visible plutôt qu\'un chiffre gonflé.</p>';
   html+='<div class="kpi-grid" style="margin-bottom:14px">';
-  html+='<div class="kpi blue" style="cursor:default"><div class="kpi-icon">⏱</div><div class="kv">'+Math.round(tempsEconomiseH)+'h</div><div class="kl">Temps estimé économisé</div></div>';
-  html+='<div class="kpi green" style="cursor:default"><div class="kpi-icon">💶</div><div class="kv">'+eur(valeurTempsEconomise)+'</div><div class="kl">Valeur estimée (hypothèse)</div></div>';
+  html+='<div class="kpi blue" style="cursor:default"><div class="kv">'+Math.round(tempsEconomiseH)+'h</div><div class="kl">⏱ Temps estimé économisé</div></div>';
+  html+='<div class="kpi green" style="cursor:default"><div class="kv">'+eur(valeurTempsEconomise)+'</div><div class="kl">💶 Valeur estimée (hypothèse)</div></div>';
   html+='</div>';
   html+='<h4 style="margin:0 0 8px;font-size:13px;color:var(--grey)">Comparaison de coût</h4>';
   html+='<div class="tbl-wrap"><table><thead><tr><th>Solution</th><th>Coût mensuel</th><th>Coût annuel récurrent</th><th>Mise en route (une fois)</th></tr></thead><tbody>'+
@@ -7138,13 +7200,26 @@ function renderCodir(){
   // Onglets Bloc 1/Bloc 2 (14 août 2026) : un seul panneau existe dans le DOM à la fois, donc chaque
   // graphique est créé seulement si son canevas est réellement présent — sinon Chart.js échoue sur
   // un contexte introuvable.
-  ['codirTerr','codirCat','codirCircdep','codirTrim','codirSem','codirEvo','codirAge'].forEach(function(k){if(charts[k]){charts[k].destroy();charts[k]=null;}});
-  if(document.getElementById('ch-codir-terr'))charts.codirTerr=new Chart(document.getElementById('ch-codir-terr'),{type:'doughnut',data:{labels:['Réunion','Mayotte'],datasets:[{data:[vp.parTerr.Reunion,vp.parTerr.Mayotte],backgroundColor:['#2980B9','#1E9E5A'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
-  if(document.getElementById('ch-codir-cat')){
-    var catKeys=Object.keys(vp.parCat).sort(function(a,b){return vp.parCat[b]-vp.parCat[a];}).slice(0,8);
-    charts.codirCat=new Chart(document.getElementById('ch-codir-cat'),{type:'bar',data:{labels:catKeys,datasets:[{data:catKeys.map(function(k){return vp.parCat[k];}),backgroundColor:'#A67A1E',borderRadius:5,borderWidth:0}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});
+  // « Valeur par catégorie » et « Circulation vs dépôt » sont passées en barres HTML/CSS pures
+  // (14 août 2026, voir plus haut) — plus de canevas à créer pour ces deux-là.
+  ['codirTerr','codirTrim','codirSem','codirEvo','codirAge'].forEach(function(k){if(charts[k]){charts[k].destroy();charts[k]=null;}});
+  if(document.getElementById('ch-codir-terr')){
+    // Plugin local (non enregistré globalement) : dessine le total au centre du donut, sur le
+    // modèle de la référence (« 1023 immos »). N'affecte aucun autre graphique Chart.js de l'app.
+    var centreLabelPlugin={id:'codirCentreLabel',afterDraw:function(chart){
+      var ctx=chart.ctx,area=chart.chartArea;if(!area)return;
+      var cx=(area.left+area.right)/2,cy=(area.top+area.bottom)/2;
+      ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--ds-text')||'#222';
+      ctx.font='800 16px '+getComputedStyle(document.body).fontFamily;
+      ctx.fillText(comptes.circ+comptes.depot+comptes.jamais>0?(comptes.circ+comptes.depot+comptes.jamais).toLocaleString('fr-FR'):'0',cx,cy-7);
+      ctx.font='600 10px '+getComputedStyle(document.body).fontFamily;
+      ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--ds-text-muted')||'#888';
+      ctx.fillText('immos',cx,cy+10);
+      ctx.restore();
+    }};
+    charts.codirTerr=new Chart(document.getElementById('ch-codir-terr'),{type:'doughnut',data:{labels:['Réunion','Mayotte'],datasets:[{data:[vp.parTerr.Reunion,vp.parTerr.Mayotte],backgroundColor:['#2980B9','#1E9E5A'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom'}}},plugins:[centreLabelPlugin]});
   }
-  if(document.getElementById('ch-codir-circdep'))charts.codirCircdep=new Chart(document.getElementById('ch-codir-circdep'),{type:'bar',data:{labels:['Circulation','Dépôt','Jamais sorties'],datasets:[{data:[vp.valCirc,vp.valDepot,vp.valJamais],backgroundColor:['#A67A1E','#1E9E5A','#BDC3C7'],borderRadius:5,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
   if(document.getElementById('ch-codir-evo')){
     evo=codirEvolution12Mois(fs,vp.total);
     charts.codirEvo=new Chart(document.getElementById('ch-codir-evo'),{type:'line',data:{labels:evo.labels,datasets:[{data:evo.values,borderColor:'#A67A1E',backgroundColor:'rgba(166,122,30,.16)',fill:true,tension:.3,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:function(v){return Math.round(v/1000)+' k€';}}}}}});

@@ -397,16 +397,12 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
    plutôt qu'un tiret permanent dont le sens n'est pas évident. ── */
 .nav-badge:empty{display:none;}
 
-/* ── Mode sombre : champ de recherche du header ── #gsearch-input (dashboard.html)
-   pose un fond blanc translucide (rgba(255,255,255,.12)) directement sur
-   --ds-nav-bg. En mode clair, --ds-nav-bg reste assez lumineux pour que ce blanc
-   translucide se lise comme un champ neutre ; en sombre, --ds-nav-bg devient un
-   bordeaux profond (#5A2038) et ce même blanc translucide se teinte alors
-   nettement de rose/mauve au lieu de rester neutre, en plus d'un contraste plus
-   faible. Fond opaque neutre (encre --ds-ink-900), indépendant de la teinte du
-   header, réservé au thème sombre — le mode clair n'est pas concerné. ── */
-:root[data-theme="dark"] #gsearch-input{background:rgba(18,21,27,.55);border-color:rgba(255,255,255,.3);}
-:root[data-theme="dark"] #gsearch-input:focus{background:rgba(18,21,27,.7);}
+/* ── Champ de recherche du header (14 août 2026) ── #gsearch-input pose désormais un fond noir
+   translucide (rgba(0,0,0,.22), voir dashboard.html) plutôt que blanc translucide — cette teinte
+   se lit comme un champ neutre sur le bandeau prune quel que soit le thème choisi (le bandeau
+   reste toujours prune foncé dans les deux thèmes, voir #header), donc plus besoin de la variante
+   spécifique au mode sombre qui existait ici avant ce changement (l'ancien fond blanc translucide
+   virait au rose sur le bordeaux sombre du thème dark — ce risque disparaît avec un fond noir). ── */
 
 /* ============================================================================
    Refonte premium — Synthèse direction (14 août 2026, voir 04_HISTORIQUE_DECISIONS.md)
@@ -531,6 +527,19 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
 #codir-content .kpi::before{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--ds-border-strong),transparent);}
 #codir-content .kpi.blue::before,#codir-content .kpi.orange::before,#codir-content .kpi.green::before,#codir-content .kpi.yellow::before{background:linear-gradient(90deg,var(--ds-accent),var(--ds-accent-2));}
 #codir-content .kpi.red::before{background:linear-gradient(90deg,var(--ds-danger),color-mix(in oklab,var(--ds-danger) 55%,var(--ds-accent)));}
+/* Emoji déplacé dans le libellé (voir renderCodir()) plutôt qu'une pastille .kpi-icon dédiée — la
+   pastille reste utilisée partout ailleurs dans le dashboard (Vue générale...), seul l'écran Synthèse
+   direction s'en écarte pour coller à la référence. Le filet de sécurité ci-dessous masque toute
+   .kpi-icon qui subsisterait par erreur plutôt que de laisser un bloc vide. */
+#codir-content .kpi-icon{display:none;}
+#codir-content .kpi .kl{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ds-text-muted);}
+#codir-content .kpi .kv{font-size:28px;}
+/* Carte à valeur nulle (section 7 du handoff) : traitement pointillé/atténué plutôt que la barre
+   d'accent pleine — ajoutée au cas par cas en JS (classe .codir-kpi-empty) quand la valeur réelle
+   calculée est 0, jamais codée en dur pour une carte donnée. */
+#codir-content .kpi.codir-kpi-empty{border:1px dashed var(--ds-border-strong);background:var(--ds-surface-alt);box-shadow:none;opacity:.75;}
+#codir-content .kpi.codir-kpi-empty::before{display:none;}
+#codir-content .kpi.codir-kpi-empty:hover{transform:none;box-shadow:none;}
 
 /* ── Onglets Bloc 1 / Bloc 2 (14 août 2026) — pastilles à droite du titre de bloc, voir
    renderCodir() (setCodirTab1/setCodirTab2) dans dashboard.html. .card-head est déjà
