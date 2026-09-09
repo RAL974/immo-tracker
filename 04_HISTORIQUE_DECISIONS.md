@@ -835,5 +835,123 @@ Session de finition pure (aucun changement de comportement métier, gabarits imp
 - `npm run verify` : 253/253 en début de session (baseline recomptée), **262/262** après (9 nouveaux tests, 0 régression). `npm run sync:staging` relancé après modification de `dashboard.html`/`worker.js`.
 - **Étape bloquante côté William avant que `Renouvellement_Mois` soit réellement utilisable** : créer la colonne `Renouvellement_Mois` (Nombre) sur `Grille_Dotation_EPI`, **sur les deux sites** (production ET recette, si la recette est utilisée pour ce module) — voir `02_MODELE_DONNEES.md`. Sans cette colonne, le module fonctionne déjà normalement avec un renouvellement par défaut de 12 mois pour toutes les lignes.
 
+## Consultations EPI — persistance du besoin figé, fournisseurs, offres (9 sept. 2026)
+
+- **Suite directe de la session précédente** ("Calcul et affichage du besoin annuel EPI") : le besoin
+  se calcule correctement mais reste éphémère (recalculé à chaque ouverture d'écran, jamais persisté).
+  Objectif de cette session : figer un besoin à un instant T dans une "consultation", pour que les
+  offres reçues ensuite restent comparables à une référence stable, et gérer un répertoire de
+  fournisseurs.
+- **Préalable bloquant, vérifié avant tout code** : les 5 listes SharePoint attendues (`Fournisseurs`,
+  `EPI_Consultations`, `EPI_Consultation_Lignes`, `EPI_Offres`, `EPI_Offres_Lignes`) ont été testées via
+  `?debug_columns=<liste>` sur les deux Workers (`immo-proxy` production et `immo-proxy-staging`
+  recette) — **aucune des 5 n'existait, sur aucun des deux environnements** (`itemNotFound` à chaque
+  appel). Conformément à la consigne explicite de la session, ce constat a été signalé avant toute
+  écriture de code, avec le détail exact des colonnes attendues. **Décision retenue** (cohérente avec
+  le mode de fonctionnement établi du projet — voir par ex. le chantier Brasseurs d'air : le code est
+  systématiquement écrit et testé en isolation, avec Microsoft Graph entièrement mocké, pendant que les
+  listes sont en attente de création) : implémenter le module intégralement, vérifié par 32 tests
+  dédiés (Graph mocké, zéro appel réseau réel) et une vérification visuelle en navigateur avec des
+  données factices injectées côté client — **rien de tout cela n'a pu être vérifié contre de vraies
+  données SharePoint dans cette session**, faute de listes existantes. Les 5 listes restent donc une
+  **étape bloquante côté William avant mise en service réelle**, comme pour chaque nouveau module.
+- **Schéma effectivement livré différent du cadrage préalable, sciemment.** Un document de cadrage
+  plus large avait été rédigé dans une session antérieure (`CADRAGE_MODULE_BESOIN_EPI.md`), proposant
+  6 listes (`Consultations_EPI`, `Effectif_Previsionnel_EPI`, `Lignes_Consultation_EPI`,
+  `Fournisseurs_EPI`, `Fournisseurs_Consultation_EPI`, `Lignes_Offres_EPI`), des statuts différents
+  (`Besoin_Valide`/`En_Consultation`/`Offres_Recues`/`Arbitree` au lieu de
+  `Envoyee`/`Depouillement`/`Attribuee`), une capacité `ROLE_CAPS` dédiée
+  (`peutGererBesoinEPI`/`peutVoirBesoinEPI`), et un découpage `requireAdmin`/`requireGarant` par
+  action. **L'instruction de cette session a fourni un schéma différent, directement et explicitement**
+  (5 listes au lieu de 6 — pas de liste séparée pour l'effectif prévisionnel, qui reste un paramètre
+  éphémère non persisté comme déjà décidé la session précédente ; pas de liste séparée pour le suivi
+  d'invitation fournisseur, une offre rattache directement un fournisseur à une consultation ; statuts
+  différents ; toutes les actions en `requireGarant`, aucune distinction `requireAdmin`). **Ce schéma a
+  été suivi tel quel, pas celui du cadrage** — le cadrage document une réflexion antérieure, pas un
+  contrat figé, et l'instruction directe de session prévaut. Différence notée explicitement ici pour
+  qu'une session future ne se fie pas au cadrage pour deviner l'état réel du code.
+- **Actions d'écriture au-delà de la liste explicitement énumérée dans la consigne** : la consigne
+  citait 6 actions (`creer_fournisseur`, `editer_fournisseur`, `creer_consultation_epi`,
+  `editer_consultation_epi`, `editer_ligne_consultation_epi`, `changer_statut_consultation_epi`) mais
+  décrivait aussi un schéma `EPI_Offres`/`EPI_Offres_Lignes` complet (délai, frais de port, franco,
+  remise, MOQ, non-proposé...) et un écran de "rattachement des fournisseurs consultés à une
+  consultation" — impossible à honorer sans au moins une action d'écriture sur les offres. La consigne
+  elle-même anticipait ce cas ("si le test de synchronisation échoue parce qu'une action a été
+  oubliée, corrige, ne contourne pas") : 3 actions supplémentaires ont été ajoutées
+  (`creer_offre_epi`, `editer_offre_epi`, `editer_ligne_offre_epi`), suivant exactement le même
+  patron `requireGarant` que les 6 actions explicitement demandées. **9 actions au total**, toutes
+  dans `GATED_ACTIONS`/`GATED_ACTIONS_AUDIT`/le bloc protégé côté Worker, synchronisation vérifiée par
+  `tests/security.gated-actions.test.js` (aucune modification propre à ce test n'a été nécessaire — le
+  garde-fou existant a validé la cohérence sans changement).
+- **Pattern Brasseurs d'air réutilisé comme référence directe** : deux agents d'exploration ont
+  cartographié en détail `worker.js` (actions Brasseurs, `requireAdmin`/`requireGarant`,
+  `GATED_ACTIONS_AUDIT`, `paginate`/`paginateStatus`, `graphBatch`, `EXPORTABLE_LISTS`,
+  `dispatchPost`) et `dashboard.html` (sous-onglets EPI, modale `#add-overlay` partagée,
+  `confirmModal`, `exporterExcel`, capacités `peutGererEPI`/`peutGererBrasseurs`) avant tout code —
+  chaque pattern du nouveau module (dédoublonnage à la création, PATCH partiel avec vérification
+  `!== undefined`, `null` jamais `''` sur les colonnes Date, écriture `$batch` en-tête + lignes,
+  transition de statut par liste blanche, annulation par préfixe de motif dans Notes plutôt que
+  suppression) est copié à l'identique d'un équivalent Brasseurs déjà en production, pas réinventé.
+- **`creer_consultation_epi` : chunking serveur au-delà de 20 lignes**, contrairement à
+  `creer_commande_brasseur` qui plafonne à 20 lignes en un seul appel (usage manuel ligne par ligne).
+  Un besoin annuel calculé automatiquement peut dépasser 20 lignes type×taille — plutôt que
+  d'imposer un plafond artificiel ou de multiplier les allers-retours client, l'action boucle en
+  interne sur des lots de 20 (la limite Graph `$batch`), toujours en une seule requête HTTP côté
+  client. Plafond global généreux (500 lignes) en garde-fou anti-typo, jamais destiné à être atteint
+  en usage réel.
+- **Droits — décision volontairement plus simple que le cadrage** : pas de nouvelle capacité
+  `ROLE_CAPS` (`peutGererBesoinEPI`/`peutVoirBesoinEPI` du cadrage non introduites) — réutilise
+  `peutGererEPI`/`peutVoirEPI` tels quels, cohérent avec la décision déjà prise la session précédente
+  pour l'écran "Besoin annuel". L'instruction de session ne demandait pas cette séparation ; l'ajouter
+  aurait été une sur-ingénierie non demandée.
+- **Endpoints GET, protection alignée sur la majorité des endpoints EPI existants plutôt que sur le
+  cadrage** : `?fournisseurs=1`/`?epi_consultations=1`/`?epi_consultation_lignes=<id>` publics (aucun
+  prix — même niveau de confiance que `?catalogue_epi=1`/`?grille_dotation_epi=1`, qui sont la norme
+  pour ce module) ; seul `?epi_offres=<id_consultation>` (qui expose `Prix_Unitaire_HT`) est protégé
+  `requireGarant`, jeton en paramètre `&token=` comme `?brasseurs_commandes=1`. Le cadrage proposait de
+  protéger aussi les quantités du besoin (jugées "RH-adjacentes") — écarté ici, l'instruction de
+  session ne le demandait pas et cette cohérence avec le reste du module EPI (déjà public) a semblé
+  plus defendable qu'un chantier de durcissement non demandé.
+- **`?epi_offres=<id>` renvoie les offres avec leurs lignes déjà imbriquées** (`lignes:[...]` par
+  offre), plutôt qu'un endpoint séparé pour `EPI_Offres_Lignes` — la consigne n'énumérait que 4
+  endpoints GET, celui-ci absorbe donc la lecture des lignes en un seul appel réseau côté dashboard
+  (filtrage par id d'offre fait côté Worker après une lecture complète de la liste, comme
+  `?lignes_dotation_epi_toutes=1`/`reception_commande_brasseur` le font déjà pour un besoin similaire).
+- **Écran** : deux nouveaux sous-onglets EPI (« 📑 Consultations », « 🏭 Fournisseurs »), chargement
+  paresseux comme Historique EPI. Bouton « 🧊 Figer en consultation » ajouté à l'écran Besoin annuel
+  existant (session précédente), à côté de l'export Excel — ouvre la modale de création partagée
+  (`#add-overlay`), envoie `EPI_BESOIN_RESULTAT.lignes` telles quelles à `creer_consultation_epi`, puis
+  bascule automatiquement sur l'onglet Consultations. L'écran de détail d'une consultation montre les
+  lignes de besoin (retenue/fournisseur/motif éditables uniquement en `Brouillon`, surlignées si la
+  quantité retenue diverge de la quantité calculée) et les offres reçues (bouton « 🔎 Détail » par
+  offre, formulaire d'ajout pré-rempli avec toutes les lignes de besoin de la consultation, une ligne
+  par prix à saisir). Boutons de transition de statut générés dynamiquement depuis la liste
+  `transitions_autorisees` renvoyée par le Worker en cas de refus, pour rester synchronisé avec le
+  cycle de vie réel sans dupliquer la logique côté client au-delà d'un simple miroir d'affichage.
+- **Portée volontairement non couverte cette session** (cadrage complet, non redemandé par
+  l'instruction) : pas de tableau comparatif à deux scénarios (fournisseur unique moins-disant vs
+  meilleur prix ligne à ligne panaché) — l'arbitrage se fait aujourd'hui en lisant le détail de chaque
+  offre ouverte individuellement ; pas d'action "reporter au catalogue" (report des références/prix
+  retenus vers `Catalogue_Articles_EPI`) — l'arbitrage (`Fournisseur_Retenu`) reste dans la
+  consultation. À construire dans une session dédiée si le besoin se confirme.
+- **Vérification** : 32 nouveaux tests (`tests/worker.epi-consultations.test.js`, Microsoft Graph
+  entièrement mocké) couvrant le dédoublonnage Fournisseurs, la création en-tête+lignes en `$batch` (y
+  compris le chunking au-delà de 20 lignes), l'édition d'une ligne de besoin bloquée hors `Brouillon`,
+  les 6 transitions de statut valides et les cas refusés (saut d'étape, état terminal), le motif
+  d'annulation tracé sans écrasement, la validation du fournisseur actif à la création d'une offre, et
+  la protection `requireGarant` de `?epi_offres=`. Vérification visuelle complémentaire en navigateur
+  (serveur statique local, données factices injectées côté client pour Fournisseurs/Consultations/
+  lignes/offres) : les deux nouveaux sous-onglets, l'écran de détail d'une consultation `Brouillon`
+  (champs éditables) et `Cloturee` (lecture seule, aucune transition), les modales "Figer en
+  consultation" et "Enregistrer une offre" (fournisseurs inactifs bien exclus de la liste) — zéro
+  erreur console sur l'ensemble du parcours. `npm run verify` : 262/262 en début de session, **294/294**
+  après (32 nouveaux tests, 0 régression). `npm run sync:staging` relancé après modification de
+  `dashboard.html`.
+- **Étape bloquante côté William avant mise en service réelle** : créer les 5 listes SharePoint
+  (`Fournisseurs`, `EPI_Consultations`, `EPI_Consultation_Lignes`, `EPI_Offres`, `EPI_Offres_Lignes`,
+  colonnes détaillées dans `02_MODELE_DONNEES.md`) sur les deux sites (production **et** recette, si la
+  recette est utilisée pour ce module) — vérifiable après création via `?debug_columns=<liste>` sur les
+  deux Workers, exactement la méthode utilisée en début de session pour constater leur absence.
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.

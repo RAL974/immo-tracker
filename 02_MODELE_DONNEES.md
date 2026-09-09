@@ -534,6 +534,115 @@ Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et
 synchronisation vérifiée par `tests/backup.export-structure.test.js`) — sauvegarde possible via
 `?export_liste=<nom>` comme le reste du modèle de données, voir `PROCEDURE_ROLLBACK.md`.
 
+## Module « Consultations EPI » — fournisseurs, besoin figé, offres (ajouté sept. 2026)
+
+*Rend persistant le besoin annuel EPI calculé côté client (`epiCalculerBesoinAnnuel`, voir session
+précédente) : « figer » ce besoin à un instant T dans une consultation, pour que les offres reçues
+ensuite d'un fournisseur restent comparables à une référence stable. Un cadrage plus large avait été
+rédigé au préalable (`CADRAGE_MODULE_BESOIN_EPI.md`) avec un modèle de données légèrement différent
+(listes `Consultations_EPI`/`Fournisseurs_EPI`/`Fournisseurs_Consultation_EPI`/`Lignes_Offres_EPI`,
+statuts et niveaux de protection distincts) — **le schéma effectivement livré, décrit ci-dessous, a
+été fourni directement en instruction de session et prévaut** ; voir `04_HISTORIQUE_DECISIONS.md`
+pour le détail des écarts. Effectif prévisionnel et marge de sécurité restent des paramètres
+éphémères (jamais persistés en tant que tels, voir session précédente) — sérialisés tels quels dans
+`EPI_Consultations.Parametres` au moment du figeage, pour rester la référence exacte envoyée aux
+fournisseurs même si l'effectif ou la grille changent ensuite.*
+
+### `Fournisseurs`
+
+*Répertoire indépendant des consultations — un fournisseur peut être invité à plusieurs consultations
+successives, réutilisé aussi par la saisie d'une offre.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom du fournisseur |
+| `Contact_Nom` | Texte | |
+| `Contact_Email` | Texte | |
+| `Contact_Telephone` | Texte | |
+| `Domaines` | Texte | Libre, ex. "chaussures, gants" |
+| `Actif` | Texte | `Oui` / `Non` |
+| `Notes` | **Plusieurs lignes de texte** | Libre |
+
+### `EPI_Consultations`
+
+*Une consultation = un besoin figé à un instant T + son cycle de vie.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | Nom de la consultation, ex. `Consultation EPI 2027` |
+| `Annee_Cible` | Nombre | Année de dotation visée |
+| `Statut` | Texte | `Brouillon` / `Envoyee` / `Depouillement` / `Attribuee` / `Cloturee` / `Annulee` — liste fermée et transitions validées côté serveur, voir `03_REGLES_METIER_ET_ROLES.md` |
+| `Date_Creation` | **Date et heure** | ISO |
+| `Date_Limite_Reponse` | Date | Optionnelle |
+| `Cree_Par` | Texte | Code employé résolu du jeton de session, jamais du corps de la requête |
+| `Parametres` | **Plusieurs lignes de texte** | JSON des hypothèses de calcul figées (année, marge de sécurité, effectif prévisionnel, effectif compté/exclu) — jamais recalculé automatiquement après création |
+| `Notes` | **Plusieurs lignes de texte** | Libre ; porte aussi la trace d'annulation (`[ANNULÉ par CODE le ISO — motif]`, convention Brasseurs, préfixée sans écraser l'existant) |
+
+### `EPI_Consultation_Lignes`
+
+*Le besoin calculé et figé au moment de la création de la consultation — une ligne = un
+(type d'article, taille). Porte aussi l'arbitrage final (quantité retenue, fournisseur choisi),
+sur les mêmes lignes plutôt qu'une liste séparée.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | ID SharePoint de la consultation parente (texte, pas de Lookup — cohérent avec `Lignes_Inventaire`/`Lignes_Dotation_EPI`) |
+| `Type_Article` | Texte | |
+| `Taille_Article` | Texte | Vide pour un article à taille unique |
+| `Reference_Interne` | Texte | Référence catalogue EPI au moment du figeage |
+| `Designation` | Texte | |
+| `Quantite_Reunion` | Nombre | Figée au moment de la création |
+| `Quantite_Mayotte` | Nombre | idem |
+| `Quantite_Calculee` | Nombre | Total (Réunion + Mayotte), figé — jamais recalculé |
+| `Quantite_Retenue` | Nombre | Initialisée = `Quantite_Calculee` à la création, éditable ligne à ligne tant que la consultation est `Brouillon` |
+| `Commentaire` | Texte | |
+| `Fournisseur_Retenu` | Texte | Vide tant que non arbitrée |
+| `Motif_Choix` | **Plusieurs lignes de texte** | |
+
+### `EPI_Offres`
+
+*Une offre reçue d'un fournisseur pour une consultation — en-tête ; le détail par ligne est dans
+`EPI_Offres_Lignes`. Le fournisseur doit exister et être actif dans `Fournisseurs` (pas de saisie
+libre, contrairement à `Brasseurs_Commandes.Fournisseur`).*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | ID SharePoint de la consultation parente |
+| `Fournisseur` | Texte | Correspond à `Fournisseurs.Title` |
+| `Date_Reception` | Date | |
+| `Validite_Offre` | Date | |
+| `Delai_Livraison_Jours` | Nombre | |
+| `Frais_Port` | Nombre | |
+| `Franco_A_Partir_De` | Nombre | Seuil de franco de port |
+| `Remise_Globale_Pct` | Nombre | |
+| `Devise` | Texte | Défaut `EUR` si non transmis |
+| `Statut` | Texte | `Recue` / `Ecartee` |
+| `Notes` | **Plusieurs lignes de texte** | |
+
+### `EPI_Offres_Lignes`
+
+*Le prix proposé par le fournisseur pour chaque ligne de besoin.*
+
+| Colonne (nom interne) | Type | Contenu |
+|---|---|---|
+| `Title` | Texte | ID SharePoint de l'offre parente |
+| `Ligne_Consultation_Id` | Texte | ID SharePoint de la ligne `EPI_Consultation_Lignes` correspondante — permet de rapprocher une offre du besoin ligne à ligne |
+| `Type_Article` | Texte | |
+| `Taille_Article` | Texte | |
+| `Reference_Fournisseur` | Texte | SKU du fournisseur, optionnel |
+| `Designation_Proposee` | Texte | |
+| `Prix_Unitaire_HT` | Nombre (2 décimales) | |
+| `Conditionnement` | Nombre | Quantité par colis/lot |
+| `Quantite_Minimum` | Nombre | MOQ |
+| `Delai_Jours` | Nombre | Délai propre à cette ligne (distinct du délai global de l'offre) |
+| `Non_Propose` | Texte | `Oui` / `Non` — le fournisseur ne propose pas cet article pour cette taille |
+| `Commentaire` | **Plusieurs lignes de texte** | |
+
+### `EXPORTABLE_LISTS` (mise à jour)
+
+Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et `dashboard.html`,
+synchronisation vérifiée par `tests/backup.export-structure.test.js`).
+
 ## Recherche globale dashboard (ajoutée août 2026)
 
 Aucun nouveau modèle de données : la recherche du header (voir `03_REGLES_METIER_ET_ROLES.md`) lit exclusivement les structures déjà chargées en mémoire côté dashboard (`im`, `employesList`, `epiCatalogue`, `outilCatalogue`, et depuis août 2026 `brasseursCatalogue`) — aucune colonne SharePoint ni action Worker ajoutée.

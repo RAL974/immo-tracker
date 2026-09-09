@@ -821,8 +821,8 @@ if(IS_RECETTE){
 // fichier : le Worker vérifie ce jeton côté serveur avant d'exécuter ces actions (voir worker.js).
 // Listes SharePoint exportables via ?export_liste=<nom> (doit rester synchronisée avec
 // EXPORTABLE_LISTS côté worker.js, seule source de vérité pour ce qui est réellement autorisé).
-var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit','Brasseurs_Depots','Brasseurs_Catalogue','Brasseurs_Mouvements','Brasseurs_Commandes','Brasseurs_Lignes_Commande'];
-var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur','ajouter_depot_brasseur','ajouter_reference_brasseur','migrer_mouvement_brasseur'];
+var EXPORTABLE_LISTS=['Immos','Employes','Mouvements','Transferts_En_Attente','Reservations','Absences','Campagnes_Inventaire','Lignes_Inventaire','Catalogue_Articles_EPI','Grille_Dotation_EPI','Dotations_EPI','Lignes_Dotation_EPI','Catalogue_Outillage','Grille_Outillage','Lignes_Outillage','Materiel_IT','Mouvements_Materiel_IT','Lignes_Telephoniques','Mouvements_Lignes_Telephoniques','Campagnes_Inventaire_Immos','Scans_Inventaire_Immos','Journal_Audit','Brasseurs_Depots','Brasseurs_Catalogue','Brasseurs_Mouvements','Brasseurs_Commandes','Brasseurs_Lignes_Commande','Fournisseurs','EPI_Consultations','EPI_Consultation_Lignes','EPI_Offres','EPI_Offres_Lignes'];
+var GATED_ACTIONS=['ajouter_employe','ajouter_immo','maj_droits','maj_actif','maj_site_employe','reset_password','dedupe_employes','seed_immo_sites','seed_roles_sites','bulk_patch_immos','importer_affectation_immo','bulk_import_tailles_epi','bulk_import_catalogue_epi','bulk_import_grille_dotation_epi','bulk_import_catalogue_outillage','bulk_import_grille_outillage','bulk_import_lignes_outillage','bulk_import_lignes_inventaire','bulk_maj_duree_outillage','marquer_statut_immo','enregistrer_reparation','maj_panne','creer_mouvement_direct','maj_transfert','annuler_transfert','maj_site_immo','ajouter_article_epi','maj_grille_dotation_epi','supprimer_grille_dotation_epi','reception_commande_epi','generer_dotation_epi','generer_remise_ponctuelle_epi','annuler_dotation_epi','emarger_dotation_epi','upload_fiche_epi','bulk_maj_stock_epi','maj_stock_mini_epi','maj_grille_outillage','supprimer_grille_outillage','reception_commande_outillage','editer_stock_outillage','maj_stock_mini_outillage','distribuer_outillage','upload_fiche_outillage','maj_service_outillage','annuler_ligne_outillage','cloturer_campagne_inventaire','creer_campagne_inventaire','cloturer_campagne_inventaire_immos','creer_campagne_inventaire_immos','upload_fds','maj_taille_employe','ajouter_materiel_it','maj_materiel_it','affecter_materiel_it','bulk_import_materiel_it','bulk_import_mouvements_materiel_it','ajouter_ligne_telephonique','maj_ligne_telephonique','affecter_ligne_telephonique','bulk_import_lignes_telephoniques','bulk_import_mouvements_lignes_telephoniques','creer_mouvement_brasseur','transfert_brasseur','creer_commande_brasseur','editer_commande_brasseur','reception_commande_brasseur','annuler_mouvement_brasseur','ajouter_depot_brasseur','ajouter_reference_brasseur','migrer_mouvement_brasseur','creer_fournisseur','editer_fournisseur','creer_consultation_epi','editer_consultation_epi','editer_ligne_consultation_epi','changer_statut_consultation_epi','creer_offre_epi','editer_offre_epi','editer_ligne_offre_epi'];
 // Détection centralisée d'une session expirée (ajouté août 2026) : le jeton dure 12h — passé ce
 // délai, tout appel gated (POST action protégée, ou GET avec un jeton en paramètre d'URL comme les
 // endpoints Matériel IT/Brasseurs/Journal d'audit) échoue avec 401 {error:'session_invalide'}. Sans
@@ -2143,7 +2143,7 @@ function renderEPI(){
     div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
     return;
   }
-  var vues=[['stock','📦 Stock'],['commande','🛒 Suggestion de commande'],['besoin','📋 Besoin annuel'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle'],['historique','🕘 Historique']];
+  var vues=[['stock','📦 Stock'],['commande','🛒 Suggestion de commande'],['besoin','📋 Besoin annuel'],['consultations','📑 Consultations'],['fournisseurs','🏭 Fournisseurs'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle'],['historique','🕘 Historique']];
   var html='';
   if(estAdmin(ADMIN_SESSION.code)&&!epiCatalogue.length){
     html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : tailles, catalogue & grille de dotation</h3></div>'+
@@ -2201,6 +2201,8 @@ function renderEPIVue(){
   if(epiVue==='stock')renderEPIStock(c);
   else if(epiVue==='commande')renderEPICommande(c);
   else if(epiVue==='besoin')renderEPIBesoin(c);
+  else if(epiVue==='consultations')renderEPIConsultations(c);
+  else if(epiVue==='fournisseurs')renderEPIFournisseurs(c);
   else if(epiVue==='grille')renderEPIGrille(c);
   else if(epiVue==='dotations')renderEPIDotations(c);
   else if(epiVue==='ponctuelle')renderEPIPonctuelle(c);
@@ -2457,6 +2459,23 @@ var EPI_BESOIN_MARGE=0;
 var EPI_BESOIN_PREVISIONNEL={}; // 'Aff|Site' -> {entrees,sorties}
 var EPI_BESOIN_RESULTAT=null; // dernier calcul, réutilisé par l'export
 var EPI_BESOIN_FILTRE_TYPE='';
+// ── Consultations EPI (fournisseurs, besoin figé, offres — ajouté sept. 2026) : chargement
+// paresseux, même principe que Historique EPI — ces sous-onglets ne chargent leurs données qu'à
+// leur première ouverture dans la session.
+var fournisseursList=[];
+var dataLoadedFournisseurs=false;
+var epiConsultationsList=[];
+var dataLoadedEPIConsultations=false;
+var EPI_CONSULTATION_SELECTIONNEE=null; // id de la consultation actuellement ouverte en détail
+var epiConsultationLignesCache={}; // id consultation -> [lignes de besoin]
+var epiOffresCache={}; // id consultation -> [offres, avec leurs lignes imbriquées]
+var offreLignesForm=[]; // lignes du formulaire "Enregistrer une offre", une par ligne de besoin
+var EPI_STATUT_BADGE={'Brouillon':'bu','Envoyee':'bn','Depouillement':'bn','Attribuee':'bb','Cloturee':'bb','Annulee':'ba'};
+var EPI_OFFRE_STATUT_BADGE={'Recue':'bn','Ecartee':'ba'};
+var EPI_STATUT_LABELS={'Brouillon':'📝 Brouillon','Envoyee':'📤 Envoyée','Depouillement':'🔍 Dépouillement','Attribuee':'🏆 Attribuée','Cloturee':'✅ Clôturée','Annulee':'🗑️ Annulée'};
+// Miroir client des transitions autorisées côté Worker (EPI_CONSULTATION_TRANSITIONS, worker.js) —
+// purement pour n'afficher que les boutons pertinents ; le Worker revalide indépendamment.
+var EPI_CONSULTATION_TRANSITIONS_CLIENT={'Brouillon':['Envoyee','Annulee'],'Envoyee':['Depouillement','Annulee'],'Depouillement':['Attribuee','Annulee'],'Attribuee':['Cloturee','Annulee'],'Cloturee':[],'Annulee':[]};
 function epiBesoinAnneeDefaut(){return new Date().getFullYear()+1;}
 function renderEPIBesoin(container){
   if(!EPI_BESOIN_ANNEE)EPI_BESOIN_ANNEE=epiBesoinAnneeDefaut();
@@ -2465,6 +2484,7 @@ function renderEPIBesoin(container){
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   var html='<div class="card"><div class="card-head"><h3>📋 Besoin annuel EPI</h3>'+
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="card-cnt" id="epi-besoin-cnt"></span>'+
+    (canEdit?'<button onclick="ouvrirFigerBesoinEPI()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer" title="Fige ce besoin (quantités + hypothèses) dans une nouvelle consultation, comme référence stable pour comparer des offres fournisseurs">🧊 Figer en consultation</button>':'')+
     '<button class="filter-btn" onclick="exporterBesoinAnnuelEPI()">📥 Export Excel</button></div></div>'+
     '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Besoin en quantités par article × taille, ventilé Réunion/Mayotte, pour préparer une consultation fournisseurs. Couvre toujours les deux territoires. Le stock actuel est affiché à titre indicatif, jamais déduit du besoin.</p>'+
     '<div style="padding:0 14px 12px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">'+
@@ -2584,6 +2604,431 @@ function exporterBesoinAnnuelEPI(){
     {nom:'Besoin par article',entetes:['Type','Taille','Référence','Désignation','Employés','Qté Réunion','Qté Mayotte','Qté totale','Stock actuel'],lignes:lignesBesoin,cols:[18,10,16,28,10,12,12,12,12]},
     {nom:'Détail par employé',entetes:['Type','Taille','Origine','Code/Profil','Nom','Territoire','Quantité'],lignes:lignesDetail,cols:[18,10,14,14,24,10,10]},
     {nom:'Anomalies',entetes:['Catégorie','Détail (JSON)'],lignes:lignesAnom,cols:[28,60]}
+  ]);
+}
+
+// ── « Figer le besoin » en consultation (depuis l'onglet Besoin annuel) ──────────────────────
+function ouvrirFigerBesoinEPI(){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  if(!EPI_BESOIN_RESULTAT||!EPI_BESOIN_RESULTAT.lignes.length){alert('Aucune ligne de besoin à figer — vérifiez le calcul ci-dessus.');return;}
+  document.getElementById('add-titre').textContent='🧊 Figer le besoin en consultation';
+  document.getElementById('add-msg').textContent='';
+  var totalAnom=Object.keys(EPI_BESOIN_RESULTAT.anomalies).reduce(function(s,k){return s+EPI_BESOIN_RESULTAT.anomalies[k].length;},0);
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Nom de la consultation *</label><input id="fc-titre" style="'+addFieldStyle+'" value="Consultation EPI '+EPI_BESOIN_ANNEE+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Date limite de réponse (optionnel)</label><input type="date" id="fc-limite" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="fc-notes" style="'+addFieldStyle+'"></div>'+
+    '<p style="font-size:12px;color:var(--grey);margin-top:6px">'+EPI_BESOIN_RESULTAT.lignes.length+' ligne(s) de besoin seront figées pour l\'année '+EPI_BESOIN_ANNEE+', marge '+EPI_BESOIN_MARGE+'%.'+
+    (totalAnom?' ⚠️ '+totalAnom+' anomalie(s) sur le calcul actuel (déjà exclues des lignes ci-dessus) — la consultation peut quand même être créée.':' ✅ Aucune anomalie détectée.')+
+    ' Une fois figée, cette consultation ne se recalculera jamais automatiquement, même si le besoin ci-dessus change ensuite.</p>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=soumettreFigerBesoinEPI;
+}
+async function soumettreFigerBesoinEPI(){
+  var titre=(document.getElementById('fc-titre').value||'').trim();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!titre){msg.textContent='Le nom de la consultation est obligatoire.';return;}
+  if(!(await confirmModal('Figer ce besoin dans la consultation « '+titre+' » ?\n\nLes quantités calculées seront gelées — un futur recalcul du besoin (grille, catalogue, effectifs) ne modifiera jamais cette consultation.')))return;
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var r=EPI_BESOIN_RESULTAT;
+  var lignes=r.lignes.map(function(l){return{type_article:l.type_article,taille:l.taille,reference_interne:l.reference,designation:l.designation,quantite_reunion:l.qte_reunion,quantite_mayotte:l.qte_mayotte,quantite_calculee:l.qte_totale};});
+  var payload={titre:titre,annee_cible:EPI_BESOIN_ANNEE,date_limite_reponse:(document.getElementById('fc-limite').value||''),notes:(document.getElementById('fc-notes').value||'').trim(),
+    parametres:{annee:r.annee,marge_pourcentage:r.marge_pourcentage,previsionnel:r.previsionnel,effectif:r.effectif},lignes:lignes};
+  try{
+    var rr=await fetch(W+'?action=creer_consultation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await rr.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Consultation créée ('+res.lignes_ecrites+' ligne(s)) !';
+      dataLoadedEPIConsultations=false;
+      EPI_CONSULTATION_SELECTIONNEE=res.id;
+      setTimeout(function(){fermerAjout();epiVue='consultations';renderEPI();},1200);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+// ── Vue Fournisseurs (répertoire indépendant, réutilisable d'une consultation à l'autre) ─────
+async function chargerFournisseurs(force){
+  if(dataLoadedFournisseurs&&!force)return;
+  dataLoadedFournisseurs=true;
+  try{var r=await fetch(W+'?fournisseurs=1');fournisseursList=await r.json();if(!Array.isArray(fournisseursList))fournisseursList=[];}catch(e){fournisseursList=[];}
+}
+function renderEPIFournisseurs(container){
+  container.innerHTML='<div class="card"><div class="card-head"><h3>🏭 Fournisseurs EPI</h3>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="card-cnt" id="fourn-cnt"></span>'+
+    (peutGererEPI(ADMIN_SESSION.code)?'<button onclick="ouvrirAjoutFournisseur()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter</button>':'')+
+    '<button class="filter-btn" onclick="exporterFournisseursEPI()">📥 Export Excel</button></div></div>'+
+    '<div class="filters" style="padding:10px 14px 0;margin-bottom:0"><input type="text" id="fourn-q" oninput="refreshFournisseursResults()" placeholder="🔍 Filtrer par nom, contact, domaine..." style="max-width:400px"></div>'+
+    '<div id="fourn-results">Chargement…</div></div>';
+  chargerFournisseurs().then(refreshFournisseursResults);
+}
+function refreshFournisseursResults(){
+  var el=document.getElementById('fourn-results');
+  if(!el)return;
+  var q=((document.getElementById('fourn-q')||{}).value||'').trim().toUpperCase();
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var rows=fournisseursList.filter(function(f){return!q||(f.nom||'').toUpperCase().includes(q)||(f.contact_nom||'').toUpperCase().includes(q)||(f.domaines||'').toUpperCase().includes(q)||(f.contact_email||'').toUpperCase().includes(q);});
+  var cnt=document.getElementById('fourn-cnt');if(cnt)cnt.textContent=rows.length+' fournisseur(s)';
+  if(!rows.length){el.innerHTML='<p class="es" style="padding:16px">Aucun fournisseur'+(q?' pour ce filtre':' — ajoutez-en un pour commencer.')+'</p>';return;}
+  el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Contact</th><th>Email</th><th>Téléphone</th><th>Domaines</th><th>Statut</th>'+(canEdit?'<th>Actions</th>':'')+'</tr></thead><tbody>'+
+    rows.slice().sort(function(a,b){return(a.nom||'').localeCompare(b.nom||'');}).map(function(f){
+      return '<tr><td style="font-weight:700">'+f.nom+'</td><td>'+(f.contact_nom||'—')+'</td><td>'+(f.contact_email||'—')+'</td><td>'+(f.contact_telephone||'—')+'</td><td>'+(f.domaines||'—')+'</td>'+
+        '<td>'+(f.actif?'<span class="badge bn">✅ Actif</span>':'<span class="badge ba">⛔ Inactif</span>')+'</td>'+
+        (canEdit?'<td style="white-space:nowrap"><button onclick="ouvrirEditionFournisseur(\''+f.id+'\')" style="padding:4px 10px;background:var(--ds-neutral-200,#e5e5e5);color:var(--ds-ink-900,#222);border:none;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px">✏️ Éditer</button>'+
+        '<button onclick="toggleActifFournisseur(\''+f.id+'\','+(!f.actif)+')" style="padding:4px 10px;background:'+(f.actif?'var(--red)':'var(--green)')+';color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">'+(f.actif?'⛔ Désactiver':'✅ Activer')+'</button></td>':'')+
+        '</tr>';
+    }).join('')+
+    '</tbody></table></div>';
+}
+function ouvrirAjoutFournisseur(){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  document.getElementById('add-titre').textContent='➕ Ajouter un fournisseur';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Nom *</label><input id="fn-nom" style="'+addFieldStyle+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Contact</label><input id="fn-contact" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Email</label><input id="fn-email" style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Téléphone</label><input id="fn-tel" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Domaines</label><input id="fn-domaines" style="'+addFieldStyle+'" placeholder="Ex: chaussures, gants..."></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="fn-notes" style="'+addFieldStyle+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=enregistrerFournisseur;
+}
+async function enregistrerFournisseur(){
+  var nom=(document.getElementById('fn-nom').value||'').trim();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!nom){msg.textContent='Le nom est obligatoire.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={nom:nom,contact_nom:(document.getElementById('fn-contact').value||'').trim(),contact_email:(document.getElementById('fn-email').value||'').trim(),
+    contact_telephone:(document.getElementById('fn-tel').value||'').trim(),domaines:(document.getElementById('fn-domaines').value||'').trim(),notes:(document.getElementById('fn-notes').value||'').trim()};
+  try{
+    var r=await fetch(W+'?action=creer_fournisseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Fournisseur ajouté !';
+      fournisseursList.push({id:res.id,nom:nom,contact_nom:payload.contact_nom,contact_email:payload.contact_email,contact_telephone:payload.contact_telephone,domaines:payload.domaines,actif:true,notes:payload.notes});
+      setTimeout(function(){fermerAjout();renderEPIVue();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+function ouvrirEditionFournisseur(id){
+  var f=fournisseursList.find(function(x){return x.id===id;});
+  if(!f){alert('Fournisseur introuvable.');return;}
+  document.getElementById('add-titre').textContent='✏️ Éditer '+f.nom;
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Nom *</label><input id="fn-nom" style="'+addFieldStyle+'" value="'+(f.nom||'').replace(/"/g,'&quot;')+'"></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Contact</label><input id="fn-contact" style="'+addFieldStyle+'" value="'+(f.contact_nom||'').replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Email</label><input id="fn-email" style="'+addFieldStyle+'" value="'+(f.contact_email||'').replace(/"/g,'&quot;')+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Téléphone</label><input id="fn-tel" style="'+addFieldStyle+'" value="'+(f.contact_telephone||'').replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Domaines</label><input id="fn-domaines" style="'+addFieldStyle+'" value="'+(f.domaines||'').replace(/"/g,'&quot;')+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="fn-notes" style="'+addFieldStyle+'" value="'+(f.notes||'').replace(/"/g,'&quot;')+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=function(){soumettreEditionFournisseur(id);};
+}
+async function soumettreEditionFournisseur(id){
+  var nom=(document.getElementById('fn-nom').value||'').trim();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!nom){msg.textContent='Le nom est obligatoire.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={id:id,nom:nom,contact_nom:(document.getElementById('fn-contact').value||'').trim(),contact_email:(document.getElementById('fn-email').value||'').trim(),
+    contact_telephone:(document.getElementById('fn-tel').value||'').trim(),domaines:(document.getElementById('fn-domaines').value||'').trim(),notes:(document.getElementById('fn-notes').value||'').trim()};
+  try{
+    var r=await fetch(W+'?action=editer_fournisseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Modifications enregistrées !';
+      var f=fournisseursList.find(function(x){return x.id===id;});
+      if(f){f.nom=nom;f.contact_nom=payload.contact_nom;f.contact_email=payload.contact_email;f.contact_telephone=payload.contact_telephone;f.domaines=payload.domaines;f.notes=payload.notes;}
+      setTimeout(function(){fermerAjout();renderEPIVue();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+async function toggleActifFournisseur(id,nouveauActif){
+  try{
+    var r=await fetch(W+'?action=editer_fournisseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,actif:nouveauActif})});
+    var res=await r.json();
+    if(res.success){var f=fournisseursList.find(function(x){return x.id===id;});if(f)f.actif=nouveauActif;refreshFournisseursResults();}
+    else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+function exporterFournisseursEPI(){
+  var q=((document.getElementById('fourn-q')||{}).value||'').trim();
+  var lignes=fournisseursList.map(function(f){return[f.nom,f.contact_nom,f.contact_email,f.contact_telephone,f.domaines,f.actif?'Actif':'Inactif'];});
+  exporterExcel(nomFichierExport('Fournisseurs_EPI'),[
+    {nom:'Filtres',entetes:['Filtres actifs'],lignes:[[ligneFiltresActifs({Recherche:q})]]},
+    {nom:'Fournisseurs',entetes:['Nom','Contact','Email','Téléphone','Domaines','Statut'],lignes:lignes,cols:[24,20,24,16,24,10]}
+  ]);
+}
+
+// ── Vue Consultations (liste + détail : lignes de besoin figées + offres reçues) ─────────────
+async function chargerConsultationsEPI(force){
+  if(dataLoadedEPIConsultations&&!force)return;
+  dataLoadedEPIConsultations=true;
+  try{var r=await fetch(W+'?epi_consultations=1');epiConsultationsList=await r.json();if(!Array.isArray(epiConsultationsList))epiConsultationsList=[];}catch(e){epiConsultationsList=[];}
+}
+function renderEPIConsultations(container){
+  container.innerHTML='<div id="epi-cons-content">Chargement…</div>';
+  Promise.all([chargerConsultationsEPI(),chargerFournisseurs()]).then(function(){renderEPIConsultationsInner();});
+}
+function renderEPIConsultationsInner(){
+  var elWrap=document.getElementById('epi-cons-content');
+  if(!elWrap)return;
+  if(EPI_CONSULTATION_SELECTIONNEE){renderConsultationDetailEPI();return;}
+  var html='<div class="card"><div class="card-head"><h3>📑 Consultations EPI</h3><span class="card-cnt">'+epiConsultationsList.length+' consultation(s)</span></div>'+
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Une consultation se crée en figeant le besoin depuis l\'onglet « 📋 Besoin annuel » (bouton 🧊 Figer en consultation).</p>';
+  if(!epiConsultationsList.length){html+='<p class="es" style="padding:16px">Aucune consultation créée pour l\'instant.</p></div>';elWrap.innerHTML=html;return;}
+  html+='<div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Année</th><th>Statut</th><th>Créée le</th><th>Par</th><th>Limite réponse</th><th></th></tr></thead><tbody>'+
+    epiConsultationsList.slice().sort(function(a,b){return(b.date_creation||'').localeCompare(a.date_creation||'');}).map(function(c){
+      return '<tr><td style="font-weight:700">'+c.titre+'</td><td>'+(c.annee_cible||'—')+'</td>'+
+        '<td><span class="badge '+(EPI_STATUT_BADGE[c.statut]||'bn')+'">'+(EPI_STATUT_LABELS[c.statut]||c.statut)+'</span></td>'+
+        '<td>'+(c.date_creation?fmtDT(c.date_creation):'—')+'</td><td>'+lienEmpSiConnu(c.cree_par)+'</td><td>'+(c.date_limite_reponse?fmtD(c.date_limite_reponse):'—')+'</td>'+
+        '<td><button onclick="ouvrirConsultationEPI(\''+c.id+'\')" style="padding:4px 10px;background:var(--blue-chrome);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">👁️ Ouvrir</button></td></tr>';
+    }).join('')+
+    '</tbody></table></div></div>';
+  elWrap.innerHTML=html;
+}
+function ouvrirConsultationEPI(id){EPI_CONSULTATION_SELECTIONNEE=id;renderEPIConsultationsInner();}
+function fermerConsultationEPI(){EPI_CONSULTATION_SELECTIONNEE=null;renderEPIConsultationsInner();}
+async function chargerDetailConsultationEPI(id,force){
+  if(epiConsultationLignesCache[id]&&!force){}else{
+    try{var r=await fetch(W+'?epi_consultation_lignes='+encodeURIComponent(id));epiConsultationLignesCache[id]=await r.json();if(!Array.isArray(epiConsultationLignesCache[id]))epiConsultationLignesCache[id]=[];}catch(e){epiConsultationLignesCache[id]=[];}
+  }
+  if(epiOffresCache[id]&&!force){}else{
+    try{var r2=await fetch(W+'?epi_offres='+encodeURIComponent(id)+'&token='+encodeURIComponent(ADMIN_SESSION.token||''));var d2=await r2.json();epiOffresCache[id]=Array.isArray(d2)?d2:[];}catch(e){epiOffresCache[id]=[];}
+  }
+}
+function renderConsultationDetailEPI(){
+  var elWrap=document.getElementById('epi-cons-content');
+  if(!elWrap)return;
+  var c=epiConsultationsList.find(function(x){return x.id===EPI_CONSULTATION_SELECTIONNEE;});
+  if(!c){elWrap.innerHTML='<p class="es" style="padding:16px">Consultation introuvable.</p>';return;}
+  elWrap.innerHTML='<div id="epi-cons-detail">Chargement du détail…</div>';
+  chargerDetailConsultationEPI(c.id).then(function(){renderConsultationDetailEPIInner(c);});
+}
+function renderConsultationDetailEPIInner(c){
+  var el=document.getElementById('epi-cons-detail');
+  if(!el)return;
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var lignes=epiConsultationLignesCache[c.id]||[];
+  var offres=epiOffresCache[c.id]||[];
+  var transitions=EPI_CONSULTATION_TRANSITIONS_CLIENT[c.statut]||[];
+  var totR=0,totM=0,totT=0;lignes.forEach(function(l){totR+=l.quantite_reunion;totM+=l.quantite_mayotte;totT+=l.quantite_calculee;});
+  var html='<div class="card"><div class="card-head"><h3>'+c.titre+' <span class="badge '+(EPI_STATUT_BADGE[c.statut]||'bn')+'" style="margin-left:8px">'+(EPI_STATUT_LABELS[c.statut]||c.statut)+'</span></h3>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="fermerConsultationEPI()" style="padding:6px 14px;background:var(--ds-neutral-100,#eee);color:var(--ds-text,#444);border:none;border-radius:8px;font-size:12px;cursor:pointer">← Retour à la liste</button>'+
+    '<button class="filter-btn" onclick="exporterConsultationEPI(\''+c.id+'\')">📥 Export Excel</button></div></div>'+
+    '<div style="padding:0 14px 10px;font-size:12px;color:var(--grey)">Année cible <b>'+c.annee_cible+'</b> · Créée le '+(c.date_creation?fmtDT(c.date_creation):'—')+' par '+lienEmpSiConnu(c.cree_par)+
+    (c.date_limite_reponse?' · Limite de réponse '+fmtD(c.date_limite_reponse):'')+' · '+lignes.length+' ligne(s), '+totT+' unité(s) au total ('+totR+' Réunion / '+totM+' Mayotte)</div>';
+  if(canEdit){
+    html+='<div style="padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+      '<button onclick="ouvrirEditionConsultationEPI(\''+c.id+'\')" style="padding:6px 14px;background:var(--ds-neutral-200,#e5e5e5);color:var(--ds-ink-900,#222);border:none;border-radius:8px;font-size:12px;cursor:pointer">✏️ Éditer</button>';
+    transitions.forEach(function(t){
+      var danger=t==='Annulee';
+      html+='<button onclick="changerStatutConsultationEPI(\''+c.id+'\',\''+t+'\')" style="padding:6px 14px;background:'+(danger?'var(--red)':'var(--green)')+';color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">'+(EPI_STATUT_LABELS[t]||t)+'</button>';
+    });
+    html+='</div>';
+  }
+  if(c.notes)html+='<p style="padding:0 14px 10px;font-size:11px;color:var(--grey)"><b>Notes :</b> '+c.notes+'</p>';
+  html+='<div style="padding:0 14px 6px"><h4 style="font-size:13px;margin:6px 0">Lignes de besoin'+(c.statut==='Brouillon'?' (quantité retenue modifiable tant que la consultation est en Brouillon)':'')+'</h4></div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Taille</th><th>Réf. interne</th><th>Désignation</th><th>Qté Réunion</th><th>Qté Mayotte</th><th>Qté calculée</th><th>Qté retenue</th><th>Fournisseur retenu</th><th>Commentaire</th></tr></thead><tbody>'+
+    lignes.map(function(l){
+      var ecart=l.quantite_retenue!==l.quantite_calculee;
+      var editable=canEdit&&c.statut==='Brouillon';
+      return '<tr'+(ecart?' style="background:var(--ds-warning-bg)"':'')+'><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td><td>'+(l.reference_interne||'—')+'</td><td>'+(l.designation||'—')+'</td>'+
+        '<td>'+l.quantite_reunion+'</td><td>'+l.quantite_mayotte+'</td><td>'+l.quantite_calculee+'</td>'+
+        '<td>'+(editable?'<input type="number" min="0" value="'+l.quantite_retenue+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'quantite_retenue\',this.value)" style="width:70px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;text-align:center;background:var(--card);color:var(--ds-text,#222)">':'<b>'+l.quantite_retenue+'</b>')+'</td>'+
+        '<td>'+(editable?'<input value="'+(l.fournisseur_retenu||'').replace(/"/g,'&quot;')+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'fournisseur_retenu\',this.value)" style="width:110px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222)">':(l.fournisseur_retenu||'—'))+'</td>'+
+        '<td>'+(editable?'<input value="'+(l.commentaire||'').replace(/"/g,'&quot;')+'" onchange="majLigneConsultationEPI(\''+c.id+'\',\''+l.id+'\',\'commentaire\',this.value)" style="width:130px;padding:4px;border:1px solid var(--ds-border,#ddd);border-radius:6px;background:var(--card);color:var(--ds-text,#222)">':(l.commentaire||'—'))+'</td>'+
+        '</tr>';
+    }).join('')+
+    '</tbody></table></div></div>';
+  html+='<div class="card" style="margin-top:14px"><div class="card-head"><h3>🏭 Offres reçues</h3>'+
+    (canEdit?'<button onclick="ouvrirAjoutOffreEPI(\''+c.id+'\')" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Enregistrer une offre</button>':'')+
+    '</div>';
+  if(!offres.length)html+='<p class="es" style="padding:16px">Aucune offre enregistrée pour cette consultation.</p></div>';
+  else{
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Fournisseur</th><th>Statut</th><th>Reçue le</th><th>Validité</th><th>Délai livraison</th><th>Frais port</th><th>Remise</th><th>Devise</th><th></th></tr></thead><tbody>'+
+      offres.map(function(o){
+        return '<tr><td style="font-weight:700">'+o.fournisseur+'</td><td><span class="badge '+(EPI_OFFRE_STATUT_BADGE[o.statut]||'bn')+'">'+(o.statut==='Ecartee'?'❌ Écartée':'✅ Reçue')+'</span></td>'+
+          '<td>'+(o.date_reception?fmtD(o.date_reception):'—')+'</td><td>'+(o.validite_offre?fmtD(o.validite_offre):'—')+'</td><td>'+(o.delai_livraison_jours!=null?o.delai_livraison_jours+' j':'—')+'</td>'+
+          '<td>'+(o.frais_port!=null?nbFr(o.frais_port):'—')+'</td><td>'+(o.remise_globale_pct!=null?o.remise_globale_pct+'%':'—')+'</td><td>'+(o.devise||'—')+'</td>'+
+          '<td><button onclick="voirOffreEPI(\''+c.id+'\',\''+o.id+'\')" style="padding:4px 10px;background:var(--ds-neutral-200,#e5e5e5);color:var(--ds-ink-900,#222);border:none;border-radius:6px;font-size:11px;cursor:pointer">🔎 Détail</button></td></tr>';
+      }).join('')+
+      '</tbody></table></div></div>';
+  }
+  el.innerHTML=html;
+}
+async function majLigneConsultationEPI(consultationId,ligneId,champ,valeur){
+  var payload={id:ligneId};payload[champ]=(champ==='quantite_retenue')?parseFloat(valeur):valeur;
+  try{
+    var r=await fetch(W+'?action=editer_ligne_consultation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      var l=(epiConsultationLignesCache[consultationId]||[]).find(function(x){return x.id===ligneId;});
+      if(l)l[champ]=payload[champ];
+    }else{alert('Échec : '+(res.error||'inconnu'));renderConsultationDetailEPI();}
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+async function changerStatutConsultationEPI(id,nouveauStatut){
+  var danger=nouveauStatut==='Annulee';
+  var motif='';
+  if(danger){motif=prompt('Motif d\'annulation (optionnel) :')||'';if(motif===null)return;}
+  if(!(await confirmModal('Passer cette consultation au statut « '+(EPI_STATUT_LABELS[nouveauStatut]||nouveauStatut)+' » ?',{danger:danger})))return;
+  try{
+    var r=await fetch(W+'?action=changer_statut_consultation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,statut:nouveauStatut,motif:motif})});
+    var res=await r.json();
+    if(res.success){
+      var c=epiConsultationsList.find(function(x){return x.id===id;});
+      if(c)c.statut=nouveauStatut;
+      renderEPIConsultationsInner();
+    }else alert('Échec : '+(res.error||'inconnu')+(res.transitions_autorisees?' (transitions possibles : '+res.transitions_autorisees.join(', ')+')':''));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+function ouvrirEditionConsultationEPI(id){
+  var c=epiConsultationsList.find(function(x){return x.id===id;});
+  if(!c)return;
+  document.getElementById('add-titre').textContent='✏️ Éditer la consultation';
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-form').innerHTML=
+    '<div class="frow"><label style="'+addLabelStyle+'">Nom *</label><input id="ec-titre" style="'+addFieldStyle+'" value="'+(c.titre||'').replace(/"/g,'&quot;')+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Date limite de réponse</label><input type="date" id="ec-limite" style="'+addFieldStyle+'" value="'+(c.date_limite_reponse?c.date_limite_reponse.slice(0,10):'')+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="ec-notes" style="'+addFieldStyle+'" value="'+(c.notes||'').replace(/"/g,'&quot;')+'"></div>';
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=function(){soumettreEditionConsultationEPI(id);};
+}
+async function soumettreEditionConsultationEPI(id){
+  var titre=(document.getElementById('ec-titre').value||'').trim();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!titre){msg.textContent='Le nom est obligatoire.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={id:id,titre:titre,date_limite_reponse:(document.getElementById('ec-limite').value||''),notes:(document.getElementById('ec-notes').value||'').trim()};
+  try{
+    var r=await fetch(W+'?action=editer_consultation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Modifications enregistrées !';
+      var c=epiConsultationsList.find(function(x){return x.id===id;});
+      if(c){c.titre=titre;c.date_limite_reponse=payload.date_limite_reponse;c.notes=payload.notes;}
+      setTimeout(function(){fermerAjout();renderEPIConsultationsInner();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+
+// ── Offres (en-tête + lignes) ─────────────────────────────────────────────────────────────────
+function ouvrirAjoutOffreEPI(consultationId){
+  if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  var lignes=epiConsultationLignesCache[consultationId]||[];
+  if(!lignes.length){alert('Cette consultation n\'a aucune ligne de besoin.');return;}
+  var fournOptions=fournisseursList.filter(function(f){return f.actif;});
+  if(!fournOptions.length){alert('Aucun fournisseur actif dans le répertoire — ajoutez-en un depuis l\'onglet 🏭 Fournisseurs.');return;}
+  offreLignesForm=lignes.map(function(l){return{ligne_consultation_id:l.id,type_article:l.type_article,taille:l.taille,reference_fournisseur:'',designation_proposee:'',prix_unitaire_ht:'',conditionnement:'',quantite_minimum:'',delai_jours:'',non_propose:false,commentaire:''};});
+  document.getElementById('add-titre').textContent='➕ Enregistrer une offre';
+  document.getElementById('add-msg').textContent='';
+  var html='<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Fournisseur *</label><select id="of-fourn" style="'+addFieldStyle+'"><option value="">-- Sélectionner --</option>'+fournOptions.map(function(f){return '<option value="'+f.nom.replace(/"/g,'&quot;')+'">'+f.nom+'</option>';}).join('')+'</select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Statut</label><select id="of-statut" style="'+addFieldStyle+'"><option value="Recue">Reçue</option><option value="Ecartee">Écartée</option></select></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Date de réception</label><input type="date" id="of-date" value="'+new Date().toISOString().slice(0,10)+'" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Validité de l\'offre</label><input type="date" id="of-validite" style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Délai livraison (jours)</label><input type="number" id="of-delai" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Devise</label><input id="of-devise" value="EUR" style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Frais de port</label><input type="number" step="0.01" id="of-port" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Franco à partir de</label><input type="number" step="0.01" id="of-franco" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Remise globale (%)</label><input type="number" step="0.1" id="of-remise" style="'+addFieldStyle+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="of-notes" style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Prix par ligne (laisser vide + cocher « non proposé » si le fournisseur ne propose pas cet article)</label>'+
+    '<div class="tbl-wrap" style="max-height:300px"><table style="font-size:11px"><thead><tr><th>Type</th><th>Taille</th><th>Réf. fourn.</th><th>Prix unit. HT</th><th>Cond.</th><th>Qté mini</th><th>Délai (j)</th><th>Non proposé</th></tr></thead><tbody>'+
+    offreLignesForm.map(function(l,idx){
+      return '<tr><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td>'+
+        '<td><input onchange="offreLignesForm['+idx+'].reference_fournisseur=this.value" style="width:90px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" step="0.01" min="0" onchange="offreLignesForm['+idx+'].prix_unitaire_ht=this.value" style="width:80px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" min="0" onchange="offreLignesForm['+idx+'].conditionnement=this.value" style="width:60px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" min="0" onchange="offreLignesForm['+idx+'].quantite_minimum=this.value" style="width:60px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td><input type="number" min="0" onchange="offreLignesForm['+idx+'].delai_jours=this.value" style="width:60px;padding:3px;border:1px solid var(--ds-border,#ddd);border-radius:4px;background:var(--card);color:var(--ds-text,#222)"></td>'+
+        '<td style="text-align:center"><input type="checkbox" onchange="offreLignesForm['+idx+'].non_propose=this.checked"></td></tr>';
+    }).join('')+
+    '</tbody></table></div></div>';
+  document.getElementById('add-form').innerHTML=html;
+  document.getElementById('add-overlay').style.display='flex';
+  document.getElementById('add-confirm-btn').onclick=function(){soumettreOffreEPI(consultationId);};
+}
+async function soumettreOffreEPI(consultationId){
+  var fournisseur=(document.getElementById('of-fourn').value||'').trim();
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  if(!fournisseur){msg.textContent='Sélectionnez un fournisseur.';return;}
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={consultation_id:consultationId,fournisseur:fournisseur,statut:(document.getElementById('of-statut').value||'Recue'),
+    date_reception:(document.getElementById('of-date').value||''),validite_offre:(document.getElementById('of-validite').value||''),
+    delai_livraison_jours:(document.getElementById('of-delai').value||''),devise:(document.getElementById('of-devise').value||'EUR').trim(),
+    frais_port:(document.getElementById('of-port').value||''),franco_a_partir_de:(document.getElementById('of-franco').value||''),
+    remise_globale_pct:(document.getElementById('of-remise').value||''),notes:(document.getElementById('of-notes').value||'').trim(),
+    lignes:offreLignesForm};
+  try{
+    var r=await fetch(W+'?action=creer_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Offre enregistrée ('+res.lignes_ecrites+' ligne(s)) !';
+      delete epiOffresCache[consultationId];
+      await chargerDetailConsultationEPI(consultationId,true);
+      setTimeout(function(){fermerAjout();renderConsultationDetailEPI();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+function voirOffreEPI(consultationId,offreId){
+  var o=(epiOffresCache[consultationId]||[]).find(function(x){return x.id===offreId;});
+  if(!o){alert('Offre introuvable.');return;}
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  document.getElementById('add-titre').textContent='🔎 Offre — '+o.fournisseur;
+  document.getElementById('add-msg').textContent='';
+  document.getElementById('add-confirm-btn').style.display=canEdit?'':'none';
+  var html='<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Statut</label><select id="ofd-statut" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"><option value="Recue"'+(o.statut==='Recue'?' selected':'')+'>Reçue</option><option value="Ecartee"'+(o.statut==='Ecartee'?' selected':'')+'>Écartée</option></select></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Devise</label><input id="ofd-devise" value="'+(o.devise||'').replace(/"/g,'&quot;')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div></div>'+
+    '<div style="display:flex;gap:10px"><div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Reçue le</label><input type="date" id="ofd-date" value="'+(o.date_reception?o.date_reception.slice(0,10):'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div>'+
+    '<div class="frow" style="flex:1"><label style="'+addLabelStyle+'">Validité</label><input type="date" id="ofd-validite" value="'+(o.validite_offre?o.validite_offre.slice(0,10):'')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Notes</label><input id="ofd-notes" value="'+(o.notes||'').replace(/"/g,'&quot;')+'" '+(canEdit?'':'disabled')+' style="'+addFieldStyle+'"></div>'+
+    '<div class="frow"><label style="'+addLabelStyle+'">Lignes proposées</label>'+
+    '<div class="tbl-wrap" style="max-height:300px"><table style="font-size:11px"><thead><tr><th>Type</th><th>Taille</th><th>Réf. fourn.</th><th>Prix unit. HT</th><th>Cond.</th><th>Qté mini</th><th>Délai</th><th>Non proposé</th></tr></thead><tbody>'+
+    (o.lignes||[]).map(function(l){
+      return '<tr'+(l.non_propose?' style="opacity:.55"':'')+'><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td><td>'+(l.reference_fournisseur||'—')+'</td>'+
+        '<td>'+(l.prix_unitaire_ht!=null?nbFr(l.prix_unitaire_ht):'—')+'</td><td>'+(l.conditionnement!=null?l.conditionnement:'—')+'</td><td>'+(l.quantite_minimum!=null?l.quantite_minimum:'—')+'</td><td>'+(l.delai_jours!=null?l.delai_jours+' j':'—')+'</td>'+
+        '<td style="text-align:center">'+(l.non_propose?'✅':'—')+'</td></tr>';
+    }).join('')+
+    '</tbody></table></div></div>';
+  document.getElementById('add-form').innerHTML=html;
+  document.getElementById('add-overlay').style.display='flex';
+  if(canEdit)document.getElementById('add-confirm-btn').onclick=function(){soumettreEditionOffreEPI(consultationId,offreId);};
+}
+async function soumettreEditionOffreEPI(consultationId,offreId){
+  var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
+  msg.style.color='var(--red)';
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  var payload={id:offreId,statut:(document.getElementById('ofd-statut').value||''),devise:(document.getElementById('ofd-devise').value||'').trim(),
+    date_reception:(document.getElementById('ofd-date').value||''),validite_offre:(document.getElementById('ofd-validite').value||''),notes:(document.getElementById('ofd-notes').value||'').trim()};
+  try{
+    var r=await fetch(W+'?action=editer_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res=await r.json();
+    if(res.success){
+      msg.style.color='var(--green)';msg.textContent='✅ Modifications enregistrées !';
+      delete epiOffresCache[consultationId];
+      await chargerDetailConsultationEPI(consultationId,true);
+      setTimeout(function(){fermerAjout();document.getElementById('add-confirm-btn').style.display='';renderConsultationDetailEPI();},1000);
+    }else{btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='❌ '+(res.message||res.error||'Échec');}
+  }catch(e){btn.disabled=false;btn.textContent='✅ Enregistrer';msg.textContent='Erreur réseau : '+e.message;}
+}
+function exporterConsultationEPI(id){
+  var c=epiConsultationsList.find(function(x){return x.id===id;});
+  if(!c)return;
+  var lignes=epiConsultationLignesCache[id]||[];
+  var offres=epiOffresCache[id]||[];
+  var lignesBesoin=lignes.map(function(l){return[l.type_article,l.taille,l.reference_interne,l.designation,l.quantite_reunion,l.quantite_mayotte,l.quantite_calculee,l.quantite_retenue,l.fournisseur_retenu,l.commentaire];});
+  var lignesOffres=[];
+  offres.forEach(function(o){(o.lignes||[]).forEach(function(l){lignesOffres.push([o.fournisseur,o.statut,l.type_article,l.taille,l.reference_fournisseur,l.prix_unitaire_ht,l.conditionnement,l.quantite_minimum,l.delai_jours,l.non_propose?'Oui':'Non']);});});
+  exporterExcel(nomFichierExport('Consultation_EPI_'+c.titre.replace(/[^A-Za-z0-9_-]+/g,'_')),[
+    {nom:'Consultation',entetes:['Champ','Valeur'],lignes:[['Nom',c.titre],['Année cible',c.annee_cible],['Statut',c.statut],['Créée le',c.date_creation],['Créée par',c.cree_par],['Limite de réponse',c.date_limite_reponse],['Notes',c.notes]],cols:[20,50]},
+    {nom:'Lignes de besoin',entetes:['Type','Taille','Réf. interne','Désignation','Qté Réunion','Qté Mayotte','Qté calculée','Qté retenue','Fournisseur retenu','Commentaire'],lignes:lignesBesoin,cols:[18,10,16,28,12,12,12,12,20,24]},
+    {nom:'Offres',entetes:['Fournisseur','Statut','Type','Taille','Réf. fournisseur','Prix unit. HT','Conditionnement','Qté mini','Délai (j)','Non proposé'],lignes:lignesOffres,cols:[20,10,18,10,16,12,14,10,10,12]}
   ]);
 }
 

@@ -539,3 +539,88 @@ aussi vouloir imprimer/archiver sa sortie) :
   `?fiche_epi=`/`?fiche_outillage=`, aucun jeton). Dashboard : icône « 📎 » à côté du numéro de
   document dans le journal des mouvements Brasseurs dès que `photo_fiche` est renseigné, lien direct
   vers la preuve.
+
+## Module « Consultations EPI » — fournisseurs, besoin figé, offres (ajouté sept. 2026)
+
+*Rend persistant le besoin annuel EPI (session précédente, `epiCalculerBesoinAnnuel`) : « figer » ce
+besoin dans une consultation à un instant T, gérer un répertoire de fournisseurs, et enregistrer
+leurs offres pour comparaison ligne à ligne. Modèle de données complet dans `02_MODELE_DONNEES.md`.
+Aucun écran PWA — module 100% dashboard, comme EPI/Outillage/Brasseurs.*
+
+**Droits — aucune nouvelle capacité `ROLE_CAPS`** : réutilise `peutGererEPI`/`peutVoirEPI` tels
+quels (Admin, Logistique, Logistique_Mayotte en écriture ; +Encadrement en lecture seule) — décision
+volontairement plus simple que le cadrage initial (`CADRAGE_MODULE_BESOIN_EPI.md` §6/§8.3-8.4, qui
+proposait une capacité dédiée `peutGererBesoinEPI`/`peutVoirBesoinEPI`), l'instruction de session
+n'ayant pas demandé cette séparation. **Toutes les actions d'écriture sont `requireGarant`**, y
+compris la création d'une consultation (`creer_consultation_epi`) — même niveau que le reste de la
+gestion EPI courante, pas de palier `requireAdmin` distinct.
+
+**« Figer le besoin » = `creer_consultation_epi`** : bouton dédié sur l'onglet Besoin annuel EPI
+(🧊 Figer en consultation), qui crée en une seule action l'en-tête `EPI_Consultations`
+(`Statut='Brouillon'`) et toutes les lignes `EPI_Consultation_Lignes` depuis le résultat déjà calculé
+côté client — écriture `$batch`, découpée en lots de 20 en interne si le besoin dépasse cette taille
+(un besoin annuel réaliste reste très en dessous). Les hypothèses de calcul (année, marge de
+sécurité, effectif prévisionnel, effectif compté/exclu) sont sérialisées telles quelles dans
+`Parametres` (JSON). **Une consultation figée ne se recalcule jamais automatiquement** : un
+changement ultérieur de la grille de dotation, du catalogue ou des effectifs réels n'affecte aucune
+consultation déjà créée — c'est la référence contractuelle envoyée aux fournisseurs, elle doit rester
+stable jusqu'à ce que quelqu'un décide explicitement de la réviser (édition manuelle ligne à ligne,
+voir plus bas, ou une nouvelle consultation).
+
+**Cycle de vie du statut, transitions validées côté serveur** (`changer_statut_consultation_epi`,
+défense en couches — pas seulement dans l'écran, même principe que le blocage des sorties Brasseurs
+à stock zéro) :
+
+```
+Brouillon → Envoyee → Depouillement → Attribuee → Cloturee
+    ↓            ↓             ↓            ↓
+    └────────────┴─────────────┴────────────┴──→ Annulee
+```
+
+`Cloturee` et `Annulee` sont des états terminaux (aucune transition possible ensuite). `Annulee` est
+atteignable depuis n'importe quel état non terminal — un abandon reste possible jusqu'au dernier
+moment avant clôture. **Aucune suppression** : comme les mouvements Brasseurs annulés, le motif est
+tracé dans `Notes` en préfixant sans écraser l'existant (`[ANNULÉ par CODE le ISO — motif]`).
+
+**Édition d'une ligne de besoin (`editer_ligne_consultation_epi`) limitée au statut `Brouillon`** :
+`Quantite_Retenue`/`Fournisseur_Retenu`/`Motif_Choix`/`Commentaire` ne sont modifiables que tant que
+la consultation parente est encore `Brouillon` — au-delà (dès `Envoyee`), le besoin figé sert de
+référence stable envoyée aux fournisseurs et ne doit plus bouger silencieusement. Vérifié côté
+serveur à chaque appel (relit le statut de la consultation parente avant d'écrire), pas seulement
+côté affichage. L'en-tête de la consultation (nom, date limite de réponse, notes — jamais
+`Annee_Cible`/`Parametres`/`Statut`, qui définissent le besoin figé lui-même ou son cycle de vie)
+reste éditable quel que soit le statut via `editer_consultation_epi`, simple métadonnée
+administrative.
+
+**Fournisseurs — répertoire indépendant** (`creer_fournisseur`/`editer_fournisseur`) : un fournisseur
+existe indépendamment de toute consultation, réutilisable d'une consultation à l'autre. Dédoublonnage
+sur le nom (`Title`), y compris au renommage. `Actif`/`Non` plutôt qu'une suppression — un fournisseur
+désactivé disparaît des choix proposés à la création d'une offre (`creer_offre_epi`) mais reste
+visible dans le répertoire et dans l'historique des offres déjà enregistrées.
+
+**Offres (`creer_offre_epi`/`editer_offre_epi`/`editer_ligne_offre_epi`)** : une offre rattache un
+fournisseur **existant et actif** du répertoire à une consultation — pas de saisie libre du nom du
+fournisseur, contrairement à `Brasseurs_Commandes.Fournisseur` (décision volontaire : les fournisseurs
+EPI sont un référentiel géré, pas un champ texte ponctuel). En-tête + lignes créés en une seule action
+(même pattern en-tête/lignes que `creer_commande_brasseur`), `Statut` par défaut `Recue` (`Ecartee`
+explicite si le fournisseur décline). Chaque ligne d'offre porte `Non_Propose` pour le cas où un
+fournisseur ne chiffre pas un article donné, plutôt que d'omettre la ligne (le tableau de comparaison
+reste ainsi complet ligne par ligne pour toutes les offres reçues).
+
+**Lecture des prix protégée `requireGarant`** : `?epi_offres=<id_consultation>` (jeton en paramètre
+`&token=`, GET sans corps JSON, même mécanisme que `?brasseurs_commandes=1`/`?materiel_it=1`) —
+renvoie les offres d'une consultation **avec leurs lignes imbriquées** en un seul appel (pas
+d'endpoint séparé pour les lignes d'offre). `?fournisseurs=1`/`?epi_consultations=1`/
+`?epi_consultation_lignes=<id>` restent publics (aucun prix, même niveau de confiance que
+`?catalogue_epi=1`/`?grille_dotation_epi=1`) — cohérence retenue avec la majorité des endpoints EPI
+existants plutôt qu'avec le cadrage initial (qui proposait de protéger aussi les quantités du besoin,
+jugées RH-adjacentes).
+
+**Portée volontairement non couverte cette session** (voir `CADRAGE_MODULE_BESOIN_EPI.md` pour le
+cadrage complet qui les envisageait) : pas de tableau comparatif à deux scénarios (fournisseur unique
+moins-disant vs meilleur prix ligne à ligne panaché) — la comparaison se fait aujourd'hui en lisant le
+détail de chaque offre, `Fournisseur_Retenu`/`Motif_Choix` par ligne servant de trace d'arbitrage ; pas
+d'étape distincte « reporter au catalogue » (report des références retenues vers
+`Catalogue_Articles_EPI`) — l'arbitrage ligne à ligne (`Fournisseur_Retenu`, `Quantite_Retenue`) reste
+dans la consultation, jamais recopié ailleurs automatiquement. À construire dans une session dédiée
+si le besoin se confirme.

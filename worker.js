@@ -484,6 +484,34 @@ const BRASSEUR_ROLES_PLAFONNES_PWA = new Set(['ouvrier', 'ouvrier_specialise', '
 // 04_HISTORIQUE_DECISIONS.md. Toujours utiliser cette constante, jamais le nom littéral.
 const BRASSEUR_QTE_FIELD = 'Quantit_x00e9_';
 
+// ── Module « Consultations EPI » (fournisseurs, besoin figé, offres — ajouté sept. 2026) ───────
+// Persiste le besoin annuel EPI calculé côté client (epiCalculerBesoinAnnuel, dashboard.html,
+// session précédente) en une "consultation" figée à un instant T, pour que les offres reçues
+// ensuite d'un fournisseur restent comparables à une référence stable — un recalcul ultérieur du
+// besoin (grille/catalogue/effectifs modifiés) ne doit JAMAIS modifier silencieusement une
+// consultation déjà lancée. Répertoire de fournisseurs indépendant (Fournisseurs), réutilisable
+// d'une consultation à l'autre — jamais un simple champ texte comme sur Brasseurs_Commandes.
+const EPI_CONSULTATION_STATUTS = ['Brouillon', 'Envoyee', 'Depouillement', 'Attribuee', 'Cloturee', 'Annulee'];
+// Cycle de vie explicite, vérifié côté serveur (pas seulement dans l'écran) — défense en couches,
+// même principe que le blocage des sorties Brasseurs à stock zéro. Cloturee/Annulee sont des états
+// terminaux ; Annulee est atteignable depuis tout état non terminal (abandon possible à tout moment
+// avant clôture), jamais l'inverse.
+const EPI_CONSULTATION_TRANSITIONS = {
+  Brouillon: ['Envoyee', 'Annulee'],
+  Envoyee: ['Depouillement', 'Annulee'],
+  Depouillement: ['Attribuee', 'Annulee'],
+  Attribuee: ['Cloturee', 'Annulee'],
+  Cloturee: [],
+  Annulee: [],
+};
+const EPI_OFFRE_STATUTS = ['Recue', 'Ecartee'];
+// Cap sur le nombre de lignes acceptées en une seule écriture (chunks de 20 en interne, la limite
+// Graph $batch) — un besoin annuel réaliste reste très en dessous (quelques dizaines de lignes
+// type×taille), la marge évite un plafond artificiel comme creer_commande_brasseur (20, à usage
+// manuel ligne par ligne, contrairement à un besoin calculé automatiquement).
+const EPI_CONSULTATION_LIGNES_MAX = 500;
+const EPI_OFFRE_LIGNES_MAX = 500;
+
 // ── Journal d'audit des actions sensibles (liste SharePoint Journal_Audit, ajoutée août 2026) ──
 // Périmètre : exactement les 62 actions POST protégées requireAdmin/requireGarant (mêmes noms que
 // GATED_ACTIONS côté dashboard.html) + les échecs de connexion (verify_password, voir plus bas).
@@ -511,7 +539,10 @@ const GATED_ACTIONS_AUDIT = new Set([
   'affecter_ligne_telephonique', 'bulk_import_lignes_telephoniques', 'bulk_import_mouvements_lignes_telephoniques',
   'creer_mouvement_brasseur', 'transfert_brasseur', 'creer_commande_brasseur', 'editer_commande_brasseur',
   'reception_commande_brasseur', 'annuler_mouvement_brasseur', 'ajouter_depot_brasseur', 'ajouter_reference_brasseur',
-  'migrer_mouvement_brasseur'
+  'migrer_mouvement_brasseur',
+  'creer_fournisseur', 'editer_fournisseur', 'creer_consultation_epi', 'editer_consultation_epi',
+  'editer_ligne_consultation_epi', 'changer_statut_consultation_epi', 'creer_offre_epi', 'editer_offre_epi',
+  'editer_ligne_offre_epi'
 ]);
 // Réponses renvoyées par requireAdmin/requireGarant AVANT toute exécution métier : ne jamais
 // journaliser ces cas. Deux raisons : (1) aucune écriture n'a eu lieu, rien à auditer côté métier ;
@@ -942,7 +973,8 @@ async function handleRequest(request) {
       'Lignes_Dotation_EPI', 'Catalogue_Outillage', 'Grille_Outillage', 'Lignes_Outillage', 'Materiel_IT',
       'Mouvements_Materiel_IT', 'Lignes_Telephoniques', 'Mouvements_Lignes_Telephoniques',
       'Campagnes_Inventaire_Immos', 'Scans_Inventaire_Immos', 'Journal_Audit',
-      'Brasseurs_Depots', 'Brasseurs_Catalogue', 'Brasseurs_Mouvements', 'Brasseurs_Commandes', 'Brasseurs_Lignes_Commande'];
+      'Brasseurs_Depots', 'Brasseurs_Catalogue', 'Brasseurs_Mouvements', 'Brasseurs_Commandes', 'Brasseurs_Lignes_Commande',
+      'Fournisseurs', 'EPI_Consultations', 'EPI_Consultation_Lignes', 'EPI_Offres', 'EPI_Offres_Lignes'];
     const nomListe = p.get('export_liste');
     if (EXPORTABLE_LISTS.indexOf(nomListe) === -1) return json({ success: false, error: 'liste_inconnue', listes_valides: EXPORTABLE_LISTS }, 400);
     const res = await paginateStatus(GL + '/' + encodeURIComponent(nomListe) + '/items?$expand=fields&$top=200', 45);
@@ -1488,6 +1520,63 @@ async function handleRequest(request) {
     return json(items.map(i => {
       const f = i.fields || {};
       return { id: i.id, commande_id: f.Title || '', reference: f.Reference || '', quantite_commandee: f.Quantite_Commandee != null ? f.Quantite_Commandee : 0, prix_unitaire: f.Prix_Unitaire != null ? f.Prix_Unitaire : 0, quantite_recue: f.Quantite_Recue != null ? f.Quantite_Recue : 0 };
+    }));
+  }
+
+  // ── Module « Consultations EPI » (fournisseurs, besoin figé, offres) — lecture ─────────────────
+  // Aucun prix sur ces trois endpoints (Fournisseurs/EPI_Consultations/EPI_Consultation_Lignes) :
+  // publics, même niveau de confiance que ?catalogue_epi=1/?grille_dotation_epi=1 — la plupart des
+  // endpoints EPI existants ne sont pas protégés, seuls ceux portant un prix le sont (cadrage repris
+  // de Brasseurs_Commandes/Brasseurs_Lignes_Commande, voir plus bas).
+  if (p.get('fournisseurs') === '1') {
+    const items = await paginate(GL + '/Fournisseurs/items?$expand=fields&$top=500', 5);
+    return json(items.map(i => { const f = i.fields || {}; return { id: i.id, nom: f.Title || '', contact_nom: f.Contact_Nom || '', contact_email: f.Contact_Email || '', contact_telephone: f.Contact_Telephone || '', domaines: f.Domaines || '', actif: (f.Actif || 'Oui') !== 'Non', notes: f.Notes || '' }; }));
+  }
+
+  if (p.get('epi_consultations') === '1') {
+    const items = await paginate(GL + '/EPI_Consultations/items?$expand=fields&$orderby=fields/Created%20desc&$top=500', 8);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, titre: f.Title || '', annee_cible: f.Annee_Cible != null ? f.Annee_Cible : null, statut: f.Statut || 'Brouillon', date_creation: f.Date_Creation || '', date_limite_reponse: f.Date_Limite_Reponse || '', cree_par: f.Cree_Par || '', parametres: f.Parametres || '', notes: f.Notes || '' };
+    }));
+  }
+
+  if (p.get('epi_consultation_lignes')) {
+    const consultationId = p.get('epi_consultation_lignes');
+    const items = await paginate(GL + "/EPI_Consultation_Lignes/items?$expand=fields&$filter=fields/Title eq '" + consultationId.replace(/'/g, "''") + "'&$top=1000", 10);
+    return json(items.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, consultation_id: f.Title || '', type_article: f.Type_Article || '', taille: f.Taille_Article || '', reference_interne: f.Reference_Interne || '', designation: f.Designation || '', quantite_reunion: f.Quantite_Reunion != null ? f.Quantite_Reunion : 0, quantite_mayotte: f.Quantite_Mayotte != null ? f.Quantite_Mayotte : 0, quantite_calculee: f.Quantite_Calculee != null ? f.Quantite_Calculee : 0, quantite_retenue: f.Quantite_Retenue != null ? f.Quantite_Retenue : 0, commentaire: f.Commentaire || '', fournisseur_retenu: f.Fournisseur_Retenu || '', motif_choix: f.Motif_Choix || '' };
+    }));
+  }
+
+  // Offres reçues : contient Prix_Unitaire_HT (donnée financière) — protégé requireGarant, jeton en
+  // paramètre &token= (GET, pas de corps JSON), même mécanisme que ?brasseurs_commandes=1. Renvoie
+  // les offres ET leurs lignes imbriquées pour une consultation en un seul appel (pas d'endpoint
+  // séparé pour EPI_Offres_Lignes — filtrées côté serveur par les ids d'offres déjà récupérés, sur
+  // le même principe que reception_commande_brasseur qui filtre les lignes par Title).
+  if (p.get('epi_offres')) {
+    const _auth = await requireGarant({ token: p.get('token') });
+    if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+    const consultationId = p.get('epi_offres');
+    const offresRaw = await paginate(GL + "/EPI_Offres/items?$expand=fields&$filter=fields/Title eq '" + consultationId.replace(/'/g, "''") + "'&$top=200", 5);
+    const offreIds = new Set(offresRaw.map(i => i.id));
+    const lignesRaw = offreIds.size ? await paginate(GL + '/EPI_Offres_Lignes/items?$expand=fields&$top=2000', 10) : [];
+    const lignesParOffre = {};
+    lignesRaw.forEach(i => {
+      const f = i.fields || {};
+      if (!offreIds.has(f.Title)) return;
+      (lignesParOffre[f.Title] = lignesParOffre[f.Title] || []).push({
+        id: i.id, ligne_consultation_id: f.Ligne_Consultation_Id || '', type_article: f.Type_Article || '', taille: f.Taille_Article || '',
+        reference_fournisseur: f.Reference_Fournisseur || '', designation_proposee: f.Designation_Proposee || '',
+        prix_unitaire_ht: f.Prix_Unitaire_HT != null ? f.Prix_Unitaire_HT : null, conditionnement: f.Conditionnement != null ? f.Conditionnement : null,
+        quantite_minimum: f.Quantite_Minimum != null ? f.Quantite_Minimum : null, delai_jours: f.Delai_Jours != null ? f.Delai_Jours : null,
+        non_propose: (f.Non_Propose || 'Non') === 'Oui', commentaire: f.Commentaire || '',
+      });
+    });
+    return json(offresRaw.map(i => {
+      const f = i.fields || {};
+      return { id: i.id, consultation_id: f.Title || '', fournisseur: f.Fournisseur || '', date_reception: f.Date_Reception || '', validite_offre: f.Validite_Offre || '', delai_livraison_jours: f.Delai_Livraison_Jours != null ? f.Delai_Livraison_Jours : null, frais_port: f.Frais_Port != null ? f.Frais_Port : null, franco_a_partir_de: f.Franco_A_Partir_De != null ? f.Franco_A_Partir_De : null, remise_globale_pct: f.Remise_Globale_Pct != null ? f.Remise_Globale_Pct : null, devise: f.Devise || '', statut: f.Statut || 'Recue', notes: f.Notes || '', lignes: lignesParOffre[i.id] || [] };
     }));
   }
 
@@ -3978,6 +4067,299 @@ async function handleRequest(request) {
       try {
         const res = await graphBatch(aEcrire);
         return json({ success: res.success, ecrites: aEcrire.length - res.ko, sautees: sautees, ok: res.ok, ko: res.ko, erreurs: res.erreurs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // ── Module « Consultations EPI » (fournisseurs, besoin figé, offres) — écriture ─────────────
+    // Toutes ces actions gèrent une donnée d'achat (prix fournisseurs, besoin figé de référence) :
+    // gated requireGarant (même population que EPI/Outillage/Brasseurs : Admin, Logistique,
+    // Logistique_Mayotte), journalisées via GATED_ACTIONS_AUDIT.
+
+    // Crée un fournisseur (répertoire indépendant, réutilisable d'une consultation à l'autre) —
+    // même pattern que ajouter_reference_brasseur (dédoublonnage sur Title, insensible à la casse).
+    if (action === 'creer_fournisseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const nom = (body.nom || '').trim();
+      if (!nom) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const existe = await fetch(GL + "/Fournisseurs/items?$expand=fields&$filter=fields/Title eq '" + nom.replace(/'/g, "''") + "'&$top=1", { headers: H });
+        const existeData = await existe.json();
+        if (existeData.value && existeData.value.length) return json({ success: false, error: 'doublon', message: 'Ce fournisseur existe déjà.' });
+        const r = await fetch(GL + '/Fournisseurs/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: nom, Contact_Nom: body.contact_nom || '', Contact_Email: body.contact_email || '', Contact_Telephone: body.contact_telephone || '', Domaines: body.domaines || '', Actif: 'Oui', Notes: body.notes || ''
+        } }) });
+        const rd = await r.json();
+        if (!r.ok) return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' });
+        return json({ success: true, id: rd.id });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Édite un fournisseur — PATCH partiel, dédoublonnage revérifié si le nom change.
+    if (action === 'editer_fournisseur') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      try {
+        const fields = {};
+        if (body.nom !== undefined) {
+          const nom = (body.nom || '').trim();
+          if (!nom) return json({ success: false, error: 'donnees_invalides' });
+          const existe = await fetch(GL + "/Fournisseurs/items?$expand=fields&$filter=fields/Title eq '" + nom.replace(/'/g, "''") + "'&$top=2", { headers: H });
+          const existeData = await existe.json();
+          if ((existeData.value || []).some(it => it.id !== id)) return json({ success: false, error: 'doublon', message: 'Un autre fournisseur porte déjà ce nom.' });
+          fields.Title = nom;
+        }
+        if (body.contact_nom !== undefined) fields.Contact_Nom = body.contact_nom;
+        if (body.contact_email !== undefined) fields.Contact_Email = body.contact_email;
+        if (body.contact_telephone !== undefined) fields.Contact_Telephone = body.contact_telephone;
+        if (body.domaines !== undefined) fields.Domaines = body.domaines;
+        if (body.actif !== undefined) fields.Actif = (body.actif === false || body.actif === 'Non') ? 'Non' : 'Oui';
+        if (body.notes !== undefined) fields.Notes = body.notes;
+        if (!Object.keys(fields).length) return json({ success: false, error: 'donnees_invalides' });
+        const r = await fetch(GL + '/Fournisseurs/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
+        return json({ success: true });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // « Figer le besoin » : crée l'en-tête EPI_Consultations (Statut initial Brouillon) puis toutes
+    // ses lignes EPI_Consultation_Lignes en $batch (chunks de 20, la limite Graph par lot) — depuis
+    // le résultat déjà calculé côté client (epiCalculerBesoinAnnuel, dashboard.html). Les hypothèses
+    // de calcul (année, marge, effectif prévisionnel) sont sérialisées telles quelles dans
+    // Parametres : une consultation figée ne se recalcule JAMAIS toute seule, même si la grille/le
+    // catalogue/les effectifs changent ensuite — c'est la référence contractuelle envoyée aux
+    // fournisseurs.
+    if (action === 'creer_consultation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const titre = (body.titre || '').trim();
+      const anneeCible = parseInt(body.annee_cible, 10);
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!titre || !anneeCible || !lignes.length) return json({ success: false, error: 'donnees_invalides' });
+      if (lignes.length > EPI_CONSULTATION_LIGNES_MAX) return json({ success: false, error: 'trop_de_lignes', max: EPI_CONSULTATION_LIGNES_MAX });
+      const lignesValidees = [];
+      for (const l of lignes) {
+        const typeArticle = (l.type_article || '').trim();
+        if (!typeArticle) return json({ success: false, error: 'ligne_invalide', message: 'type_article manquant sur une ligne.' });
+        lignesValidees.push({
+          type_article: typeArticle, taille: l.taille || '', reference_interne: l.reference_interne || l.reference || '',
+          designation: l.designation || '', quantite_reunion: parseFloat(l.quantite_reunion != null ? l.quantite_reunion : l.qte_reunion) || 0,
+          quantite_mayotte: parseFloat(l.quantite_mayotte != null ? l.quantite_mayotte : l.qte_mayotte) || 0,
+          quantite_calculee: parseFloat(l.quantite_calculee != null ? l.quantite_calculee : l.qte_totale) || 0,
+        });
+      }
+      const auteurCode = _auth.session.code;
+      const horodatage = new Date().toISOString();
+      try {
+        const rCons = await fetch(GL + '/EPI_Consultations/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: titre, Annee_Cible: anneeCible, Statut: 'Brouillon', Date_Creation: horodatage,
+          Date_Limite_Reponse: body.date_limite_reponse || null, Cree_Par: auteurCode,
+          Parametres: JSON.stringify(body.parametres || {}).slice(0, 100000), Notes: body.notes || ''
+        } }) });
+        const consData = await rCons.json();
+        if (!rCons.ok) return json({ success: false, error: 'sharepoint', message: (consData.error && consData.error.message) || 'Erreur écriture' });
+        const consultationId = String(consData.id);
+        let ok = 0, ko = 0; const erreurs = [];
+        for (let i = 0; i < lignesValidees.length; i += 20) {
+          const chunk = lignesValidees.slice(i, i + 20);
+          const requests = chunk.map((l, idx) => ({
+            id: String(idx), method: 'POST', url: '/sites/' + SITE_ID + '/lists/EPI_Consultation_Lignes/items',
+            headers: { 'Content-Type': 'application/json' },
+            body: { fields: {
+              Title: consultationId, Type_Article: l.type_article, Taille_Article: l.taille, Reference_Interne: l.reference_interne,
+              Designation: l.designation, Quantite_Reunion: l.quantite_reunion, Quantite_Mayotte: l.quantite_mayotte,
+              Quantite_Calculee: l.quantite_calculee, Quantite_Retenue: l.quantite_calculee, Commentaire: '', Fournisseur_Retenu: '', Motif_Choix: ''
+            } }
+          }));
+          const res = await graphBatch(requests);
+          ok += res.ok; ko += res.ko; if (res.erreurs.length) erreurs.push(...res.erreurs.slice(0, Math.max(0, 3 - erreurs.length)));
+        }
+        return json({ success: ko === 0, id: consultationId, titre: titre, lignes_ecrites: ok, ok: ok, ko: ko, erreurs: erreurs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Édite les métadonnées d'une consultation — jamais Annee_Cible/Parametres/Statut/Cree_Par, qui
+    // définissent le besoin figé lui-même ou son cycle de vie (traités par creer_consultation_epi /
+    // changer_statut_consultation_epi).
+    if (action === 'editer_consultation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const fields = {};
+      if (body.titre !== undefined) { const t = (body.titre || '').trim(); if (!t) return json({ success: false, error: 'donnees_invalides' }); fields.Title = t; }
+      if (body.date_limite_reponse !== undefined) fields.Date_Limite_Reponse = body.date_limite_reponse || null;
+      if (body.notes !== undefined) fields.Notes = body.notes;
+      if (!Object.keys(fields).length) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/EPI_Consultations/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
+        return json({ success: true });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Édite une ligne de besoin figé (Quantite_Retenue/Fournisseur_Retenu/Motif_Choix/Commentaire) —
+    // uniquement tant que la consultation parente est encore Brouillon : au-delà, le besoin figé
+    // sert de référence stable envoyée aux fournisseurs, il ne doit plus bouger silencieusement.
+    if (action === 'editer_ligne_consultation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      try {
+        const ligneRes = await fetch(GL + '/EPI_Consultation_Lignes/items/' + id + '?$expand=fields', { headers: H });
+        const ligneData = await ligneRes.json();
+        if (!ligneRes.ok || !ligneData.fields) return json({ success: false, error: 'ligne_introuvable' });
+        const consultationId = ligneData.fields.Title;
+        const consRes = await fetch(GL + '/EPI_Consultations/items/' + consultationId + '?$expand=fields', { headers: H });
+        const consData = await consRes.json();
+        if (!consRes.ok || !consData.fields) return json({ success: false, error: 'consultation_introuvable' });
+        if ((consData.fields.Statut || 'Brouillon') !== 'Brouillon') return json({ success: false, error: 'consultation_non_modifiable', statut: consData.fields.Statut });
+        const fields = {};
+        if (body.quantite_retenue !== undefined) { const q = parseFloat(body.quantite_retenue); if (isNaN(q) || q < 0) return json({ success: false, error: 'quantite_invalide' }); fields.Quantite_Retenue = q; }
+        if (body.commentaire !== undefined) fields.Commentaire = body.commentaire;
+        if (body.fournisseur_retenu !== undefined) fields.Fournisseur_Retenu = body.fournisseur_retenu;
+        if (body.motif_choix !== undefined) fields.Motif_Choix = body.motif_choix;
+        if (!Object.keys(fields).length) return json({ success: false, error: 'donnees_invalides' });
+        const r = await fetch(GL + '/EPI_Consultation_Lignes/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
+        return json({ success: true });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Transition de statut, validée côté serveur (pas seulement dans l'écran) — défense en couches,
+    // même principe que le blocage des sorties Brasseurs à stock zéro. Aucune suppression : Annulee
+    // est un état terminal comme les autres, le motif est tracé dans Notes en préfixant sans écraser
+    // l'existant (convention Brasseurs, cf. annuler_mouvement_brasseur).
+    if (action === 'changer_statut_consultation_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      const nouveauStatut = body.statut;
+      if (!id || EPI_CONSULTATION_STATUTS.indexOf(nouveauStatut) === -1) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const consRes = await fetch(GL + '/EPI_Consultations/items/' + id + '?$expand=fields', { headers: H });
+        const consData = await consRes.json();
+        if (!consRes.ok || !consData.fields) return json({ success: false, error: 'consultation_introuvable' });
+        const statutActuel = consData.fields.Statut || 'Brouillon';
+        const transitionsAutorisees = EPI_CONSULTATION_TRANSITIONS[statutActuel] || [];
+        if (transitionsAutorisees.indexOf(nouveauStatut) === -1) return json({ success: false, error: 'transition_invalide', statut_actuel: statutActuel, transitions_autorisees: transitionsAutorisees });
+        const fields = { Statut: nouveauStatut };
+        if (nouveauStatut === 'Annulee') {
+          const auteurCode = _auth.session.code;
+          const note = '[ANNULÉ par ' + auteurCode + ' le ' + new Date().toISOString() + (body.motif ? ' — ' + body.motif : '') + ']';
+          fields.Notes = ((consData.fields.Notes || '') + ' ' + note).trim();
+        }
+        const r = await fetch(GL + '/EPI_Consultations/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
+        return json({ success: true, statut: nouveauStatut });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Enregistre une offre reçue d'un fournisseur pour une consultation (en-tête EPI_Offres +
+    // lignes EPI_Offres_Lignes en $batch) — même pattern en-tête/lignes que creer_commande_brasseur.
+    // Le fournisseur doit exister et être actif dans le répertoire Fournisseurs (pas de saisie libre
+    // ici, contrairement à Brasseurs_Commandes.Fournisseur).
+    if (action === 'creer_offre_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const consultationId = body.consultation_id;
+      const fournisseur = (body.fournisseur || '').trim();
+      const lignes = Array.isArray(body.lignes) ? body.lignes : [];
+      if (!consultationId || !fournisseur) return json({ success: false, error: 'donnees_invalides' });
+      if (lignes.length > EPI_OFFRE_LIGNES_MAX) return json({ success: false, error: 'trop_de_lignes', max: EPI_OFFRE_LIGNES_MAX });
+      try {
+        const [consRes, fournRes] = await Promise.all([
+          fetch(GL + '/EPI_Consultations/items/' + consultationId + '?$expand=fields', { headers: H }),
+          fetch(GL + "/Fournisseurs/items?$expand=fields&$filter=fields/Title eq '" + fournisseur.replace(/'/g, "''") + "'&$top=1", { headers: H }),
+        ]);
+        const consData = await consRes.json();
+        if (!consRes.ok || !consData.fields) return json({ success: false, error: 'consultation_introuvable' });
+        const fournData = await fournRes.json();
+        const fournInfo = (fournData.value || [])[0];
+        if (!fournInfo || (fournInfo.fields.Actif || 'Oui') === 'Non') return json({ success: false, error: 'fournisseur_invalide' });
+        const statut = body.statut === 'Ecartee' ? 'Ecartee' : 'Recue';
+        const lignesValidees = lignes.map(l => ({
+          ligne_consultation_id: l.ligne_consultation_id || '', type_article: l.type_article || '', taille: l.taille || l.taille_article || '',
+          reference_fournisseur: l.reference_fournisseur || '', designation_proposee: l.designation_proposee || '',
+          prix_unitaire_ht: (l.prix_unitaire_ht != null && l.prix_unitaire_ht !== '') ? parseFloat(l.prix_unitaire_ht) : null,
+          conditionnement: (l.conditionnement != null && l.conditionnement !== '') ? parseFloat(l.conditionnement) : null,
+          quantite_minimum: (l.quantite_minimum != null && l.quantite_minimum !== '') ? parseFloat(l.quantite_minimum) : null,
+          delai_jours: (l.delai_jours != null && l.delai_jours !== '') ? parseFloat(l.delai_jours) : null,
+          non_propose: !!l.non_propose, commentaire: l.commentaire || '',
+        }));
+        const rOffre = await fetch(GL + '/EPI_Offres/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: {
+          Title: String(consultationId), Fournisseur: fournisseur, Date_Reception: body.date_reception || new Date().toISOString().slice(0, 10),
+          Validite_Offre: body.validite_offre || null, Delai_Livraison_Jours: (body.delai_livraison_jours != null && body.delai_livraison_jours !== '') ? parseFloat(body.delai_livraison_jours) : null,
+          Frais_Port: (body.frais_port != null && body.frais_port !== '') ? parseFloat(body.frais_port) : null,
+          Franco_A_Partir_De: (body.franco_a_partir_de != null && body.franco_a_partir_de !== '') ? parseFloat(body.franco_a_partir_de) : null,
+          Remise_Globale_Pct: (body.remise_globale_pct != null && body.remise_globale_pct !== '') ? parseFloat(body.remise_globale_pct) : null,
+          Devise: body.devise || 'EUR', Statut: statut, Notes: body.notes || ''
+        } }) });
+        const offreData = await rOffre.json();
+        if (!rOffre.ok) return json({ success: false, error: 'sharepoint', message: (offreData.error && offreData.error.message) || 'Erreur écriture' });
+        const offreId = String(offreData.id);
+        let ok = 0, ko = 0; const erreurs = [];
+        for (let i = 0; i < lignesValidees.length; i += 20) {
+          const chunk = lignesValidees.slice(i, i + 20);
+          const requests = chunk.map((l, idx) => ({
+            id: String(idx), method: 'POST', url: '/sites/' + SITE_ID + '/lists/EPI_Offres_Lignes/items',
+            headers: { 'Content-Type': 'application/json' },
+            body: { fields: {
+              Title: offreId, Ligne_Consultation_Id: l.ligne_consultation_id, Type_Article: l.type_article, Taille_Article: l.taille,
+              Reference_Fournisseur: l.reference_fournisseur, Designation_Proposee: l.designation_proposee, Prix_Unitaire_HT: l.prix_unitaire_ht,
+              Conditionnement: l.conditionnement, Quantite_Minimum: l.quantite_minimum, Delai_Jours: l.delai_jours,
+              Non_Propose: l.non_propose ? 'Oui' : 'Non', Commentaire: l.commentaire
+            } }
+          }));
+          const res = await graphBatch(requests);
+          ok += res.ok; ko += res.ko; if (res.erreurs.length) erreurs.push(...res.erreurs.slice(0, Math.max(0, 3 - erreurs.length)));
+        }
+        return json({ success: ko === 0, id: offreId, lignes_ecrites: ok, ok: ok, ko: ko, erreurs: erreurs });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Édite l'en-tête d'une offre (dates, délai, frais de port, franco, remise, devise, statut,
+    // notes) — les lignes se modifient via editer_ligne_offre_epi.
+    if (action === 'editer_offre_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const fields = {};
+      if (body.date_reception !== undefined) fields.Date_Reception = body.date_reception || null;
+      if (body.validite_offre !== undefined) fields.Validite_Offre = body.validite_offre || null;
+      if (body.delai_livraison_jours !== undefined) fields.Delai_Livraison_Jours = (body.delai_livraison_jours === '' || body.delai_livraison_jours == null) ? null : parseFloat(body.delai_livraison_jours);
+      if (body.frais_port !== undefined) fields.Frais_Port = (body.frais_port === '' || body.frais_port == null) ? null : parseFloat(body.frais_port);
+      if (body.franco_a_partir_de !== undefined) fields.Franco_A_Partir_De = (body.franco_a_partir_de === '' || body.franco_a_partir_de == null) ? null : parseFloat(body.franco_a_partir_de);
+      if (body.remise_globale_pct !== undefined) fields.Remise_Globale_Pct = (body.remise_globale_pct === '' || body.remise_globale_pct == null) ? null : parseFloat(body.remise_globale_pct);
+      if (body.devise !== undefined) fields.Devise = body.devise;
+      if (body.notes !== undefined) fields.Notes = body.notes;
+      if (body.statut !== undefined) {
+        if (EPI_OFFRE_STATUTS.indexOf(body.statut) === -1) return json({ success: false, error: 'statut_invalide', valeurs_valides: EPI_OFFRE_STATUTS });
+        fields.Statut = body.statut;
+      }
+      if (!Object.keys(fields).length) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/EPI_Offres/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
+        return json({ success: true });
+      } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
+    }
+
+    // Édite une ligne d'offre (prix, conditionnement, quantité minimum, délai, non proposé...).
+    if (action === 'editer_ligne_offre_epi') {
+      const _auth = await requireGarant(body); if (!_auth.ok) return json({ success: false, error: _auth.error }, _auth.error === 'droits_insuffisants' ? 403 : 401);
+      const id = body.id;
+      if (!id) return json({ success: false, error: 'id_manquant' });
+      const fields = {};
+      if (body.reference_fournisseur !== undefined) fields.Reference_Fournisseur = body.reference_fournisseur;
+      if (body.designation_proposee !== undefined) fields.Designation_Proposee = body.designation_proposee;
+      if (body.prix_unitaire_ht !== undefined) fields.Prix_Unitaire_HT = (body.prix_unitaire_ht === '' || body.prix_unitaire_ht == null) ? null : parseFloat(body.prix_unitaire_ht);
+      if (body.conditionnement !== undefined) fields.Conditionnement = (body.conditionnement === '' || body.conditionnement == null) ? null : parseFloat(body.conditionnement);
+      if (body.quantite_minimum !== undefined) fields.Quantite_Minimum = (body.quantite_minimum === '' || body.quantite_minimum == null) ? null : parseFloat(body.quantite_minimum);
+      if (body.delai_jours !== undefined) fields.Delai_Jours = (body.delai_jours === '' || body.delai_jours == null) ? null : parseFloat(body.delai_jours);
+      if (body.non_propose !== undefined) fields.Non_Propose = body.non_propose ? 'Oui' : 'Non';
+      if (body.commentaire !== undefined) fields.Commentaire = body.commentaire;
+      if (!Object.keys(fields).length) return json({ success: false, error: 'donnees_invalides' });
+      try {
+        const r = await fetch(GL + '/EPI_Offres_Lignes/items/' + id + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(fields) });
+        if (!r.ok) { const rd = await r.json().catch(() => ({})); return json({ success: false, error: 'sharepoint', message: (rd.error && rd.error.message) || 'Erreur écriture' }); }
+        return json({ success: true });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }
     }
 
