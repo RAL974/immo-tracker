@@ -2143,7 +2143,7 @@ function renderEPI(){
     div.innerHTML='<p class="es" style="padding:40px">🔒 Réservé à l\'encadrement et aux gestionnaires dépôt.</p>';
     return;
   }
-  var vues=[['stock','📦 Stock'],['commande','🛒 Suggestion de commande'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle'],['historique','🕘 Historique']];
+  var vues=[['stock','📦 Stock'],['commande','🛒 Suggestion de commande'],['besoin','📋 Besoin annuel'],['grille','📐 Grille de dotation'],['dotations','🧾 Dotations employés'],['ponctuelle','✋ Remise ponctuelle'],['historique','🕘 Historique']];
   var html='';
   if(estAdmin(ADMIN_SESSION.code)&&!epiCatalogue.length){
     html+='<div class="card" style="border-top:3px solid var(--orange)"><div class="card-head"><h3>⏫ Migration initiale : tailles, catalogue & grille de dotation</h3></div>'+
@@ -2200,6 +2200,7 @@ function renderEPIVue(){
   if(!c)return;
   if(epiVue==='stock')renderEPIStock(c);
   else if(epiVue==='commande')renderEPICommande(c);
+  else if(epiVue==='besoin')renderEPIBesoin(c);
   else if(epiVue==='grille')renderEPIGrille(c);
   else if(epiVue==='dotations')renderEPIDotations(c);
   else if(epiVue==='ponctuelle')renderEPIPonctuelle(c);
@@ -2447,6 +2448,145 @@ function exporterCommandeEPI(){
     {nom:'Suggestion commande',entetes:['Type','Taille','Stock actuel','Seuil mini','Besoin restant (nouveaux entrants '+EPI_COMMANDE_ANNEE+')','À commander'],lignes:lignes,cols:[20,10,12,12,28,12]}
   ]);
 }
+// ── Vue Besoin annuel (consultation fournisseurs — calcul + affichage uniquement à ce stade, voir
+// CADRAGE_MODULE_BESOIN_EPI.md §6 écran "📋 Besoin"). Aucune persistance SharePoint pour les paramètres :
+// année cible, effectif prévisionnel et marge sont saisis en mémoire et recalculés à la volée. Le module
+// complet (consultations, fournisseurs, offres, arbitrage) suivra dans une session ultérieure — §7.
+var EPI_BESOIN_ANNEE=null;
+var EPI_BESOIN_MARGE=0;
+var EPI_BESOIN_PREVISIONNEL={}; // 'Aff|Site' -> {entrees,sorties}
+var EPI_BESOIN_RESULTAT=null; // dernier calcul, réutilisé par l'export
+var EPI_BESOIN_FILTRE_TYPE='';
+function epiBesoinAnneeDefaut(){return new Date().getFullYear()+1;}
+function renderEPIBesoin(container){
+  if(!EPI_BESOIN_ANNEE)EPI_BESOIN_ANNEE=epiBesoinAnneeDefaut();
+  var anneeBase=epiBesoinAnneeDefaut();
+  var annees=[];for(var y=anneeBase+1;y>=anneeBase-1;y--)annees.push(y);
+  var canEdit=peutGererEPI(ADMIN_SESSION.code);
+  var html='<div class="card"><div class="card-head"><h3>📋 Besoin annuel EPI</h3>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="card-cnt" id="epi-besoin-cnt"></span>'+
+    '<button class="filter-btn" onclick="exporterBesoinAnnuelEPI()">📥 Export Excel</button></div></div>'+
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Besoin en quantités par article × taille, ventilé Réunion/Mayotte, pour préparer une consultation fournisseurs. Couvre toujours les deux territoires. Le stock actuel est affiché à titre indicatif, jamais déduit du besoin.</p>'+
+    '<div style="padding:0 14px 12px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">'+
+    '<div><label style="display:block;font-size:11px;color:var(--grey);margin-bottom:4px">Année cible</label>'+
+    '<select id="epi-besoin-annee" '+(canEdit?'onchange="epiBesoinChangerAnnee(this.value)"':'disabled')+' style="padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+
+    annees.map(function(a){return '<option value="'+a+'"'+(a===EPI_BESOIN_ANNEE?' selected':'')+'>'+a+'</option>';}).join('')+'</select></div>'+
+    '<div><label style="display:block;font-size:11px;color:var(--grey);margin-bottom:4px">Marge de sécurité (%)</label>'+
+    '<input type="number" id="epi-besoin-marge" min="0" step="1" value="'+EPI_BESOIN_MARGE+'" '+(canEdit?'onchange="epiBesoinChangerMarge(this.value)"':'disabled')+' style="width:80px;padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)"></div>'+
+    '</div>';
+  if(canEdit){
+    html+='<div style="padding:0 14px 14px"><h4 style="font-size:12px;color:var(--grey);margin:0 0 8px">Effectif prévisionnel '+EPI_BESOIN_ANNEE+' (entrées/sorties par profil × territoire — un solde net de départs ne retire jamais de besoin déjà couvert par l\'effectif réel actuel)</h4>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>Profil</th><th>Territoire</th><th>Entrées prévues</th><th>Sorties prévues</th></tr></thead><tbody>'+
+      EPI_AFFECTATIONS_VALIDES.map(function(aff){
+        return EPI_SITES_VALIDES.map(function(site){
+          var key=aff+'|'+site;
+          var p=EPI_BESOIN_PREVISIONNEL[key]||{entrees:0,sorties:0};
+          return '<tr><td>'+(EPI_AFF_LABELS[aff]||aff)+'</td><td>'+territoireLabel(site)+'</td>'+
+            '<td><input type="number" min="0" value="'+(p.entrees||0)+'" onchange="epiBesoinMajPrevisionnel(\''+key+'\',\'entrees\',this.value)" style="width:70px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;text-align:center;background:var(--card);color:var(--ds-text,#222)"></td>'+
+            '<td><input type="number" min="0" value="'+(p.sorties||0)+'" onchange="epiBesoinMajPrevisionnel(\''+key+'\',\'sorties\',this.value)" style="width:70px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;text-align:center;background:var(--card);color:var(--ds-text,#222)"></td></tr>';
+        }).join('');
+      }).join('')+
+      '</tbody></table></div></div>';
+  }
+  html+='<div id="epi-besoin-audit"></div><div id="epi-besoin-resultats"></div></div>';
+  container.innerHTML=html;
+  epiBesoinRecalculer();
+}
+function epiBesoinChangerAnnee(v){EPI_BESOIN_ANNEE=parseInt(v,10);epiBesoinRecalculer();}
+function epiBesoinChangerMarge(v){var n=parseFloat(v);EPI_BESOIN_MARGE=(isNaN(n)||n<0)?0:n;epiBesoinRecalculer();}
+function epiBesoinMajPrevisionnel(key,champ,valeur){
+  var n=parseFloat(valeur);
+  if(isNaN(n)||n<0)n=0;
+  EPI_BESOIN_PREVISIONNEL[key]=EPI_BESOIN_PREVISIONNEL[key]||{entrees:0,sorties:0};
+  EPI_BESOIN_PREVISIONNEL[key][champ]=n;
+  epiBesoinRecalculer();
+}
+function epiBesoinFiltrerType(v){EPI_BESOIN_FILTRE_TYPE=v;epiBesoinRenderResultats();}
+function epiBesoinRecalculer(){
+  EPI_BESOIN_RESULTAT=epiCalculerBesoinAnnuel(EPI_BESOIN_ANNEE,EPI_BESOIN_PREVISIONNEL,EPI_BESOIN_MARGE);
+  epiBesoinRenderAudit();
+  epiBesoinRenderResultats();
+}
+function epiBesoinRenderAudit(){
+  var el=document.getElementById('epi-besoin-audit');
+  if(!el||!EPI_BESOIN_RESULTAT)return;
+  var r=EPI_BESOIN_RESULTAT;
+  var eff=r.effectif;
+  var blocs=[
+    {titre:'Tailles manquantes',liste:r.anomalies.taille_manquante,fmt:function(a){return lienEmpSiConnu(a.code,a.nom||a.code)+' — '+a.type_article;}},
+    {titre:'Article introuvable pour cette taille',liste:r.anomalies.article_introuvable,fmt:function(a){return (a.code?lienEmpSiConnu(a.code,a.nom||a.code):a.nom)+' — '+a.type_article+(a.taille?' (taille '+a.taille+')':'');}},
+    {titre:'Type d\'article absent du catalogue (aucune taille)',liste:r.anomalies.type_absent_catalogue,fmt:function(a){return a.type_article;}},
+    {titre:'Affectation EPI non reconnue',liste:r.anomalies.affectation_inconnue,fmt:function(a){return lienEmpSiConnu(a.code,a.nom||a.code)+' — affectation "'+(a.affectation||'(vide)')+'"';}},
+    {titre:'Site non exploitable',liste:r.anomalies.site_inexploitable,fmt:function(a){return lienEmpSiConnu(a.code,a.nom||a.code)+' — site "'+(a.site||'(vide)')+'"';}},
+    {titre:'Taille à préciser (entrées prévisionnelles sans référence)',liste:r.anomalies.taille_a_preciser,fmt:function(a){return (EPI_AFF_LABELS[a.affectation]||a.affectation)+' — '+a.type_article+' — '+territoireLabel(a.site)+' ('+a.effectif+' effectif(s))';}}
+  ];
+  var totalAnom=blocs.reduce(function(s,b){return s+b.liste.length;},0);
+  var html='<div class="card" style="border-top:3px solid '+(totalAnom?'var(--orange)':'var(--green)')+';margin:14px 0"><div class="card-head"><h3>'+(totalAnom?'⚠️':'✅')+' Contrôle de complétude ('+totalAnom+' anomalie(s))</h3></div>'+
+    '<p style="padding:0 14px 8px;font-size:12px;color:var(--grey)">Besoin calculé sur '+eff.comptes+' employé(s) éligible(s) sur '+eff.eligibles+(eff.exclus?' — '+eff.exclus+' exclu(s), voir le détail ci-dessous.':'.')+'</p>'+
+    '<div style="padding:0 14px 14px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">'+
+    blocs.map(function(b){
+      return '<div><div style="font-weight:700;font-size:12px;margin-bottom:4px">'+b.titre+' ('+b.liste.length+')</div>'+
+        (b.liste.length?'<ul style="margin:0;padding-left:18px;font-size:11px;max-height:160px;overflow:auto">'+b.liste.map(function(a){return '<li>'+b.fmt(a)+'</li>';}).join('')+'</ul>':'<p class="es" style="padding:6px 0;margin:0;font-size:11px">Aucune anomalie détectée.</p>')+
+        '</div>';
+    }).join('')+
+    '</div></div>';
+  el.innerHTML=html;
+}
+function epiBesoinRenderResultats(){
+  var el=document.getElementById('epi-besoin-resultats');
+  var cnt=document.getElementById('epi-besoin-cnt');
+  if(!el||!EPI_BESOIN_RESULTAT)return;
+  var types=[];
+  EPI_BESOIN_RESULTAT.lignes.forEach(function(l){if(types.indexOf(l.type_article)===-1)types.push(l.type_article);});
+  types.sort();
+  var lignes=EPI_BESOIN_FILTRE_TYPE?EPI_BESOIN_RESULTAT.lignes.filter(function(l){return l.type_article===EPI_BESOIN_FILTRE_TYPE;}):EPI_BESOIN_RESULTAT.lignes;
+  if(cnt)cnt.textContent=lignes.length+' ligne(s)'+(EPI_BESOIN_FILTRE_TYPE?' (filtrées)':'');
+  var totR=0,totM=0,totT=0;
+  lignes.forEach(function(l){totR+=l.qte_reunion;totM+=l.qte_mayotte;totT+=l.qte_totale;});
+  var html='<div style="padding:8px 14px"><select onchange="epiBesoinFiltrerType(this.value)" style="padding:6px 10px;border:1px solid var(--ds-border-strong,#ddd);border-radius:8px;background:var(--card);color:var(--ds-text,#222)">'+
+    '<option value="">Tous types d\'article</option>'+types.map(function(t){return '<option value="'+t+'"'+(t===EPI_BESOIN_FILTRE_TYPE?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>';
+  if(!lignes.length){html+='<p class="es" style="padding:16px">Aucune ligne de besoin'+(EPI_BESOIN_FILTRE_TYPE?' pour ce filtre':' — vérifier la grille de dotation et l\'effectif éligible')+'.</p>';el.innerHTML=html;return;}
+  html+='<div class="tbl-wrap"><table><thead><tr><th></th><th>Type</th><th>Taille</th><th>Référence</th><th>Désignation</th><th>Employés</th><th>Qté Réunion</th><th>Qté Mayotte</th><th>Qté totale</th><th>Stock actuel</th></tr></thead><tbody>';
+  lignes.forEach(function(l,idx){
+    var rid='epi-besoin-detail-'+idx;
+    html+='<tr><td><button onclick="epiBesoinToggleDetail(\''+rid+'\')" style="border:none;background:none;cursor:pointer;font-size:12px" title="Voir le détail">▶️</button></td><td>'+l.type_article+'</td><td>'+(l.taille||'—')+'</td><td>'+(l.reference||'—')+'</td><td>'+(l.designation||'—')+'</td><td>'+l.nb_employes+'</td><td>'+l.qte_reunion+'</td><td>'+l.qte_mayotte+'</td><td style="font-weight:700">'+l.qte_totale+'</td><td>'+l.stock_actuel+'</td></tr>';
+    html+='<tr id="'+rid+'" style="display:none"><td></td><td colspan="9" style="font-size:11px;color:var(--grey);padding:6px 10px">'+
+      (l.details.length?l.details.map(function(d){
+        return d.origine==='employe'?(lienEmpSiConnu(d.code,d.nom||d.code)+' ('+territoireLabel(d.site)+', '+d.quantite+')'):('Entrées prévisionnelles '+(EPI_AFF_LABELS[d.affectation]||d.affectation)+' / '+territoireLabel(d.site)+' — '+d.effectif+' effectif(s) → '+d.quantite);
+      }).join(' · '):'—')+
+      '</td></tr>';
+  });
+  html+='</tbody><tfoot><tr style="font-weight:700"><td colspan="6">Total</td><td>'+totR+'</td><td>'+totM+'</td><td>'+totT+'</td><td></td></tr></tfoot></table></div>';
+  el.innerHTML=html;
+}
+function epiBesoinToggleDetail(id){var el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'':'none';}
+function exporterBesoinAnnuelEPI(){
+  if(!EPI_BESOIN_RESULTAT)return;
+  var r=EPI_BESOIN_RESULTAT;
+  var lignesParam=[['Filtre écran (n\'affecte pas les onglets ci-dessous, export toujours complet)',ligneFiltresActifs({Type:EPI_BESOIN_FILTRE_TYPE})],['Année cible',r.annee],['Marge de sécurité (%)',r.marge_pourcentage],['Employés éligibles',r.effectif.eligibles],['Employés comptés',r.effectif.comptes],['Employés exclus',r.effectif.exclus]];
+  EPI_AFFECTATIONS_VALIDES.forEach(function(aff){
+    EPI_SITES_VALIDES.forEach(function(site){
+      var p=(r.previsionnel||{})[aff+'|'+site]||{entrees:0,sorties:0};
+      lignesParam.push(['Prévisionnel '+(EPI_AFF_LABELS[aff]||aff)+' / '+territoireLabel(site),'+'+(p.entrees||0)+' / -'+(p.sorties||0)]);
+    });
+  });
+  var lignesBesoin=r.lignes.map(function(l){return[l.type_article,l.taille,l.reference,l.designation,l.nb_employes,l.qte_reunion,l.qte_mayotte,l.qte_totale,l.stock_actuel];});
+  var lignesDetail=[];
+  r.lignes.forEach(function(l){
+    l.details.forEach(function(d){
+      lignesDetail.push(d.origine==='employe'?[l.type_article,l.taille,'Employé',d.code,d.nom,territoireLabel(d.site),d.quantite]:[l.type_article,l.taille,'Prévisionnel',(EPI_AFF_LABELS[d.affectation]||d.affectation),'',territoireLabel(d.site),d.quantite]);
+    });
+  });
+  var lignesAnom=[];
+  Object.keys(r.anomalies).forEach(function(k){r.anomalies[k].forEach(function(a){lignesAnom.push([k,JSON.stringify(a)]);});});
+  exporterExcel(nomFichierExport('Besoin_Annuel_EPI_'+r.annee),[
+    {nom:'Paramètres et hypothèses',entetes:['Paramètre','Valeur'],lignes:lignesParam,cols:[40,20]},
+    {nom:'Besoin par article',entetes:['Type','Taille','Référence','Désignation','Employés','Qté Réunion','Qté Mayotte','Qté totale','Stock actuel'],lignes:lignesBesoin,cols:[18,10,16,28,10,12,12,12,12]},
+    {nom:'Détail par employé',entetes:['Type','Taille','Origine','Code/Profil','Nom','Territoire','Quantité'],lignes:lignesDetail,cols:[18,10,14,14,24,10,10]},
+    {nom:'Anomalies',entetes:['Catégorie','Détail (JSON)'],lignes:lignesAnom,cols:[28,60]}
+  ]);
+}
+
 async function receptionCommandeEPI(catId,label){
   var qte=prompt('Quantité reçue pour "'+label+'" :');
   if(qte==null)return;
@@ -2484,15 +2624,17 @@ function renderEPIGrille(container){
   var html='<div class="card"><div class="card-head"><h3>📐 Grille de dotation standard</h3>'+
     (canEdit?'<button onclick="ajouterTypeGrilleEPI()" style="padding:6px 14px;background:var(--blue-chrome);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Ajouter article</button>':'')+
     '</div>'+
-    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Quantité standard remise par profil, utilisée pour générer automatiquement les fiches de dotation.'+(canEdit?' Cliquez sur une valeur pour la modifier.':'')+'</p>'+
+    '<p style="font-size:11px;color:var(--grey);padding:0 14px 8px">Quantité standard remise par profil, utilisée pour générer automatiquement les fiches de dotation.'+(canEdit?' Cliquez sur une valeur pour la modifier.':'')+' Le lien 🔁 sous chaque quantité règle la fréquence de renouvellement (mois), utilisée par le calcul du besoin annuel EPI — absente = 12 mois par défaut.</p>'+
     '<div class="tbl-wrap"><table><thead><tr><th>Type d\'article</th>'+affectations.map(function(a){return '<th>'+a[1]+'</th>';}).join('')+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
   types.forEach(function(t){
     html+='<tr><td style="font-weight:700">'+t+'</td>';
     affectations.forEach(function(a){
       var g=byKey[a[0]+'|'+t];
       var qte=g?g.quantite:0;
-      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleDotationEPI(\''+a[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;text-align:center;background:var(--card,#fff);color:var(--ds-text,#222)"></td>';
-      else html+='<td style="text-align:center">'+qte+'</td>';
+      var rm=g&&g.renouvellement_mois;
+      if(canEdit)html+='<td><input type="number" min="0" value="'+qte+'" onchange="majGrilleDotationEPI(\''+a[0]+'\',\''+t.replace(/'/g,"\\'")+'\',this.value)" style="width:60px;padding:4px 6px;border:1px solid var(--ds-border-strong,#ddd);border-radius:6px;text-align:center;background:var(--card,#fff);color:var(--ds-text,#222)">'+
+        '<div style="margin-top:3px;text-align:center"><a href="javascript:void(0)" onclick="majRenouvellementGrilleEPI(\''+a[0]+'\',\''+t.replace(/'/g,"\\'")+'\','+(rm||12)+')" style="font-size:10px;color:var(--grey);text-decoration:underline" title="Fréquence de renouvellement, utilisée par le calcul du besoin annuel EPI">🔁 '+(rm?rm+' mois':'12 (défaut)')+'</a></div></td>';
+      else html+='<td style="text-align:center">'+qte+(rm?'<div style="font-size:10px;color:var(--grey)">🔁 '+rm+' mois</div>':'')+'</td>';
     });
     if(canEdit)html+='<td><button onclick="supprimerTypeGrilleEPI(\''+t.replace(/'/g,"\\'")+'\')" title="Retirer ce type d\'article de la grille" style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">🗑️</button></td>';
     html+='</tr>';
@@ -2519,6 +2661,25 @@ async function majGrilleDotationEPI(affectation,typeArticle,valeur){
       var g=epiGrille.find(function(x){return x.affectation===affectation&&x.type_article===typeArticle;});
       if(g)g.quantite=q;else epiGrille.push({id:res.id,affectation:affectation,type_article:typeArticle,quantite:q});
     }else alert('Échec : '+(res.error||'inconnu'));
+  }catch(e){alert('Erreur réseau : '+e.message);}
+}
+// Fréquence de renouvellement (mois) d'une ligne de grille — pilote le calcul du besoin annuel EPI
+// (epiCalculerBesoinAnnuel). Colonne SharePoint Renouvellement_Mois pas encore créée par William au
+// 9 sept. 2026 (voir CADRAGE_MODULE_BESOIN_EPI.md §4/§7) : l'échec est alors explicite (message ci-dessous),
+// jamais silencieux — le calcul lui-même continue de fonctionner avec le repli à 12 en attendant.
+async function majRenouvellementGrilleEPI(affectation,typeArticle,valeurActuelle){
+  var v=prompt('Renouvellement pour "'+typeArticle+'" ('+(EPI_AFF_LABELS[affectation]||affectation)+') — fréquence en mois (ex: 12, 24) :',valeurActuelle||'12');
+  if(v==null)return;
+  var n=parseFloat((v||'').replace(',','.'));
+  if(isNaN(n)||n<=0){alert('Valeur invalide (nombre de mois > 0 attendu).');return;}
+  var g=epiGrille.find(function(x){return x.affectation===affectation&&x.type_article===typeArticle;});
+  try{
+    var r=await fetch(W+'?action=maj_grille_dotation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({affectation:affectation,type_article:typeArticle,quantite:g?g.quantite:0,renouvellement_mois:n})});
+    var res=await r.json();
+    if(res.success){
+      if(g)g.renouvellement_mois=n;
+      renderEPIVue();
+    }else alert('Échec : '+(res.error||'inconnu')+' — la colonne Renouvellement_Mois existe-t-elle sur Grille_Dotation_EPI (SharePoint) ?');
   }catch(e){alert('Erreur réseau : '+e.message);}
 }
 async function ajouterTypeGrilleEPI(){
@@ -2648,6 +2809,148 @@ function epiCalculerBesoinStock(affectation,tailles){
     return {type_article:g.type_article,taille:tailleEmp,quantite_requise:g.quantite,article_trouve:!!art,stock_disponible:stockDispo,suffisant:!!art&&stockDispo>=g.quantite};
   });
 }
+
+// === BESOIN_ANNUEL_EPI_DEBUT ===
+// Calcul du besoin EPI de l'année à venir (quantités par article × taille × territoire), pour construire
+// un chiffre défendable devant un fournisseur ou la direction — voir CADRAGE_MODULE_BESOIN_EPI.md §2/§3.
+// Bloc pur (aucune dépendance DOM), testé isolément dans tests/dashboard.epi-besoin-annuel.test.js.
+// Réutilise epiCalculerBesoinStock/epiTrouverArticleCatalogue ci-dessus (aucune 3e copie du mapping
+// taille → article) : ce bloc n'ajoute QUE l'annualisation (renouvellement), la ventilation territoriale,
+// l'effectif prévisionnel et la marge de sécurité — une couche au-dessus des briques existantes.
+//
+// Distinct de calculerManquantsEPI (plus bas) : ce dernier ne porte que sur les employés sans fiche cette
+// année (rattrapage, alimente "Suggestion de commande") — périmètre volontairement partiel, qui ne convient
+// pas à un besoin annuel total (voir CADRAGE_MODULE_BESOIN_EPI.md §1.1). Les deux fonctions coexistent
+// sciemment plutôt que d'être fusionnées.
+var EPI_AFFECTATIONS_VALIDES=['C','M','Z','A'];
+var EPI_SITES_VALIDES=['Reunion','Mayotte'];
+// Résout le Site brut d'un employé en 'Reunion'/'Mayotte'/null (null = anomalie "site non exploitable").
+// Volontairement DIFFÉRENT de normSiteD (plus bas dans ce fichier) : normSiteD sert à l'affichage et
+// retombe sur 'Reunion' par défaut pour ne jamais laisser un badge vide — correct pour un badge, faux pour
+// un calcul de besoin qui doit signaler une donnée manquante, jamais la deviner silencieusement (voir
+// CADRAGE_MODULE_BESOIN_EPI.md §1.5, §3 anomalie 5).
+function epiSiteExploitable(siteRaw){
+  var s=(siteRaw||'').toString().trim().toLowerCase();
+  if(!s)return null;
+  if(s.indexOf('may')===0)return 'Mayotte';
+  if(s.indexOf('reu')===0||s.indexOf('run')===0)return 'Reunion';
+  return null;
+}
+// Renouvellement_Mois : colonne SharePoint pas encore créée par William (vérifié le 9 sept. 2026 via
+// ?debug_columns=Grille_Dotation_EPI, absente en production) — défensif : absente/vide/⩽0 → 12 (comportement
+// identique à avant l'existence de cette colonne, aucune régression sur les lignes non révisées).
+function epiRenouvellementMois(affectation,typeArticle){
+  var g=epiGrille.filter(function(x){return x.affectation===affectation&&x.type_article===typeArticle;})[0];
+  var rm=g&&parseFloat(g.renouvellement_mois);
+  return (rm&&rm>0)?rm:12;
+}
+// annee: année cible (information seule, non utilisée dans le calcul — tailles/effectif sont "actuels").
+// previsionnel: { 'Aff|Site': {entrees:Number, sorties:Number}, ... } — saisie éphémère, jamais persistée.
+// margePct: marge de sécurité en %, appliquée ligne à ligne par territoire (jamais sur un total global, D5).
+function epiCalculerBesoinAnnuel(annee,previsionnel,margePct){
+  previsionnel=previsionnel||{};
+  margePct=parseFloat(margePct)||0;
+  var anomalies={
+    taille_manquante:[], article_introuvable:[], type_absent_catalogue:[],
+    affectation_inconnue:[], site_inexploitable:[], taille_a_preciser:[]
+  };
+  // Anomalie de configuration (#3) : type de grille sans AUCUNE ligne catalogue, pour aucune taille — vérifié
+  // une fois, indépendamment des employés. Zéro besoin calculé pour ce type tant que non corrigé.
+  var typesGrille=[];
+  epiGrille.forEach(function(g){if(g.quantite>0&&typesGrille.indexOf(g.type_article)===-1)typesGrille.push(g.type_article);});
+  var typesAbsents={};
+  typesGrille.forEach(function(t){
+    if(!epiCatalogue.some(function(c){return c.type_article===t;})){anomalies.type_absent_catalogue.push({type_article:t});typesAbsents[t]=true;}
+  });
+  var acc={}; // 'Type|Taille' -> {type_article,taille,Reunion,Mayotte,details:[]}
+  function ajouterAcc(type,taille,site,qte,detail){
+    var key=type+'|'+(taille||'');
+    if(!acc[key])acc[key]={type_article:type,taille:taille||'',Reunion:0,Mayotte:0,details:[]};
+    acc[key][site]+=qte;
+    if(detail)acc[key].details.push(detail);
+  }
+  var freqTaille={}; // 'Aff|Type|Site' -> {tailleOuSentinelle: nbOccurrences}
+  var eligibles=employesList.filter(function(e){return e.Actif&&e.AffectationEPI;});
+  var effectifExclu=0;
+  // Étape A — besoin lié à l'effectif réel actuel (tout employé actif+éligible, pas seulement les sans-fiche).
+  eligibles.forEach(function(e){
+    var affectation=e.AffectationEPI;
+    if(EPI_AFFECTATIONS_VALIDES.indexOf(affectation)===-1){
+      anomalies.affectation_inconnue.push({code:e.Code,nom:e.Nom,affectation:affectation});
+      effectifExclu++;
+      return;
+    }
+    var site=epiSiteExploitable(e.Site);
+    if(!site){
+      anomalies.site_inexploitable.push({code:e.Code,nom:e.Nom,site:e.Site||''});
+      effectifExclu++;
+      return;
+    }
+    var emp=employesByCode[e.Code]||{};
+    var tailles={taillePantalon:emp.taillePantalon,tailleTshirt:emp.tailleTshirt,tailleVeste:emp.tailleVeste,pointureChaussures:emp.pointureChaussures,tailleGants:emp.tailleGants};
+    epiCalculerBesoinStock(affectation,tailles).forEach(function(l){
+      if(typesAbsents[l.type_article])return;
+      var champTaille=EPI_TAILLE_FIELD_PAR_TYPE[l.type_article];
+      if(champTaille&&!l.taille){anomalies.taille_manquante.push({code:e.Code,nom:e.Nom,type_article:l.type_article});return;}
+      if(!l.article_trouve){anomalies.article_introuvable.push({code:e.Code,nom:e.Nom,type_article:l.type_article,taille:l.taille||''});return;}
+      var fk=affectation+'|'+l.type_article+'|'+site;
+      var tkey=l.taille||' UNIQUE';
+      freqTaille[fk]=freqTaille[fk]||{};
+      freqTaille[fk][tkey]=(freqTaille[fk][tkey]||0)+1;
+      var rm=epiRenouvellementMois(affectation,l.type_article);
+      var qteAnnuelle=Math.ceil(l.quantite_requise*12/rm);
+      ajouterAcc(l.type_article,l.taille,site,qteAnnuelle,{origine:'employe',code:e.Code,nom:e.Nom,site:site,quantite:qteAnnuelle});
+    });
+  });
+  var effectifCompte=eligibles.length-effectifExclu;
+  // Étape B — besoin lié à l'effectif prévisionnel (entrées/sorties saisies par affectation × territoire).
+  EPI_AFFECTATIONS_VALIDES.forEach(function(aff){
+    EPI_SITES_VALIDES.forEach(function(site){
+      var p=previsionnel[aff+'|'+site]||{};
+      var delta=(parseFloat(p.entrees)||0)-(parseFloat(p.sorties)||0);
+      if(delta<=0)return; // un solde net de départs ne retire jamais de besoin déjà couvert (D3 tranché)
+      epiGrille.filter(function(g){return g.affectation===aff&&g.quantite>0;}).forEach(function(g){
+        if(typesAbsents[g.type_article])return;
+        var champTaille=EPI_TAILLE_FIELD_PAR_TYPE[g.type_article];
+        var tailleProvisionnee='';
+        if(champTaille){
+          var freqs=freqTaille[aff+'|'+g.type_article+'|'+site];
+          if(!freqs){anomalies.taille_a_preciser.push({affectation:aff,type_article:g.type_article,site:site,effectif:delta});return;}
+          var best=null,bestN=-1;
+          Object.keys(freqs).forEach(function(tk){if(freqs[tk]>bestN){bestN=freqs[tk];best=tk;}});
+          tailleProvisionnee=best===' UNIQUE'?'':best;
+        }
+        var art=epiTrouverArticleCatalogue(g.type_article,tailleProvisionnee);
+        if(!art){anomalies.article_introuvable.push({code:'',nom:'Entrées prévues '+aff+'/'+site,type_article:g.type_article,taille:tailleProvisionnee});return;}
+        var rm=epiRenouvellementMois(aff,g.type_article);
+        var qteLigne=Math.ceil(g.quantite*12/rm)*delta;
+        ajouterAcc(g.type_article,tailleProvisionnee,site,qteLigne,{origine:'previsionnel',affectation:aff,site:site,effectif:delta,quantite:qteLigne});
+      });
+    });
+  });
+  // Étape C — territoire et marge de sécurité : arrondi ligne à ligne par territoire, jamais sur un total global.
+  var lignes=Object.keys(acc).map(function(k){
+    var a=acc[k];
+    var art=epiTrouverArticleCatalogue(a.type_article,a.taille);
+    var qR=Math.ceil(a.Reunion*(1+margePct/100));
+    var qM=Math.ceil(a.Mayotte*(1+margePct/100));
+    return {
+      type_article:a.type_article, taille:a.taille,
+      reference:art?art.reference:'', designation:art?art.designation:'',
+      nb_employes:a.details.filter(function(d){return d.origine==='employe';}).length,
+      qte_reunion:qR, qte_mayotte:qM, qte_totale:qR+qM,
+      stock_actuel:art?art.stock_actuel:0,
+      details:a.details
+    };
+  }).sort(function(x,y){return x.type_article===y.type_article?(x.taille||'').localeCompare(y.taille||''):x.type_article.localeCompare(y.type_article);});
+  return {
+    annee:annee, marge_pourcentage:margePct, previsionnel:previsionnel,
+    effectif:{eligibles:eligibles.length,exclus:effectifExclu,comptes:effectifCompte},
+    anomalies:anomalies, lignes:lignes
+  };
+}
+// === BESOIN_ANNUEL_EPI_FIN ===
+
 // Employés actifs éligibles à une dotation EPI mais sans fiche Annuelle/Entree pour l'année donnée.
 function epiEmployesSansFiche(annee){
   var eligibles=employesList.filter(function(e){return e.Actif&&e.AffectationEPI;});

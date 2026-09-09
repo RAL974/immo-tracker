@@ -1239,7 +1239,11 @@ async function handleRequest(request) {
     const items = await paginate(GL + '/Grille_Dotation_EPI/items?$expand=fields&$top=200', 5);
     return json(items.map(i => {
       const f = i.fields || {};
-      return { id: i.id, affectation: f.Title || '', type_article: f.Type_Article || '', quantite: f.Quantite || 0 };
+      // Renouvellement_Mois (fréquence de renouvellement en mois, ex. 24 pour une veste) : colonne pas encore
+      // créée par William au 9 sept. 2026 (voir CADRAGE_MODULE_BESOIN_EPI.md §4/§7) — f.Renouvellement_Mois est
+      // alors simplement undefined, jamais une erreur ($expand=fields sans $select ne dépend pas de son existence).
+      // Le calcul du besoin annuel EPI (dashboard.html) retombe défensivement sur 12 quand cette valeur est null.
+      return { id: i.id, affectation: f.Title || '', type_article: f.Type_Article || '', quantite: f.Quantite || 0, renouvellement_mois: f.Renouvellement_Mois != null ? f.Renouvellement_Mois : null };
     }));
   }
 
@@ -2578,15 +2582,20 @@ async function handleRequest(request) {
       const typeArticle = (body.type_article || '').trim();
       const quantite = parseFloat(body.quantite);
       if (!affectation || !typeArticle || isNaN(quantite)) return json({ success: false, error: 'donnees_invalides' });
+      // Renouvellement_Mois : champ optionnel (colonne pas encore créée par William au 9 sept. 2026, voir
+      // CADRAGE_MODULE_BESOIN_EPI.md §4/§7) — envoyé UNIQUEMENT si fourni et > 0, jamais écrasé avec une valeur
+      // vide/0 (le calcul du besoin annuel EPI retombe déjà sur 12 par défaut côté lecture sinon).
+      const renouvellementMois = body.renouvellement_mois != null ? parseFloat(body.renouvellement_mois) : null;
+      const champsSupp = (renouvellementMois && renouvellementMois > 0) ? { Renouvellement_Mois: renouvellementMois } : {};
       try {
         const cur = await fetch(GL + "/Grille_Dotation_EPI/items?$expand=fields&$filter=fields/Title eq '" + affectation.replace(/'/g, "''") + "' and fields/Type_Article eq '" + typeArticle.replace(/'/g, "''") + "'&$top=1", { headers: H });
         const curData = await cur.json();
         const itemId = curData.value && curData.value[0] ? curData.value[0].id : null;
         if (itemId) {
-          const r = await fetch(GL + '/Grille_Dotation_EPI/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify({ Quantite: quantite }) });
+          const r = await fetch(GL + '/Grille_Dotation_EPI/items/' + itemId + '/fields', { method: 'PATCH', headers: H, body: JSON.stringify(Object.assign({ Quantite: quantite }, champsSupp)) });
           return json({ success: r.ok, id: itemId });
         }
-        const r = await fetch(GL + '/Grille_Dotation_EPI/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: { Title: affectation, Type_Article: typeArticle, Quantite: quantite } }) });
+        const r = await fetch(GL + '/Grille_Dotation_EPI/items', { method: 'POST', headers: H, body: JSON.stringify({ fields: Object.assign({ Title: affectation, Type_Article: typeArticle, Quantite: quantite }, champsSupp) } ) });
         const rd = await r.json();
         return json({ success: r.ok, id: rd.id });
       } catch (e) { return json({ success: false, error: 'exception', message: e.message }); }

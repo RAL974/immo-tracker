@@ -254,6 +254,7 @@ Recherche d'un article pour une taille employé donnée : `Type_Article` = X **e
 | `Title` | Texte | Affectation (`C`/`M`/`Z`/`A`) |
 | `Type_Article` | Texte | Doit correspondre à un `Type_Article` du catalogue |
 | `Quantite` | Nombre | Quantité standard remise pour ce profil |
+| `Renouvellement_Mois` | Nombre | Ajoutée septembre 2026 — fréquence de renouvellement en mois (ex. `24` pour une veste), utilisée par le calcul du besoin annuel EPI (voir `04_HISTORIQUE_DECISIONS.md`). **⚠️ Pas encore créée par William** (vérifié le 9 sept. 2026 via `?debug_columns=Grille_Dotation_EPI`, colonne absente en production) — le code gère ce cas défensivement : absente/vide/`0` ⇒ 12 mois par défaut, aucune régression. Éditable depuis le dashboard (onglet EPI → Grille de dotation, lien "🔁" sous chaque quantité) une fois la colonne créée sur SharePoint. À créer sur les deux sites (production et recette) si la recette est utilisée pour ce module.
 
 ## Liste `Dotations_EPI` (ajoutée août 2026)
 
