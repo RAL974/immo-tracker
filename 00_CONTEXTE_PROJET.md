@@ -1,6 +1,6 @@
 # Immo Tracker — Contexte du projet
 
-*Document de référence à charger en connaissance de projet. Dernière mise à jour : août 2026.*
+*Document de référence à charger en connaissance de projet. Dernière mise à jour : septembre 2026.*
 
 ## Qui, quoi, pourquoi
 
@@ -59,6 +59,7 @@
 - **Roadmap item D** — Demande de matériel planifiée par catégorie (sans immo précise) + planning dashboard par semaine/chantier, Lot 1 et Lot 2 (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
 - **Roadmap item E** — Accueil PWA simplifié pour le référent Mayotte (`ROLE_CAPS.modeSimplifie`) (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
 - **Roadmap item F** — Digest hebdomadaire de notifications (`?digest=1` + flux Power Automate) (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
+- Module Besoin annuel EPI & Consultations fournisseurs — calcul du besoin de l'année suivante par article × taille × territoire (effectif réel + prévisionnel, marge de sécurité), figé dans une consultation, répertoire fournisseurs, saisie/comparatif d'offres (2 scénarios), attribution ligne à ligne, report au catalogue, cadre de réponse fournisseur exportable/réimportable en Excel (sept. 2026, code livré et testé — voir `04_HISTORIQUE_DECISIONS.md` et `03_REGLES_METIER_ET_ROLES.md`). **Bloquant avant usage réel** : les 5 listes SharePoint du module (`Fournisseurs`, `EPI_Consultations`, `EPI_Consultation_Lignes`, `EPI_Offres`, `EPI_Offres_Lignes`) restent à créer par William, production et recette — voir la checklist dédiée dans `PROCEDURE_RECETTE.md`.
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier (seule évolution de la roadmap non encore développée)

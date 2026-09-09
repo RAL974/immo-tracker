@@ -1149,5 +1149,131 @@ Session de finition pure (aucun changement de comportement métier, gabarits imp
   aucune nouvelle liste ni colonne, donc aucune étape supplémentaire ne s'ajoute à celle déjà signalée
   dans les sessions 2 et 3.
 
+## Session 5 — Documentation, recette et mise en service du module Besoin EPI / Consultations (9 sept. 2026)
+
+*Les 4 sessions précédentes (638ae7a, 8b62aab, fbbf436, ab95d35, ce1f40f — 9 sept. 2026 également,
+mêmes journée) ont livré le code du module, chacune mettant à jour `02_MODELE_DONNEES.md` et
+`03_REGLES_METIER_ET_ROLES.md` au fil de l'eau, plus cette même section de `04_HISTORIQUE_DECISIONS.md`.
+Mais **aucune des 5** n'a touché `00_CONTEXTE_PROJET.md`, `05_ROADMAP_EVOLUTIONS_FUTURES.md`,
+`ARCHITECTURE_GLOBALE.md` ni `CLAUDE.md` (vérifié par `git show --stat` sur chacune) — le module était
+donc invisible dans la vue d'ensemble du projet, dans la cartographie technique, et dans le fichier que
+Claude Code charge automatiquement à l'ouverture du dépôt. Cette session ferme cet écart : documentation
+seulement, aucun changement de comportement, `npm run verify` vert avant/après.*
+
+**Méthode : rien pris pour acquis, tout revérifié sur le code réel de ce jour** — y compris les
+sections déjà écrites par les sessions précédentes, avant de considérer qu'elles n'avaient pas besoin
+de retouche. Diff complet de `ce1f40f`/`ab95d35` rejoué depuis git, `worker.js`/`dashboard.html` relus
+par grep ciblé (actions, endpoints, formule, transitions), les 4 fichiers de test EPI relus
+intégralement, `ARCHITECTURE_GLOBALE.md`/`PROCEDURE_RECETTE.md` lus en entier (jamais concaténés dans
+`CLAUDE.md`, donc jamais vus lors des sessions précédentes sauf à les ouvrir explicitement). Conclusion
+de cette relecture : `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md` se sont révélés déjà
+exacts et complets (aucune correction nécessaire) — la valeur de cette session porte sur les 5 autres
+fichiers.
+
+### D1 à D9 : ce que `CADRAGE_MODULE_BESOIN_EPI.md` proposait vs ce qui a été livré
+
+*Le document de cadrage (racine du dépôt, jamais un contrat figé) proposait un schéma à 6 listes et
+11 actions avec un partage admin/garant. L'instruction de session qui a suivi en a livré un différent,
+« qui prévaut » (déjà noté dans `02_MODELE_DONNEES.md`). Cette section recoupe, décision par décision,
+ce qui a été conservé du raisonnement du cadrage et ce qui a été concrètement écarté — vérifié contre
+le code réel de ce jour, pas contre la mémoire de session.*
+
+| # | Décision (cadrage) | Livré — vérifié sur le code de ce jour |
+|---|---|---|
+| D1 | Calcul par territoire, jamais fusionné avant la marge | **Conforme.** `epiCalculerBesoinAnnuel` (dashboard.html) accumule Réunion/Mayotte séparément de bout en bout (étapes A, B, C) — vérifié ligne à ligne. |
+| D2 | `Renouvellement_Mois` absent/vide/`0` ⇒ 12 mois par défaut | **Conforme.** Lecture (`?grille_dotation_epi=1`) et écriture (`maj_grille_dotation_epi`) toutes deux défensives ; colonne **toujours pas créée en production** au 9 sept. 2026 (reconfirmé ce jour via le commentaire du code, qui documente lui-même cet état). |
+| D3 | Effectif prévisionnel : delta entrées−sorties plafonné à 0, taille provisionnée = la plus fréquente | **Formule conforme**, mais **stockage écarté** : le cadrage proposait une liste persistée `Effectif_Previsionnel_EPI` (une ligne par affectation×site, avec `Effectif_Actuel` figé). Le livré ne persiste rien à part écran — l'effectif prévisionnel est saisi à la volée et, seulement au figeage, sérialisé en JSON dans `EPI_Consultations.Parametres`. Aucune liste dédiée n'existe ni n'est prévue. |
+| D4 | Stock catalogue informatif seul, jamais dans le calcul | **Principe respecté** (le stock n'entre jamais dans `epiCalculerBesoinAnnuel`) **mais le champ informatif lui-même (`Stock_Actuel_Info` du cadrage) n'a pas été construit** — `EPI_Consultation_Lignes` livrée n'a pas de colonne stock. Simplification, pas une contradiction du principe. |
+| D5 | Marge appliquée ligne à ligne par territoire, jamais sur un total global | **Conforme.** `Math.ceil(a.Reunion*(1+margePct/100))` et `Math.ceil(a.Mayotte*(1+margePct/100))` calculés indépendamment, le total est leur somme — jamais l'inverse. |
+| D6 | Prix jamais dans le calcul du besoin ; devise figée EUR, pas de conversion | **Conforme sur le fond** (aucune conversion n'existe nulle part dans le code) — **nuance** : le cadrage voulait `Devise` *figée* EUR (non modifiable), le livré (`EPI_Offres.Devise`) accepte ce que le client envoie et ne retombe sur `'EUR'` que si rien n'est transmis — légèrement plus souple, sans que cela change quoi que ce soit en pratique tant qu'aucun flux multi-devise n'existe. Le multi-devise réel (taux de change, conversion) reste hors périmètre — reporté explicitement dans `05_ROADMAP_EVOLUTIONS_FUTURES.md`. |
+| D7 | Comparatif 2 scénarios (mono-fournisseur moins-disant vs ligne à ligne panaché) | **Conforme, livré en session 3** (`fbbf436`, pas dans la session de persistance initiale comme le cadrage l'esquissait) — avec un raffinement non explicité par le cadrage : le scénario A (mono-fournisseur) n'est calculable que si un fournisseur couvre **100%** des lignes, sinon explicitement signalé non calculable plutôt que de forcer un résultat trompeur. |
+| D8 | Report au catalogue : `Reference`/`Fournisseur` uniquement, jamais de prix stocké sur le catalogue | **Conforme.** `reporter_catalogue_epi` (session 3) n'écrit que ces deux champs, jamais `Stock_Actuel`/`Stock_Mini`/`Type_Article`/`Taille_*` — vérifié dans le code (`worker.js:4456`). Tableau de contrôle décochable avant tout envoi, comme demandé. |
+| D9 | Annulation = statut `Annulee` terminal, jamais de suppression | **Conforme.** `changer_statut_consultation_epi` — `Annulee` atteignable depuis tout état non terminal, motif préfixé dans `Notes` sans écraser l'existant, jamais de `DELETE`. |
+
+**Ce qui a été écarté du cadrage au-delà de D1-D9, et pourquoi** (déjà en partie noté dans `02_MODELE_DONNEES.md`/`03_REGLES_METIER_ET_ROLES.md`, rassemblé ici pour la première fois en un seul endroit) :
+- **Schéma à 5 listes au lieu de 6** : pas de `Fournisseurs_Consultation_EPI` (suivi d'invitation "Invite/Offre_Recue/Ecarte") — dans le livré, rien ne trace formellement qu'un fournisseur a été sollicité ; le fait qu'il ait une offre `EPI_Offres` pour cette consultation *est* la seule trace. En échange, `EPI_Offres` (en-tête) porte davantage de conditions commerciales que le `Lignes_Offres_EPI` plat du cadrage (frais de port, franco, remise globale, délai, validité) — nécessaires au calcul des scénarios A/B (D7), donc un enrichissement net sur ce point précis malgré la liste en moins.
+- **Statuts** : 6 valeurs livrées (`Brouillon/Envoyee/Depouillement/Attribuee/Cloturee/Annulee`) contre 7 proposées (le cadrage avait un `Besoin_Valide` intermédiaire entre Brouillon et En_Consultation) — fusionné : le livré fige le besoin et crée la consultation en un seul geste (`creer_consultation_epi`), pas de statut « besoin validé mais pas encore envoyé ».
+- **Droits** : le cadrage proposait des capacités dédiées `peutGererBesoinEPI`/`peutVoirBesoinEPI`, distinctes de `peutGererEPI`/`peutVoirEPI` (justification : module tarifaire, à séparer). L'instruction de session a tranché plus simple — réutilisation pure de `peutGererEPI`/`peutVoirEPI`, aucune nouvelle capacité `ROLE_CAPS`. Déjà documenté, reconfirmé exact ce jour (grep : zéro occurrence de `peutGererBesoinEPI`/`peutVoirBesoinEPI` dans `dashboard.html`).
+- **Partage admin/garant aplati à `requireGarant` partout** : le cadrage répartissait les 11 actions entre `requireAdmin` (créer/valider/arbitrer/reporter/clôturer/annuler) et `requireGarant` (le reste). **Vérifié ce jour par script indépendant sur `worker.js`** : les 11 actions du module (`creer_fournisseur`, `editer_fournisseur`, `creer_consultation_epi`, `editer_consultation_epi`, `editer_ligne_consultation_epi`, `changer_statut_consultation_epi`, `creer_offre_epi`, `editer_offre_epi`, `editer_ligne_offre_epi`, `importer_lignes_offre_epi`, `reporter_catalogue_epi`) sont **toutes** `requireGarant`, aucune n'est `requireAdmin` — cohérent avec « aucune nouvelle capacité dédiée », un module `requireAdmin` séparé aurait été incohérent avec des droits calqués sur `peutGererEPI` (Admin+Logistique+Logistique_Mayotte).
+- **Lectures GET moins protégées que le cadrage ne le proposait** : le cadrage voulait `requireGarant` sur les lignes de besoin seules (« donnée RH-adjacente »). Le livré ne protège que ce qui porte un prix : `?fournisseurs=1`, `?epi_consultations=1`, `?epi_consultation_lignes=<id>` sont **publics** (aucune authentification), seul `?epi_offres=<id>&token=` est `requireGarant` — cohérence retenue avec la majorité des endpoints EPI déjà publics (`?catalogue_epi=1`, `?grille_dotation_epi=1`) plutôt qu'avec le cadrage. Déjà documenté dans `03_REGLES_METIER_ET_ROLES.md`, reconfirmé par lecture directe de `worker.js` ce jour (`?epi_offres=` vérifié comme le seul des 4 GET du module à appeler `requireGarant`).
+- **4 écrans proposés → 3 écrans livrés** : "Consultations"/"Besoin"/"Fournisseurs & Offres"/"Arbitrage" du cadrage sont devenus "📋 Besoin annuel"/"📑 Consultations"/"🏭 Fournisseurs" — le comparatif d'offres (D7) et l'arbitrage (attribution ligne à ligne) sont tous deux rendus **à l'intérieur** de l'écran de détail d'une consultation, pas dans des sous-onglets séparés.
+- **La fonctionnalité la plus significative écartée du cadrage n'y figurait pas du tout** : le « cadre de réponse fournisseur » (export/réimport Excel, session 4, `ce1f40f`) répond à un besoin d'usage réel remonté par William après le début du développement — le cadrage, écrit avant tout code, ne pouvait pas l'anticiper.
+
+### Vérification indépendante des chiffres (script de comptage, pas une estimation)
+
+*`ARCHITECTURE_GLOBALE.md` datait du 11 août 2026 — près d'un mois de développement (Brasseurs d'air,
+Synthèse direction, ce module) s'était accumulé sans qu'aucun total n'y soit revérifié. Plutôt que
+d'ajouter "+ 11" à un chiffre déjà obsolète, tous les comptes ci-dessous sont recalculés depuis le
+code réel de ce jour (script Node ponctuel, non conservé dans le dépôt — un simple parcours de chaque
+bloc `if (action === 'xxx')` de `worker.js`, classé par présence de `requireAdmin(body)`/
+`requireGarant(body)` dans le corps du bloc, pas par proximité de ligne pour éviter tout faux positif) :*
+
+- **104 actions POST** au total dans le routeur (`dispatchPost()`), décomposées en **28 `requireAdmin`
+  + 54 `requireGarant`** (= 82, taille exacte du `Set` `GATED_ACTIONS_AUDIT`, confirmée par un second
+  calcul indépendant) **+ 18 actions publiques partagées PWA** (`PWA_SHARED_ACTIONS`,
+  `tests/security.gated-actions.test.js`) **+ 2 actions de connexion** (`verify_password`,
+  `set_password`, qui produisent le jeton et ne peuvent donc pas déjà en exiger un) **+ 2 blocs
+  neutralisés** (`bulk_maj_immos`, `maj_duree_amort`, tous deux `{success:false,error:'deprecated'}`
+  depuis l'audit de sécurité du 9 août). 28+54+18+2+2 = 104, aucun écart.
+- **32 listes SharePoint** dans `EXPORTABLE_LISTS` (`worker.js`), pas 22 — l'écart de 10 vient des 5
+  listes Brasseurs d'air (11 août) et des 5 listes Consultations EPI (ce module, jamais recomptées
+  ensemble jusqu'ici).
+- **341/341 tests** (`npm test`), dont **88 spécifiquement dédiés au module Besoin/Consultations EPI**
+  répartis sur 4 fichiers (`worker.epi-consultations.test.js` : 44, `dashboard.epi-besoin-annuel.test.js` :
+  9, `dashboard.epi-comparatif.test.js` : 13, `dashboard.epi-import-offre.test.js` : 22).
+- Ces chiffres remplacent ceux, obsolètes, encore affichés dans `ARCHITECTURE_GLOBALE.md` (mis à jour
+  cette session, voir plus bas) — mais **uniquement pour le périmètre de recomptage global** ; le détail
+  nominatif complet des 28 actions admin / 54 garant (au-delà des 11 de ce module) n'a pas été
+  intégralement re-cartographié action par action dans la prose de `ARCHITECTURE_GLOBALE.md` (voir
+  écart signalé dans ce même fichier, §7) — seuls les totaux et les 11 actions de ce module sont
+  garantis exacts à cette date.
+
+### Anomalie trouvée en cours de recomptage, sans lien avec ce module — signalée, non corrigée
+
+En scannant systématiquement chaque bloc d'action de `worker.js` pour recompter les niveaux de
+protection, `modifier_ligne_inventaire` (édition d'une ligne de comptage de stock, campagne
+d'inventaire d'articles — module distinct, sans rapport avec les EPI) s'est révélée **publique/non
+gated, exactement comme sa voisine `supprimer_ligne_inventaire`** (même bloc `if`, même modèle de
+confiance auteur-ou-admin via `body.par_code`/`body.est_admin`) — mais contrairement à elle,
+`modifier_ligne_inventaire` **n'apparaît pas** dans `PWA_SHARED_ACTIONS`
+(`tests/security.gated-actions.test.js`), la liste blanche qui documente/vérifie quelles actions sont
+volontairement non protégées. Rien n'indique un bug de comportement (le code fonctionne, le test
+`security.gated-actions.test.js` passe car il ne vérifie pas l'exhaustivité du côté "public") — c'est
+un oubli de classification dans la liste de suivi, repéré incidemment en travaillant sur un tout autre
+module. Non corrigé ici (hors périmètre, et une modification de `PWA_SHARED_ACTIONS` — même sans
+changer aucun comportement — mérite sa propre session plutôt qu'un ajout de passage). Détail dans
+`ARCHITECTURE_GLOBALE.md` § 7.
+
+### Vérification de sécurité des données (fixtures) — aucune donnée réelle
+
+Balayage explicite des 4 fichiers de test EPI-consultations et de leurs fixtures, à la demande
+explicite de cette session : noms de fournisseurs fictifs utilisés (`ACME Corp`, `Beta SARL`, `Inconnu
+SARL`, un contact `Jean Dupont`/`jean@acme.test`/`0600000000` — domaine `.test` et téléphone à zéros,
+délibérément non réels), codes employés fictifs génériques (`EMP1`…`EMP5`, `A`/`B`/`C`, `Z1`…`Z3`,
+`BADAFF`, `BADSITE`). `grep -rn "1stShine\|1ST SHINE\|93801\|93 801\|54,01\|54.01"` sur les 4 fichiers
+(ces valeurs appartiennent à la vraie commande fournisseur Brasseurs d'air `FS202603051`, un module
+différent) : **aucune occurrence**. Aucun nom de salarié réel, aucun nom de fournisseur réel, aucun prix
+négocié réel dans les fixtures de ce module.
+
+### Livrables de cette session
+
+- `00_CONTEXTE_PROJET.md` : ligne d'état ajoutée au module (absente jusqu'ici).
+- `05_ROADMAP_EVOLUTIONS_FUTURES.md` : 4 évolutions différées documentées explicitement (multi-devise,
+  notation qualité fournisseur, suivi de la commande réelle post-attribution, rapprochement facture) —
+  aucune n'était dans le cadrage ni dans le développement livré, toutes hors périmètre volontaire de ce
+  module tel que construit.
+- `ARCHITECTURE_GLOBALE.md` : module ajouté à l'inventaire des écrans (§2), les 11 actions ajoutées au
+  tableau `requireGarant` (§3), comptes recalculés (§3), les 5 listes ajoutées (§4), les 4 endpoints GET
+  ajoutés à leur tableau, écarts constatés mis à jour (§7).
+- `PROCEDURE_RECETTE.md` : les 5 listes du module ajoutées à la table de duplication (§2, avec les 5
+  listes Brasseurs, également absentes jusqu'ici) ; nouveau scénario de bout en bout jouable en recette
+  avec des données 100% fictives (calcul → anomalies → figeage → 3 fournisseurs → 3 offres dont une
+  incomplète → comparatif → attribution panachée → export → report au catalogue).
+- Checklist « avant première consultation réelle » produite pour William (voir `PROCEDURE_RECETTE.md`).
+- `CLAUDE.md` régénéré (concaténation des 6 documents `00`-`05` mis à jour).
+- `02_MODELE_DONNEES.md`/`03_REGLES_METIER_ET_ROLES.md` : relus intégralement, confirmés déjà exacts,
+  aucune correction nécessaire.
+- `npm run verify` : 341/341, vert avant et après cette session (aucun fichier de code touché).
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.

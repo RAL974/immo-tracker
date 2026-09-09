@@ -10,7 +10,7 @@
 
 # Immo Tracker — Contexte du projet
 
-*Document de référence à charger en connaissance de projet. Dernière mise à jour : août 2026.*
+*Document de référence à charger en connaissance de projet. Dernière mise à jour : septembre 2026.*
 
 ## Qui, quoi, pourquoi
 
@@ -69,6 +69,7 @@
 - **Roadmap item D** — Demande de matériel planifiée par catégorie (sans immo précise) + planning dashboard par semaine/chantier, Lot 1 et Lot 2 (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
 - **Roadmap item E** — Accueil PWA simplifié pour le référent Mayotte (`ROLE_CAPS.modeSimplifie`) (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
 - **Roadmap item F** — Digest hebdomadaire de notifications (`?digest=1` + flux Power Automate) (août 2026, voir `04_HISTORIQUE_DECISIONS.md`).
+- Module Besoin annuel EPI & Consultations fournisseurs — calcul du besoin de l'année suivante par article × taille × territoire (effectif réel + prévisionnel, marge de sécurité), figé dans une consultation, répertoire fournisseurs, saisie/comparatif d'offres (2 scénarios), attribution ligne à ligne, report au catalogue, cadre de réponse fournisseur exportable/réimportable en Excel (sept. 2026, code livré et testé — voir `04_HISTORIQUE_DECISIONS.md` et `03_REGLES_METIER_ET_ROLES.md`). **Bloquant avant usage réel** : les 5 listes SharePoint du module (`Fournisseurs`, `EPI_Consultations`, `EPI_Consultation_Lignes`, `EPI_Offres`, `EPI_Offres_Lignes`) restent à créer par William, production et recette — voir la checklist dédiée dans `PROCEDURE_RECETTE.md`.
 
 🔜 **Évoquées pour la suite** (voir `05_ROADMAP_EVOLUTIONS_FUTURES.md`) :
 - Module de report d'heures / temps chantier (seule évolution de la roadmap non encore développée)
@@ -944,6 +945,20 @@ libre, contrairement à `Brasseurs_Commandes.Fournisseur`).*
 Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et `dashboard.html`,
 synchronisation vérifiée par `tests/backup.export-structure.test.js`).
 
+⚠️ **Pièges à vérifier à la création (pas encore rencontrés sur ces 5 listes précisément — elles
+n'existent toujours pas en production au 9 sept. 2026 — mais systématiques sur ce projet à chaque fois
+qu'une liste est créée à la main) : `?debug_columns=<liste>` sur les deux sites (production ET recette)
+avant d'utiliser le module.** Trois classes d'incident déjà vécues ailleurs dans ce projet, chacune
+susceptible de se reproduire ici : un nom de colonne accentué encodé en interne par SharePoint
+(`Quantité` → `Quantit_x00e9_` sur `Brasseurs_Mouvements`) — aucune colonne de ces 5 listes n'est
+accentuée, choix délibéré pour ne pas reproduire l'incident ; une colonne **Date et heure** oubliée à
+la création (`Dotations_EPI.Genere_Le`/`Emarge_Le`, découvert après coup) — `EPI_Consultations.Date_Creation`
+est le seul champ « Date et heure » de ce module, à ne pas rater ; un champ **Notes/Commentaire**
+créé en texte « Une seule ligne » qui tronque silencieusement au-delà de ~255 caractères
+(`Brasseurs_Commandes.Notes`, vécu réellement lors de la saisie d'une commande) — `Fournisseurs.Notes`,
+`EPI_Consultations.Notes`, `EPI_Offres.Notes` et `EPI_Offres_Lignes.Commentaire` doivent tous être créés
+en **« Plusieurs lignes de texte »**, déjà indiqué dans les tableaux ci-dessus.
+
 ### Comparatif, attribution et report au catalogue (session 3, sept. 2026)
 
 *Aucune nouvelle liste ni colonne SharePoint pour cette tranche — le comparatif des offres et les
@@ -1680,6 +1695,60 @@ retenue, modifiable avant validation comme n'importe quelle autre ligne du table
 **Droits inchangés** : lecture seule pour Encadrement (`peutVoirEPI`) sur l'ensemble de ces écrans
 (comparatif compris) ; toute action d'écriture reste `peutGererEPI` + `requireGarant`, sans nouvelle
 capacité `ROLE_CAPS`.
+
+## Cadre de réponse fournisseur — export et réimport (session 4, sept. 2026)
+
+*Les offres se saisissaient jusqu'ici entièrement à la main (« Enregistrer une offre », ligne par
+ligne) — long et faillible dès qu'un fournisseur répond sur plusieurs dizaines de références. Cette
+session ajoute, sur l'écran de détail d'une consultation (à côté d'« ➕ Enregistrer une offre ») :
+« 📤 Cadre de réponse » (génère un fichier Excel à envoyer au fournisseur) et « 📥 Importer un cadre »
+(réimporte le fichier qu'il renvoie rempli). Aucune nouvelle liste ni colonne SharePoint.*
+
+**Cadre exporté** : deux onglets (Instructions, Lignes à compléter). La 2ᵉ reprend chaque ligne de
+besoin de la consultation — colonnes A à H en lecture seule (dont la colonne A, l'identifiant
+technique `EPI_Consultation_Lignes` de la ligne, marquée « ne pas modifier », indispensable au
+rapprochement au réimport) — suivies des colonnes I à P à remplir par le fournisseur (Référence
+fournisseur, Désignation proposée, Prix unitaire HT, Conditionnement, Quantité minimum, Délai
+(jours), Non proposé, Commentaire) — exactement les champs de `EPI_Offres_Lignes`.
+
+**Détection des colonnes par libellé, pas par position** (`epiDetecterColonnesImportOffre`) : robuste
+à un fournisseur qui réordonne les colonnes en ouvrant le fichier dans son propre tableur. Rejette
+explicitement un fichier non conforme (identifiant de ligne, référence fournisseur ou prix introuvables)
+avant toute tentative de lecture des données — pas d'erreur silencieuse.
+
+**Rapprochement** (`epiAnalyserImportOffre`) : par l'identifiant technique de ligne en priorité, puis,
+s'il est absent ou inconnu, par correspondance exacte type d'article + taille + référence interne
+(seulement si le résultat est un match **unique** — une correspondance ambiguë reste non rapprochée,
+jamais devinée). Une ligne non rapprochée est affichée pour information mais **jamais écrite**.
+
+**Écran de contrôle obligatoire avant toute écriture**, quatre signaux : lignes reconnues/non
+rapprochées, prix aberrants (nul, négatif, ou écart de plus d'un facteur 10 avec une autre offre déjà
+reçue sur la même ligne — les offres `Ecartee` sont exclues de cette comparaison), et libellé modifié
+(la colonne « Désignation », en lecture seule côté cadre, renvoyée différente de l'originale — purement
+informatif, jamais bloquant). Une ligne à prix suspect est décochée par défaut ; l'utilisateur doit la
+recocher consciemment après vérification.
+
+**Un import ne peut jamais écraser silencieusement une offre déjà saisie à la main** : une ligne
+d'offre existante n'est considérée « en conflit » que si elle porte un contenu réellement saisi
+(au moins un champ non vide/non nul/`Non_Propose`) ET que ce contenu diffère de l'import — un simple
+gabarit vide créé en attendant le fichier (cas courant : une offre a été enregistrée tôt avec des
+lignes à prix nul, en attendant justement ce cadre) est mis à jour directement, sans arbitrage inutile.
+En cas de vrai conflit, l'action par défaut est **« Garder l'existant »** — l'utilisateur doit
+explicitement choisir « Utiliser l'import » ligne par ligne pour écraser.
+
+**Écriture, deux chemins selon qu'une offre existe déjà pour ce fournisseur sur cette consultation** :
+- **Aucune offre existante** : réutilise `creer_offre_epi` (action déjà existante, aucune modification)
+  avec toutes les lignes retenues par l'écran de contrôle.
+- **Une offre existe déjà** : nouvelle action `importer_lignes_offre_epi` (`requireGarant`) — chaque
+  ligne porte soit un `ligne_offre_id` (met à jour une ligne `EPI_Offres_Lignes` déjà là, PATCH sur les
+  mêmes champs qu'`editer_ligne_offre_epi`) soit rien (nouvelle ligne, POST, mêmes champs que
+  `creer_offre_epi`). Défense en profondeur côté serveur : `ligne_consultation_id` doit appartenir à la
+  MÊME consultation que l'offre visée, `ligne_offre_id` (si fourni) doit appartenir à cette MÊME offre —
+  une ligne qui échoue à cette vérification est rejetée individuellement (`erreurs_validation`), sans
+  bloquer l'écriture des autres lignes valides du même import.
+
+**Aucune nouvelle dépendance** : réutilise SheetJS 0.18.5 (déjà chargé, déjà utilisé pour l'import du
+comptage de stock EPI) et `exporterExcel` tels quels. Aucun gabarit imprimable existant modifié.
 
 ---
 
@@ -2738,6 +2807,228 @@ Session de finition pure (aucun changement de comportement métier, gabarits imp
   l'attribution — cette session n'a touché à aucune nouvelle liste ni colonne, donc aucune étape
   supplémentaire ne s'ajoute à celle déjà signalée.
 
+## Cadre de réponse fournisseur EPI — export et réimport (session 4, sept. 2026)
+
+- **Contexte** : suite directe des sessions 2-3 (Consultations EPI, comparatif, attribution) — les
+  offres se saisissent entièrement à la main depuis leur création, ce qui devient long et faillible
+  dès qu'un fournisseur répond sur plusieurs dizaines de références. Objectif de session : produire un
+  fichier « cadre de réponse » exportable par fournisseur, puis réimporter le fichier rempli, avec un
+  écran de contrôle obligatoire et un arbitrage explicite en cas de conflit avec une saisie manuelle
+  déjà en place.
+- **Recherche préalable systématique avant tout code** : plutôt que de deviner les conventions du
+  fichier (`worker.js` ~4400 lignes, `dashboard.html` ~10200 lignes), une passe de lecture complète des
+  actions EPI existantes (`creer_offre_epi`, `editer_offre_epi`, `editer_ligne_offre_epi`,
+  `reporter_catalogue_epi`), du pattern d'import Excel déjà en place (`bulk_maj_stock_epi` + son
+  appelant côté dashboard, import du comptage de stock EPI), du pattern d'écran de contrôle le plus
+  proche (`ouvrirReportCatalogueEPI`, tableau décochable ligne à ligne) et des conventions de test
+  (mock Graph de `worker.epi-consultations.test.js`, extraction `vm` de
+  `dashboard.epi-comparatif.test.js`) a précédé toute écriture — confirmé ensuite ligne par ligne
+  directement dans le code réel avant de s'en servir de modèle.
+- **Aucune action existante ne permettait d'ajouter des lignes à une offre déjà créée** : `creer_offre_epi`
+  crée toujours un en-tête + ses lignes ensemble (jamais sur un en-tête déjà là) ; `editer_ligne_offre_epi`
+  ne PATCH qu'une ligne déjà existante par son id, jamais une création. Une nouvelle action
+  `importer_lignes_offre_epi` a donc été ajoutée, seule écriture serveur réellement nouvelle de cette
+  session — mixte création/mise à jour dans le même appel (chaque ligne du tableau porte ou non un
+  `ligne_offre_id`), avec double garde-fou référentiel (la ligne de besoin doit appartenir à la
+  consultation de l'offre visée, la ligne d'offre à mettre à jour doit appartenir à cette même offre) —
+  une ligne qui échoue est rejetée individuellement, sans bloquer les lignes valides du même import.
+- **Décision structurante : réutiliser `creer_offre_epi` tel quel quand aucune offre n'existe encore**
+  pour ce fournisseur sur cette consultation, plutôt que de dupliquer la logique de création d'en-tête
+  dans la nouvelle action — seul le cas « une offre existe déjà » (mise à jour/ajout de lignes) exigeait
+  réellement une nouvelle action.
+- **Détection des colonnes du fichier par libellé, pas par position** (`epiDetecterColonnesImportOffre`,
+  dashboard.html) : un fournisseur qui réordonne les colonnes en ouvrant le fichier dans son propre
+  tableur (Excel, Numbers, Google Sheets réexporté...) ne doit pas faire échouer le rapprochement.
+  Libellés traités du plus long au plus court pour qu'« Designation proposee » ne se fasse jamais voler
+  sa colonne par le plus court « Designation » (la colonne interne, en lecture seule) — les deux
+  coexistent dans le même fichier. Fichier non conforme (colonnes obligatoires introuvables : id ligne,
+  référence fournisseur, prix unitaire) → rejeté explicitement, jamais une tentative de lecture
+  approximative.
+- **Rapprochement en deux temps, jamais une correspondance devinée à l'aveugle**
+  (`epiAnalyserImportOffre`) : par l'identifiant technique (colonne A, ID de la ligne
+  `EPI_Consultation_Lignes`) en priorité ; en repli, par correspondance exacte type d'article + taille +
+  référence interne, uniquement si le résultat est **unique** — une correspondance ambiguë (deux lignes
+  de besoin identiques par ces trois critères) reste explicitement non rapprochée plutôt que d'attribuer
+  la ligne au hasard.
+- **Définition du « conflit » pesée avec soin** : une ligne d'offre déjà existante n'est un conflit que
+  si elle porte un contenu réellement saisi (au moins un champ non vide/non nul, ou `Non_Propose=true`)
+  ET que ce contenu diffère de l'import — un simple gabarit vide (offre créée tôt, prix nuls, en
+  attendant justement ce cadre) est mis à jour directement, sans demander un arbitrage qui n'aurait
+  aucun sens. Une vraie divergence entre une saisie manuelle et l'import se résout par défaut vers
+  « Garder l'existant » (jamais un écrasement silencieux), avec un contrôle explicite (menu déroulant
+  par ligne) pour basculer vers « Utiliser l'import » si l'utilisateur le décide.
+- **Prix aberrants : deux règles distinctes, jamais mélangées** — nul/négatif (erreur de saisie quasi
+  certaine) vs écart de plus d'un facteur 10 avec une autre offre déjà reçue sur la même ligne (les
+  offres `Ecartee` exclues de cette comparaison, cohérent avec `epiCalculerComparatifOffres`). Une
+  ligne à prix suspect est décochée par défaut dans l'écran de contrôle — l'utilisateur doit la
+  recocher consciemment après avoir vérifié visuellement.
+- **Libellé modifié = informatif, jamais bloquant** : si la colonne « Désignation » (interne, en
+  lecture seule côté cadre exporté) revient différente de l'originale, c'est signalé (le fournisseur a
+  peut-être mal recopié ou volontairement précisé quelque chose) mais n'empêche jamais l'inclusion de
+  la ligne — à la différence des prix aberrants, qui eux sont exclus par défaut.
+- **Aucune nouvelle dépendance, conformément à la contrainte de session** : réutilise SheetJS 0.18.5
+  (déjà chargé, déjà utilisé par l'import Excel du comptage de stock EPI, même flux `FileReader` →
+  `XLSX.read` → `sheet_to_json`) et `exporterExcel` tels quels. Aucun des 3 gabarits imprimables
+  existants (fiches EPI/Outillage, relevé de sortie) n'a été touché.
+- **Vérification en navigateur, au-delà des tests automatisés** : serveur statique local
+  (`.claude/launch.json`), session simulée (`ADMIN_SESSION`/catalogues injectés directement),
+  `XLSX.writeFile` stubbé pour capturer le classeur exporté (2 onglets, en-têtes et lignes conformes)
+  sans déclencher de téléchargement réel ; **le réimport a été exercé avec un VRAI aller-retour SheetJS**
+  (écriture d'un classeur en mémoire via `XLSX.write`, relecture via `XLSX.read`/`sheet_to_json`,
+  exactement le chemin que `chargerFichierImportOffreEPI` emprunte pour un vrai fichier) plutôt qu'avec
+  des lignes construites à la main — confirme que la détection de colonnes et le rapprochement
+  fonctionnent sur des données réellement issues du moteur SheetJS, pas seulement sur des fixtures de
+  test. Les deux chemins d'écriture ont été exercés de bout en bout avec `fetch` stubbé : offre déjà
+  existante (ACME Corp) → `importer_lignes_offre_epi` avec le bon `offre_id` et `ligne_offre_id` porté
+  uniquement sur la ligne où l'utilisateur a choisi « Utiliser l'import » ; aucune offre existante
+  (Beta SARL) → `creer_offre_epi` avec les 2 lignes retenues. L'écran de contrôle a été vérifié
+  interactivement (bascule du menu déroulant de conflit, case à cocher d'inclusion, compteur/activation
+  du bouton « Valider l'import » recalculés correctement à chaque changement). Zéro appel réseau réel
+  vers le Worker de production dans cette session.
+- **Tests** : 313/313 en début de session (baseline vérifiée). +6 tests serveur
+  (`tests/worker.epi-consultations.test.js` : création + mise à jour dans le même appel, ligne hors
+  périmètre de la consultation rejetée sans bloquer les autres, `ligne_offre_id` étranger à l'offre
+  rejeté, offre introuvable, données invalides, sans jeton garant) et +20 tests client
+  (`tests/dashboard.epi-import-offre.test.js`, même principe d'extraction `vm` que les sessions
+  précédentes : détection de colonnes — cas nominal, ordre indifférent, colonnes réordonnées, fichier
+  non conforme, en-tête vide —, construction des lignes — virgule décimale, lignes vides ignorées,
+  variantes de « Oui » pour non-proposé —, rapprochement par id/par repli/ambigu/introuvable, conflit
+  sur gabarit vierge vs saisie manuelle réelle, prix nul/négatif/écart de facteur 10/dans la marge/offre
+  écartée exclue, libellé modifié/inchangé, résumé cumulé sur un jeu hétérogène). `tests/worker.audit-helpers.test.js`
+  mis à jour (81 → 82 actions gated). **341/341** en fin de session, 0 régression. `npm run sync:staging`
+  relancé après modification de `dashboard.html`.
+- **Étape bloquante côté William, inchangée** : les 5 listes SharePoint du module Consultations EPI
+  (`Fournisseurs`, `EPI_Consultations`, `EPI_Consultation_Lignes`, `EPI_Offres`, `EPI_Offres_Lignes`)
+  restent à créer (production et recette) avant toute utilisation réelle — cette session n'a ajouté
+  aucune nouvelle liste ni colonne, donc aucune étape supplémentaire ne s'ajoute à celle déjà signalée
+  dans les sessions 2 et 3.
+
+## Session 5 — Documentation, recette et mise en service du module Besoin EPI / Consultations (9 sept. 2026)
+
+*Les 4 sessions précédentes (638ae7a, 8b62aab, fbbf436, ab95d35, ce1f40f — 9 sept. 2026 également,
+mêmes journée) ont livré le code du module, chacune mettant à jour `02_MODELE_DONNEES.md` et
+`03_REGLES_METIER_ET_ROLES.md` au fil de l'eau, plus cette même section de `04_HISTORIQUE_DECISIONS.md`.
+Mais **aucune des 5** n'a touché `00_CONTEXTE_PROJET.md`, `05_ROADMAP_EVOLUTIONS_FUTURES.md`,
+`ARCHITECTURE_GLOBALE.md` ni `CLAUDE.md` (vérifié par `git show --stat` sur chacune) — le module était
+donc invisible dans la vue d'ensemble du projet, dans la cartographie technique, et dans le fichier que
+Claude Code charge automatiquement à l'ouverture du dépôt. Cette session ferme cet écart : documentation
+seulement, aucun changement de comportement, `npm run verify` vert avant/après.*
+
+**Méthode : rien pris pour acquis, tout revérifié sur le code réel de ce jour** — y compris les
+sections déjà écrites par les sessions précédentes, avant de considérer qu'elles n'avaient pas besoin
+de retouche. Diff complet de `ce1f40f`/`ab95d35` rejoué depuis git, `worker.js`/`dashboard.html` relus
+par grep ciblé (actions, endpoints, formule, transitions), les 4 fichiers de test EPI relus
+intégralement, `ARCHITECTURE_GLOBALE.md`/`PROCEDURE_RECETTE.md` lus en entier (jamais concaténés dans
+`CLAUDE.md`, donc jamais vus lors des sessions précédentes sauf à les ouvrir explicitement). Conclusion
+de cette relecture : `02_MODELE_DONNEES.md` et `03_REGLES_METIER_ET_ROLES.md` se sont révélés déjà
+exacts et complets (aucune correction nécessaire) — la valeur de cette session porte sur les 5 autres
+fichiers.
+
+### D1 à D9 : ce que `CADRAGE_MODULE_BESOIN_EPI.md` proposait vs ce qui a été livré
+
+*Le document de cadrage (racine du dépôt, jamais un contrat figé) proposait un schéma à 6 listes et
+11 actions avec un partage admin/garant. L'instruction de session qui a suivi en a livré un différent,
+« qui prévaut » (déjà noté dans `02_MODELE_DONNEES.md`). Cette section recoupe, décision par décision,
+ce qui a été conservé du raisonnement du cadrage et ce qui a été concrètement écarté — vérifié contre
+le code réel de ce jour, pas contre la mémoire de session.*
+
+| # | Décision (cadrage) | Livré — vérifié sur le code de ce jour |
+|---|---|---|
+| D1 | Calcul par territoire, jamais fusionné avant la marge | **Conforme.** `epiCalculerBesoinAnnuel` (dashboard.html) accumule Réunion/Mayotte séparément de bout en bout (étapes A, B, C) — vérifié ligne à ligne. |
+| D2 | `Renouvellement_Mois` absent/vide/`0` ⇒ 12 mois par défaut | **Conforme.** Lecture (`?grille_dotation_epi=1`) et écriture (`maj_grille_dotation_epi`) toutes deux défensives ; colonne **toujours pas créée en production** au 9 sept. 2026 (reconfirmé ce jour via le commentaire du code, qui documente lui-même cet état). |
+| D3 | Effectif prévisionnel : delta entrées−sorties plafonné à 0, taille provisionnée = la plus fréquente | **Formule conforme**, mais **stockage écarté** : le cadrage proposait une liste persistée `Effectif_Previsionnel_EPI` (une ligne par affectation×site, avec `Effectif_Actuel` figé). Le livré ne persiste rien à part écran — l'effectif prévisionnel est saisi à la volée et, seulement au figeage, sérialisé en JSON dans `EPI_Consultations.Parametres`. Aucune liste dédiée n'existe ni n'est prévue. |
+| D4 | Stock catalogue informatif seul, jamais dans le calcul | **Principe respecté** (le stock n'entre jamais dans `epiCalculerBesoinAnnuel`) **mais le champ informatif lui-même (`Stock_Actuel_Info` du cadrage) n'a pas été construit** — `EPI_Consultation_Lignes` livrée n'a pas de colonne stock. Simplification, pas une contradiction du principe. |
+| D5 | Marge appliquée ligne à ligne par territoire, jamais sur un total global | **Conforme.** `Math.ceil(a.Reunion*(1+margePct/100))` et `Math.ceil(a.Mayotte*(1+margePct/100))` calculés indépendamment, le total est leur somme — jamais l'inverse. |
+| D6 | Prix jamais dans le calcul du besoin ; devise figée EUR, pas de conversion | **Conforme sur le fond** (aucune conversion n'existe nulle part dans le code) — **nuance** : le cadrage voulait `Devise` *figée* EUR (non modifiable), le livré (`EPI_Offres.Devise`) accepte ce que le client envoie et ne retombe sur `'EUR'` que si rien n'est transmis — légèrement plus souple, sans que cela change quoi que ce soit en pratique tant qu'aucun flux multi-devise n'existe. Le multi-devise réel (taux de change, conversion) reste hors périmètre — reporté explicitement dans `05_ROADMAP_EVOLUTIONS_FUTURES.md`. |
+| D7 | Comparatif 2 scénarios (mono-fournisseur moins-disant vs ligne à ligne panaché) | **Conforme, livré en session 3** (`fbbf436`, pas dans la session de persistance initiale comme le cadrage l'esquissait) — avec un raffinement non explicité par le cadrage : le scénario A (mono-fournisseur) n'est calculable que si un fournisseur couvre **100%** des lignes, sinon explicitement signalé non calculable plutôt que de forcer un résultat trompeur. |
+| D8 | Report au catalogue : `Reference`/`Fournisseur` uniquement, jamais de prix stocké sur le catalogue | **Conforme.** `reporter_catalogue_epi` (session 3) n'écrit que ces deux champs, jamais `Stock_Actuel`/`Stock_Mini`/`Type_Article`/`Taille_*` — vérifié dans le code (`worker.js:4456`). Tableau de contrôle décochable avant tout envoi, comme demandé. |
+| D9 | Annulation = statut `Annulee` terminal, jamais de suppression | **Conforme.** `changer_statut_consultation_epi` — `Annulee` atteignable depuis tout état non terminal, motif préfixé dans `Notes` sans écraser l'existant, jamais de `DELETE`. |
+
+**Ce qui a été écarté du cadrage au-delà de D1-D9, et pourquoi** (déjà en partie noté dans `02_MODELE_DONNEES.md`/`03_REGLES_METIER_ET_ROLES.md`, rassemblé ici pour la première fois en un seul endroit) :
+- **Schéma à 5 listes au lieu de 6** : pas de `Fournisseurs_Consultation_EPI` (suivi d'invitation "Invite/Offre_Recue/Ecarte") — dans le livré, rien ne trace formellement qu'un fournisseur a été sollicité ; le fait qu'il ait une offre `EPI_Offres` pour cette consultation *est* la seule trace. En échange, `EPI_Offres` (en-tête) porte davantage de conditions commerciales que le `Lignes_Offres_EPI` plat du cadrage (frais de port, franco, remise globale, délai, validité) — nécessaires au calcul des scénarios A/B (D7), donc un enrichissement net sur ce point précis malgré la liste en moins.
+- **Statuts** : 6 valeurs livrées (`Brouillon/Envoyee/Depouillement/Attribuee/Cloturee/Annulee`) contre 7 proposées (le cadrage avait un `Besoin_Valide` intermédiaire entre Brouillon et En_Consultation) — fusionné : le livré fige le besoin et crée la consultation en un seul geste (`creer_consultation_epi`), pas de statut « besoin validé mais pas encore envoyé ».
+- **Droits** : le cadrage proposait des capacités dédiées `peutGererBesoinEPI`/`peutVoirBesoinEPI`, distinctes de `peutGererEPI`/`peutVoirEPI` (justification : module tarifaire, à séparer). L'instruction de session a tranché plus simple — réutilisation pure de `peutGererEPI`/`peutVoirEPI`, aucune nouvelle capacité `ROLE_CAPS`. Déjà documenté, reconfirmé exact ce jour (grep : zéro occurrence de `peutGererBesoinEPI`/`peutVoirBesoinEPI` dans `dashboard.html`).
+- **Partage admin/garant aplati à `requireGarant` partout** : le cadrage répartissait les 11 actions entre `requireAdmin` (créer/valider/arbitrer/reporter/clôturer/annuler) et `requireGarant` (le reste). **Vérifié ce jour par script indépendant sur `worker.js`** : les 11 actions du module (`creer_fournisseur`, `editer_fournisseur`, `creer_consultation_epi`, `editer_consultation_epi`, `editer_ligne_consultation_epi`, `changer_statut_consultation_epi`, `creer_offre_epi`, `editer_offre_epi`, `editer_ligne_offre_epi`, `importer_lignes_offre_epi`, `reporter_catalogue_epi`) sont **toutes** `requireGarant`, aucune n'est `requireAdmin` — cohérent avec « aucune nouvelle capacité dédiée », un module `requireAdmin` séparé aurait été incohérent avec des droits calqués sur `peutGererEPI` (Admin+Logistique+Logistique_Mayotte).
+- **Lectures GET moins protégées que le cadrage ne le proposait** : le cadrage voulait `requireGarant` sur les lignes de besoin seules (« donnée RH-adjacente »). Le livré ne protège que ce qui porte un prix : `?fournisseurs=1`, `?epi_consultations=1`, `?epi_consultation_lignes=<id>` sont **publics** (aucune authentification), seul `?epi_offres=<id>&token=` est `requireGarant` — cohérence retenue avec la majorité des endpoints EPI déjà publics (`?catalogue_epi=1`, `?grille_dotation_epi=1`) plutôt qu'avec le cadrage. Déjà documenté dans `03_REGLES_METIER_ET_ROLES.md`, reconfirmé par lecture directe de `worker.js` ce jour (`?epi_offres=` vérifié comme le seul des 4 GET du module à appeler `requireGarant`).
+- **4 écrans proposés → 3 écrans livrés** : "Consultations"/"Besoin"/"Fournisseurs & Offres"/"Arbitrage" du cadrage sont devenus "📋 Besoin annuel"/"📑 Consultations"/"🏭 Fournisseurs" — le comparatif d'offres (D7) et l'arbitrage (attribution ligne à ligne) sont tous deux rendus **à l'intérieur** de l'écran de détail d'une consultation, pas dans des sous-onglets séparés.
+- **La fonctionnalité la plus significative écartée du cadrage n'y figurait pas du tout** : le « cadre de réponse fournisseur » (export/réimport Excel, session 4, `ce1f40f`) répond à un besoin d'usage réel remonté par William après le début du développement — le cadrage, écrit avant tout code, ne pouvait pas l'anticiper.
+
+### Vérification indépendante des chiffres (script de comptage, pas une estimation)
+
+*`ARCHITECTURE_GLOBALE.md` datait du 11 août 2026 — près d'un mois de développement (Brasseurs d'air,
+Synthèse direction, ce module) s'était accumulé sans qu'aucun total n'y soit revérifié. Plutôt que
+d'ajouter "+ 11" à un chiffre déjà obsolète, tous les comptes ci-dessous sont recalculés depuis le
+code réel de ce jour (script Node ponctuel, non conservé dans le dépôt — un simple parcours de chaque
+bloc `if (action === 'xxx')` de `worker.js`, classé par présence de `requireAdmin(body)`/
+`requireGarant(body)` dans le corps du bloc, pas par proximité de ligne pour éviter tout faux positif) :*
+
+- **104 actions POST** au total dans le routeur (`dispatchPost()`), décomposées en **28 `requireAdmin`
+  + 54 `requireGarant`** (= 82, taille exacte du `Set` `GATED_ACTIONS_AUDIT`, confirmée par un second
+  calcul indépendant) **+ 18 actions publiques partagées PWA** (`PWA_SHARED_ACTIONS`,
+  `tests/security.gated-actions.test.js`) **+ 2 actions de connexion** (`verify_password`,
+  `set_password`, qui produisent le jeton et ne peuvent donc pas déjà en exiger un) **+ 2 blocs
+  neutralisés** (`bulk_maj_immos`, `maj_duree_amort`, tous deux `{success:false,error:'deprecated'}`
+  depuis l'audit de sécurité du 9 août). 28+54+18+2+2 = 104, aucun écart.
+- **32 listes SharePoint** dans `EXPORTABLE_LISTS` (`worker.js`), pas 22 — l'écart de 10 vient des 5
+  listes Brasseurs d'air (11 août) et des 5 listes Consultations EPI (ce module, jamais recomptées
+  ensemble jusqu'ici).
+- **341/341 tests** (`npm test`), dont **88 spécifiquement dédiés au module Besoin/Consultations EPI**
+  répartis sur 4 fichiers (`worker.epi-consultations.test.js` : 44, `dashboard.epi-besoin-annuel.test.js` :
+  9, `dashboard.epi-comparatif.test.js` : 13, `dashboard.epi-import-offre.test.js` : 22).
+- Ces chiffres remplacent ceux, obsolètes, encore affichés dans `ARCHITECTURE_GLOBALE.md` (mis à jour
+  cette session, voir plus bas) — mais **uniquement pour le périmètre de recomptage global** ; le détail
+  nominatif complet des 28 actions admin / 54 garant (au-delà des 11 de ce module) n'a pas été
+  intégralement re-cartographié action par action dans la prose de `ARCHITECTURE_GLOBALE.md` (voir
+  écart signalé dans ce même fichier, §7) — seuls les totaux et les 11 actions de ce module sont
+  garantis exacts à cette date.
+
+### Anomalie trouvée en cours de recomptage, sans lien avec ce module — signalée, non corrigée
+
+En scannant systématiquement chaque bloc d'action de `worker.js` pour recompter les niveaux de
+protection, `modifier_ligne_inventaire` (édition d'une ligne de comptage de stock, campagne
+d'inventaire d'articles — module distinct, sans rapport avec les EPI) s'est révélée **publique/non
+gated, exactement comme sa voisine `supprimer_ligne_inventaire`** (même bloc `if`, même modèle de
+confiance auteur-ou-admin via `body.par_code`/`body.est_admin`) — mais contrairement à elle,
+`modifier_ligne_inventaire` **n'apparaît pas** dans `PWA_SHARED_ACTIONS`
+(`tests/security.gated-actions.test.js`), la liste blanche qui documente/vérifie quelles actions sont
+volontairement non protégées. Rien n'indique un bug de comportement (le code fonctionne, le test
+`security.gated-actions.test.js` passe car il ne vérifie pas l'exhaustivité du côté "public") — c'est
+un oubli de classification dans la liste de suivi, repéré incidemment en travaillant sur un tout autre
+module. Non corrigé ici (hors périmètre, et une modification de `PWA_SHARED_ACTIONS` — même sans
+changer aucun comportement — mérite sa propre session plutôt qu'un ajout de passage). Détail dans
+`ARCHITECTURE_GLOBALE.md` § 7.
+
+### Vérification de sécurité des données (fixtures) — aucune donnée réelle
+
+Balayage explicite des 4 fichiers de test EPI-consultations et de leurs fixtures, à la demande
+explicite de cette session : noms de fournisseurs fictifs utilisés (`ACME Corp`, `Beta SARL`, `Inconnu
+SARL`, un contact `Jean Dupont`/`jean@acme.test`/`0600000000` — domaine `.test` et téléphone à zéros,
+délibérément non réels), codes employés fictifs génériques (`EMP1`…`EMP5`, `A`/`B`/`C`, `Z1`…`Z3`,
+`BADAFF`, `BADSITE`). `grep -rn "1stShine\|1ST SHINE\|93801\|93 801\|54,01\|54.01"` sur les 4 fichiers
+(ces valeurs appartiennent à la vraie commande fournisseur Brasseurs d'air `FS202603051`, un module
+différent) : **aucune occurrence**. Aucun nom de salarié réel, aucun nom de fournisseur réel, aucun prix
+négocié réel dans les fixtures de ce module.
+
+### Livrables de cette session
+
+- `00_CONTEXTE_PROJET.md` : ligne d'état ajoutée au module (absente jusqu'ici).
+- `05_ROADMAP_EVOLUTIONS_FUTURES.md` : 4 évolutions différées documentées explicitement (multi-devise,
+  notation qualité fournisseur, suivi de la commande réelle post-attribution, rapprochement facture) —
+  aucune n'était dans le cadrage ni dans le développement livré, toutes hors périmètre volontaire de ce
+  module tel que construit.
+- `ARCHITECTURE_GLOBALE.md` : module ajouté à l'inventaire des écrans (§2), les 11 actions ajoutées au
+  tableau `requireGarant` (§3), comptes recalculés (§3), les 5 listes ajoutées (§4), les 4 endpoints GET
+  ajoutés à leur tableau, écarts constatés mis à jour (§7).
+- `PROCEDURE_RECETTE.md` : les 5 listes du module ajoutées à la table de duplication (§2, avec les 5
+  listes Brasseurs, également absentes jusqu'ici) ; nouveau scénario de bout en bout jouable en recette
+  avec des données 100% fictives (calcul → anomalies → figeage → 3 fournisseurs → 3 offres dont une
+  incomplète → comparatif → attribution panachée → export → report au catalogue).
+- Checklist « avant première consultation réelle » produite pour William (voir `PROCEDURE_RECETTE.md`).
+- `CLAUDE.md` régénéré (concaténation des 6 documents `00`-`05` mis à jour).
+- `02_MODELE_DONNEES.md`/`03_REGLES_METIER_ET_ROLES.md` : relus intégralement, confirmés déjà exacts,
+  aucune correction nécessaire.
+- `npm run verify` : 341/341, vert avant et après cette session (aucun fichier de code touché).
+
 ## Comment utiliser ce journal
 Ajouter une entrée à chaque décision structurante : la date approximative, ce qui a été décidé, et surtout **pourquoi** (le contexte qui a motivé le choix). Ne pas y mettre le détail technique (qui vit dans le code et les autres documents) mais le raisonnement métier.
 
@@ -2780,6 +3071,41 @@ Constat : le référent matériel à Mayotte (Logistique_Mayotte) est peu à l'a
 
 ### F. Digest de notifications hebdomadaire — ✅ FAIT (août 2026)
 Développé et déployé : nouvel endpoint `?digest=1` (Worker, protégé par `DIGEST_TOKEN_ENV`) calculé et envoyé chaque lundi par un nouveau flux Power Automate planifié, en complément du flux "Notification_Mouvement_Immo" existant (qui reste inchangé — un email par mouvement continue d'être envoyé). Récapitule 5 points d'action : transferts/retours en attente > 7 jours, garanties expirant sous 30 jours, pannes non résolues > 7 jours, stock bas EPI/Outillage (seuils déjà en place), campagnes d'inventaire immos ouvertes à faible couverture (< 50%, ouvertes depuis > 14 jours) — les 3 derniers points ajoutés par l'assistant en complément de la demande initiale de William, à sa validation lors du cadrage. Digest vide = pas d'email (décision prise côté flux Power Automate, via une Condition sur le champ `vide`). Détail complet dans `01_ARCHITECTURE_TECHNIQUE.md` § Digest hebdomadaire et `04_HISTORIQUE_DECISIONS.md`.
+
+### G. Module Besoin annuel EPI & Consultations fournisseurs — évolutions différées (sept. 2026)
+
+Le module (calcul du besoin, figeage en consultation, répertoire fournisseurs, offres, comparatif,
+attribution, report au catalogue, cadre de réponse Excel exportable/réimportable) est **fait et testé**
+— voir `04_HISTORIQUE_DECISIONS.md`. Quatre points ont été identifiés en cours de développement mais
+volontairement reportés, aucun n'ayant été demandé par William ni figurant dans le cadrage initial
+(`CADRAGE_MODULE_BESOIN_EPI.md`) :
+
+- **Multi-devise réelle** (taux de change, conversion) : `EPI_Offres.Devise` accepte n'importe quelle
+  valeur transmise et ne retombe sur `EUR` que si rien n'est fourni, mais aucune conversion n'existe
+  nulle part dans le code — un fournisseur qui répond en USD ou CNY (cas déjà vécu côté Brasseurs d'air
+  avec 1ST SHINE) verrait ses prix comparés tels quels aux offres en EUR, sans conversion, faussant le
+  comparatif. Pas un bug (comportement documenté, cohérent avec D6 — prix jamais dans le calcul du
+  besoin, seulement dans l'arbitrage) mais une limite réelle si un fournisseur international répond un
+  jour à une consultation EPI.
+- **Notation qualité fournisseur** : le comparatif (`epiCalculerComparatifOffres`) et l'attribution ne
+  tiennent compte que du prix (et du conditionnement/délai déjà saisis par ligne) — aucune note de
+  fiabilité, de qualité de service ou d'historique de litige par fournisseur n'existe, contrairement à
+  ce qu'un outil d'achat plus mature proposerait. Le répertoire `Fournisseurs` a une colonne `Notes`
+  libre, mais rien de structuré ni d'exploité dans le calcul.
+- **Suivi de la commande réelle après attribution** : le module s'arrête au report au catalogue (D8) —
+  une fois `Reference`/`Fournisseur` écrits sur `Catalogue_Articles_EPI`, rien ne trace la commande
+  d'achat réelle qui en découle (bon de commande, date de passation, réception, écarts commandé/reçu).
+  Le module Brasseurs d'air a ce cycle complet (`Brasseurs_Commandes`/`Brasseurs_Lignes_Commande`,
+  réception avec gestion des écarts) — rien d'équivalent n'existe côté EPI après l'attribution. Le flux
+  de réception de stock EPI déjà existant (`reception_commande_epi`, incrémente `Stock_Actuel`) reste
+  totalement indépendant d'une consultation/attribution : rien ne relie une réception physique à
+  l'offre qui l'a justifiée.
+- **Rapprochement facture** : aucun lien entre une offre attribuée (prix retenu, ligne à ligne) et une
+  facture fournisseur reçue ensuite — pas de vérification automatique que ce qui a été facturé
+  correspond à ce qui a été arbitré. À rapprocher manuellement en dehors de l'outil aujourd'hui.
+
+Aucun de ces points n'est un engagement — à cadrer avec William si l'usage réel du module (une fois les
+5 listes SharePoint créées et une vraie consultation menée) en révèle le besoin concret.
 
 ## Priorisation suggérée (à valider avec William)
 

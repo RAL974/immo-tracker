@@ -643,6 +643,20 @@ libre, contrairement à `Brasseurs_Commandes.Fournisseur`).*
 Les 5 listes ci-dessus ont été ajoutées à `EXPORTABLE_LISTS` (`worker.js` et `dashboard.html`,
 synchronisation vérifiée par `tests/backup.export-structure.test.js`).
 
+⚠️ **Pièges à vérifier à la création (pas encore rencontrés sur ces 5 listes précisément — elles
+n'existent toujours pas en production au 9 sept. 2026 — mais systématiques sur ce projet à chaque fois
+qu'une liste est créée à la main) : `?debug_columns=<liste>` sur les deux sites (production ET recette)
+avant d'utiliser le module.** Trois classes d'incident déjà vécues ailleurs dans ce projet, chacune
+susceptible de se reproduire ici : un nom de colonne accentué encodé en interne par SharePoint
+(`Quantité` → `Quantit_x00e9_` sur `Brasseurs_Mouvements`) — aucune colonne de ces 5 listes n'est
+accentuée, choix délibéré pour ne pas reproduire l'incident ; une colonne **Date et heure** oubliée à
+la création (`Dotations_EPI.Genere_Le`/`Emarge_Le`, découvert après coup) — `EPI_Consultations.Date_Creation`
+est le seul champ « Date et heure » de ce module, à ne pas rater ; un champ **Notes/Commentaire**
+créé en texte « Une seule ligne » qui tronque silencieusement au-delà de ~255 caractères
+(`Brasseurs_Commandes.Notes`, vécu réellement lors de la saisie d'une commande) — `Fournisseurs.Notes`,
+`EPI_Consultations.Notes`, `EPI_Offres.Notes` et `EPI_Offres_Lignes.Commentaire` doivent tous être créés
+en **« Plusieurs lignes de texte »**, déjà indiqué dans les tableaux ci-dessus.
+
 ### Comparatif, attribution et report au catalogue (session 3, sept. 2026)
 
 *Aucune nouvelle liste ni colonne SharePoint pour cette tranche — le comparatif des offres et les

@@ -36,6 +36,41 @@ Constat : le référent matériel à Mayotte (Logistique_Mayotte) est peu à l'a
 ### F. Digest de notifications hebdomadaire — ✅ FAIT (août 2026)
 Développé et déployé : nouvel endpoint `?digest=1` (Worker, protégé par `DIGEST_TOKEN_ENV`) calculé et envoyé chaque lundi par un nouveau flux Power Automate planifié, en complément du flux "Notification_Mouvement_Immo" existant (qui reste inchangé — un email par mouvement continue d'être envoyé). Récapitule 5 points d'action : transferts/retours en attente > 7 jours, garanties expirant sous 30 jours, pannes non résolues > 7 jours, stock bas EPI/Outillage (seuils déjà en place), campagnes d'inventaire immos ouvertes à faible couverture (< 50%, ouvertes depuis > 14 jours) — les 3 derniers points ajoutés par l'assistant en complément de la demande initiale de William, à sa validation lors du cadrage. Digest vide = pas d'email (décision prise côté flux Power Automate, via une Condition sur le champ `vide`). Détail complet dans `01_ARCHITECTURE_TECHNIQUE.md` § Digest hebdomadaire et `04_HISTORIQUE_DECISIONS.md`.
 
+### G. Module Besoin annuel EPI & Consultations fournisseurs — évolutions différées (sept. 2026)
+
+Le module (calcul du besoin, figeage en consultation, répertoire fournisseurs, offres, comparatif,
+attribution, report au catalogue, cadre de réponse Excel exportable/réimportable) est **fait et testé**
+— voir `04_HISTORIQUE_DECISIONS.md`. Quatre points ont été identifiés en cours de développement mais
+volontairement reportés, aucun n'ayant été demandé par William ni figurant dans le cadrage initial
+(`CADRAGE_MODULE_BESOIN_EPI.md`) :
+
+- **Multi-devise réelle** (taux de change, conversion) : `EPI_Offres.Devise` accepte n'importe quelle
+  valeur transmise et ne retombe sur `EUR` que si rien n'est fourni, mais aucune conversion n'existe
+  nulle part dans le code — un fournisseur qui répond en USD ou CNY (cas déjà vécu côté Brasseurs d'air
+  avec 1ST SHINE) verrait ses prix comparés tels quels aux offres en EUR, sans conversion, faussant le
+  comparatif. Pas un bug (comportement documenté, cohérent avec D6 — prix jamais dans le calcul du
+  besoin, seulement dans l'arbitrage) mais une limite réelle si un fournisseur international répond un
+  jour à une consultation EPI.
+- **Notation qualité fournisseur** : le comparatif (`epiCalculerComparatifOffres`) et l'attribution ne
+  tiennent compte que du prix (et du conditionnement/délai déjà saisis par ligne) — aucune note de
+  fiabilité, de qualité de service ou d'historique de litige par fournisseur n'existe, contrairement à
+  ce qu'un outil d'achat plus mature proposerait. Le répertoire `Fournisseurs` a une colonne `Notes`
+  libre, mais rien de structuré ni d'exploité dans le calcul.
+- **Suivi de la commande réelle après attribution** : le module s'arrête au report au catalogue (D8) —
+  une fois `Reference`/`Fournisseur` écrits sur `Catalogue_Articles_EPI`, rien ne trace la commande
+  d'achat réelle qui en découle (bon de commande, date de passation, réception, écarts commandé/reçu).
+  Le module Brasseurs d'air a ce cycle complet (`Brasseurs_Commandes`/`Brasseurs_Lignes_Commande`,
+  réception avec gestion des écarts) — rien d'équivalent n'existe côté EPI après l'attribution. Le flux
+  de réception de stock EPI déjà existant (`reception_commande_epi`, incrémente `Stock_Actuel`) reste
+  totalement indépendant d'une consultation/attribution : rien ne relie une réception physique à
+  l'offre qui l'a justifiée.
+- **Rapprochement facture** : aucun lien entre une offre attribuée (prix retenu, ligne à ligne) et une
+  facture fournisseur reçue ensuite — pas de vérification automatique que ce qui a été facturé
+  correspond à ce qui a été arbitré. À rapprocher manuellement en dehors de l'outil aujourd'hui.
+
+Aucun de ces points n'est un engagement — à cadrer avec William si l'usage réel du module (une fois les
+5 listes SharePoint créées et une vraie consultation menée) en révèle le besoin concret.
+
 ## Priorisation suggérée (à valider avec William)
 
 1. ~~**A — Inventaire physique**~~ : **fait (août 2026)**, code livré pour les deux volets (stock A2, immobilisations A1) — consolide la fiabilité de la base de données sur laquelle s'appuient déjà l'amortissement, l'export comptable et la maintenance préventive.
