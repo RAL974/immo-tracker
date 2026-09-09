@@ -2608,9 +2608,19 @@ function exporterBesoinAnnuelEPI(){
 }
 
 // ── « Figer le besoin » en consultation (depuis l'onglet Besoin annuel) ──────────────────────
+// Réinitialise le bouton de la modale #add-overlay à l'ouverture d'un nouveau flux — sans ça, un
+// bouton laissé disabled/"Enregistrement…" par un usage précédent (succès pas encore auto-fermé,
+// ou une exception échappée) resterait figé dans cet état à la réouverture suivante. Défense en
+// profondeur pour les 6 flux Consultations EPI ajoutés cette session (voir le correctif du bouton
+// resté bloqué sur "Figer en consultation", 04_HISTORIQUE_DECISIONS.md).
+function resetAddBtnEPI(){
+  var btn=document.getElementById('add-confirm-btn');
+  btn.disabled=false;btn.textContent='✅ Enregistrer';btn.style.display='';
+}
 function ouvrirFigerBesoinEPI(){
   if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
   if(!EPI_BESOIN_RESULTAT||!EPI_BESOIN_RESULTAT.lignes.length){alert('Aucune ligne de besoin à figer — vérifiez le calcul ci-dessus.');return;}
+  resetAddBtnEPI();
   document.getElementById('add-titre').textContent='🧊 Figer le besoin en consultation';
   document.getElementById('add-msg').textContent='';
   var totalAnom=Object.keys(EPI_BESOIN_RESULTAT.anomalies).reduce(function(s,k){return s+EPI_BESOIN_RESULTAT.anomalies[k].length;},0);
@@ -2630,12 +2640,20 @@ async function soumettreFigerBesoinEPI(){
   msg.style.color='var(--red)';
   if(!titre){msg.textContent='Le nom de la consultation est obligatoire.';return;}
   if(!(await confirmModal('Figer ce besoin dans la consultation « '+titre+' » ?\n\nLes quantités calculées seront gelées — un futur recalcul du besoin (grille, catalogue, effectifs) ne modifiera jamais cette consultation.')))return;
+  if(!EPI_BESOIN_RESULTAT||!EPI_BESOIN_RESULTAT.lignes||!EPI_BESOIN_RESULTAT.lignes.length){msg.textContent='Le besoin affiché n\'est plus disponible — ferme cette fenêtre et réessaie depuis l\'écran Besoin annuel.';return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
-  var r=EPI_BESOIN_RESULTAT;
-  var lignes=r.lignes.map(function(l){return{type_article:l.type_article,taille:l.taille,reference_interne:l.reference,designation:l.designation,quantite_reunion:l.qte_reunion,quantite_mayotte:l.qte_mayotte,quantite_calculee:l.qte_totale};});
-  var payload={titre:titre,annee_cible:EPI_BESOIN_ANNEE,date_limite_reponse:(document.getElementById('fc-limite').value||''),notes:(document.getElementById('fc-notes').value||'').trim(),
-    parametres:{annee:r.annee,marge_pourcentage:r.marge_pourcentage,previsionnel:r.previsionnel,effectif:r.effectif},lignes:lignes};
+  // Tout ce qui suit est désormais dans le try/catch (bug corrigé sept. 2026, retour terrain de
+  // William) : la construction de lignes/payload se faisait auparavant hors du bloc try, donc toute
+  // exception y survenant (accès à une propriété inattendue, etc.) rejetait silencieusement cette
+  // fonction async sans jamais réinitialiser le bouton ni afficher de message — le bouton restait
+  // bloqué sur "Enregistrement…" indéfiniment, sans qu'aucun appel réseau n'ait même été envoyé
+  // (donc aucune consultation créée). Même classe de bug déjà rencontrée et corrigée une fois sur la
+  // modale de mouvement partagée, voir 04_HISTORIQUE_DECISIONS.md.
   try{
+    var r=EPI_BESOIN_RESULTAT;
+    var lignes=r.lignes.map(function(l){return{type_article:l.type_article,taille:l.taille,reference_interne:l.reference,designation:l.designation,quantite_reunion:l.qte_reunion,quantite_mayotte:l.qte_mayotte,quantite_calculee:l.qte_totale};});
+    var payload={titre:titre,annee_cible:EPI_BESOIN_ANNEE,date_limite_reponse:(document.getElementById('fc-limite').value||''),notes:(document.getElementById('fc-notes').value||'').trim(),
+      parametres:{annee:r.annee,marge_pourcentage:r.marge_pourcentage,previsionnel:r.previsionnel,effectif:r.effectif},lignes:lignes};
     var rr=await fetch(W+'?action=creer_consultation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await rr.json();
     if(res.success){
@@ -2682,6 +2700,7 @@ function refreshFournisseursResults(){
 }
 function ouvrirAjoutFournisseur(){
   if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  resetAddBtnEPI();
   document.getElementById('add-titre').textContent='➕ Ajouter un fournisseur';
   document.getElementById('add-msg').textContent='';
   document.getElementById('add-form').innerHTML=
@@ -2700,9 +2719,9 @@ async function enregistrerFournisseur(){
   msg.style.color='var(--red)';
   if(!nom){msg.textContent='Le nom est obligatoire.';return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
-  var payload={nom:nom,contact_nom:(document.getElementById('fn-contact').value||'').trim(),contact_email:(document.getElementById('fn-email').value||'').trim(),
-    contact_telephone:(document.getElementById('fn-tel').value||'').trim(),domaines:(document.getElementById('fn-domaines').value||'').trim(),notes:(document.getElementById('fn-notes').value||'').trim()};
   try{
+    var payload={nom:nom,contact_nom:(document.getElementById('fn-contact').value||'').trim(),contact_email:(document.getElementById('fn-email').value||'').trim(),
+      contact_telephone:(document.getElementById('fn-tel').value||'').trim(),domaines:(document.getElementById('fn-domaines').value||'').trim(),notes:(document.getElementById('fn-notes').value||'').trim()};
     var r=await fetch(W+'?action=creer_fournisseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
@@ -2715,6 +2734,7 @@ async function enregistrerFournisseur(){
 function ouvrirEditionFournisseur(id){
   var f=fournisseursList.find(function(x){return x.id===id;});
   if(!f){alert('Fournisseur introuvable.');return;}
+  resetAddBtnEPI();
   document.getElementById('add-titre').textContent='✏️ Éditer '+f.nom;
   document.getElementById('add-msg').textContent='';
   document.getElementById('add-form').innerHTML=
@@ -2733,9 +2753,9 @@ async function soumettreEditionFournisseur(id){
   msg.style.color='var(--red)';
   if(!nom){msg.textContent='Le nom est obligatoire.';return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
-  var payload={id:id,nom:nom,contact_nom:(document.getElementById('fn-contact').value||'').trim(),contact_email:(document.getElementById('fn-email').value||'').trim(),
-    contact_telephone:(document.getElementById('fn-tel').value||'').trim(),domaines:(document.getElementById('fn-domaines').value||'').trim(),notes:(document.getElementById('fn-notes').value||'').trim()};
   try{
+    var payload={id:id,nom:nom,contact_nom:(document.getElementById('fn-contact').value||'').trim(),contact_email:(document.getElementById('fn-email').value||'').trim(),
+      contact_telephone:(document.getElementById('fn-tel').value||'').trim(),domaines:(document.getElementById('fn-domaines').value||'').trim(),notes:(document.getElementById('fn-notes').value||'').trim()};
     var r=await fetch(W+'?action=editer_fournisseur',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
@@ -2889,6 +2909,7 @@ async function changerStatutConsultationEPI(id,nouveauStatut){
 function ouvrirEditionConsultationEPI(id){
   var c=epiConsultationsList.find(function(x){return x.id===id;});
   if(!c)return;
+  resetAddBtnEPI();
   document.getElementById('add-titre').textContent='✏️ Éditer la consultation';
   document.getElementById('add-msg').textContent='';
   document.getElementById('add-form').innerHTML=
@@ -2904,8 +2925,8 @@ async function soumettreEditionConsultationEPI(id){
   msg.style.color='var(--red)';
   if(!titre){msg.textContent='Le nom est obligatoire.';return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
-  var payload={id:id,titre:titre,date_limite_reponse:(document.getElementById('ec-limite').value||''),notes:(document.getElementById('ec-notes').value||'').trim()};
   try{
+    var payload={id:id,titre:titre,date_limite_reponse:(document.getElementById('ec-limite').value||''),notes:(document.getElementById('ec-notes').value||'').trim()};
     var r=await fetch(W+'?action=editer_consultation_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
@@ -2920,6 +2941,7 @@ async function soumettreEditionConsultationEPI(id){
 // ── Offres (en-tête + lignes) ─────────────────────────────────────────────────────────────────
 function ouvrirAjoutOffreEPI(consultationId){
   if(!peutGererEPI(ADMIN_SESSION.code)){alert('Réservé aux gestionnaires EPI.');return;}
+  resetAddBtnEPI();
   var lignes=epiConsultationLignesCache[consultationId]||[];
   if(!lignes.length){alert('Cette consultation n\'a aucune ligne de besoin.');return;}
   var fournOptions=fournisseursList.filter(function(f){return f.actif;});
@@ -2959,13 +2981,13 @@ async function soumettreOffreEPI(consultationId){
   msg.style.color='var(--red)';
   if(!fournisseur){msg.textContent='Sélectionnez un fournisseur.';return;}
   btn.disabled=true;btn.textContent='Enregistrement…';
-  var payload={consultation_id:consultationId,fournisseur:fournisseur,statut:(document.getElementById('of-statut').value||'Recue'),
-    date_reception:(document.getElementById('of-date').value||''),validite_offre:(document.getElementById('of-validite').value||''),
-    delai_livraison_jours:(document.getElementById('of-delai').value||''),devise:(document.getElementById('of-devise').value||'EUR').trim(),
-    frais_port:(document.getElementById('of-port').value||''),franco_a_partir_de:(document.getElementById('of-franco').value||''),
-    remise_globale_pct:(document.getElementById('of-remise').value||''),notes:(document.getElementById('of-notes').value||'').trim(),
-    lignes:offreLignesForm};
   try{
+    var payload={consultation_id:consultationId,fournisseur:fournisseur,statut:(document.getElementById('of-statut').value||'Recue'),
+      date_reception:(document.getElementById('of-date').value||''),validite_offre:(document.getElementById('of-validite').value||''),
+      delai_livraison_jours:(document.getElementById('of-delai').value||''),devise:(document.getElementById('of-devise').value||'EUR').trim(),
+      frais_port:(document.getElementById('of-port').value||''),franco_a_partir_de:(document.getElementById('of-franco').value||''),
+      remise_globale_pct:(document.getElementById('of-remise').value||''),notes:(document.getElementById('of-notes').value||'').trim(),
+      lignes:offreLignesForm};
     var r=await fetch(W+'?action=creer_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
@@ -2979,6 +3001,7 @@ async function soumettreOffreEPI(consultationId){
 function voirOffreEPI(consultationId,offreId){
   var o=(epiOffresCache[consultationId]||[]).find(function(x){return x.id===offreId;});
   if(!o){alert('Offre introuvable.');return;}
+  resetAddBtnEPI();
   var canEdit=peutGererEPI(ADMIN_SESSION.code);
   document.getElementById('add-titre').textContent='🔎 Offre — '+o.fournisseur;
   document.getElementById('add-msg').textContent='';
@@ -3004,9 +3027,9 @@ async function soumettreEditionOffreEPI(consultationId,offreId){
   var msg=document.getElementById('add-msg');var btn=document.getElementById('add-confirm-btn');
   msg.style.color='var(--red)';
   btn.disabled=true;btn.textContent='Enregistrement…';
-  var payload={id:offreId,statut:(document.getElementById('ofd-statut').value||''),devise:(document.getElementById('ofd-devise').value||'').trim(),
-    date_reception:(document.getElementById('ofd-date').value||''),validite_offre:(document.getElementById('ofd-validite').value||''),notes:(document.getElementById('ofd-notes').value||'').trim()};
   try{
+    var payload={id:offreId,statut:(document.getElementById('ofd-statut').value||''),devise:(document.getElementById('ofd-devise').value||'').trim(),
+      date_reception:(document.getElementById('ofd-date').value||''),validite_offre:(document.getElementById('ofd-validite').value||''),notes:(document.getElementById('ofd-notes').value||'').trim()};
     var r=await fetch(W+'?action=editer_offre_epi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var res=await r.json();
     if(res.success){
