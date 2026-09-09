@@ -12,6 +12,10 @@ leurs offres, comparer, arbitrer ligne à ligne, puis reporter les références 
 catalogue — en s'ajoutant à l'onglet EPI existant (dotation annuelle, catalogue, grille,
 stock, suggestion de commande, historique), sans le modifier.*
 
+*Les 6 questions ouvertes de la v1 de ce document ont toutes été tranchées par William en
+session (voir §8, qui documente désormais l'état après réponses) — ce document intègre
+ses choix, tous alignés sur l'option recommandée.*
+
 ---
 
 ## 1. Constats de l'audit (code réel, pas la doc)
@@ -230,17 +234,17 @@ avec `Affectation_EPI` renseignée** — pas `epiEmployesSansFiche` (mauvais pé
 Pour chaque ligne saisie dans `Effectif_Previsionnel_EPI` (Affectation *aff*, Site *T*,
 `Entrees_Prevues`, `Sorties_Prevues`) :
 
-1. `Delta = Entrees_Prevues − Sorties_Prevues`, **plafonné à 0** si négatif — un solde net
-   de départs ne retire jamais de besoin déjà couvert par des employés réellement en poste
-   aujourd'hui (voir question ouverte §8.2 pour confirmation).
+1. `Delta = Entrees_Prevues − Sorties_Prevues`, **plafonné à 0** si négatif — **tranché
+   (§8.2)** : un solde net de départs ne retire jamais de besoin déjà couvert par des
+   employés réellement en poste aujourd'hui.
 2. Si `Delta > 0` : pour chaque ligne de grille de ce profil, même calcul de
    `Quantite_Annuelle_Ligne` qu'à l'étape A.
-3. **Taille provisionnée** : les futures recrues n'ont pas de taille connue. Par défaut,
-   la taille **la plus fréquente** observée à l'étape A pour ce `(aff, Type_Article, T)`
-   parmi les employés réels actuels de ce profil sur ce territoire (voir question ouverte
-   §8.1). Si aucun employé réel actuel de ce profil sur ce territoire n'existe (pas de
-   référence de taille disponible) → anomalie "taille à préciser" (§3), ligne comptée mais
-   signalée plutôt que devinée au hasard.
+3. **Taille provisionnée** : les futures recrues n'ont pas de taille connue. **Tranché
+   (§8.1)** : la taille **la plus fréquente** observée à l'étape A pour ce
+   `(aff, Type_Article, T)` parmi les employés réels actuels de ce profil sur ce
+   territoire. Si aucun employé réel actuel de ce profil sur ce territoire n'existe (pas
+   de référence de taille disponible) → anomalie "taille à préciser" (§3), ligne comptée
+   mais signalée plutôt que devinée au hasard.
 4. Ajouter `Quantite_Annuelle_Ligne × Delta` à l'accumulateur `(Type_Article, Taille, T)`.
 
 ### Étape C — Territoire et marge de sécurité (D1 + D5)
@@ -434,7 +438,7 @@ concerne que les POST, ne protège jamais un GET.
 
 | Endpoint | Protection | Contenu |
 |---|---|---|
-| `?consultations_epi=1` | `requireGarant` (jeton `&token=`) — recommandé par cohérence avec le reste du module, voir question §8.6 | En-têtes des consultations |
+| `?consultations_epi=1` | `requireGarant` (jeton `&token=`) — tranché (§8.6), cohérence avec le reste du module | En-têtes des consultations |
 | `?consultation_epi_detail=1&id=...` | `requireGarant` (jeton `&token=`) | Lignes de besoin + effectif prévisionnel + fournisseurs invités + offres d'**une** consultation (contient les prix) |
 | `?fournisseurs_epi=1` | Public, comme `?catalogue_epi=1` | Répertoire fournisseurs (aucune donnée sensible) |
 
@@ -458,13 +462,16 @@ commande"** (ne modifie ni ne réordonne les sous-onglets actuels) :
    catalogue" (D8, action finale, distincte de l'arbitrage ligne à ligne pour rester
    réversible jusqu'au dernier moment).
 
-**Droits** : `peutGererEPI`/`peutVoirEPI` existent déjà mais n'ont jamais porté de données
-tarifaires — voir question ouverte §8.3 sur une capacité dédiée. Dans tous les cas,
-**Encadrement (`peutVoirEPI` view-only)** : accès lecture seule proposé sur "Consultations"
-et "Besoin" (quantités uniquement) ; **"Fournisseurs & Offres" et "Arbitrage" (prix)
-resteraient masqués même en lecture seule**, sur le modèle de `peutGererBrasseurs`
-(`dashboard.html:1207-1217`, qui n'a délibérément **aucune** variante "voir" pour
-Encadrement, les prix y étant protégés `requireGarant` — voir question §8.4).
+**Droits — tranché (§8.3, §8.4)** : `peutGererEPI`/`peutVoirEPI` existent déjà mais n'ont
+jamais porté de données tarifaires — nouvelle capacité dédiée `peutGererBesoinEPI` (même
+population : Admin, Logistique, Logistique_Mayotte), distincte de `peutGererEPI`.
+**Encadrement (`peutVoirBesoinEPI`, view-only)** garde un accès lecture seule sur
+"Consultations" et "Besoin" (quantités uniquement) ; **"Fournisseurs & Offres" et
+"Arbitrage" (prix) restent masqués même en lecture seule** pour Encadrement — seule
+nuance par rapport à `peutGererBrasseurs` (`dashboard.html:1207-1217`, qui n'a
+**aucune** variante "voir" du tout), justifiée ici par le fait que le besoin en
+quantités seul (sans prix) reste une information utile à la RH/aux services support,
+alors que Brasseurs n'a pas cette distinction quantité/prix dans son périmètre.
 
 ---
 
@@ -484,32 +491,38 @@ ne pas confondre avec les tests eux-mêmes) et un livrable vérifiable concret.
 
 ---
 
-## 8. Questions ouvertes (réponse oui/non)
+## 8. Décisions prises en session (état après réponses de William)
 
-1. **Taille des entrées prévisionnelles** : provisionner le besoin des entrées prévues
-   (D3, sans identité donc sans taille connue) sur la taille **la plus fréquente**
-   actuellement observée pour ce profil/territoire, plutôt qu'une distribution
-   proportionnelle plus complexe (§2 étape B.3) — d'accord ?
-2. **Sorties prévisionnelles nettes** : un solde net de départs sur une ligne d'effectif
-   prévisionnel (plus de sorties que d'entrées) ne retire **jamais** de besoin déjà
-   couvert par les employés réellement en poste aujourd'hui — le delta est alors plafonné
-   à 0, jamais négatif (§2 étape B.1) — d'accord ?
-3. **Nouvelle capacité `peutGererBesoinEPI`** (même population qu'aujourd'hui : Admin,
-   Logistique, Logistique_Mayotte) plutôt que de réutiliser `peutGererEPI` tel quel, pour
-   garder ce module tarifaire distinct de la gestion EPI courante (qui ne porte aujourd'hui
-   aucun prix) — d'accord ? *(Sinon : réutilisation directe de `peutGererEPI`/`peutVoirEPI`.)*
-4. **Encadrement** garde un accès lecture seule aux onglets Consultations/Besoin
-   (quantités uniquement, jamais les prix) — d'accord ? *(Sinon : aucun accès Encadrement
-   à ce module, sur le modèle strict de Brasseurs d'air.)*
-5. **Report au catalogue** (D8) : écrit uniquement `Reference` et `Fournisseur` sur
-   `Catalogue_Articles_EPI` — le prix retenu reste seulement dans la consultation
-   (`Lignes_Consultation_EPI.Prix_Retenu_HT`), **aucun prix stocké de façon permanente sur
-   le catalogue** (qui n'a aujourd'hui aucune colonne prix) — d'accord ? *(Sinon : ajouter
-   une colonne prix sur `Catalogue_Articles_EPI`, avec les implications de maintenance que
-   cela suppose à chaque nouvelle consultation.)*
-6. **Lectures GET du besoin** (quantités, hors offres/prix) protégées `requireGarant`
-   comme le reste du module, plutôt que publiques comme `?catalogue_epi=1`/
-   `?grille_dotation_epi=1` aujourd'hui (§5) — d'accord ?
+*Les 6 questions posées ont toutes été tranchées en faveur de l'option recommandée.*
+
+1. **Taille des entrées prévisionnelles → tranché : la plus fréquente.** Le besoin des
+   entrées prévues (D3, sans identité donc sans taille connue) est provisionné sur la
+   taille **la plus fréquente** actuellement observée pour ce profil/territoire (§2 étape
+   B.3), plutôt qu'une distribution proportionnelle (plus fidèle mais plus complexe) ou
+   qu'un renvoi systématique en anomalie "à préciser" (ce dernier cas reste le
+   comportement de repli quand aucun employé réel de ce profil/territoire n'existe pour
+   servir de référence).
+2. **Sorties prévisionnelles nettes → tranché : plafonné à 0.** Un solde net de départs
+   sur une ligne d'effectif prévisionnel ne retire **jamais** de besoin déjà couvert par
+   les employés réellement en poste aujourd'hui (§2 étape B.1) — seul un solde net positif
+   (plus d'entrées que de sorties) ajoute du volume.
+3. **Droits → tranché : nouvelle capacité `peutGererBesoinEPI`** (même population
+   qu'aujourd'hui : Admin, Logistique, Logistique_Mayotte), distincte de `peutGererEPI`,
+   pour garder ce module tarifaire séparé de la gestion EPI courante (qui ne porte
+   aujourd'hui aucun prix) — voir §6.
+4. **Encadrement → tranché : accès lecture seule maintenu**, sur les onglets
+   Consultations/Besoin uniquement (quantités, jamais les prix) — nouvelle fonction
+   `peutVoirBesoinEPI`, voir §6.
+5. **Report au catalogue (D8) → tranché : aucun prix stocké sur le catalogue.**
+   `reporter_arbitrage_catalogue_epi` écrit uniquement `Reference` et `Fournisseur` sur
+   `Catalogue_Articles_EPI` (§5) — le prix retenu reste seulement dans la consultation
+   (`Lignes_Consultation_EPI.Prix_Retenu_HT`). `Catalogue_Articles_EPI` ne gagne donc
+   **aucune** nouvelle colonne dans ce cadrage.
+6. **Lectures GET du besoin → tranché : protégées `requireGarant`.** Cohérence retenue :
+   tout le module reste derrière le même niveau de protection que les offres/prix, y
+   compris les lignes de besoin seules (elles révèlent des effectifs prévisionnels par
+   affectation/site, une donnée RH-adjacente) — contrairement à `?catalogue_epi=1`/
+   `?grille_dotation_epi=1`, qui restent publics et non concernés par ce cadrage (§5).
 
 ---
 
@@ -523,5 +536,5 @@ ne pas confondre avec les tests eux-mêmes) et un livrable vérifiable concret.
   documenté, environnement de recette non documenté, tests non recensés, incohérence
   commentaire/code sur `Site`) — signalés pour mémoire, à traiter dans une session dédiée
   si William le souhaite.
-- Pas de valorisation monétaire permanente du catalogue EPI (voir question §8.5) — cohérent
+- Pas de valorisation monétaire permanente du catalogue EPI (tranché §8.5) — cohérent
   avec l'absence de prix dans `Catalogue_Articles_EPI` aujourd'hui.
